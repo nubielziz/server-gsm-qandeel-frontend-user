@@ -14,6 +14,20 @@ Rules: `CLAUDE.md`. Images to add: `docs/IMAGE-PROMPTS.md`.
 | M5 | Customer account (overview, orders, settings, privacy requests) and support tickets (new, conversation, rating) | done (2026-11-09, `6bee86a`) |
 | M6 | Merchant portal: dashboard, catalog + ordering, orders, wallet, top-ups, invoices (`230b7b3`); settings, security/2FA/sessions, notifications, KYC, API keys, webhooks, referrals (`5e0a8d2`) | done (2026-11-09) |
 
+## Wiring (changed 2026-11-09, late evening, at the owner's request)
+- **Dev site (`npm run dev`, :5175) → the owner's main API (:3000).** `.env.development.local`: `GSM_API_ORIGIN=http://localhost:3000`.
+  Its data is the owner's real dev DB (`gsm`): almost empty (1 currency, 0 services, 0 gateways), so the shop shows
+  empty states until staff add services in the console.
+- `backend/.env` (owner's file) got 3 lines: `CORS_ORIGINS` (console origins + :5175), `PORTAL_BASE_URL=http://localhost:5175/merchant`,
+  `STORE_BASE_URL=http://localhost:5175`. The main API and worker were restarted detached with the owner's usual
+  commands (`bun --watch src/main.ts`, `bun --watch src/worker.ts`); logs and PIDs in `/tmp/gsm-main-backend/`.
+- **Production build / e2e (`npm start`, :5176) → the isolated demo API (:3100)** via `.env.production.local`
+  (the e2e suite needs the demo data). Start it with `scripts/dev-backend.sh start`.
+- Merchant `progammerabood@gmail.com` (main DB, id 2) has the password chosen by the owner (set with the backend's own
+  policy check and argon2 hasher; verified by signing in through the site).
+- Mail on the main API is still Resend in test mode: it delivers only to the Resend account's own address
+  (`550` for everyone else). Owner to choose: verify a domain at Resend, or `MAIL_SMTP_URL=smtp://localhost:1025` (Mailpit).
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.
