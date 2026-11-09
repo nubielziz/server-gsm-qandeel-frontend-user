@@ -1,0 +1,63 @@
+# GSM storefront: rules for every session and agent
+
+@AGENTS.md
+
+This is the public website (merchants + customers) of the GSM project. The plan and the backend facts are in
+`/home/saifi/gsm-project/STOREFRONT-HANDOFF.md` (cite its § numbers); status is in `PROGRESS.md`.
+Next.js 16.4 differs from your training data: read the matching guide in `node_modules/next/dist/docs/` before writing
+Next code (caching = `01-app/01-getting-started/08-caching.md`, `use cache`, `next/root-params`, `proxy.ts`).
+
+## Owner's rules (handoff §1.6)
+- Code, comments, docs and commit messages in English. The owner writes short Jordanian Arabic: answer the same way.
+- Never push, force-push, `--no-verify` or rewrite history. Stage explicit paths (never `git add -A`). Only the lead
+  session commits; agents never change git state or spawn agents.
+- Conventional commits ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- At most 4 agents at once. Do not edit `backend/` or `frontend-admin/`; do not change `backend/.env`.
+- No new dependency without the lead's approval (approved: lucide-react, markdown-it; dev: vitest, @playwright/test).
+- **Images:** never draw SVG artwork or illustrations for site images. Image slots are files in `public/images/`
+  listed with generation prompts in `docs/IMAGE-PROMPTS.md`; render them with `siteImage('<file>')`
+  (`lib/site-images.ts`), which returns null until the owner adds the file: show a plain placeholder surface then.
+  UI icons come from `lucide-react` only.
+
+## Commands
+`npm run dev` (http://localhost:5175) · `npm run typecheck` · `npm run lint` · `npm run test` (Vitest) ·
+`npm run build` · `npm run e2e` (Playwright) · `npm run gen:api` (types from the backend OpenAPI) · `npm run check`.
+Dev API: `.env.development.local` sets `GSM_API_ORIGIN`. `scripts/dev-backend.sh start|stop|status|reset` runs an
+isolated, demo-seeded backend on :3100 (own DB `gsm_storefront`, Redis DB 5, bucket `gsm-files-storefront`, mail to
+Mailpit http://localhost:8025); the owner's API on :3000 and its data are never touched.
+
+## Architecture
+- **Routes:** everything under `app/[lang]/` (`en`, `ar`; root layout `app/[lang]/layout.tsx` sets `lang`/`dir`).
+  `proxy.ts` redirects paths without a language (email links like `/sign-in?token=`, `/merchant/set-password?token=`).
+  Route groups: `(store)` public shop (+ support tickets), `(auth)` sign-in/up and email-link pages (including
+  `(auth)/merchant/{register,set-password,verify-email}`), `(checkout)` checkout, `account/` customer area,
+  `(portal)/merchant/` merchant portal. `/client/*` and `/store/v1/*` are rewritten to the API.
+  `proxy.ts` also redirects `/account…` and portal pages to sign-in when the surface's CSRF cookie is missing.
+- **Server Components by default.** `"use client"` only on interactive leaves (forms, toggles, drawers, menus).
+- **Data:**
+  - Shared store data → `lib/api/public.ts` (`'use cache'` + `cacheLife('catalog'|'content')`). Never personal data.
+  - Personal data → `lib/api/session.ts` (`getMerchant`, `getCustomer`, `requireMerchant`, `requireCustomer`) and
+    `apiSessionGet/List` (`lib/api/server.ts`). They read cookies: render the caller inside `<Suspense>`, never at
+    the top level of a layout, never inside `'use cache'`.
+  - Mutations, sign-in and anything that sets cookies → the browser client `api` (`lib/api/browser.ts`) from Client
+    Components, then `router.refresh()`. Never Server Actions for API calls (Set-Cookie would not reach the browser).
+  - Types: `lib/api/types.ts` (aliases of the generated `lib/api/schema.gen.ts`; JSDoc there = the API contract).
+  - Lists: `listQuery()` (`lib/api/query.ts`); totals from `x-total-count`; unknown query params → 422, send none.
+- **Language:** server code calls `getLocale()` / `getMessages(namespace)` (`lib/i18n/server.ts`); Client Components
+  get the strings they need as props. Messages: one `defineMessages({ en, ar })` namespace per area in
+  `lib/i18n/messages/<area>.ts` (TypeScript forces both languages to match). Arabic = clear Modern Standard Arabic.
+  Links: `localePath(locale, '/path')`. Never derive business rules from mockup placeholder text.
+- **Errors:** every failure is an `ApiError` (`lib/api/errors.ts`): translate with `useErrorText()` (client) by
+  `code` and per-field `code`; show `reference()` (request id) on error screens. Sign out rules: handoff §3.4.
+- **Money:** 4-decimal strings. Display with `formatMoney()`; sum with `sumMoney()`; never floats.
+- **Turnstile:** `components/turnstile.tsx` for the 6 store routes; reset after every submit (tokens are single-use).
+
+## UI rules
+- Build pages from `components/ui` (primitives) and `components/layout` (shells); no one-off copies of a primitive.
+  Design tokens live in `app/globals.css` (`@theme`); never hard-code colours, radii or shadows in pages.
+- Accessibility: real labels, `aria-describedby` for hints/errors, focus moves to the first error, keyboard support,
+  visible focus, touch targets ≥ 44 px, `aria-live` for async results.
+- RTL: logical utilities only (`ms-/me-/ps-/pe-/start-/end-/text-start`); mirror directional icons with
+  `rtl:-scale-x-100`.
+- Performance: small client components, `next/image` with explicit sizes, no layout shift (reserve space for
+  async content with skeletons of the same size).

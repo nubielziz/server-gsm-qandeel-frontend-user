@@ -1,0 +1,47 @@
+import { describe, expect, it } from "vitest";
+import { compareMoney, formatMoney, isValidImei, normalizeImei, subtractMoney, sumMoney } from "./index";
+
+describe("money math on 4-decimal strings", () => {
+  it("sums exactly where floats would drift", () => {
+    expect(sumMoney(["0.1000", "0.2000"])).toBe("0.3000");
+    expect(sumMoney(["12.4900", "7.5100", "-20.0000"])).toBe("0.0000");
+    expect(sumMoney([])).toBe("0.0000");
+  });
+  it("subtracts and compares", () => {
+    expect(subtractMoney("245.0000", "2.5000")).toBe("242.5000");
+    expect(subtractMoney("1.0000", "2.5000")).toBe("-1.5000");
+    expect(compareMoney("10.0000", "9.9999")).toBe(1);
+    expect(compareMoney("-1.0000", "0.0000")).toBe(-1);
+    expect(compareMoney("3.1000", "3.1")).toBe(0);
+  });
+  it("rejects non-money strings", () => {
+    expect(() => sumMoney(["12,49"])).toThrow();
+  });
+});
+
+describe("formatMoney", () => {
+  it("formats from the exact string with the currency's decimals", () => {
+    expect(formatMoney("12.4900", "USD", "en", 2)).toBe("$12.49");
+    expect(formatMoney("1234.5000", "USD", "en", 2)).toBe("$1,234.50");
+    expect(formatMoney("100.0000", "JOD", "en", 3)).toContain("100.000");
+  });
+  it("keeps Latin digits in Arabic", () => {
+    const text = formatMoney("12.4900", "USD", "ar", 2);
+    expect(text).toMatch(/12[.,٫]49/);
+    expect(text).not.toMatch(/[٠-٩]/);
+  });
+  it("falls back to plain text for an unknown currency code", () => {
+    expect(formatMoney("5.0000", "NOT-A-CODE", "en")).toBe("5.0000 NOT-A-CODE");
+  });
+});
+
+describe("IMEI helpers", () => {
+  it("normalizes like the API (spaces and dashes)", () => {
+    expect(normalizeImei("49-015420 323751 8")).toBe("490154203237518");
+  });
+  it("checks the Luhn digit", () => {
+    expect(isValidImei("490154203237518")).toBe(true);
+    expect(isValidImei("490154203237519")).toBe(false);
+    expect(isValidImei("49015420323751")).toBe(false);
+  });
+});
