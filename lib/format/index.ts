@@ -44,13 +44,28 @@ export function formatPercent(percent: string, locale: Locale, maxDigits = 2): s
   return `${nf(locale, { maximumFractionDigits: maxDigits }).format(percent as Intl.StringNumericLiteral)}%`;
 }
 
+/**
+ * Time zone used for every displayed date: the same on the server and in the browser, so rendering is deterministic
+ * (no hydration mismatch, no server-timezone leak). Default UTC (the API's own zone); set NEXT_PUBLIC_TIME_ZONE
+ * (e.g. "Asia/Amman") to show the business's local time instead.
+ */
+export const DISPLAY_TIME_ZONE = process.env.NEXT_PUBLIC_TIME_ZONE || "UTC";
+
 export function formatDate(iso: string, locale: Locale, options: Intl.DateTimeFormatOptions = { dateStyle: "medium" }): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : df(locale, options).format(d);
+  return Number.isNaN(d.getTime()) ? iso : df(locale, { timeZone: DISPLAY_TIME_ZONE, ...options }).format(d);
 }
 
+/** Date and time with the zone named ("Nov 9, 2026, 5:45 PM UTC"), so a time is never ambiguous. */
 export function formatDateTime(iso: string, locale: Locale): string {
-  return formatDate(iso, locale, { dateStyle: "medium", timeStyle: "short" });
+  return formatDate(iso, locale, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
 }
 
 // ── Exact money math on 4-decimal strings (BigInt of ten-thousandths).

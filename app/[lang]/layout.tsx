@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import { LOCALES, dirOf, isLocale } from "@/lib/i18n/config";
 import { errors } from "@/lib/i18n/messages/errors";
 import { ErrorTextProvider } from "@/lib/i18n/error-text";
+import { siteImage } from "@/lib/site-images";
 import "../globals.css";
 
 const inter = Inter({
@@ -32,12 +33,26 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: LayoutProps<"/[lang]">): Promise<Metadata> {
   const { lang } = await params;
   const ar = lang === "ar";
+  const title = ar ? "GSM Store — سوق الخدمات الرقمية" : "GSM Store — Digital Services Marketplace";
+  const description = ar
+    ? "فحص IMEI، فك الشبكات، تفعيل الأدوات والرصيد الرقمي لمحترفي صيانة الهواتف وعملائهم."
+    : "IMEI checks, unlocks, tool activations and digital credits for GSM professionals and their customers.";
+  // The owner's share image (docs/IMAGE-PROMPTS.md); left out until the file exists.
+  const ogImage = siteImage("og-default.jpg");
   return {
-    title: { default: ar ? "GSM Store — سوق الخدمات الرقمية" : "GSM Store — Digital Services Marketplace", template: "%s · GSM Store" },
-    description: ar
-      ? "فحص IMEI، فك الشبكات، تفعيل الأدوات والرصيد الرقمي لمحترفي صيانة الهواتف وعملائهم."
-      : "IMEI checks, unlocks, tool activations and digital credits for GSM professionals and their customers.",
+    // Absolute URLs for social cards and alternates. Set NEXT_PUBLIC_SITE_URL in production (https://<site>).
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:5175"),
+    title: { default: title, template: "%s · GSM Store" },
+    description,
     alternates: { languages: { en: "/en", ar: "/ar" } },
+    openGraph: {
+      siteName: "GSM Store",
+      locale: ar ? "ar_JO" : "en_US",
+      type: "website",
+      title,
+      description,
+      images: ogImage ? [{ url: ogImage, width: 1200, height: 630 }] : undefined,
+    },
   };
 }
 

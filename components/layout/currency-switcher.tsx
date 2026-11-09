@@ -36,9 +36,12 @@ export function CurrencySwitcher({ currencies, current, label, className }: Curr
     <div className={cn("relative inline-flex items-center", className)}>
       <Coins aria-hidden="true" className="pointer-events-none absolute start-2.5 size-4 text-ink-subtle" />
       <select
+        // Uncontrolled + keyed on the server value: the new choice stays visible while the refresh runs, and the
+        // select resets to whatever the server renders next.
+        key={current}
         aria-label={label}
         aria-busy={pending || undefined}
-        value={current}
+        defaultValue={current}
         onChange={onChange}
         className="h-11 appearance-none rounded-control bg-transparent ps-8 pe-7 text-body font-semibold text-ink transition-colors hover:bg-surface-sunken disabled:opacity-60"
       >

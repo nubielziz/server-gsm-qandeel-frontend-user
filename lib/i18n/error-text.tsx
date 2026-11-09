@@ -33,6 +33,9 @@ export function useErrorText(): ErrorText {
 export function errorText(t: ErrorMessages): ErrorText {
   const codes = t.codes as Record<string, string>;
   const fieldTexts = t.fields as Record<string, string>;
+  // Field codes come in both cases from the API (`INVALID_IMEI` as a problem code, `invalid_imei` on a field).
+  const fieldText = (code: string) =>
+    fieldTexts[code] ?? fieldTexts[code.toLowerCase()] ?? fieldTexts[code.toUpperCase()] ?? fieldTexts.fallback;
   return {
     message(error) {
       if (!isApiError(error)) return codes.fallback;
@@ -42,12 +45,12 @@ export function errorText(t: ErrorMessages): ErrorText {
     },
     field(error) {
       if (!error) return undefined;
-      return fieldTexts[error.code] ?? fieldTexts.fallback;
+      return fieldText(error.code);
     },
     fields(error) {
       const out: Record<string, string> = {};
       if (!isApiError(error)) return out;
-      for (const fe of (error as ApiError).fieldErrors) out[fe.field] ??= fieldTexts[fe.code] ?? fieldTexts.fallback;
+      for (const fe of (error as ApiError).fieldErrors) out[fe.field] ??= fieldText(fe.code);
       return out;
     },
     reference(error) {

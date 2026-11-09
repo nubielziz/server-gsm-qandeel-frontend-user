@@ -19,6 +19,7 @@ other brands, no watermarks. Photographic or high-quality 3D render.
 | `service-remote.jpg` | 1200 × 900 | Art for remote / tool-activation services |
 | `service-file.jpg` | 1200 × 900 | Art for file services (firmware, unlock files) |
 | `og-default.jpg` | 1200 × 630 | Preview image when a page is shared on social media |
+| `app/favicon.ico` (replace the file; NOT in public/images) | 48 × 48 ICO | Browser tab icon (today it is the Next.js scaffold's icon). Make it from `logo-mark.png` |
 | `brands/<brand>.png` (optional) | 480 × 240, transparent | Brand logo on service cards. `<brand>` = the brand name lower-cased, spaces → `-` (e.g. `apple.png`, `samsung.png`). Only add logos you have the right to use |
 
 ## Prompts

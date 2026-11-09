@@ -67,7 +67,7 @@ async function MerchantFrame({ children }: { children: React.ReactNode }) {
     ? [{ href: p("/merchant"), label: t.merchantNav.overview, icon: <LayoutDashboard aria-hidden="true" className={icon} />, match: "exact" }]
     : [
         { href: p("/merchant"), label: t.merchantNav.overview, icon: <LayoutDashboard aria-hidden="true" className={icon} />, match: "exact" },
-        { href: p("/merchant/services"), label: t.merchantNav.services, icon: <PlusCircle aria-hidden="true" className={icon} /> },
+        { href: p("/merchant/services"), label: t.merchantNav.services, title: t.servicesTitle, icon: <PlusCircle aria-hidden="true" className={icon} /> },
         { href: p("/merchant/orders"), label: t.merchantNav.orders, icon: <ClipboardList aria-hidden="true" className={icon} /> },
         { href: p("/merchant/wallet"), label: t.merchantNav.wallet, icon: <Wallet aria-hidden="true" className={icon} /> },
         { href: p("/merchant/invoices"), label: t.merchantNav.invoices, icon: <ReceiptText aria-hidden="true" className={icon} /> },
