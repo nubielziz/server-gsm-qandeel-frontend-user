@@ -1,0 +1,181 @@
+// Opening a checkout: `/checkout?service=<slug>`. The page shell is static; the service (priced in the visitor's currency),
+// the signed-in customer and the URL all stream in behind one <Suspense> with a same-size skeleton.
+import { Suspense } from "react";
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { PackageSearch, TriangleAlert } from "lucide-react";
+import { Container, PageHeader } from "@/components/layout/container";
+import { Alert } from "@/components/ui/alert";
+import { ButtonLink } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CheckoutForm } from "@/components/checkout/checkout-form";
+import { resolveService } from "@/components/store/resolve-service";
+import { firstParam, type SearchParams } from "@/components/store/search-params";
+import { ServiceArt } from "@/components/store/service-art";
+import { getStoreConfig } from "@/lib/api/public";
+import { getCustomer } from "@/lib/api/session";
+import { countryOptions } from "@/lib/countries";
+import { getCurrency } from "@/lib/currency";
+import { localePath } from "@/lib/i18n/config";
+import { fmt } from "@/lib/i18n/define";
+import { checkout } from "@/lib/i18n/messages/checkout";
+import { common } from "@/lib/i18n/messages/common";
+import { getLocale, getMessages } from "@/lib/i18n/server";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getMessages(checkout);
+  return { title: t.meta.start, robots: { index: false, follow: false } };
+}
+
+export default async function CheckoutPage(props: PageProps<"/[lang]/checkout">) {
+  const t = await getMessages(checkout);
+  return (
+    <Container width="wide" className="py-8 lg:py-10">
+      <PageHeader title={t.start.title} description={t.start.description} />
+      <div className="mt-6">
+        <Suspense fallback={<CheckoutSkeleton />}>
+          <CheckoutContent searchParams={props.searchParams} />
+        </Suspense>
+      </div>
+    </Container>
+  );
+}
+
+const UTM_KEYS = ["source", "medium", "campaign", "term", "content"] as const;
+
+async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const [params, locale, t, c] = await Promise.all([searchParams, getLocale(), getMessages(checkout), getMessages(common)]);
+  const slug = firstParam(params.service, 200);
+  const p = (path: string) => localePath(locale, path);
+  const nextPath = `${p("/checkout")}?service=${encodeURIComponent(slug)}`;
+  const signInHref = `${p("/sign-in")}?as=customer&next=${encodeURIComponent(nextPath)}`;
+
+  if (!slug) {
+    return (
+      <Card>
+        <EmptyState
+          icon={<PackageSearch aria-hidden="true" />}
+          title={t.start.missingTitle}
+          description={t.start.missingText}
+          action={<ButtonLink href={p("/services")}>{t.start.missingAction}</ButtonLink>}
+        />
+      </Card>
+    );
+  }
+
+  const [currency, config, customer] = await Promise.all([getCurrency(), getStoreConfig(), getCustomer()]);
+  const resolved = await resolveService(slug, locale, currency.code);
+
+  if (resolved.kind === "redirect") {
+    redirect(`${p("/checkout")}?service=${encodeURIComponent(resolved.slug)}`);
+  }
+  if (resolved.kind === "missing") {
+    return (
+      <Card>
+        <EmptyState
+          icon={<PackageSearch aria-hidden="true" />}
+          title={t.start.notFoundTitle}
+          description={t.start.notFoundText}
+          action={<ButtonLink href={p("/services")}>{t.start.missingAction}</ButtonLink>}
+        />
+      </Card>
+    );
+  }
+  if (resolved.kind === "other-language") {
+    const language = c.languageNames[resolved.locale];
+    return (
+      <Card>
+        <EmptyState
+          icon={<PackageSearch aria-hidden="true" />}
+          title={t.start.otherLanguageTitle}
+          description={fmt(t.start.otherLanguageText, { language })}
+          action={
+            <ButtonLink href={`${localePath(resolved.locale, "/checkout")}?service=${encodeURIComponent(resolved.slug)}`}>
+              {fmt(t.start.otherLanguageAction, { language })}
+            </ButtonLink>
+          }
+        />
+      </Card>
+    );
+  }
+
+  const { service } = resolved;
+
+  if (service.type === "file") {
+    return (
+      <Alert
+        tone="warning"
+        icon={<TriangleAlert aria-hidden="true" />}
+        title={t.start.fileTitle}
+        action={
+          <ButtonLink href={p("/support")} variant="secondary" size="sm">
+            {t.start.fileAction}
+          </ButtonLink>
+        }
+      >
+        {t.start.fileText}
+      </Alert>
+    );
+  }
+
+  // Guest checkout switched off: only a signed-in customer can open a checkout.
+  if (!config.policies.guestCheckout && !customer) {
+    return (
+      <Card>
+        <EmptyState
+          title={t.start.signInTitle}
+          description={t.start.signInText}
+          action={<ButtonLink href={signInHref}>{t.start.signInAction}</ButtonLink>}
+        />
+      </Card>
+    );
+  }
+
+  const utm: Record<string, string> = {};
+  for (const key of UTM_KEYS) {
+    const value = firstParam(params[`utm_${key}`], 100);
+    if (value) utm[key] = value;
+  }
+
+  return (
+    <CheckoutForm
+      locale={locale}
+      labels={t.start}
+      typeLabel={c.serviceType[service.type]}
+      service={{
+        id: service.id,
+        slug: service.slug,
+        title: service.title,
+        deliveryTime: service.deliveryTime,
+        isImei: service.type === "imei",
+        quantity: service.quantity,
+        fields: service.fields,
+        price: service.price,
+      }}
+      art={<ServiceArt type={service.type} sizes="96px" aspect="1 / 1" />}
+      currencies={config.currencies}
+      currency={currency.code}
+      taxRates={config.taxRates}
+      countries={countryOptions(locale)}
+      customer={customer ? { email: customer.email, country: customer.country } : null}
+      signInHref={signInHref}
+      supportHref={p("/support")}
+      utm={utm}
+    />
+  );
+}
+
+/** Same layout as the form: two cards on the left, the summary on the right. */
+function CheckoutSkeleton() {
+  return (
+    <div aria-busy="true" aria-hidden="true" className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
+      <div className="grid gap-6">
+        <Skeleton className="h-[15.5rem] rounded-card" />
+        <Skeleton className="h-[30rem] rounded-card sm:h-[24rem]" />
+      </div>
+      <Skeleton className="h-[31rem] rounded-card" />
+    </div>
+  );
+}
