@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 // Where the GSM API listens. The browser never calls it directly: `/client/*` and `/store/v1/*` are proxied here,
@@ -20,6 +21,8 @@ const nextConfig: NextConfig = {
   },
   poweredByHeader: false,
   turbopack: {
+    // This app is its own root (an empty package-lock.json sits in the parent workspace folder).
+    root: path.join(__dirname),
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],

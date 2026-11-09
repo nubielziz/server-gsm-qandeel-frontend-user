@@ -1,6 +1,6 @@
 // Routing layer: language redirects (email links must keep working), optimistic sign-in redirects and the API
 // rewrites. HTTP-level checks, no UI.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test.describe("language routing", () => {
   test("a path without a language goes to the visitor's language and keeps the query", async ({ request }) => {

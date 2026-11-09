@@ -4,8 +4,9 @@
 // streams behind <Suspense>; a reply calls `router.refresh()` to re-read it.
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { apiPublicGet } from "@/lib/api/server";
+import { apiSessionGet } from "@/lib/api/server";
 import { isApiError } from "@/lib/api/errors";
+import { BusyState } from "@/components/ui/busy-state";
 import type { Ticket } from "@/lib/api/types";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { localePath } from "@/lib/i18n/config";
@@ -46,8 +47,11 @@ async function TicketContent({ params }: { params: PageProps<"/[lang]/support/ti
   const [{ token }, locale, t, c] = await Promise.all([params, getLocale(), getMessages(support), getMessages(common)]);
   let ticket: Ticket;
   try {
-    ticket = await apiPublicGet<Ticket>(`/store/v1/tickets/${encodeURIComponent(token)}`);
+    ticket = await apiSessionGet<Ticket>(`/store/v1/tickets/${encodeURIComponent(token)}`);
   } catch (error) {
+    if (isApiError(error) && error.status === 429) {
+      return <BusyState error={error} retryHref={localePath(locale, `/support/tickets/${encodeURIComponent(token)}`)} />;
+    }
     // A wrong or cut-off token: 404 (a token of the wrong length can answer 422). Everything else is a real failure.
     if (isApiError(error) && (error.status === 404 || error.status === 422)) {
       return (

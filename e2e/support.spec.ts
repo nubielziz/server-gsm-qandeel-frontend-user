@@ -2,7 +2,8 @@
 // 404. Staff answers come from the admin API of the isolated backend (the seeded Support agent), because the customer
 // side cannot create them. Throwaway emails keep the "3 tickets per hour per email" limit away from the demo customers.
 import { createHmac } from "node:crypto";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { type Page } from "@playwright/test";
 import { ACCOUNTS, signInCustomer } from "./helpers";
 
 const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
@@ -51,7 +52,9 @@ function totp(secret: string): string {
   return String(code).padStart(6, "0");
 }
 async function staff(page: Page) {
-  const headers = { "Content-Type": "application/json", Origin: "http://localhost:5175" };
+  // Staff calls go straight to the API as this machine (the seeded admin IP allow-list is localhost); they must not
+  // carry the per-test client IP the fixture adds (e2e/fixtures.ts).
+  const headers = { "Content-Type": "application/json", Origin: "http://localhost:5175", "X-Forwarded-For": "127.0.0.1" };
   const login = await page.request.post(`${API_ORIGIN}/admin/auth/login`, {
     headers,
     data: { email: "lina@gsm-supply.example", password: "demo-password" },
@@ -59,10 +62,17 @@ async function staff(page: Page) {
   expect(login.status(), await login.text()).toBe(200);
   const pending = login.headers()["x-csrf-token"];
   const cookie1 = login.headersArray().filter((h) => h.name.toLowerCase() === "set-cookie").map((h) => h.value.split(";")[0]).join("; ");
-  const second = await page.request.post(`${API_ORIGIN}/admin/auth/2fa`, {
-    headers: { ...headers, Cookie: cookie1, "X-CSRF-Token": pending },
-    data: { code: totp("KMG4IZYMUXD3VSCZ6VRP5TRPN3VCYBEW") },
-  });
+  // A TOTP code works once: if another run just used this window's code, wait for the next window and retry.
+  const twofa = () =>
+    page.request.post(`${API_ORIGIN}/admin/auth/2fa`, {
+      headers: { ...headers, Cookie: cookie1, "X-CSRF-Token": pending },
+      data: { code: totp("KMG4IZYMUXD3VSCZ6VRP5TRPN3VCYBEW") },
+    });
+  let second = await twofa();
+  if (second.status() === 422) {
+    await page.waitForTimeout((30 - (Math.floor(Date.now() / 1000) % 30) + 1) * 1000);
+    second = await twofa();
+  }
   expect(second.status(), await second.text()).toBe(204);
   const cookie = second.headersArray().filter((h) => h.name.toLowerCase() === "set-cookie").map((h) => h.value.split(";")[0]).join("; ");
   const auth = { ...headers, Cookie: cookie, "X-CSRF-Token": second.headers()["x-csrf-token"] };

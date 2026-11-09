@@ -1,7 +1,8 @@
 // The customer area against the isolated demo backend. Read-only checks use the demo customer (Daniel, 4 orders). Anything
 // that changes data (preferences, password, privacy requests) runs on a throwaway customer created through the email link,
 // so the shared demo accounts stay as every other test expects them.
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { type Page } from "@playwright/test";
 import { ACCOUNTS, signInCustomer } from "./helpers";
 
 const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";

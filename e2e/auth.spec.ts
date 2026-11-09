@@ -2,7 +2,8 @@
 // Rules this file keeps (rate limits are real, handoff §3.9): wrong passwords only with throwaway emails, the shared demo
 // accounts are never changed (passwords, settings): lifecycle tests create their own customer / merchant.
 import { createHmac } from "node:crypto";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { type Page } from "@playwright/test";
 import { ACCOUNTS } from "./helpers";
 
 const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
@@ -37,7 +38,9 @@ function totp(secret: string, offsetMs = 0): string {
   return String(code).padStart(6, "0");
 }
 async function ownerSession(page: Page) {
-  const headers = { "Content-Type": "application/json", Origin: "http://localhost:5175" };
+  // Staff calls go straight to the API as this machine (the seeded admin IP allow-list is localhost); they must not
+  // carry the per-test client IP the fixture adds (e2e/fixtures.ts).
+  const headers = { "Content-Type": "application/json", Origin: "http://localhost:5175", "X-Forwarded-For": "127.0.0.1" };
   const cookiesOf = (res: Awaited<ReturnType<Page["request"]["post"]>>) =>
     res.headersArray().filter((h) => h.name.toLowerCase() === "set-cookie").map((h) => h.value.split(";")[0]).join("; ");
   const login = await page.request.post(`${API_ORIGIN}/admin/auth/login`, {
@@ -45,10 +48,17 @@ async function ownerSession(page: Page) {
     data: { email: "rami@gsm-supply.example", password: "demo-password" },
   });
   expect(login.status(), await login.text()).toBe(200);
-  const second = await page.request.post(`${API_ORIGIN}/admin/auth/2fa`, {
-    headers: { ...headers, Cookie: cookiesOf(login), "X-CSRF-Token": login.headers()["x-csrf-token"] },
-    data: { code: totp("4DP3DBKM62TVFPNM5QE6OO4P6STUYM3J") },
-  });
+  // A TOTP code works once: if another run just used this window's code, wait for the next window and retry.
+  const twofa = () =>
+    page.request.post(`${API_ORIGIN}/admin/auth/2fa`, {
+      headers: { ...headers, Cookie: cookiesOf(login), "X-CSRF-Token": login.headers()["x-csrf-token"] },
+      data: { code: totp("4DP3DBKM62TVFPNM5QE6OO4P6STUYM3J") },
+    });
+  let second = await twofa();
+  if (second.status() === 422) {
+    await page.waitForTimeout((30 - (Math.floor(Date.now() / 1000) % 30) + 1) * 1000);
+    second = await twofa();
+  }
   expect(second.status(), await second.text()).toBe(204);
   return { ...headers, Cookie: cookiesOf(second), "X-CSRF-Token": second.headers()["x-csrf-token"] };
 }

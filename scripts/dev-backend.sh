@@ -19,6 +19,9 @@ export S3_BUCKET=gsm-files-storefront
 export CORS_ORIGINS=http://localhost:5175,http://127.0.0.1:5175,http://localhost:5176
 export STORE_BASE_URL=http://localhost:5175
 export PORTAL_BASE_URL=http://localhost:5175/merchant
+# The site (Next, on this machine) is a trusted proxy: the API takes the visitor's IP from X-Forwarded-For, as in
+# production behind a reverse proxy (handoff §3.9). E2E tests send one IP per test so rate limits do not pile up.
+export TRUST_PROXY=loopback
 # Every mail goes to Mailpit (http://localhost:8025), never to Resend.
 export MAIL_SMTP_URL=smtp://localhost:1025
 
@@ -26,8 +29,13 @@ export MAIL_SMTP_URL=smtp://localhost:1025
 S3_USER="${S3_ACCESS_KEY_ID:-gsm-minio}"
 S3_PASS="${S3_SECRET_ACCESS_KEY:-gsm-minio-secret}"
 
-pid_of() { cat "$LOG_DIR/$1.pid" 2>/dev/null || true; }
-alive() { local p; p=$(pid_of "$1"); [[ -n "$p" ]] && kill -0 "$p" 2>/dev/null; }
+# The real process of each part is whoever listens on its port (PID files can go stale).
+port_of() { [[ "$1" == api ]] && echo 3100 || echo 9465; }
+pid_of() { ss -ltnp 2>/dev/null | grep -E ":$(port_of "$1")\s" | grep -oE "pid=[0-9]+" | head -1 | cut -d= -f2; }
+alive() { [[ -n "$(pid_of "$1")" ]]; }
+launch() { # launch <name> <entry file>: detached, and the PID written by the process itself (exec keeps it)
+  (cd "$BACKEND_DIR" && setsid nohup bash -c 'echo $$ > "$0"; exec bun "$1"' "$LOG_DIR/$1.pid" "$2" >"$LOG_DIR/$1.log" 2>&1 &)
+}
 
 case "${1:-status}" in
   bucket)
@@ -40,8 +48,8 @@ case "${1:-status}" in
     (cd "$BACKEND_DIR" && bun run db:reset --seed)
     ;;
   start)
-    alive api || { (cd "$BACKEND_DIR" && setsid nohup bun src/main.ts >"$LOG_DIR/api.log" 2>&1 & echo $! >"$LOG_DIR/api.pid"); }
-    alive worker || { (cd "$BACKEND_DIR" && setsid nohup bun src/worker.ts >"$LOG_DIR/worker.log" 2>&1 & echo $! >"$LOG_DIR/worker.pid"); }
+    alive api || launch api src/main.ts
+    alive worker || launch worker src/worker.ts
     for _ in $(seq 1 60); do
       [[ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3100/health)" == "200" ]] && { echo "API up on :3100 (logs: $LOG_DIR)"; exit 0; }
       sleep 1
@@ -51,6 +59,7 @@ case "${1:-status}" in
   stop)
     for name in api worker; do
       if alive "$name"; then kill "$(pid_of "$name")" && echo "stopped $name"; fi
+      for _ in $(seq 1 20); do alive "$name" || break; sleep 0.5; done
       rm -f "$LOG_DIR/$name.pid"
     done
     ;;

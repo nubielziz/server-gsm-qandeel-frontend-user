@@ -4,7 +4,8 @@
 //   one webhook that is deleted). Password, 2FA and KYC run on a freshly registered (pending) merchant.
 // - Mutating integration tests (API keys, webhooks) run on the desktop project only.
 import { createHmac } from "node:crypto";
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { type APIRequestContext } from "@playwright/test";
 import { ACCOUNTS, BASE_URL, signInMerchant } from "./helpers";
 
 // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────────────

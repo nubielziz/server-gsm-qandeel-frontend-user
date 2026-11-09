@@ -6,6 +6,7 @@
 // Mutations and sign-in run in the browser through the same-origin rewrite (lib/api/browser.ts), never here:
 // a Set-Cookie answered to the server would never reach the browser.
 import { cookies, headers } from "next/headers";
+import { connection } from "next/server";
 import { ApiError, networkError, parseProblem } from "./errors";
 import { toQueryString, type QueryInput } from "./query";
 
@@ -16,6 +17,8 @@ type Init = { query?: QueryInput; signal?: AbortSignal };
 async function call(path: string, init: Init & { session: boolean }): Promise<Response> {
   const h = new Headers({ Accept: "application/json" });
   if (init.session) {
+    // Personal data is never prerendered: wait for a real request before anything else runs (Cache Components).
+    await connection();
     const [jar, incoming] = await Promise.all([cookies(), headers()]);
     const cookie = jar.toString();
     if (cookie) h.set("Cookie", cookie);

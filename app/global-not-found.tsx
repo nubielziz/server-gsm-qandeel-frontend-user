@@ -1,6 +1,7 @@
 // 404 for URLs that match no route at all (the root layout sits under [lang], so it cannot render these).
 // Rare in practice: proxy.ts sends every path without a language to /en or /ar first.
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = { title: "Page not found · GSM Store" };
@@ -16,12 +17,12 @@ export default function GlobalNotFound() {
             The page you are looking for does not exist. · الصفحة التي تبحث عنها غير موجودة.
           </p>
           <p className="mt-6 flex justify-center gap-3">
-            <a className="rounded-md bg-inverse px-4 py-2.5 font-semibold text-on-inverse" href="/en">
+            <Link className="rounded-control bg-inverse px-4 py-2.5 font-semibold text-on-inverse" href="/en">
               GSM Store
-            </a>
-            <a className="rounded-md border border-line-strong bg-surface px-4 py-2.5 font-semibold" href="/ar" lang="ar">
+            </Link>
+            <Link className="rounded-control border border-line-strong bg-surface px-4 py-2.5 font-semibold" href="/ar" lang="ar">
               المتجر
-            </a>
+            </Link>
           </p>
         </main>
       </body>

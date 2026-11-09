@@ -3,7 +3,8 @@
 // isolated database: IMEIs are generated per run so a second run never trips the "duplicate open order" rule.
 // The backend can end a session at any time (other test runs sign in as the same merchant), so every navigation goes
 // through `go()`, which signs in again when it lands on the sign-in page.
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { type Locator, type Page } from "@playwright/test";
 import fs from "node:fs/promises";
 import { ACCOUNTS, signInMerchant } from "./helpers";
 
