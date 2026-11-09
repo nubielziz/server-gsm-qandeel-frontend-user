@@ -1,0 +1,86 @@
+// AuthShell (mockup "Sign-In"): two columns from `lg` up. Left: a light-grey hero panel with the logo, a big headline,
+// a subtitle, three feature items and the `sign-in-hero.jpg` image as the backdrop. Right: the white form panel
+// (children), centred, max 28rem, language switcher on top and Terms / Privacy at the bottom.
+// Mobile: the form comes first under a compact brand bar; no hero image.
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { Layers, Store, Zap } from "lucide-react";
+import { localePath } from "@/lib/i18n/config";
+import { getLocale, getMessages } from "@/lib/i18n/server";
+import { common } from "@/lib/i18n/messages/common";
+import { ImageSlot } from "@/components/ui/image-slot";
+import { ChromeProviders } from "./chrome-providers";
+import { LanguageSwitcher } from "./language-switcher";
+import { Logo } from "./logo";
+import { SkipLink } from "./skip-link";
+
+export type AuthShellProps = {
+  /** The form content: the page renders its own `h1` and form. */
+  children: ReactNode;
+};
+
+/** The sign-in / sign-up page frame. Static: no session reads. */
+export async function AuthShell({ children }: AuthShellProps) {
+  const [locale, t] = await Promise.all([getLocale(), getMessages(common)]);
+  const features = [
+    { icon: <Layers aria-hidden="true" />, title: t.auth.featureServicesTitle, text: t.auth.featureServicesText },
+    { icon: <Zap aria-hidden="true" />, title: t.auth.featureTrackingTitle, text: t.auth.featureTrackingText },
+    { icon: <Store aria-hidden="true" />, title: t.auth.featureProsTitle, text: t.auth.featureProsText },
+  ];
+
+  return (
+    <ChromeProviders>
+      <SkipLink />
+      <div className="min-h-dvh bg-surface lg:grid lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        <section aria-label={t.brand.name} className="relative hidden overflow-hidden bg-surface-muted lg:block">
+          <ImageSlot
+            file="sign-in-hero.jpg"
+            alt=""
+            sizes="(min-width: 1024px) 56vw, 0px"
+            objectPosition="center bottom"
+            priority
+          />
+          <div className="relative z-10 flex flex-col gap-12 p-10 xl:p-14">
+            <Logo tagline />
+            <div className="max-w-2xl">
+              <p className="text-display text-ink">{t.auth.headline}</p>
+              <p className="mt-5 max-w-xl text-subheading font-normal text-ink-muted">{t.auth.subtitle}</p>
+            </div>
+            <ul className="grid max-w-3xl gap-6 xl:grid-cols-3">
+              {features.map((feature) => (
+                <li key={feature.title} className="flex items-start gap-3">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-card border border-line bg-surface text-ink shadow-card [&_svg]:size-5">
+                    {feature.icon}
+                  </span>
+                  <span>
+                    <span className="block text-subheading text-ink">{feature.title}</span>
+                    <span className="mt-0.5 block text-body text-ink-muted">{feature.text}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <div className="flex min-h-dvh flex-col lg:min-h-0">
+          <div className="flex items-center justify-between px-gutter py-3 lg:justify-end">
+            <Logo className="lg:hidden" />
+            <LanguageSwitcher locale={locale} names={t.languageNames} />
+          </div>
+          <main id="main" className="flex flex-1 items-center justify-center px-gutter py-8">
+            <div className="w-full max-w-[28rem]">{children}</div>
+          </main>
+          <footer className="flex flex-wrap items-center justify-center gap-x-4 px-gutter pb-8 text-small text-ink-muted">
+            <Link href={localePath(locale, "/pages/terms")} className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">
+              {t.auth.terms}
+            </Link>
+            <span aria-hidden="true" className="h-4 w-px bg-line-strong" />
+            <Link href={localePath(locale, "/pages/privacy")} className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">
+              {t.auth.privacy}
+            </Link>
+          </footer>
+        </div>
+      </div>
+    </ChromeProviders>
+  );
+}

@@ -7,12 +7,12 @@ Rules: `CLAUDE.md`. Images to add: `docs/IMAGE-PROMPTS.md`.
 | # | Milestone | State |
 |---|---|---|
 | M0 | Foundation: Next config + API rewrites, language routing (`proxy.ts`, `/en`, `/ar`, RTL), API layer (server, cached public reads, sessions, browser client with per-surface CSRF, Turnstile, Idempotency-Key), generated API types, i18n, formatters, isolated dev backend | done (2026-11-09) |
-| M1 | Design system: tokens, primitives, shells (store, auth, checkout, workspace) | in progress |
-| M2 | Public store: home, services, service page, IMEI check, help, content/legal pages, tracking | planned |
-| M3 | Customer checkout: details, consents, pay, return polling, resume | planned |
-| M4 | Auth: sign-in (customer + merchant, 2FA), sign-up, magic link, forgot/set password, verify email | planned |
-| M5 | Customer account and support tickets | planned |
-| M6 | Merchant portal | planned |
+| M1 | Design system: tokens (`app/globals.css`), 35 primitives (`components/ui`), shells (`components/layout`: store, auth, checkout, workspace), group layouts, merchant portal layout, file upload, UI kit at `/en/ui-kit` (dev only) | done (2026-11-09) |
+| M2 | Public store: home, services, service page, IMEI check, help, content/legal pages, tracking | in progress |
+| M3 | Customer checkout: details, consents, pay, return polling, resume | in progress |
+| M4 | Auth: sign-in (customer + merchant, 2FA), sign-up, magic link, forgot/set password, verify email | in progress |
+| M5 | Customer account and support tickets | in progress |
+| M6 | Merchant portal | in progress |
 
 ## Decisions (2026-11-09)
 - Stack confirmed by the owner's request: Next.js 16.4 (App Router, Cache Components, Partial Prefetching).
@@ -38,5 +38,7 @@ Rules: `CLAUDE.md`. Images to add: `docs/IMAGE-PROMPTS.md`.
   password `Storefront-Test-4821` (set through forgot → Mailpit → reset on 2026-11-09).
 
 ## Checks
+- M1 (design agent, 2026-11-09): `npm run typecheck` clean, `npm run lint` 0 errors, `npm run build` passed; UI kit checked at 1440/768/390/360 px in en and ar (no overflow, no console errors). Lead re-checked screenshots at 1440 and 390 px.
+- `e2e/routing.spec.ts`: 6/6 pass (language redirects for email links, private-area redirects, API rewrites) — 2026-11-09.
 - `npm run test`: 20 unit tests pass (format, API errors/query, i18n) — 2026-11-09.
 - `npm run typecheck`: clean on the foundation — 2026-11-09.
