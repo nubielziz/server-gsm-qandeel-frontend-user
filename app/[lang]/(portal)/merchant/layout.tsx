@@ -24,7 +24,6 @@ import { localePath } from "@/lib/i18n/config";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { portal } from "@/lib/i18n/messages/portal";
-import { ChromeProviders } from "@/components/layout/chrome-providers";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { WorkspaceShell, WorkspaceShellSkeleton, type WorkspaceNavItem } from "@/components/layout/workspace-shell";
 import { Alert } from "@/components/ui/alert";
@@ -123,12 +122,11 @@ async function MerchantFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
+// No ChromeProviders here: WorkspaceShell mounts it (a second one would render a second <Toaster />).
 export default function MerchantLayout({ children }: LayoutProps<"/[lang]/merchant">) {
   return (
-    <ChromeProviders>
-      <Suspense fallback={<WorkspaceShellSkeleton />}>
-        <MerchantFrame>{children}</MerchantFrame>
-      </Suspense>
-    </ChromeProviders>
+    <Suspense fallback={<WorkspaceShellSkeleton />}>
+      <MerchantFrame>{children}</MerchantFrame>
+    </Suspense>
   );
 }

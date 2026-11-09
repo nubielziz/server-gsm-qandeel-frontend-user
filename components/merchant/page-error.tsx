@@ -3,7 +3,7 @@
 import { PageHeader } from "@/components/layout/container";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
-import { errorText } from "@/lib/i18n/error-text";
+import { errorText } from "@/lib/i18n/error-text-core";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { errors } from "@/lib/i18n/messages/errors";
 import { merchant } from "@/lib/i18n/messages/merchant";
