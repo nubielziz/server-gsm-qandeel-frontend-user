@@ -67,8 +67,10 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[la
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
   return (
-    <html lang={lang} dir={dirOf(lang)} className={`${inter.variable} ${plexArabic.variable}`}>
-      <body className="min-h-dvh bg-page font-sans text-ink antialiased">
+    // suppressHydrationWarning: browser extensions (translators, grammar checkers…) add attributes to <html> and
+    // <body> before React starts. It covers only these two elements' own attributes, never the page content.
+    <html lang={lang} dir={dirOf(lang)} className={`${inter.variable} ${plexArabic.variable}`} suppressHydrationWarning>
+      <body className="min-h-dvh bg-page font-sans text-ink antialiased" suppressHydrationWarning>
         <ErrorTextProvider messages={errors[lang]}>{children}</ErrorTextProvider>
       </body>
     </html>

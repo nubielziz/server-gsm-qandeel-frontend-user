@@ -8,8 +8,8 @@ export const metadata: Metadata = { title: "Page not found · GSM Store" };
 
 export default function GlobalNotFound() {
   return (
-    <html lang="en" dir="ltr">
-      <body className="grid min-h-dvh place-items-center bg-page p-6 font-sans text-ink antialiased">
+    <html lang="en" dir="ltr" suppressHydrationWarning>
+      <body className="grid min-h-dvh place-items-center bg-page p-6 font-sans text-ink antialiased" suppressHydrationWarning>
         <main className="max-w-md text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-ink-subtle">404</p>
           <h1 className="mt-2 text-3xl font-extrabold tracking-tight">Page not found</h1>
