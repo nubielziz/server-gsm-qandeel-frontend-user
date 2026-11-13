@@ -1,6 +1,6 @@
-// Sign in (customers and merchants) and the landing of the customer email sign-in link (`?token=`). The page itself is
-// static; the form reads `?as=`, `?next=` and `?token=` in the browser, so it sits behind <Suspense> with a same-size
-// skeleton. Never indexed.
+// Sign in (customers AND merchants, one form: the answer's `kind` opens the right area) and the landing of the customer
+// email sign-in link (`?token=`). The page itself is static; the form reads `?next=`, `?as=` and `?token=` in the
+// browser, so it sits behind <Suspense> with a same-size skeleton. Never indexed.
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AuthHeading } from "@/components/auth/auth-heading";
@@ -18,9 +18,9 @@ export default async function SignInPage() {
   const [locale, t] = await Promise.all([getLocale(), getMessages(auth)]);
   return (
     <>
-      <AuthHeading title={t.signIn.title} subtitle={t.signIn.subtitle} />
+      <AuthHeading title={t.signIn.title} subtitle={`${t.signIn.subtitle} ${t.signIn.oneFormHint}`} />
       <Suspense fallback={<SignInSkeleton />}>
-        <SignInFlow locale={locale} t={{ surfaces: t.surfaces, fields: t.fields, shared: t.shared, signIn: t.signIn }} />
+        <SignInFlow locale={locale} t={{ fields: t.fields, shared: t.shared, signIn: t.signIn }} />
       </Suspense>
     </>
   );

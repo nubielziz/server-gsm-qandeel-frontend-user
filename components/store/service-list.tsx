@@ -1,11 +1,11 @@
 // The browsable service list shared by the home page ("All services", mockup "All Products") and the catalog page
-// (`/services`): a filter sidebar (Categories = the service types, a price range, brand, carrier and country, each
-// option with how many services it would leave; a drawer on phones), a search box, a sort control, chips, the cards and
-// page links. The API cannot filter by type or price and has no counts, so the list is worked out over the cached
-// catalog (lib/catalog.ts `catalogList`, the API's own rules for the rest). Its state is the page URL
-// (`?type=imei&brand=Apple&brand=Samsung&max=20&page=2`): it works without JavaScript and can be shared. It reads
-// `searchParams` and the currency cookie, so render it inside <Suspense>. Availability (stock) needs the backend:
-// docs/BACKEND-NEEDS.md §1.
+// (`/services`): a filter sidebar (Categories with how many services each has, "In stock only", a price range, service
+// type, brand, carrier and country, each option with how many services it would leave; a drawer on phones), a search
+// box, a sort control, chips, the cards and page links. The rows and their total come from the API, which filters,
+// sorts and pages (lib/catalog.ts `catalogList`); the numbers beside the options are counted over the cached catalog.
+// Its state is the page URL (`?category=4-carrier-unlock&stock=1&type=imei&brand=Apple&brand=Samsung&max=20&sort=popular&page=2`):
+// it works without JavaScript and can be shared. It reads `searchParams` and the currency cookie, so render it inside
+// <Suspense>. Availability is only ever "in stock" or not: no stock level exists anywhere.
 import { PackageSearch, SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { Pagination, pageHref } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ServiceType } from "@/lib/api/types";
 import { catalogList } from "@/lib/catalog";
-import type { FacetKey, ListFilter, ListSort } from "@/lib/catalog-facets";
+import { FACET_KEYS, LIST_SORTS, SERVICE_TYPES, cleanText, parseSort, type FacetKey, type ListInput, type ListSort } from "@/lib/catalog-facets";
 import { countryName } from "@/lib/countries";
 import { getCurrency } from "@/lib/currency";
 import { formatMoney, formatNumber } from "@/lib/format";
@@ -45,45 +45,49 @@ export type ServiceListConfig = {
 };
 
 /** The list's query parameters, as its links keep them (empty ones are left out). */
-export type ListState = Record<"q" | "min" | "max" | "sort", string | undefined> & Record<FacetKey, string[]>;
+export type ListState = Record<"q" | "min" | "max" | "sort" | "stock", string | undefined> & Record<FacetKey | "category", string[]>;
 
 const LAYOUT = "grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start";
 const GRIDS = {
   mini: "grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4",
   full: "grid gap-4 sm:grid-cols-2 xl:grid-cols-3",
 } as const;
-const SERVICE_TYPES: readonly ServiceType[] = ["imei", "server", "remote", "file"];
-const FIELDS = ["type", "brand", "network", "country"] as const;
 
-function readFilter(params: SearchParams): ListFilter {
+/** The URL as a filter request. Text goes through `cleanText`: the API answers 500 to a NUL byte, and the page must not break on a crafted link. */
+function readInput(params: SearchParams): ListInput {
+  const texts = (value: string | string[] | undefined, max?: number, limit?: number) => allParams(value, max, limit).map(cleanText).filter(Boolean);
   return {
-    q: firstParam(params.q),
+    q: cleanText(firstParam(params.q)),
+    category: texts(params.category, 60, 12),
+    inStock: firstParam(params.stock) === "1",
     type: allParams(params.type, 10).filter((value): value is ServiceType => (SERVICE_TYPES as readonly string[]).includes(value)),
-    brand: allParams(params.brand),
-    network: allParams(params.network),
-    country: allParams(params.country, 2).map((code) => code.toUpperCase()),
+    brand: texts(params.brand),
+    network: texts(params.network),
+    country: texts(params.country, 2).map((code) => code.toUpperCase()),
     min: intParam(params.min),
     max: intParam(params.max),
   };
 }
 
-/** Reads the URL and the catalog and prepares everything the list shows (and `catalogSize`, 0 for an empty catalog). */
+/** Reads the URL, the API and the catalog and prepares everything the list shows (and `catalogSize`, 0 for an empty catalog). */
 export async function loadServiceList(searchParams: Promise<SearchParams>, config: ServiceListConfig) {
   const params = await searchParams;
   const [locale, t, c, currency] = await Promise.all([getLocale(), getMessages(store), getMessages(common), getCurrency()]);
-  const sort: ListSort = firstParam(params.sort) === "title" ? "title" : "featured";
-  const list = await catalogList(locale, currency.code, readFilter(params), sort, Number(firstParam(params.page)) || 1, config.perPage);
+  const sort: ListSort = parseSort(firstParam(params.sort));
+  const list = await catalogList(locale, currency.code, readInput(params), sort, Number(firstParam(params.page, 12)) || 1, config.perPage);
   const { filter, bounds } = list;
 
   const state: ListState = {
     q: filter.q || undefined,
+    category: list.categoryEntries.map((entry) => entry.value),
+    stock: filter.inStock ? "1" : undefined,
     type: filter.type,
     brand: filter.brand,
     network: filter.network,
     country: filter.country,
     min: filter.min === null ? undefined : String(filter.min),
     max: filter.max === null ? undefined : String(filter.max),
-    sort: sort === "title" ? "title" : undefined,
+    sort: sort === "featured" ? undefined : sort,
   };
   const base = localePath(locale, config.path || undefined);
   const href = (change: Partial<ListState>) => pageHref(base, { ...state, ...change }, 1) + config.hash;
@@ -102,7 +106,29 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
       selected: option.selected,
     })),
   });
-  const categories = group("type", t.home.products.categories);
+  // Real categories with the API's `serviceCount` (no other filter narrows it); one with no services shows only while selected.
+  const categories: FilterGroup = {
+    name: "category",
+    label: t.home.products.categories,
+    options: list.categories
+      .map((category) => ({ category, selected: filter.category.includes(category.id) }))
+      .filter(({ category, selected }) => category.serviceCount > 0 || selected)
+      .map(({ category, selected }) => ({
+        value: category.slug,
+        label: category.name,
+        count: `(${formatNumber(category.serviceCount, locale)})`,
+        selected,
+      })),
+  };
+  // One checkbox: how many services are in stock next to the other filters (a number of services, never of codes).
+  const availability: FilterGroup = {
+    name: "stock",
+    label: t.catalog.availability,
+    options:
+      list.inStock > 0 || filter.inStock
+        ? [{ value: "1", label: t.catalog.inStockOnly, count: `(${formatNumber(list.inStock, locale)})`, selected: filter.inStock }]
+        : [],
+  };
 
   // One chip per active value: its link leaves out only that value.
   const chips: FilterChip[] = [];
@@ -110,7 +136,12 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
     // The direction marks of the price are for the eye only: the link's name leaves them out.
     chips.push({ key, label: text, removeLabel: fmt(t.catalog.removeFilter, { label: text.replace(/[⁦-⁩]/g, "") }), href: href(change) });
   if (filter.q) chip("q", fmt(t.catalog.queryChip, { query: filter.q }), { q: undefined });
-  for (const key of FIELDS) {
+  // A category the API does not list is not applied, but its chip stays so the visitor can remove the outdated link.
+  for (const entry of list.categoryEntries) {
+    chip(`category:${entry.value}`, entry.label, { category: state.category.filter((value) => value !== entry.value) });
+  }
+  if (filter.inStock) chip("stock", t.catalog.inStockOnly, { stock: undefined });
+  for (const key of FACET_KEYS) {
     for (const value of filter[key]) chip(`${key}:${value}`, label(key, value), { [key]: filter[key].filter((v) => v !== value) });
   }
   if (bounds && (filter.min !== null || filter.max !== null)) {
@@ -120,25 +151,39 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
     });
   }
 
+  const sortNames: Record<ListSort, string> = {
+    featured: t.catalog.sortFeatured,
+    popular: t.catalog.sortPopular,
+    newest: t.catalog.sortNewest,
+    price_asc: t.catalog.sortPriceAsc,
+    price_desc: t.catalog.sortPriceDesc,
+    title: t.catalog.sortTitle,
+  };
+
   return {
     locale,
     t,
     c,
     currency,
     sort,
+    sorts: LIST_SORTS.map((value) => ({ value, label: sortNames[value] })),
     list,
     state,
     base,
     chips,
-    categories: categories.options.length > 0 ? categories : null,
-    groups: [group("brand", t.catalog.brand), group("network", t.catalog.network), group("country", t.catalog.country)],
+    /** The lists above the price range (an empty one is not drawn). */
+    top: [categories, availability],
+    /** The lists under the price range. */
+    groups: [group("type", t.catalog.type), group("brand", t.catalog.brand), group("network", t.catalog.network), group("country", t.catalog.country)],
     price:
       bounds && bounds.min < bounds.max
         ? { min: bounds.min, max: bounds.max, value: [filter.min ?? bounds.min, filter.max ?? bounds.max] as [number, number], currency: currency.code }
         : null,
-    /** The sidebar's filters, carried by the search form as hidden fields. */
+    /** The sidebar's filters, carried by the search form as hidden fields (a category the API does not list is not carried). */
     keep: [
-      ...FIELDS.flatMap((key) => filter[key].map((value): [string, string] => [key, value])),
+      ...list.categoryEntries.filter((entry) => entry.known).map((entry): [string, string] => ["category", entry.value]),
+      ...(filter.inStock ? [["stock", "1"] as [string, string]] : []),
+      ...FACET_KEYS.flatMap((key) => filter[key].map((value): [string, string] => [key, value])),
       ...(state.min ? [["min", state.min] as [string, string]] : []),
       ...(state.max ? [["max", state.max] as [string, string]] : []),
     ],
@@ -149,7 +194,7 @@ export type ServiceListData = Awaited<ReturnType<typeof loadServiceList>>;
 
 /** Sidebar (drawer on phones), toolbar, chips, count, cards or the empty state, page links. */
 export function ServiceList({ data, config }: { data: ServiceListData; config: ServiceListConfig }) {
-  const { locale, t, c, currency, sort, list, state, base, chips, categories, groups, price, keep } = data;
+  const { locale, t, c, currency, sort, sorts, list, state, base, chips, top, groups, price, keep } = data;
   const count = (n: number) => plural(locale, n, t.catalog.results, formatNumber(n, locale));
   const filtered = chips.length > 0;
   const clear = { label: t.catalog.clear, href: base + config.hash };
@@ -163,7 +208,7 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
         ["q", state.q ?? ""],
         ["sort", state.sort ?? ""],
       ].filter((pair): pair is [string, string] => Boolean(pair[1]))}
-      categories={categories}
+      top={top}
       price={price}
       groups={groups}
       locale={locale}
@@ -200,8 +245,7 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
               searchPlaceholder: t.catalog.searchPlaceholder,
               searchSubmit: t.home.products.searchSubmit,
               sort: t.catalog.sort,
-              sortFeatured: t.catalog.sortFeatured,
-              sortTitle: t.catalog.sortTitle,
+              sorts,
             }}
             extra={
               <DialogTrigger for={config.drawerId} variant="secondary" className="lg:hidden" startIcon={<SlidersHorizontal aria-hidden="true" />}>
@@ -285,7 +329,7 @@ export function ServiceListSkeleton({ config, rows }: { config: ServiceListConfi
   return (
     <div className={LAYOUT} aria-busy="true">
       <div aria-hidden="true" className="hidden gap-5 rounded-card border border-line bg-surface p-4 shadow-card lg:grid">
-        {[1, 0, 2, 4].map((n, i) => (
+        {[4, 1, 0, 4, 5].map((n, i) => (
           <div key={i} className="grid gap-2">
             <Skeleton className="h-4 w-24" />
             {n === 0 ? <Skeleton className="h-12" /> : Array.from({ length: n }, (_, j) => <Skeleton key={j} className="h-6" />)}

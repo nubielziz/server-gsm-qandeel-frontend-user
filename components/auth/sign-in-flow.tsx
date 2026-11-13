@@ -1,45 +1,48 @@
 "use client";
-// SignInFlow: the one sign-in form (interim until the smart sign-in route exists, handoff §6.1). A "Customer | Merchant"
-// switch picks which login route runs. Sign-in runs in the BROWSER (Set-Cookie must reach the browser), never in a
-// Server Action. Steps:
-//   password   customer → POST /store/v1/auth/login (Turnstile) → `done` | `password` (temporary password → new-password)
-//              merchant → POST /client/auth/login → `done` | `totp`
-//   magic      customer email link (MagicLinkForm)
+// SignInFlow: the one sign-in form for customers AND merchants (handoff §6.1, plan D1). `POST /client/auth/sign-in`
+// (email + password + Turnstile) answers `{ kind, next }`: `kind` picks the area, `next` the step still to do.
+// Sign-in runs in the BROWSER (Set-Cookie must reach the browser), never in a Server Action. Steps:
+//   password   email + password + Turnstile → `api.signIn()` → `done` | `totp` | `password`
+//   magic      customer email link (MagicLinkForm); always offered under the form
 //   totp       merchant 6-digit code → POST /client/auth/2fa
-//   new-password  customer with a temporary password → POST /store/v1/me/password
+//   customer-new-password  `next: password` for a customer (temporary password) → POST /store/v1/me/password
+//   merchant-new-password  `next: password` for a merchant (temporary password) → POST /client/auth/password/change
+//              → `totp` (continue with the code) | `done`
 //   link       `/sign-in?token=` from the magic-link mail: a button, never auto-submitted (mail scanners)
-// After success: router.replace(target) then router.refresh() so the header shows the signed-in state.
+// A 401 is always "wrong email or password" and never reveals whether the email exists. After success a merchant's saved
+// sign-up language is applied (lib/merchant/signup-locale.ts), then router.replace(target) and router.refresh() so the
+// header shows the signed-in state. `?as=` is not a choice any more: an old link's value only decides which tab the forgot
+// page and the sign-up page open on.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
-import { Mail, Store, UserRound } from "lucide-react";
+import { Mail, Store } from "lucide-react";
 import { api } from "@/lib/api/browser";
-import { isApiError } from "@/lib/api/errors";
-import type { MerchantLoginResult, StoreLoginResult } from "@/lib/api/types";
+import { ApiError, isApiError } from "@/lib/api/errors";
+import type { MerchantMe, MerchantPasswordChangeResult, SmartSignInResult } from "@/lib/api/types";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
+import { applySignupLocale } from "@/lib/merchant/signup-locale";
 import { Turnstile } from "@/components/turnstile";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Divider } from "@/components/ui/divider";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { authLinkClass } from "./auth-heading";
 import { CustomerLinkConfirm } from "./customer-link-confirm";
 import { FormAlert } from "./form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "./form-errors";
 import { MagicLinkForm } from "./magic-link-form";
-import { safeNext } from "./safe-next";
+import { targetAfterSignIn, type SignInKind } from "./safe-next";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
 import { useTurnstile } from "./use-turnstile";
 
-type Surface = "customer" | "merchant";
-type Step = "password" | "magic" | "totp" | "new-password" | "link";
+type Step = "password" | "magic" | "totp" | "customer-new-password" | "merchant-new-password" | "link";
 
 export type SignInFlowProps = {
   locale: Locale;
-  t: Pick<AuthMessages, "surfaces" | "fields" | "shared" | "signIn">;
+  t: Pick<AuthMessages, "fields" | "shared" | "signIn">;
 };
 
 function StepHeading({ title, text }: { title: string; text: string }) {
@@ -55,23 +58,48 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get("token");
-  const [surface, setSurface] = useState<Surface>(params.get("as") === "merchant" ? "merchant" : "customer");
   const [step, setStep] = useState<Step>(token ? "link" : "password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // "Your sign-in expired": shown on the form a step sent the visitor back to.
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const home = (s: Surface) => localePath(locale, s === "merchant" ? "/merchant" : "/account");
-  const target = safeNext(params.get("next"), home(surface));
+  // An old `?as=merchant` link only picks the default tab of the pages the links below open.
+  const asQuery = params.get("as") === "merchant" ? "?as=merchant" : "";
 
-  /** Signs in: go to the target, then refresh so the server parts see the new session. */
-  function finish(to: string = target) {
-    router.replace(to);
+  /** Signs in: apply a merchant's sign-up language, go to the target, then refresh so the server parts see the session. */
+  async function finish(area: SignInKind) {
+    if (area === "merchant") {
+      await applySignupLocale({
+        getMe: () => api.get<MerchantMe>("/client/auth/me"),
+        setLocale: (value) => api.patch("/client/profile", { locale: value }),
+      });
+    }
+    router.replace(targetAfterSignIn(area, params.get("next"), locale));
     router.refresh();
   }
 
-  function changeSurface(next: string) {
-    const value: Surface = next === "merchant" ? "merchant" : "customer";
-    setSurface(value);
+  /** The answer of the smart sign-in: `kind` picks the area, `next` the step still to do. */
+  function onSignedIn(result: SmartSignInResult) {
+    setNotice(null);
+    if (result.next === "done") return finish(result.kind);
+    if (result.kind === "merchant") {
+      setPassword("");
+      setStep(result.next === "totp" ? "totp" : "merchant-new-password");
+      return;
+    }
+    // A customer has no second step: `password` (a temporary password) is the only one the API sends.
+    if (result.next === "password") {
+      setStep("customer-new-password");
+      return;
+    }
+    throw new ApiError({ status: 200, code: "INVALID_RESPONSE", title: "Unexpected sign-in step" });
+  }
+
+  /** A step's pending session ended (10 minutes): back to the form with a sentence, nothing kept. */
+  function startAgain() {
+    setPassword("");
+    setNotice(t.signIn.expired);
     setStep("password");
   }
 
@@ -79,50 +107,62 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
     return (
       <CustomerLinkConfirm
         token={token}
-        target={safeNext(params.get("next"), home("customer"))}
+        target={targetAfterSignIn("customer", params.get("next"), locale)}
         strings={{ ...t.signIn.link, requestNewLink: t.shared.requestNewLink }}
-        onRequestNewLink={() => {
-          setSurface("customer");
-          setStep("magic");
-        }}
+        onRequestNewLink={() => setStep("magic")}
       />
     );
   }
-
-  const switcher = (
-    <SegmentedControl
-      label={t.surfaces.label}
-      fullWidth
-      value={surface}
-      onValueChange={changeSurface}
-      options={[
-        { value: "customer", label: t.surfaces.customer, icon: <UserRound aria-hidden="true" /> },
-        { value: "merchant", label: t.surfaces.merchant, icon: <Store aria-hidden="true" /> },
-      ]}
-    />
-  );
 
   if (step === "totp") {
     return (
       <TotpStep
         t={t}
-        onDone={() => finish()}
+        onDone={() => finish("merchant")}
+        onExpired={startAgain}
         onBack={() => {
           setPassword("");
+          setNotice(null);
           setStep("password");
         }}
       />
     );
   }
 
-  if (step === "new-password") {
-    return <NewPasswordStep t={t} currentPassword={password} onDone={() => finish()} />;
+  if (step === "customer-new-password") {
+    return (
+      <NewPasswordStep
+        t={t}
+        copy={t.signIn.newPassword}
+        onExpired={startAgain}
+        save={async (newPassword) => {
+          // The pending session becomes a full one; the answer carries the new CSRF token (lib/api/browser.ts keeps it).
+          await api.post("/store/v1/me/password", { currentPassword: password, newPassword });
+          await finish("customer");
+        }}
+      />
+    );
+  }
+
+  if (step === "merchant-new-password") {
+    return (
+      <NewPasswordStep
+        t={t}
+        copy={t.signIn.merchantNewPassword}
+        onExpired={startAgain}
+        save={async (newPassword) => {
+          const result = await api.post<MerchantPasswordChangeResult | undefined>("/client/auth/password/change", { password: newPassword });
+          if (result?.next === "totp") setStep("totp");
+          else if (result?.next === "done") await finish("merchant");
+          else throw new ApiError({ status: 200, code: "INVALID_RESPONSE", title: "Unexpected password step" });
+        }}
+      />
+    );
   }
 
   if (step === "magic") {
     return (
       <div className="grid gap-6">
-        {switcher}
         <StepHeading title={t.signIn.magic.title} text={t.signIn.magic.text} />
         <MagicLinkForm
           locale={locale}
@@ -137,7 +177,15 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
             securityCheckWait: t.shared.securityCheckWait,
           }}
         >
-          <Button variant="secondary" size="lg" block onClick={() => setStep("password")}>
+          <Button
+            variant="secondary"
+            size="lg"
+            block
+            onClick={() => {
+              setNotice(null);
+              setStep("password");
+            }}
+          >
             {t.signIn.magic.usePassword}
           </Button>
         </MagicLinkForm>
@@ -147,33 +195,38 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
 
   return (
     <div className="grid gap-6">
-      {switcher}
       <PasswordStep
-        key={surface}
         locale={locale}
-        surface={surface}
         t={t}
+        notice={notice}
+        forgotHref={`${localePath(locale, "/forgot-password")}${asQuery}`}
         email={email}
         setEmail={setEmail}
         password={password}
         setPassword={setPassword}
-        onDone={() => finish()}
-        onTotp={() => setStep("totp")}
-        onNewPassword={() => setStep("new-password")}
+        onSignedIn={onSignedIn}
       />
       <Divider label={t.signIn.or} />
-      {surface === "customer" ? (
-        <Button variant="secondary" size="lg" block startIcon={<Mail aria-hidden="true" />} onClick={() => setStep("magic")}>
-          {t.signIn.magicLinkInstead}
+      <div className="grid gap-3">
+        <Button
+          variant="secondary"
+          size="md"
+          block
+          startIcon={<Mail aria-hidden="true" />}
+          onClick={() => {
+            setNotice(null);
+            setStep("magic");
+          }}
+        >
+          {t.signIn.magicLinkCustomers}
         </Button>
-      ) : (
-        <ButtonLink href={localePath(locale, "/merchant/register")} variant="secondary" size="lg" block startIcon={<Store aria-hidden="true" />}>
+        <ButtonLink href={localePath(locale, "/merchant/register")} variant="secondary" size="md" block startIcon={<Store aria-hidden="true" />}>
           {t.signIn.applyMerchant}
         </ButtonLink>
-      )}
+      </div>
       <p className="text-center text-body text-ink-muted">
         {t.signIn.noAccount}{" "}
-        <Link href={`${localePath(locale, "/sign-up")}?as=${surface}`} className={authLinkClass}>
+        <Link href={`${localePath(locale, "/sign-up")}${asQuery}`} className={authLinkClass}>
           {t.signIn.createAccount}
         </Link>
       </p>
@@ -183,25 +236,25 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
 
 type PasswordStepProps = {
   locale: Locale;
-  surface: Surface;
   t: SignInFlowProps["t"];
+  /** A sentence to show at once (the session of a later step expired). */
+  notice: string | null;
+  forgotHref: string;
   email: string;
   setEmail: (value: string) => void;
   password: string;
   setPassword: (value: string) => void;
-  onDone: () => void;
-  onTotp: () => void;
-  onNewPassword: () => void;
+  /** Called with the API's answer; may throw an ApiError for an answer the site has no step for. */
+  onSignedIn: (result: SmartSignInResult) => void | Promise<void>;
 };
 
-function PasswordStep({ locale, surface, t, email, setEmail, password, setPassword, onDone, onTotp, onNewPassword }: PasswordStepProps) {
+function PasswordStep({ locale, t, notice, forgotHref, email, setEmail, password, setPassword, onSignedIn }: PasswordStepProps) {
   const errorText = useErrorText();
   const ts = useTurnstile();
   const form = useRef<HTMLFormElement>(null);
   const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState<FormFeedback>(NO_FEEDBACK);
+  const [feedback, setFeedback] = useState<FormFeedback>(() => (notice ? { fields: {}, message: notice, reference: null } : NO_FEEDBACK));
   useFocusOnFeedback(feedback, form);
-  const customer = surface === "customer";
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -218,24 +271,17 @@ function PasswordStep({ locale, surface, t, email, setEmail, password, setPasswo
     setFeedback(NO_FEEDBACK);
     let leaving = false;
     try {
-      if (customer) {
-        const turnstileToken = await ts.ensureToken();
-        if (!turnstileToken) {
-          setFeedback({ fields: {}, message: t.shared.securityCheckWait, reference: null });
-          return;
-        }
-        const result = await api.post<StoreLoginResult>("/store/v1/auth/login", { email: email.trim(), password }, { turnstileToken });
-        leaving = true;
-        if (result.next === "password") onNewPassword();
-        else onDone();
-      } else {
-        const result = await api.post<MerchantLoginResult>("/client/auth/login", { email: email.trim(), password });
-        leaving = true;
-        if (result.next === "totp") onTotp();
-        else onDone();
+      const turnstileToken = await ts.ensureToken();
+      if (!turnstileToken) {
+        setFeedback({ fields: {}, message: t.shared.securityCheckWait, reference: null });
+        return;
       }
+      const result = await api.signIn({ email: email.trim(), password }, turnstileToken);
+      leaving = true;
+      await onSignedIn(result);
     } catch (error) {
-      // Wrong email, wrong password and "no password yet" are one 401: one generic sentence (handoff §3.4).
+      leaving = false;
+      // Wrong email, wrong password and "no password yet" are one 401: one generic sentence, never a sign-out (handoff §3.4).
       setFeedback(
         isApiError(error) && error.status === 401
           ? { fields: {}, message: t.signIn.invalidCredentials, reference: null }
@@ -243,6 +289,7 @@ function PasswordStep({ locale, surface, t, email, setEmail, password, setPasswo
       );
     } finally {
       if (!leaving) setBusy(false);
+      // A Turnstile token works once, even when the request failed: ask the widget for the next one.
       ts.reset();
     }
   }
@@ -274,12 +321,12 @@ function PasswordStep({ locale, surface, t, email, setEmail, password, setPasswo
           error={feedback.fields.password}
         />
         <div className="flex justify-end">
-          <Link href={`${localePath(locale, "/forgot-password")}?as=${surface}`} className={authLinkClass}>
+          <Link href={forgotHref} className={authLinkClass}>
             {t.signIn.forgot}
           </Link>
         </div>
       </div>
-      {customer ? <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} lang={locale} /> : null}
+      <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} lang={locale} />
       <FormAlert message={feedback.message} reference={feedback.reference} />
       <Button type="submit" size="lg" block loading={busy}>
         {t.signIn.submit}
@@ -288,7 +335,9 @@ function PasswordStep({ locale, surface, t, email, setEmail, password, setPasswo
   );
 }
 
-function TotpStep({ t, onDone, onBack }: { t: SignInFlowProps["t"]; onDone: () => void; onBack: () => void }) {
+type TotpStepProps = { t: SignInFlowProps["t"]; onDone: () => void | Promise<void>; onExpired: () => void; onBack: () => void };
+
+function TotpStep({ t, onDone, onExpired, onBack }: TotpStepProps) {
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
   const [code, setCode] = useState("");
@@ -309,9 +358,14 @@ function TotpStep({ t, onDone, onBack }: { t: SignInFlowProps["t"]; onDone: () =
     try {
       await api.post("/client/auth/2fa", { code });
       leaving = true;
-      onDone();
+      await onDone();
     } catch (error) {
-      // A wrong code is a 422 on `code`, never a 401 (handoff §3.4).
+      leaving = false;
+      if (isApiError(error) && error.status === 401) {
+        // A wrong code is a 422 on `code`, never a 401 (handoff §3.4): a 401 means the pending session ended.
+        onExpired();
+        return;
+      }
       setFeedback(feedbackFrom(error, errorText, ["code"], { code: t.signIn.totp.invalidCode }));
     } finally {
       if (!leaving) setBusy(false);
@@ -346,7 +400,19 @@ function TotpStep({ t, onDone, onBack }: { t: SignInFlowProps["t"]; onDone: () =
   );
 }
 
-function NewPasswordStep({ t, currentPassword, onDone }: { t: SignInFlowProps["t"]; currentPassword: string; onDone: () => void }) {
+type NewPasswordStepProps = {
+  t: SignInFlowProps["t"];
+  copy: { title: string; text: string; submit: string };
+  /** Sends the new password and goes on (the next step, or the target). Throws the ApiError of a refused call. */
+  save: (newPassword: string) => Promise<void>;
+  onExpired: () => void;
+};
+
+/**
+ * The forced "choose your own password" step after a temporary password, for both kinds. The two routes name the
+ * field differently (`newPassword` for a customer, `password` for a merchant): both land under the first input.
+ */
+function NewPasswordStep({ t, copy, save, onExpired }: NewPasswordStepProps) {
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
   const [next, setNext] = useState("");
@@ -366,12 +432,14 @@ function NewPasswordStep({ t, currentPassword, onDone }: { t: SignInFlowProps["t
     setFeedback(NO_FEEDBACK);
     let leaving = false;
     try {
-      // The pending session becomes a full one; the answer carries the new CSRF token (lib/api/browser.ts keeps it).
-      await api.post("/store/v1/me/password", { currentPassword, newPassword: next });
+      await save(next);
       leaving = true;
-      onDone();
     } catch (error) {
-      setFeedback(feedbackFrom(error, errorText, ["newPassword", "currentPassword"]));
+      if (isApiError(error) && error.status === 401) {
+        onExpired();
+        return;
+      }
+      setFeedback(feedbackFrom(error, errorText, ["newPassword", "currentPassword", "password"]));
     } finally {
       if (!leaving) setBusy(false);
     }
@@ -379,7 +447,7 @@ function NewPasswordStep({ t, currentPassword, onDone }: { t: SignInFlowProps["t
 
   return (
     <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
-      <StepHeading title={t.signIn.newPassword.title} text={t.signIn.newPassword.text} />
+      <StepHeading title={copy.title} text={copy.text} />
       <PasswordInput
         name="newPassword"
         label={t.fields.newPassword}
@@ -388,7 +456,7 @@ function NewPasswordStep({ t, currentPassword, onDone }: { t: SignInFlowProps["t
         required
         value={next}
         onChange={(e) => setNext(e.target.value)}
-        error={feedback.fields.newPassword ?? feedback.fields.currentPassword}
+        error={feedback.fields.newPassword ?? feedback.fields.currentPassword ?? feedback.fields.password}
       />
       <PasswordInput
         name="confirmPassword"
@@ -401,7 +469,7 @@ function NewPasswordStep({ t, currentPassword, onDone }: { t: SignInFlowProps["t
       />
       <FormAlert message={feedback.message} reference={feedback.reference} />
       <Button type="submit" size="lg" block loading={busy}>
-        {t.signIn.newPassword.submit}
+        {copy.submit}
       </Button>
     </form>
   );

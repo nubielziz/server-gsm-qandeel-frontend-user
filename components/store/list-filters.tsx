@@ -1,7 +1,8 @@
 "use client";
-// The filter form of the home page's service list (mockup "All Products" sidebar): Categories (the service types), the
-// price range, then brand, carrier and country. Each option is a checkbox with how many services it would show; several
-// options of one list add up. A GET form, so it works without JavaScript (its Apply button shows only then). With
+// The filter form of the service list (mockup "All Products" sidebar): the lists above the price range (Categories,
+// Availability), the price range, then the lists under it (service type, brand, carrier, country). Each option is a
+// checkbox with how many services it would show; several options of one list add up. A GET form, so it works without
+// JavaScript (its Apply button shows only then). With
 // JavaScript a change applies at once (a checkbox when ticked, the slider when released) without moving the page, so
 // the list updates beside it. Rendered twice: in the sidebar and in the phone drawer, which stays open while options are
 // picked. The ticks follow the URL: a filter removed elsewhere (a chip) clears its box here too.
@@ -24,7 +25,7 @@ export type FilterOption = {
 };
 
 export type FilterGroup = {
-  /** The query parameter (`type`, `brand`, `network`, `country`). */
+  /** The query parameter (`category`, `stock`, `type`, `brand`, `network`, `country`). */
   name: string;
   label: string;
   options: FilterOption[];
@@ -55,10 +56,10 @@ export type ListFiltersProps = {
   action: string;
   /** Values the form sends along unchanged (search, sort). */
   keep: [string, string][];
-  /** The first list (Categories), above the price range. */
-  categories: FilterGroup | null;
+  /** The lists above the price range (Categories, Availability); a list with no options is left out. */
+  top: FilterGroup[];
   price: PriceFilter | null;
-  /** The lists under the price range (brand, carrier, country). */
+  /** The lists under the price range (service type, brand, carrier, country). */
   groups: FilterGroup[];
   locale: Locale;
   labels: ListFiltersLabels;
@@ -72,11 +73,11 @@ const legendClasses = "mb-1.5 text-small font-bold text-ink";
 
 const keyOf = (group: FilterGroup, option: FilterOption) => `${group.name}\u0000${option.value}`;
 
-export function ListFilters({ action, keep, categories, price, groups, locale, labels, clearHref }: ListFiltersProps) {
+export function ListFilters({ action, keep, top, price, groups, locale, labels, clearHref }: ListFiltersProps) {
   const router = useRouter();
   const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
-  const lists = categories ? [categories, ...groups] : groups;
+  const lists = [...top, ...groups];
 
   // The ticks are the URL's (from the server), changed at once on a click; a new URL resets them.
   const fromUrl = lists.flatMap((group) => group.options.filter((option) => option.selected).map((option) => keyOf(group, option))).join("\u0001");
@@ -156,7 +157,7 @@ export function ListFilters({ action, keep, categories, price, groups, locale, l
       {keep.map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
-      {categories ? list(categories) : null}
+      {top.map(list)}
       {price ? (
         <div role="group" aria-labelledby={`${id}-price`}>
           <p id={`${id}-price`} className={legendClasses}>

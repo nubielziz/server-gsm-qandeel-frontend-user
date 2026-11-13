@@ -77,7 +77,14 @@ export async function WorkspaceShell({
                     <ActiveWorkspaceNav items={footerNav} variant="rail" />
                   </Suspense>
                 ) : null}
-                <Avatar name={user.name} size="md" tone="light" label={user.name} />
+                {/* The header's account menu shows the same avatar: on short screens the rail drops it to fit. */}
+                <Avatar
+                  name={user.name}
+                  size="md"
+                  tone="light"
+                  label={user.name}
+                  className="[@media(max-height:46rem)]:hidden"
+                />
               </div>
             </nav>
           </div>

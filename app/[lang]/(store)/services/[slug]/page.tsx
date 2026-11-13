@@ -1,10 +1,12 @@
-// A service page: art, title, chips, price (visitor currency), delivery and quantity rules, "Buy now", description,
+// A service page: art (the service's own picture, else brand logo, else type picture), title, chips, price (visitor
+// currency, with "per unit", "From" and the packs), availability, delivery and quantity rules, "Buy now", description,
 // requirements and FAQ. `params` is read behind <Suspense>; the price and the merchant hint stream in behind their own.
-// A slug of the other language redirects to this language's slug of the same service (matched by id), else 404.
+// A slug of the other language redirects to this language's slug of the same service (through its `alternates`), else
+// 404; the language alternates of the metadata come from the same field.
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { ArrowRight, Clock, Hash, TriangleAlert } from "lucide-react";
+import { ArrowRight, TriangleAlert } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +17,18 @@ import { Markdown } from "@/components/ui/markdown";
 import { Skeleton } from "@/components/ui/skeleton";
 import { staticSlugParams } from "@/components/store/static-params";
 import { demoteHeadings } from "@/components/store/markdown-source";
-import { resolveService, otherLocale } from "@/components/store/resolve-service";
+import { prerenderSlugs, resolveService } from "@/components/store/resolve-service";
 import { ServiceArt } from "@/components/store/service-art";
-import { Accordion, MerchantPriceHint, ServicePrice, quantityText } from "@/components/store/service-parts";
+import {
+  Accordion,
+  MerchantPriceHint,
+  PriceBlock,
+  ServicePrice,
+  serviceFacts,
+  serviceStockHint,
+} from "@/components/store/service-parts";
 import { countryName } from "@/lib/countries";
-import { allListedServices, slugForService } from "@/lib/catalog";
+import { allListedServices } from "@/lib/catalog";
 import { localePath } from "@/lib/i18n/config";
 import { common } from "@/lib/i18n/messages/common";
 import { store } from "@/lib/i18n/messages/store";
@@ -32,11 +41,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const resolved = await resolveService(slug, locale);
   if (resolved.kind !== "found") return { robots: { index: false } };
   const { service } = resolved;
-  const other = otherLocale(locale);
-  const otherSlug = await slugForService(service.id, other);
   const own = localePath(locale, `/services/${encodeURIComponent(service.slug)}`);
+  // The switched-on pages of the same service in the other languages: an English-only service has no `ar` entry.
   const languages: Record<string, string> = { [locale]: own };
-  if (otherSlug) languages[other] = localePath(other, `/services/${encodeURIComponent(otherSlug)}`);
+  for (const alt of service.alternates ?? []) {
+    if (alt.locale !== locale && alt.slug) languages[alt.locale] = localePath(alt.locale, `/services/${encodeURIComponent(alt.slug)}`);
+  }
   const title = service.seoTitle || service.title;
   const description = service.seoDescription || service.summary || undefined;
   const og = siteImage("og-default.jpg");
@@ -48,11 +58,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-/** Every listed service of the language is prerendered (its content joins the static shell); other slugs render on demand. */
+const MAX_STATIC_SLUGS = 50;
+
+/**
+ * At most 50 services per language are prerendered (their content joins the static shell): the featured ones first, then
+ * the API's order (plan D20). The rest render on demand, so a build through the shop host stays under its request limit.
+ */
 export async function generateStaticParams() {
   try {
     const rows = await allListedServices(await getLocale());
-    return staticSlugParams(rows.map((row) => row.slug));
+    return staticSlugParams(prerenderSlugs(rows, MAX_STATIC_SLUGS));
   } catch {
     // The API is unreachable at build time: every service page renders on demand instead.
     return staticSlugParams([]);
@@ -80,7 +95,8 @@ async function ServiceContent({ params }: { params: Promise<{ slug: string }> })
   const checkoutHref = `${localePath(locale, "/checkout")}?service=${encodeURIComponent(service.slug)}`;
   const buyable = service.type !== "file";
   const hasDetails = Boolean(service.descriptionMd.trim() || service.requirementsMd.trim() || service.faqs.length > 0);
-  const eta = service.etaText || service.deliveryTime;
+  const facts = serviceFacts(service, locale, t, c);
+  const hint = serviceStockHint(service, locale, c);
 
   return (
     <>
@@ -94,7 +110,15 @@ async function ServiceContent({ params }: { params: Promise<{ slug: string }> })
       />
       <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <header className="min-w-0 overflow-hidden rounded-card border border-line bg-surface shadow-card lg:col-start-1">
-          <ServiceArt type={service.type} brand={service.brand} sizes="(min-width: 1024px) 40vw, 100vw" aspect="21 / 9" fit="contain" priority />
+          <ServiceArt
+            type={service.type}
+            imageUrl={service.imageUrl}
+            brand={service.brand}
+            sizes="(min-width: 1024px) 40vw, 100vw"
+            aspect="21 / 9"
+            fit="contain"
+            priority
+          />
           <div className="grid gap-4 p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone="inverse" shape="tag">
@@ -122,31 +146,27 @@ async function ServiceContent({ params }: { params: Promise<{ slug: string }> })
             <CardBody className="grid gap-5">
               <div>
                 <p className="text-small font-semibold text-ink-muted">{t.service.priceLabel}</p>
-                <div className="mt-1 text-stat text-ink">
-                  <Suspense fallback={<Skeleton className="h-[1lh] w-36" />}>
+                <div className="mt-1">
+                  <Suspense fallback={<PriceBlock pending rule={service.quantity} locale={locale} q={c.quantity} t={t.service} />}>
                     <ServicePrice slug={service.slug} />
                   </Suspense>
                 </div>
                 <p className="mt-1.5 text-small text-ink-subtle">{t.service.taxNote}</p>
               </div>
-              <dl className="grid gap-3 border-y border-line py-4 text-body">
-                <div className="flex items-start justify-between gap-4">
-                  <dt className="flex items-center gap-2 text-ink-muted">
-                    <Clock aria-hidden="true" className="size-4 shrink-0" />
-                    {eta === service.deliveryTime ? t.service.delivery : t.service.eta}
-                  </dt>
-                  <dd className="min-w-0 text-end font-semibold text-ink">
-                    <bdi>{eta}</bdi>
-                  </dd>
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <dt className="flex items-center gap-2 text-ink-muted">
-                    <Hash aria-hidden="true" className="size-4 shrink-0" />
-                    {t.service.quantity}
-                  </dt>
-                  <dd className="min-w-0 text-end font-semibold text-ink">{quantityText(service.quantity, locale, t.service)}</dd>
-                </div>
-              </dl>
+              <div className="grid gap-3 border-y border-line py-4">
+                <dl className="grid gap-3 text-body">
+                  {facts.map(({ key, icon: Icon, label, value }) => (
+                    <div key={key} className="flex items-start justify-between gap-4">
+                      <dt className="flex items-center gap-2 text-ink-muted">
+                        <Icon aria-hidden="true" className="size-4 shrink-0" />
+                        {label}
+                      </dt>
+                      <dd className="min-w-0 text-end font-semibold text-ink">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {hint ? <p className="text-small text-ink-subtle">{hint}</p> : null}
+              </div>
               {buyable ? (
                 <div className="grid gap-3">
                   <ButtonLink href={checkoutHref} size="lg" block endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}>

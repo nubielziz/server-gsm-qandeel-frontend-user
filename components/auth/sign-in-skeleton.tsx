@@ -1,5 +1,7 @@
 // The same-size placeholder of the sign-in form while the query string (`?as=`, `?next=`, `?token=`) is read in the
-// browser. Server-compatible. Heights follow the real password form so nothing jumps when it replaces this.
+// browser. Server-compatible. Heights follow the real password form (one form for customers and merchants: the two fields
+// and the Turnstile box, the submit button, the divider, the two secondary buttons and the "create account" line), so
+// nothing jumps when it replaces this.
 import { Skeleton } from "@/components/ui/skeleton";
 
 function FieldSkeleton() {
@@ -14,7 +16,6 @@ function FieldSkeleton() {
 export function SignInSkeleton() {
   return (
     <div aria-busy="true" className="grid gap-6">
-      <Skeleton className="h-12 rounded-control" />
       <div className="grid gap-5">
         <FieldSkeleton />
         <div>
@@ -27,7 +28,10 @@ export function SignInSkeleton() {
         <Skeleton className="h-12 rounded-control" />
       </div>
       <Skeleton className="h-5" />
-      <Skeleton className="h-11 rounded-control" />
+      <div className="grid gap-3">
+        <Skeleton className="h-11 rounded-control" />
+        <Skeleton className="h-11 rounded-control" />
+      </div>
       <Skeleton className="mx-auto h-11 w-64" />
     </div>
   );

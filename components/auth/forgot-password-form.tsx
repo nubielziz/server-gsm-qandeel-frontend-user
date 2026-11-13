@@ -1,7 +1,9 @@
 "use client";
-// ForgotPasswordForm: asks for an email and sends a reset link. Customers (Turnstile) and merchants (Origin check, no
-// Turnstile) use different routes, picked with the same Customer | Merchant switch as sign-in (`?as=`). The success
-// text is the same for every address: the page never says whether an account exists (handoff §4.1, §5.6).
+// ForgotPasswordForm: asks for an email and sends a reset link. The backend has two forgot routes and no smart one (plan
+// §8), so the page keeps a Customer | Merchant choice (default from `?as=`, customer without it). Both routes take the
+// Turnstile token in `X-Turnstile-Token` (merchants since BH §6.2: ignored by the API until it switches the check on, so
+// the site always sends it). The success text is the same for every address: the page never says whether an account
+// exists (handoff §4.1, §5.6).
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
@@ -52,16 +54,12 @@ export function ForgotPasswordForm({ locale, t }: ForgotPasswordFormProps) {
     setBusy(true);
     setFeedback(NO_FEEDBACK);
     try {
-      if (customer) {
-        const turnstileToken = await ts.ensureToken();
-        if (!turnstileToken) {
-          setFeedback({ fields: {}, message: t.shared.securityCheckWait, reference: null });
-          return;
-        }
-        await api.post("/store/v1/auth/password/forgot", { email: address }, { turnstileToken });
-      } else {
-        await api.post("/client/auth/password/forgot", { email: address });
+      const turnstileToken = await ts.ensureToken();
+      if (!turnstileToken) {
+        setFeedback({ fields: {}, message: t.shared.securityCheckWait, reference: null });
+        return;
       }
+      await api.post(customer ? "/store/v1/auth/password/forgot" : "/client/auth/password/forgot", { email: address }, { turnstileToken });
       setSentTo(address);
     } catch (error) {
       setFeedback(feedbackFrom(error, errorText, ["email"]));
@@ -71,7 +69,7 @@ export function ForgotPasswordForm({ locale, t }: ForgotPasswordFormProps) {
     }
   }
 
-  const signIn = `${localePath(locale, "/sign-in")}?as=${surface}`;
+  const signIn = localePath(locale, "/sign-in");
 
   if (sentTo) {
     return (
@@ -93,19 +91,22 @@ export function ForgotPasswordForm({ locale, t }: ForgotPasswordFormProps) {
 
   return (
     <div className="grid gap-6">
-      <SegmentedControl
-        label={t.surfaces.label}
-        fullWidth
-        value={surface}
-        onValueChange={(value) => {
-          setSurface(value === "merchant" ? "merchant" : "customer");
-          setFeedback(NO_FEEDBACK);
-        }}
-        options={[
-          { value: "customer", label: t.surfaces.customer, icon: <UserRound aria-hidden="true" /> },
-          { value: "merchant", label: t.surfaces.merchant, icon: <Store aria-hidden="true" /> },
-        ]}
-      />
+      <div className="grid gap-2">
+        <SegmentedControl
+          label={t.surfaces.label}
+          fullWidth
+          value={surface}
+          onValueChange={(value) => {
+            setSurface(value === "merchant" ? "merchant" : "customer");
+            setFeedback(NO_FEEDBACK);
+          }}
+          options={[
+            { value: "customer", label: t.surfaces.customer, icon: <UserRound aria-hidden="true" /> },
+            { value: "merchant", label: t.surfaces.merchant, icon: <Store aria-hidden="true" /> },
+          ]}
+        />
+        <p className="text-small text-ink-muted">{t.forgot.chooseHint}</p>
+      </div>
       <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
         <Input
           type="email"
@@ -121,7 +122,7 @@ export function ForgotPasswordForm({ locale, t }: ForgotPasswordFormProps) {
           onChange={(e) => setEmail(e.target.value)}
           error={feedback.fields.email}
         />
-        {customer ? <Turnstile key="ts" onToken={ts.setToken} resetKey={ts.resetKey} lang={locale} /> : null}
+        <Turnstile key="ts" onToken={ts.setToken} resetKey={ts.resetKey} lang={locale} />
         <FormAlert message={feedback.message} reference={feedback.reference} />
         <Button type="submit" size="lg" block loading={busy}>
           {t.forgot.submit}

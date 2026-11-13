@@ -2,6 +2,9 @@
 // MerchantRegisterForm: a reseller applies for a merchant account (`POST /client/auth/register` → 204). The answer is the
 // same for a new and a known email, so the page only says "if the details are valid, check your email". The account
 // starts as `pending`: staff approve it later (handoff §4.15). `?ref=` prefills the referral code from an invite link.
+// The request carries `X-Turnstile-Token` (BH §6.2: the API ignores it until it switches the check on); the widget is reset
+// after every submit. The API takes no language, so after an Arabic sign-up a marker `{ locale, at }` is left in
+// localStorage and the first sign-in saves the language on the account (lib/merchant/signup-locale.ts, plan D4).
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
@@ -12,6 +15,8 @@ import { localePath, type Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
+import { rememberSignupLocale } from "@/lib/merchant/signup-locale";
+import { Turnstile } from "@/components/turnstile";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
@@ -21,6 +26,7 @@ import { authLinkClass } from "./auth-heading";
 import { FormAlert } from "./form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "./form-errors";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
+import { useTurnstile } from "./use-turnstile";
 
 export type MerchantRegisterFormProps = {
   locale: Locale;
@@ -36,6 +42,7 @@ export function MerchantRegisterForm({ locale, t, countries }: MerchantRegisterF
   const params = useSearchParams();
   const errorText = useErrorText();
   const ui = useUiText();
+  const ts = useTurnstile();
   const form = useRef<HTMLFormElement>(null);
   const [values, setValues] = useState({
     name: "",
@@ -54,7 +61,7 @@ export function MerchantRegisterForm({ locale, t, countries }: MerchantRegisterF
 
   const set = (key: keyof typeof values) => (event: { target: { value: string } }) =>
     setValues((current) => ({ ...current, [key]: event.target.value }));
-  const signIn = `${localePath(locale, "/sign-in")}?as=merchant`;
+  const signIn = localePath(locale, "/sign-in");
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -73,20 +80,33 @@ export function MerchantRegisterForm({ locale, t, countries }: MerchantRegisterF
     setFeedback(NO_FEEDBACK);
     const optional = (text: string) => (text.trim() ? text.trim() : undefined);
     try {
-      await api.post("/client/auth/register", {
-        name: values.name.trim(),
-        email: values.email.trim(),
-        password: values.password,
-        country: values.country,
-        company: optional(values.company),
-        phone: optional(values.phone),
-        referralCode: optional(values.referralCode),
-      });
+      const turnstileToken = await ts.ensureToken();
+      if (!turnstileToken) {
+        setFeedback({ fields: {}, message: t.shared.securityCheckWait, reference: null });
+        return;
+      }
+      await api.post(
+        "/client/auth/register",
+        {
+          name: values.name.trim(),
+          email: values.email.trim(),
+          password: values.password,
+          country: values.country,
+          company: optional(values.company),
+          phone: optional(values.phone),
+          referralCode: optional(values.referralCode),
+        },
+        { turnstileToken },
+      );
+      // The API has no language field: remember the page's language for the first sign-in (English clears an old marker).
+      rememberSignupLocale(locale);
       setSentTo(values.email.trim());
     } catch (error) {
       setFeedback(feedbackFrom(error, errorText, FIELDS, { referralCode: t.register.referralInvalid }));
     } finally {
       setBusy(false);
+      // A Turnstile token works once, even when the request failed: ask the widget for the next one.
+      ts.reset();
     }
   }
 
@@ -185,6 +205,7 @@ export function MerchantRegisterForm({ locale, t, countries }: MerchantRegisterF
         onChange={set("referralCode")}
         error={feedback.fields.referralCode}
       />
+      <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} lang={locale} />
       <FormAlert message={feedback.message} reference={feedback.reference} />
       <Button type="submit" size="lg" block loading={busy}>
         {t.register.submit}

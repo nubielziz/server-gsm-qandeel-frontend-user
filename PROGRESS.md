@@ -53,8 +53,39 @@ isolated demo API (:3100, Mailpit); the owner's API (:3000) is never written to.
 | F01 Shared helpers and strings | W0 | ✓ | accept, 1 minor | ✓ | 3/3 | ✓ | W0 |
 | F02 Docker image | W0 | ✓ | accept, 2 minor (docs) | ✓ | 3/3 | ✓ | W0 |
 | F03 e2e harness | W0 | ✓ | fix, 2 major | ✓ | 3/3 | ✓ | W0 |
+| F10 Smart sign-in | W1 | ✓ | fix, 2 major (test bug; 360 px overflow) | ✓ | 3/3 | ✓ + skeletons | W1 |
+| F11 Notifications, unsubscribe | W1 | ✓ | fix, 1 major (bell count race) | ✓ | 3/3 | ✓ + rail avatar | W1 |
+| F12 Catalog list | W1 | ✓ | fix, 2 major (test bugs) | ✓ | 3/3 | ✓ | W1 |
+| F13 Card, page, quick view | W1 | ✓ | fix, 1 major (mini card badge row) | ✓ | 3/3 | ✓ | W1 |
 
-Agent calls so far: Fable 1 (plan) + 12 (W0).
+Agent calls so far: Fable 1 (plan) + 12 (W0) + 12 (W1).
+
+### Wave 1: sign-in, notifications, catalog, service display (2026-11-13)
+- **F10 smart sign-in:** one email + password form on `POST /client/auth/sign-in` (Turnstile); the answer's `kind` opens
+  the portal or the account; the Customer | Merchant switch is gone (the forgot page keeps it: two backend routes).
+  New-password step for both kinds (merchant `POST /client/auth/password/change` → 2FA or done; customer
+  `POST /store/v1/me/password`). "Email me a sign-in link (customers)" always visible. One sentence for every 401.
+  `targetAfterSignIn` keeps a customer out of the portal and a merchant out of the account (`?next=` safe).
+  `X-Turnstile-Token` on merchant register and forgot. An Arabic merchant sign-up saves `locale: 'ar'` at the first
+  sign-in (`lib/merchant/signup-locale.ts`).
+- **F11 notifications:** bell with the unread count (99+) in both areas' headers, polled at most once a minute while the
+  tab is visible; `/[lang]/account/notifications` and `/[lang]/merchant/notifications` (All / Unread, mark one, mark all
+  with `upToId`, links prefixed with the language and checked by `notificationHref`, text rendered as text, `lang`/`dir`
+  per item). **`/[lang]/unsubscribe?token=`**: a confirm button (never automatic) → "no more marketing emails" or "link
+  not valid" (fixes the 404 of the marketing mails' visible link).
+- **F12 catalog:** the list asks the API (type, real categories with counts, "In stock only", price range, brand,
+  carrier, country, sorts Featured / Best sellers / New arrivals / price ↑↓ / A–Z); option counts still worked out over
+  the cached catalog. Malformed or reversed price bounds are fixed before the request.
+- **F13 display:** service pictures (`imageUrl`, `next/image`) with the brand logo and type picture as fallbacks;
+  delivery = staff note or minutes in the page's language; "In stock" badge (never "Pre-order", "Out of stock" or a
+  count); "per unit" and "From …" / "N for …" on the service page and quick view; the language switch and a slug of
+  the other language use `alternates`; static params capped at 50 per language.
+- **Lead fixes:** forgot and register skeletons reserve the new rows; the rail avatar hides on screens under 46 rem high
+  (9 merchant rail items).
+- **Checks:** typecheck and ESLint clean; 307 unit tests; build OK; wave specs (harness, auth, smart-sign-in,
+  notifications, unsubscribe, store, catalog-filters, service-display) 250 passed / 16 skipped / 0 failed; regression
+  (routing, checkout, account, support, merchant, merchant-settings) 162 passed / 4 skipped / 0 failed; desktop + mobile.
+  The first wave run had 11 failures in the new specs: 9 were test bugs, the rest real (bell count race), all fixed.
 
 ## Wiring (changed 2026-11-09, late evening, at the owner's request)
 - **Dev site (`npm run dev`, :5175) → the isolated demo API (:3100) since 2026-11-10**, at the owner's request (to

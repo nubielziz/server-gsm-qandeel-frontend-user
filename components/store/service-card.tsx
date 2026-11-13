@@ -1,10 +1,13 @@
-// ServiceCard: one service of the catalog (mockup "Featured Products", adapted to what the API has: no stock, no cart, no
-// favourites, no order counts). The whole card opens the service page (stretched title link); the eye button opens the
-// quick view (where the mockup has the favourite heart); "Order now" goes straight to checkout. Heights are fixed by
-// design (art row, tag, 2-line title + 1-line summary, meta row, price row) so a skeleton has the same size.
+// ServiceCard: one service of the catalog (mockup "Featured Products", adapted to what the API has: no stock number, no
+// cart, no favourites, no order counts). The whole card opens the service page (stretched title link); the eye button
+// opens the quick view (where the mockup has the favourite heart); "Order now" goes straight to checkout. Heights are
+// fixed by design (art row, tag row, 2-line title + 1-line summary, meta row, price row) so a skeleton has the same
+// size: the "In stock" badge shares the tag row (ServiceCard) or wraps under the delivery time in the two-line delivery
+// row (ServiceCardMini, reserved for every card) and never changes their height. The delivery time is the staff note
+// or the minutes in the page's language (lib/store/delivery.ts).
 // ServiceCardMini is the dense variant for side lists and the home list (mockup "New Arrivals", "All Products").
 import Link from "next/link";
-import { Clock, Eye, MapPin, ShoppingCart } from "lucide-react";
+import { CircleCheck, Clock, Eye, MapPin, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { IconButtonLink } from "@/components/ui/icon-button";
@@ -15,6 +18,7 @@ import { cn } from "@/lib/cn";
 import { countryName } from "@/lib/countries";
 import { fmt } from "@/lib/i18n/define";
 import { localePath, type Locale } from "@/lib/i18n/config";
+import { deliveryTime } from "@/lib/store/delivery";
 import type { ServiceType, StoreServiceCard } from "@/lib/api/types";
 import { BdiText } from "./bdi-text";
 import { ServiceMark } from "./service-art";
@@ -28,6 +32,8 @@ export type ServiceCardLabels = {
   orderService: string;
   /** "Quick view: {title}" (accessible name of the quick view link) */
   quickView: string;
+  /** "In stock" (the badge of a service whose stock covers the smallest order; never a number). */
+  inStock: string;
   /** Service type names (`common.serviceType`). */
   types: Record<ServiceType, string>;
 };
@@ -79,33 +85,51 @@ function QuickViewLink({ service, locale, labels, className }: Pick<ServiceCardP
   );
 }
 
-/** The delivery time with a clock; screen readers hear the whole sentence ("Delivery: 2 days"). */
-function Delivery({ service, labels }: Pick<ServiceCardProps, "service" | "labels">) {
+/**
+ * The delivery time with a clock: the staff note as written, else the minutes in the page's language. Screen readers
+ * hear the whole sentence ("Delivery: 2 days"). Nothing when the service has no delivery information.
+ */
+function Delivery({ time, labels }: { time: string; labels: ServiceCardLabels }) {
+  if (!time) return null;
   return (
     <>
       <Clock aria-hidden="true" className="size-3.5 shrink-0" />
       <VisuallyHidden>
-        <BdiText template={labels.delivery} value={service.deliveryTime} />
+        <BdiText template={labels.delivery} value={time} />
       </VisuallyHidden>
       <bdi aria-hidden="true" className="truncate">
-        {service.deliveryTime}
+        {time}
       </bdi>
     </>
+  );
+}
+
+/** The "In stock" mark: for `in_stock` services only (an `on_request` service says its delivery time instead). */
+function InStock({ service, labels }: Pick<ServiceCardProps, "service" | "labels">) {
+  if (service.availability !== "in_stock") return null;
+  return (
+    <Badge tone="success" shape="tag" caps icon={<CircleCheck aria-hidden="true" />} className="shrink-0">
+      {labels.inStock}
+    </Badge>
   );
 }
 
 export function ServiceCard({ service, locale, decimals, labels, priority }: ServiceCardProps) {
   const { href, orderHref } = links(service, locale);
   const place = [service.network, service.country ? countryName(service.country, locale) : ""].filter(Boolean).join(" · ");
+  const time = deliveryTime(service, locale).text;
   return (
     <article className={cn(frame, "p-4")}>
       <div className="flex h-12 items-center gap-3">
-        <ServiceMark type={service.type} brand={service.brand} priority={priority} />
+        <ServiceMark type={service.type} imageUrl={service.imageUrl} brand={service.brand} priority={priority} />
         <QuickViewLink service={service} locale={locale} labels={labels} className="-me-2 self-start" />
       </div>
-      <Badge shape="tag" caps className="mt-3.5">
-        {labels.types[service.type]}
-      </Badge>
+      <div className="mt-3.5 flex h-[1.375rem] items-center gap-2 overflow-hidden">
+        <Badge shape="tag" caps>
+          {labels.types[service.type]}
+        </Badge>
+        <InStock service={service} labels={labels} />
+      </div>
       <div className={cn("mt-2", BODY_BLOCK)}>
         <h3 className="text-subheading font-bold text-ink">
           <Link href={href} className="card-link line-clamp-2 rounded-badge after:absolute after:inset-0 focus-visible:outline-none">
@@ -114,9 +138,11 @@ export function ServiceCard({ service, locale, decimals, labels, priority }: Ser
         </h3>
         {service.summary ? <p className="mt-0.5 line-clamp-1 text-small text-ink-muted">{service.summary}</p> : null}
         <ul className="mt-2.5 flex h-5 items-center gap-x-4 text-small text-ink-muted">
-          <li className="flex min-w-0 shrink-0 items-center gap-1.5">
-            <Delivery service={service} labels={labels} />
-          </li>
+          {time ? (
+            <li className="flex min-w-0 shrink-0 items-center gap-1.5">
+              <Delivery time={time} labels={labels} />
+            </li>
+          ) : null}
           {place ? (
             <li className="flex min-w-0 items-center gap-1.5">
               <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
@@ -155,7 +181,9 @@ export function ServiceCardSkeleton() {
         <Skeleton className="size-12 shrink-0" />
         <Skeleton className="h-4 w-20" />
       </div>
-      <Skeleton className="mt-3.5 h-[1.375rem] w-24 rounded-badge" />
+      <div className="mt-3.5 flex h-[1.375rem] items-center">
+        <Skeleton className="h-[1.375rem] w-24 rounded-badge" />
+      </div>
       <div className={cn("mt-2", BODY_BLOCK)}>
         <div className="text-subheading">
           <Skeleton className="h-[1lh] w-4/5" />
@@ -186,13 +214,17 @@ export function ServiceGridSkeleton({ count = 8, className }: { count?: number; 
   );
 }
 
-/** The dense card: art, brand, a 2-line title, a 2-line summary, the delivery time, the price and a square order link. */
+/**
+ * The dense card: art, brand, a 2-line title, a 2-line summary, the delivery time (and the "In stock" mark), the price
+ * and a square order link.
+ */
 export function ServiceCardMini({ service, locale, decimals, labels }: Omit<ServiceCardProps, "priority">) {
   const { href, orderHref } = links(service, locale);
+  const time = deliveryTime(service, locale).text;
   return (
     <article className={cn(frame, "p-3.5")}>
       <div className="flex h-10 items-center gap-2.5">
-        <ServiceMark type={service.type} brand={service.brand} size="sm" />
+        <ServiceMark type={service.type} imageUrl={service.imageUrl} brand={service.brand} size="sm" />
         <QuickViewLink service={service} locale={locale} labels={labels} className="-me-2 -mt-1 self-start" />
       </div>
       <h3 className="mt-3 text-small font-bold text-ink">
@@ -201,9 +233,12 @@ export function ServiceCardMini({ service, locale, decimals, labels }: Omit<Serv
         </Link>
       </h3>
       {service.summary ? <p className="mt-0.5 line-clamp-2 text-caption text-ink-muted">{service.summary}</p> : null}
-      <p className="mt-2 flex items-center gap-1.5 text-caption text-ink-subtle">
-        <Delivery service={service} labels={labels} />
-      </p>
+      <div className="mt-2 flex h-12 flex-wrap content-start items-center gap-x-2 gap-y-1 overflow-hidden text-caption text-ink-subtle">
+        <span className="flex h-[1.375rem] min-w-0 max-w-full items-center gap-1.5">
+          <Delivery time={time} labels={labels} />
+        </span>
+        <InStock service={service} labels={labels} />
+      </div>
       <div className="mt-auto flex items-center justify-between gap-2 pt-3">
         <Money
           amount={service.price.gross}
@@ -237,8 +272,10 @@ export function ServiceCardMiniSkeleton() {
       <div className="mt-0.5 text-caption">
         <Skeleton className="h-[1lh] w-full" />
       </div>
-      <div className="mt-2 text-caption">
-        <Skeleton className="h-[1lh] w-16" />
+      <div className="mt-2 flex h-12 items-start">
+        <div className="flex h-[1.375rem] items-center">
+          <Skeleton className="h-3.5 w-16" />
+        </div>
       </div>
       <div className="mt-auto flex items-center justify-between gap-2 pt-3">
         <div className="text-body">

@@ -1,5 +1,7 @@
 // The catalog: the same browsable list as the home page's "All services" (components/store/service-list.tsx): filter
-// sidebar (categories, price range, brand, carrier, country; a drawer on phones), search, sort, chips, 24 cards a page.
+// sidebar (categories, "In stock only", price range, service type, brand, carrier, country; a drawer on phones), search,
+// six sorts (featured, best sellers, new arrivals, price both ways, name), chips, 24 cards a page. The API filters,
+// sorts and pages the rows.
 // The page shell is static; everything that depends on the URL (`searchParams`) or on the visitor's currency cookie
 // streams in behind one <Suspense>.
 import { Suspense } from "react";

@@ -78,7 +78,7 @@ export function SignUpChooser({ locale, t }: SignUpChooserProps) {
 
       <p className="text-center text-body text-ink-muted">
         {t.signUp.haveAccount}{" "}
-        <Link href={`${localePath(locale, "/sign-in")}?as=${kind}`} className={authLinkClass}>
+        <Link href={localePath(locale, "/sign-in")} className={authLinkClass}>
           {t.signIn.submit}
         </Link>
       </p>

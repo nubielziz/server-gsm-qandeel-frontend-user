@@ -2,7 +2,7 @@
 // Real browser → Next → the isolated demo backend (:3100). The Cloudflare script is replaced by a stub that hands out the
 // backend's dev token, so the tests do not depend on the internet.
 import { expect, test } from "./fixtures";
-import { type Page } from "@playwright/test";
+import { type APIRequestContext, type Page } from "@playwright/test";
 
 /** The token the backend's dev Turnstile verifier accepts (handoff §3.10). */
 const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
@@ -15,6 +15,19 @@ async function stubTurnstile(page: Page) {
     }),
   );
 }
+
+type ApiCategory = { id: number; slug: string; name: string; serviceCount: number };
+
+/** The categories the API lists (`GET /store/v1/categories`), read through the site's own rewrite. */
+async function apiCategories(request: APIRequestContext, locale: "en" | "ar" = "en"): Promise<ApiCategory[]> {
+  const res = await request.get(`/store/v1/categories?locale=${locale}`);
+  expect(res.status()).toBe(200);
+  return ((await res.json()) as { categories: ApiCategory[] }).categories;
+}
+
+/** The accessible name of a category's checkbox in the sidebar: its name, then its `serviceCount` in brackets. */
+const categoryCheckbox = (category: ApiCategory) =>
+  new RegExp(`^${category.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\(${category.serviceCount}\\)`);
 
 test.describe("home", () => {
   test("shows featured services priced in USD, brand and carrier tiles and the quick IMEI form", async ({ page }) => {
@@ -53,7 +66,7 @@ test.describe("home", () => {
     await expect(collections.getByText("8 services")).toBeVisible();
   });
 
-  test("all services: 8 per page, sidebar checkboxes with counts, search; the state is in the home URL", async ({ page, isMobile }) => {
+  test("all services: 8 per page, sidebar checkboxes with counts, search; the state is in the home URL", async ({ page, request, isMobile }) => {
     await page.goto("/en");
     const list = page.getByRole("region", { name: /^All services/ });
     await expect(list.getByRole("article")).toHaveCount(8);
@@ -67,7 +80,11 @@ test.describe("home", () => {
     // options of one list add up.
     if (isMobile) await list.getByRole("button", { name: /^Filters/ }).click();
     const filters = isMobile ? page.getByRole("dialog", { name: "Filters" }) : list.getByRole("complementary", { name: "Filters" });
-    await expect(filters.getByRole("group", { name: "Categories" }).getByRole("checkbox", { name: /^IMEI check/ })).toBeVisible();
+    // "Categories" holds the API's real categories with their service count; the four service types sit under "Service type".
+    const category = (await apiCategories(request)).find((c) => c.serviceCount > 0);
+    expect(category, "the demo catalog has a category with services").toBeDefined();
+    await expect(filters.getByRole("group", { name: "Categories" }).getByRole("checkbox", { name: categoryCheckbox(category!) })).toBeVisible();
+    await expect(filters.getByRole("group", { name: "Service type" }).getByRole("checkbox", { name: /^IMEI check/ })).toBeVisible();
     const brands = filters.getByRole("group", { name: "Brand" });
     await expect(brands.getByText("(8)")).toBeVisible();
     await brands.getByRole("checkbox", { name: /^Samsung/ }).check();
@@ -160,11 +177,14 @@ test.describe("catalog", () => {
     await expect(page.getByRole("article")).toHaveCount(11);
   });
 
-  test("has the same filter sidebar as the home page: categories, price range, brand checkboxes", async ({ page, isMobile }) => {
+  test("has the same filter sidebar as the home page: categories, service type, price range, brand checkboxes", async ({ page, request, isMobile }) => {
     await page.goto("/en/services");
     if (isMobile) await page.getByRole("button", { name: /^Filters/ }).click();
     const filters = isMobile ? page.getByRole("dialog", { name: "Filters" }) : page.getByRole("complementary", { name: "Filters" });
-    await expect(filters.getByRole("group", { name: "Categories" }).getByRole("checkbox", { name: /^IMEI check/ })).toBeVisible();
+    const category = (await apiCategories(request)).find((c) => c.serviceCount > 0);
+    expect(category, "the demo catalog has a category with services").toBeDefined();
+    await expect(filters.getByRole("group", { name: "Categories" }).getByRole("checkbox", { name: categoryCheckbox(category!) })).toBeVisible();
+    await expect(filters.getByRole("group", { name: "Service type" }).getByRole("checkbox", { name: /^IMEI check/ })).toBeVisible();
     await expect(filters.getByRole("slider", { name: "Maximum price" })).toHaveValue("26");
     await filters.getByRole("group", { name: "Brand" }).getByRole("checkbox", { name: /^Samsung/ }).check();
     await expect(page).toHaveURL(/\/en\/services\?brand=Samsung$/);

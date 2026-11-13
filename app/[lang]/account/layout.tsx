@@ -2,13 +2,14 @@
 // on who is signed in, so it streams behind <Suspense> (the static shell is the same-size skeleton). Signed out → sign-in
 // (customer tab). No wallet: customers have none yet (ROADMAP 2W). Support lives in the shop chrome (`/support`).
 import { Suspense, type ReactNode } from "react";
-import { ClipboardList, Headset, LayoutDashboard, Settings, Store, UserRound } from "lucide-react";
+import { Bell, ClipboardList, Headset, LayoutDashboard, Settings, Store, UserRound } from "lucide-react";
 import { requireCustomer } from "@/lib/api/session";
 import { localePath } from "@/lib/i18n/config";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { portal } from "@/lib/i18n/messages/portal";
 import { SignOutButton } from "@/components/layout/sign-out-button";
+import { BellSkeleton, BellSlot } from "@/components/notifications/bell-slot";
 import { WorkspaceShell, WorkspaceShellSkeleton, type WorkspaceNavItem } from "@/components/layout/workspace-shell";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
 
@@ -21,6 +22,7 @@ async function CustomerFrame({ children }: { children: ReactNode }) {
   const nav: WorkspaceNavItem[] = [
     { href: p("/account"), label: t.customerNav.overview, icon: <LayoutDashboard aria-hidden="true" className={icon} />, match: "exact" },
     { href: p("/account/orders"), label: t.customerNav.orders, icon: <ClipboardList aria-hidden="true" className={icon} /> },
+    { href: p("/account/notifications"), label: t.customerNav.notifications, icon: <Bell aria-hidden="true" className={icon} /> },
     { href: p("/support"), label: t.customerNav.support, icon: <Headset aria-hidden="true" className={icon} /> },
   ];
   const footerNav: WorkspaceNavItem[] = [
@@ -48,6 +50,11 @@ async function CustomerFrame({ children }: { children: ReactNode }) {
           <MenuSeparator />
           <SignOutButton surface="customer" label={c.header.signOut} pendingLabel={c.header.signingOut} />
         </>
+      }
+      headerSlot={
+        <Suspense fallback={<BellSkeleton />}>
+          <BellSlot surface="customer" />
+        </Suspense>
       }
       search={{ action: p("/services"), label: t.searchServices, placeholder: t.searchServices, submitLabel: c.actions.search }}
     >

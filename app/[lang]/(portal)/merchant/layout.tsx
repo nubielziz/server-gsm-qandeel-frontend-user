@@ -6,7 +6,9 @@
 import { Suspense, cache } from "react";
 import Link from "next/link";
 import {
+  Bell,
   ClipboardList,
+  Clock,
   Gift,
   KeyRound,
   LayoutDashboard,
@@ -25,6 +27,7 @@ import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { portal } from "@/lib/i18n/messages/portal";
 import { SignOutButton } from "@/components/layout/sign-out-button";
+import { BellSkeleton, BellSlot } from "@/components/notifications/bell-slot";
 import { WorkspaceShell, WorkspaceShellSkeleton, type WorkspaceNavItem } from "@/components/layout/workspace-shell";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +50,7 @@ async function WalletPill() {
     <Link
       href={localePath(locale, "/merchant/wallet")}
       aria-label={`${t.availableBalance}: ${wallet.available} USD`}
-      className="inline-flex h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold transition-colors hover:bg-surface-muted"
+      className="inline-flex h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold transition-colors hover:bg-surface-muted max-sm:hidden"
     >
       <Wallet aria-hidden="true" className="size-[18px]" />
       <Money amount={wallet.available} currency="USD" locale={locale} />
@@ -62,8 +65,16 @@ async function MerchantFrame({ children }: { children: React.ReactNode }) {
   const p = (path: string) => localePath(locale, path);
   const icon = "size-5";
 
+  const notificationsItem: WorkspaceNavItem = {
+    href: p("/merchant/notifications"),
+    label: t.merchantNav.notifications,
+    icon: <Bell aria-hidden="true" className={icon} />,
+  };
   const nav: WorkspaceNavItem[] = pending
-    ? [{ href: p("/merchant"), label: t.merchantNav.overview, icon: <LayoutDashboard aria-hidden="true" className={icon} />, match: "exact" }]
+    ? [
+        { href: p("/merchant"), label: t.merchantNav.overview, icon: <LayoutDashboard aria-hidden="true" className={icon} />, match: "exact" },
+        notificationsItem,
+      ]
     : [
         { href: p("/merchant"), label: t.merchantNav.overview, icon: <LayoutDashboard aria-hidden="true" className={icon} />, match: "exact" },
         { href: p("/merchant/services"), label: t.merchantNav.services, title: t.servicesTitle, icon: <PlusCircle aria-hidden="true" className={icon} /> },
@@ -73,6 +84,7 @@ async function MerchantFrame({ children }: { children: React.ReactNode }) {
         { href: p("/merchant/api-keys"), label: t.merchantNav.apiKeys, icon: <KeyRound aria-hidden="true" className={icon} /> },
         { href: p("/merchant/webhooks"), label: t.merchantNav.webhooks, icon: <Webhook aria-hidden="true" className={icon} /> },
         { href: p("/merchant/referrals"), label: t.merchantNav.referrals, icon: <Gift aria-hidden="true" className={icon} /> },
+        notificationsItem,
       ];
   const footerNav: WorkspaceNavItem[] = [
     { href: p("/merchant/settings"), label: t.merchantNav.settings, icon: <Settings aria-hidden="true" className={icon} /> },
@@ -98,13 +110,21 @@ async function MerchantFrame({ children }: { children: React.ReactNode }) {
         </>
       }
       headerSlot={
-        pending ? (
-          <Badge tone="warning">{t.pending.badge}</Badge>
-        ) : (
-          <Suspense fallback={<Skeleton className="h-11 w-32 rounded-control" />}>
-            <WalletPill />
+        <>
+          <Suspense fallback={<BellSkeleton />}>
+            <BellSlot surface="merchant" />
           </Suspense>
-        )
+          {pending ? (
+            // On a phone the badge shrinks to its clock icon (the banner below says the same in words), so the bell fits.
+            <Badge tone="warning" icon={<Clock aria-hidden="true" className="sm:hidden" />}>
+              <span className="max-sm:sr-only">{t.pending.badge}</span>
+            </Badge>
+          ) : (
+            <Suspense fallback={<Skeleton className="h-11 w-32 rounded-control max-sm:hidden" />}>
+              <WalletPill />
+            </Suspense>
+          )}
+        </>
       }
       search={
         pending

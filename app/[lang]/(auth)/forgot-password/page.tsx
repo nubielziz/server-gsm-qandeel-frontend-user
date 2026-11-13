@@ -15,7 +15,10 @@ export async function generateMetadata(): Promise<Metadata> {
 function ForgotSkeleton() {
   return (
     <div aria-busy="true" className="grid gap-6">
-      <Skeleton className="h-12 rounded-control" />
+      <div className="grid gap-2">
+        <Skeleton className="h-12 rounded-control" />
+        <Skeleton className="h-10 w-full" />
+      </div>
       <div className="grid gap-5">
         <div className="grid gap-1.5">
           <Skeleton className="h-3.5 w-28" />

@@ -1,7 +1,8 @@
 // "All services" on the home page (mockup "All Products"): the shared service list (./service-list.tsx) with 8 dense
 // cards per page, in a section with its heading and a link to the catalog page with the same filters. Its state is the
-// home URL (`/en?type=imei&brand=Apple&max=20&page=2#all-services`); the search, chip and page links end with the
-// section's anchor so its top comes into view.
+// home URL (`/en?category=4-carrier-unlock&stock=1&type=imei&brand=Apple&max=20&sort=popular&page=2#all-services`: the
+// same parameters as `/services`, whose rows the API filters, sorts and pages); the search, chip and page links end
+// with the section's anchor so its top comes into view.
 import { ArrowRight } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { pageHref } from "@/components/ui/pagination";

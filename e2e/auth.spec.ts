@@ -1,125 +1,39 @@
 // Sign-in, sign-up and the email-link pages against the isolated demo backend (:3100) and Mailpit (:8025).
 // Rules this file keeps (rate limits are real, handoff §3.9): wrong passwords only with throwaway emails, the shared demo
 // accounts are never changed (passwords, settings): lifecycle tests create their own customer / merchant.
-import { createHmac } from "node:crypto";
+// The sign-in page is ONE form for customers and merchants (plan F10): the radios are gone. The smart-sign-in specifics
+// (request shape, tokens, temporary passwords, language marker) live in e2e/smart-sign-in.spec.ts.
 import { expect, test } from "./fixtures";
-import { type Page } from "@playwright/test";
-import { ACCOUNTS } from "./helpers";
-
-const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
-
-/** Replaces Cloudflare's script with a stub that hands out the dev token at once (and again after `reset`). */
-async function stubTurnstile(page: Page) {
-  await page.route("**/challenges.cloudflare.com/turnstile/v0/api.js*", (route) =>
-    route.fulfill({
-      contentType: "application/javascript",
-      body: `var w={};window.turnstile={render:function(el,o){var id="w"+Math.random();w[id]=o;setTimeout(function(){o.callback("${DEV_TOKEN}")},30);return id},reset:function(id){var o=w[id];if(o)setTimeout(function(){o.callback("${DEV_TOKEN}")},30)},remove:function(id){delete w[id]}};`,
-    }),
-  );
-}
-
-// Staff side (admin API of the isolated backend; the seeded Owner's password and TOTP secret are public dev data,
-// handoff §9.2). Only used to give a THROWAWAY customer a temporary password, which customers cannot ask for themselves.
-const API_ORIGIN = process.env.E2E_API_ORIGIN ?? "http://localhost:3100";
-function base32(text: string): Buffer {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  let bits = "";
-  for (const ch of text) bits += alphabet.indexOf(ch).toString(2).padStart(5, "0");
-  const bytes: number[] = [];
-  for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
-  return Buffer.from(bytes);
-}
-function totp(secret: string, offsetMs = 0): string {
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor((Date.now() + offsetMs) / 30_000)));
-  const hmac = createHmac("sha1", base32(secret)).update(counter).digest();
-  const offset = hmac[hmac.length - 1] & 15;
-  const code = (((hmac[offset] & 127) << 24) | (hmac[offset + 1] << 16) | (hmac[offset + 2] << 8) | hmac[offset + 3]) % 1_000_000;
-  return String(code).padStart(6, "0");
-}
-async function ownerSession(page: Page) {
-  // Staff calls go straight to the API as this machine (the seeded admin IP allow-list is localhost); they must not
-  // carry the per-test client IP the fixture adds (e2e/fixtures.ts).
-  const headers = { "Content-Type": "application/json", Origin: "http://localhost:5175", "X-Forwarded-For": "127.0.0.1" };
-  const cookiesOf = (res: Awaited<ReturnType<Page["request"]["post"]>>) =>
-    res.headersArray().filter((h) => h.name.toLowerCase() === "set-cookie").map((h) => h.value.split(";")[0]).join("; ");
-  const login = await page.request.post(`${API_ORIGIN}/admin/auth/login`, {
-    headers,
-    data: { email: "rami@gsm-supply.example", password: "demo-password" },
-  });
-  expect(login.status(), await login.text()).toBe(200);
-  // A TOTP code works once: if another run just used this window's code, wait for the next window and retry.
-  const twofa = () =>
-    page.request.post(`${API_ORIGIN}/admin/auth/2fa`, {
-      headers: { ...headers, Cookie: cookiesOf(login), "X-CSRF-Token": login.headers()["x-csrf-token"] },
-      data: { code: totp("4DP3DBKM62TVFPNM5QE6OO4P6STUYM3J") },
-    });
-  let second = await twofa();
-  if (second.status() === 422) {
-    await page.waitForTimeout((30 - (Math.floor(Date.now() / 1000) % 30) + 1) * 1000);
-    second = await twofa();
-  }
-  expect(second.status(), await second.text()).toBe(204);
-  return { ...headers, Cookie: cookiesOf(second), "X-CSRF-Token": second.headers()["x-csrf-token"] };
-}
-
-/** `page.goto`, then wait until the first form control is hydrated: React resets a controlled input that was filled before hydration. */
-async function go(page: Page, url: string) {
-  await page.goto(url);
-  await page.waitForFunction(() => {
-    const control = document.querySelector("form input, form textarea, form select");
-    return !control || Object.keys(control).some((key) => key.startsWith("__reactProps"));
-  });
-}
-
-function uniqueEmail(prefix: string) {
-  return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@example.test`;
-}
-
-/** Waits for a Mailpit message to `address` whose text holds a link to `pathPattern`, and returns that link's path+query. */
-async function waitForLink(page: Page, address: string, pathPattern: RegExp, skip: string[] = []): Promise<string> {
-  const deadline = Date.now() + 25_000;
-  while (Date.now() < deadline) {
-    const list = await page.request.get(`http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:${address}`)}&limit=10`);
-    const body = (await list.json()) as { messages?: { ID: string }[] };
-    for (const { ID } of body.messages ?? []) {
-      const message = (await (await page.request.get(`http://localhost:8025/api/v1/message/${ID}`)).json()) as { Text?: string; HTML?: string };
-      const text = `${message.Text ?? ""}\n${message.HTML ?? ""}`.replace(/&amp;/g, "&");
-      for (const match of text.matchAll(/https?:\/\/localhost:5175(\/[^\s"'<>)\]]+)/g)) {
-        if (pathPattern.test(match[1]) && !skip.includes(match[1])) return match[1];
-      }
-    }
-    await page.waitForTimeout(500);
-  }
-  throw new Error(`no mail to ${address} with a link matching ${pathPattern}`);
-}
+import { customerIdByEmail, temporaryCustomerPassword, totp } from "./admin";
+import { ACCOUNTS, DEV_TURNSTILE_TOKEN, go, stubTurnstile, uniqueEmail, waitForLink } from "./helpers";
 
 test.describe("sign-in page", () => {
   test.beforeEach(async ({ page }) => stubTurnstile(page));
 
-  test("customer form by default, merchant switch hides the anti-bot step, links are present", async ({ page }) => {
+  test("one form for both kinds: no account-type choice, and every other way in is always shown", async ({ page }) => {
     await go(page, "/en/sign-in");
     await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
-    await expect(page.getByRole("radio", { name: "Customer" })).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByRole("button", { name: "Email me a sign-in link instead" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Forgot password?" })).toHaveAttribute("href", "/en/forgot-password?as=customer");
-    await expect(page.getByRole("link", { name: "Create account" })).toHaveAttribute("href", /\/en\/sign-up/);
-
-    await page.getByRole("radio", { name: "Merchant" }).click();
+    await expect(page.getByRole("radio")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Email me a sign-in link (customers)" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Forgot password?" })).toHaveAttribute("href", "/en/forgot-password");
+    await expect(page.getByRole("link", { name: "Create account" })).toHaveAttribute("href", "/en/sign-up");
     await expect(page.getByRole("link", { name: "Apply as a merchant" })).toHaveAttribute("href", "/en/merchant/register");
-    await expect(page.getByRole("link", { name: "Forgot password?" })).toHaveAttribute("href", "/en/forgot-password?as=merchant");
   });
 
-  test("?as=merchant opens the merchant tab", async ({ page }) => {
+  test("an old ?as=merchant link still opens the page, and only carries its hint to the forgot and sign-up pages", async ({ page }) => {
     await go(page, "/en/sign-in?as=merchant");
-    await expect(page.getByRole("radio", { name: "Merchant" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Forgot password?" })).toHaveAttribute("href", "/en/forgot-password?as=merchant");
+    await expect(page.getByRole("link", { name: "Create account" })).toHaveAttribute("href", "/en/sign-up?as=merchant");
   });
 
   test("Arabic page is right-to-left with Arabic text", async ({ page }) => {
     await go(page, "/ar/sign-in");
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.getByRole("heading", { level: 1, name: "تسجيل الدخول" })).toBeVisible();
-    await expect(page.getByRole("radio", { name: "تاجر" })).toBeVisible();
+    await expect(page.getByRole("radio")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "أرسل لي رابط دخول (للعملاء)" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "قدّم طلبًا كتاجر" })).toHaveAttribute("href", "/ar/merchant/register");
   });
 
   test("a wrong password shows one generic message and keeps the page", async ({ page }) => {
@@ -175,8 +89,8 @@ test.describe("sign-in page", () => {
     await expect(page).toHaveURL(/\/en\/account\/orders$/);
   });
 
-  test("merchant signs in (active) and lands on the portal", async ({ page }) => {
-    await go(page, "/en/sign-in?as=merchant");
+  test("merchant signs in (active) through the same form and lands on the portal", async ({ page }) => {
+    await go(page, "/en/sign-in");
     await page.locator('input[name="email"]').fill(ACCOUNTS.merchant.email);
     await page.locator('input[name="password"]').fill(ACCOUNTS.merchant.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -184,7 +98,7 @@ test.describe("sign-in page", () => {
   });
 
   test("a pending merchant can sign in too", async ({ page }) => {
-    await go(page, "/en/sign-in?as=merchant&next=/en/merchant/settings");
+    await go(page, "/en/sign-in?next=/en/merchant/settings");
     await page.locator('input[name="email"]').fill(ACCOUNTS.pendingMerchant.email);
     await page.locator('input[name="password"]').fill(ACCOUNTS.pendingMerchant.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -198,7 +112,7 @@ test.describe("email-link pages", () => {
   test("customer magic link: request, mail, button, signed in; the link works once", async ({ page }) => {
     const email = uniqueEmail("magic");
     await go(page, "/en/sign-in");
-    await page.getByRole("button", { name: "Email me a sign-in link instead" }).click();
+    await page.getByRole("button", { name: "Email me a sign-in link (customers)" }).click();
     await page.locator('input[name="email"]').fill(email);
     await page.getByRole("button", { name: "Email me the link" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Check your email" })).toBeVisible();
@@ -245,7 +159,7 @@ test.describe("email-link pages", () => {
   test("customer password lifecycle: forgot, set password (weak refused), sign in with it", async ({ page }) => {
     const email = uniqueEmail("pw");
     // An account holder: sign in once by magic link (API), then sign out.
-    await page.request.post("/store/v1/auth/magic-link", { headers: { "X-Turnstile-Token": DEV_TOKEN }, data: { email } });
+    await page.request.post("/store/v1/auth/magic-link", { headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN }, data: { email } });
     const first = await waitForLink(page, email, /\/sign-in\?token=/);
     const verified = await page.request.post("/store/v1/auth/verify", { data: { token: new URL(first, "http://x").searchParams.get("token") } });
     expect(verified.status()).toBe(200);
@@ -331,7 +245,8 @@ test.describe("email-link pages", () => {
     await page.getByRole("button", { name: "Save password" }).click();
     await expect(page.getByText("Your password is saved")).toBeVisible();
     await page.getByRole("link", { name: "Sign in" }).click();
-    await expect(page.getByRole("radio", { name: "Merchant" })).toHaveAttribute("aria-checked", "true");
+    await expect(page).toHaveURL(/\/en\/sign-in/);
+    await expect(page.getByRole("radio")).toHaveCount(0); // one form: the merchant signs in on it like everyone
     await page.locator('input[name="email"]').fill(email);
     await page.locator('input[name="password"]').fill(fresh);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -346,7 +261,7 @@ test.describe("email-link pages", () => {
     expect(enabled.status(), await enabled.text()).toBe(204);
     await page.context().clearCookies();
 
-    await go(page, "/en/sign-in?as=merchant");
+    await go(page, "/en/sign-in");
     await page.locator('input[name="email"]').fill(email);
     await page.locator('input[name="password"]').fill(fresh);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -362,7 +277,7 @@ test.describe("email-link pages", () => {
     await page.getByRole("button", { name: "Verify and sign in" }).click();
     await expect(page.getByText("That code is not right.")).toBeVisible(); // 422 on `code`, not a sign-out
     // The code of the next 30-second step is accepted (±1 step) and was not used by the enable call above.
-    await code.fill(totp(secret, 30_000));
+    await code.fill(totp(secret, Date.now(), 1));
     await page.getByRole("button", { name: "Verify and sign in" }).click();
     await expect(page).toHaveURL(/\/en\/merchant$/);
   });
@@ -386,17 +301,12 @@ test.describe("temporary password", () => {
 
   test("a customer whose password staff set must choose their own before continuing", async ({ page }) => {
     const email = uniqueEmail("temp");
-    await page.request.post("/store/v1/auth/magic-link", { headers: { "X-Turnstile-Token": DEV_TOKEN }, data: { email } });
+    await page.request.post("/store/v1/auth/magic-link", { headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN }, data: { email } });
     const link = await waitForLink(page, email, /\/sign-in\?token=/);
     expect((await page.request.post("/store/v1/auth/verify", { data: { token: new URL(link, "http://x").searchParams.get("token") } })).status()).toBe(200);
     await page.context().clearCookies();
 
-    const staff = await ownerSession(page);
-    const found = await page.request.get(`${API_ORIGIN}/admin/customers?q=${encodeURIComponent(email)}`, { headers: staff });
-    const id = ((await found.json()) as { id: number }[])[0].id;
-    const made = await page.request.post(`${API_ORIGIN}/admin/customers/${id}/password`, { headers: staff, data: { mode: "temporary_password" } });
-    expect(made.status(), await made.text()).toBe(200);
-    const { temporaryPassword } = (await made.json()) as { temporaryPassword: string };
+    const temporaryPassword = await temporaryCustomerPassword(await customerIdByEmail(email));
 
     await go(page, "/en/sign-in");
     await page.locator('input[name="email"]').fill(email);
@@ -418,7 +328,7 @@ test.describe("temporary password", () => {
     expect((await page.request.get("/store/v1/me")).status()).toBe(200);
 
     await page.context().clearCookies();
-    const again = await page.request.post("/store/v1/auth/login", { headers: { "X-Turnstile-Token": DEV_TOKEN }, data: { email, password: chosen } });
+    const again = await page.request.post("/store/v1/auth/login", { headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN }, data: { email, password: chosen } });
     expect((await again.json()).next).toBe("done");
   });
 });

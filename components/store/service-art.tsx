@@ -1,6 +1,8 @@
-// Art of a service: the owner's `service-<type>.jpg` (docs/IMAGE-PROMPTS.md) in a fixed aspect ratio, or a plain tile with
-// a type icon until the file exists. Brand and carrier logos are files `brands/<name>.png` and `carriers/<name>.png`
-// (docs/LOGOS.md: transparent, cropped to the logo, drawn at their real proportions). Never draws artwork.
+// Art of a service. Order: the service's own picture (`imageUrl`, a file the API serves at `/store/v1/media/<hash>.<ext>`,
+// shown through next/image), then the brand logo, then the owner's `service-<type>.jpg` (docs/IMAGE-PROMPTS.md) in a fixed
+// aspect ratio, then a plain tile with a type icon until that file exists. Brand and carrier logos are files
+// `brands/<name>.png` and `carriers/<name>.png` (docs/LOGOS.md: transparent, cropped to the logo, drawn at their real
+// proportions). Never draws artwork.
 import Image from "next/image";
 import { Cable, FileArchive, Server, Smartphone, type LucideIcon } from "lucide-react";
 import { ImageSlot } from "@/components/ui/image-slot";
@@ -14,6 +16,17 @@ export const serviceTypeIcons: Record<ServiceType, LucideIcon> = {
   remote: Cable,
   file: FileArchive,
 };
+
+/** What the API's `imageUrl` may look like: `/store/v1/media/<name>`, one path segment, no query. */
+const PICTURE_PATH = /^\/store\/v1\/media\/[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/**
+ * The path of a service picture, or null when the service has none (or the value is not a media path of this site:
+ * the optimizer only accepts `/store/v1/media/**`, and nothing else from the API is trusted as an image source).
+ */
+export function servicePicture(imageUrl: string | null | undefined): string | null {
+  return imageUrl && PICTURE_PATH.test(imageUrl) ? imageUrl : null;
+}
 
 export type LogoFolder = "brands" | "carriers";
 
@@ -106,6 +119,8 @@ export function isSymbolLogo(folder: LogoFolder, name: string): boolean {
 
 export type ServiceArtProps = {
   type: ServiceType;
+  /** The service's own picture (`imageUrl` of the API, or null): when it has one it is shown instead of everything below. */
+  imageUrl?: string | null;
   /** The service's brand: when it has a logo, the logo takes the place of the type picture. */
   brand?: string;
   /** The `sizes` attribute of the image (how wide it is at each breakpoint). */
@@ -118,11 +133,37 @@ export type ServiceArtProps = {
   className?: string;
 };
 
+/** A service picture in an aspect-ratio box (decorative: the title next to it names the service). */
+function PictureBox({
+  src,
+  sizes,
+  aspect,
+  priority,
+  fit = "cover",
+  className,
+}: {
+  src: string;
+  sizes: string;
+  aspect: string;
+  priority?: boolean;
+  fit?: "cover" | "contain";
+  className?: string;
+}) {
+  return (
+    <div style={{ aspectRatio: aspect }} className={cn("relative w-full overflow-hidden bg-surface-sunken", className)}>
+      <Image src={src} alt="" fill sizes={sizes} preload={priority} className={fit === "cover" ? "object-cover" : "object-contain"} />
+    </div>
+  );
+}
+
 /**
- * The picture of a service (decorative: the title next to it names the service). The type pictures are the same for every
- * service of a type, so they are a fallback: a brand with a logo shows its logo on a quiet lit surface instead.
+ * The picture of a service (decorative: the title next to it names the service). The service's own picture comes first.
+ * The type pictures are the same for every service of a type, so they are a fallback: a brand with a logo shows its logo
+ * on a quiet lit surface instead.
  */
-export function ServiceArt({ type, brand, sizes, aspect = "16 / 10", priority, fit, className }: ServiceArtProps) {
+export function ServiceArt({ type, imageUrl, brand, sizes, aspect = "16 / 10", priority, fit, className }: ServiceArtProps) {
+  const picture = servicePicture(imageUrl);
+  if (picture) return <PictureBox src={picture} sizes={sizes} aspect={aspect} priority={priority} fit={fit} className={className} />;
   if (brand && logoFile("brands", brand)) {
     return (
       <div style={{ aspectRatio: aspect }} className={cn("sheen-surface grid w-full place-items-center overflow-hidden p-6", className)}>
@@ -146,10 +187,31 @@ export function ServiceArt({ type, brand, sizes, aspect = "16 / 10", priority, f
   );
 }
 
-/** A small square of the service art for compact cards: the owner's `service-<type>.jpg`, or the type icon on a quiet tile. */
-export function ServiceThumb({ type, size = "md", priority }: { type: ServiceType; size?: "sm" | "md"; priority?: boolean }) {
+/**
+ * A small square of the service art for compact cards: the service's own picture, else the owner's `service-<type>.jpg`,
+ * else the type icon on a quiet tile.
+ */
+export function ServiceThumb({
+  type,
+  imageUrl,
+  size = "md",
+  priority,
+}: {
+  type: ServiceType;
+  imageUrl?: string | null;
+  size?: "sm" | "md";
+  priority?: boolean;
+}) {
   const file = `service-${type}.jpg`;
   const box = size === "sm" ? "size-10" : "size-12";
+  const picture = servicePicture(imageUrl);
+  if (picture) {
+    return (
+      <span className={cn("relative block shrink-0 overflow-hidden rounded-control bg-surface-sunken", box)}>
+        <Image src={picture} alt="" fill sizes="64px" preload={priority} className="object-cover" />
+      </span>
+    );
+  }
   if (siteImage(file)) {
     return (
       <span className={cn("relative block shrink-0 overflow-hidden rounded-control", box)}>
@@ -166,11 +228,23 @@ export function ServiceThumb({ type, size = "md", priority }: { type: ServiceTyp
 }
 
 /**
- * The top corner of a service card. With a brand logo: the logo alone (a symbol keeps the name beside it). Without one:
- * the type picture (the same for every service of a type, so only a fallback) and the brand name. `md` for cards, `sm`
- * for dense cards.
+ * The top corner of a service card. With the service's own picture: the picture and the brand name. Else with a brand
+ * logo: the logo alone (a symbol keeps the name beside it). Else the type picture (the same for every service of a type,
+ * so only a fallback) and the brand name. `md` for cards, `sm` for dense cards.
  */
-export function ServiceMark({ type, brand, size = "md", priority }: { type: ServiceType; brand: string; size?: "sm" | "md"; priority?: boolean }) {
+export function ServiceMark({
+  type,
+  imageUrl,
+  brand,
+  size = "md",
+  priority,
+}: {
+  type: ServiceType;
+  imageUrl?: string | null;
+  brand: string;
+  size?: "sm" | "md";
+  priority?: boolean;
+}) {
   const name = brand ? (
     <span
       dir="auto"
@@ -182,7 +256,7 @@ export function ServiceMark({ type, brand, size = "md", priority }: { type: Serv
       {brand}
     </span>
   ) : null;
-  if (brand && logoFile("brands", brand)) {
+  if (!servicePicture(imageUrl) && brand && logoFile("brands", brand)) {
     return (
       <span className="flex min-w-0 flex-1 items-center gap-2">
         {isSymbolLogo("brands", brand) ? (
@@ -198,7 +272,7 @@ export function ServiceMark({ type, brand, size = "md", priority }: { type: Serv
   }
   return (
     <span className={cn("flex min-w-0 flex-1 items-center", size === "md" ? "gap-3" : "gap-2.5")}>
-      <ServiceThumb type={type} size={size} priority={priority} />
+      <ServiceThumb type={type} imageUrl={imageUrl} size={size} priority={priority} />
       {name}
     </span>
   );

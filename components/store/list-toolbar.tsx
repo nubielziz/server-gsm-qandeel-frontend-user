@@ -1,21 +1,23 @@
 "use client";
-// The search box and the sort control above the home page's service list: one GET form, so it works without
-// JavaScript (the search button submits it). With JavaScript a new sort applies at once, empty and default values stay
-// out of the URL, the page number starts again at 1 and the list's anchor keeps it in view. The other filters ride along
-// as hidden fields. Give it a `key` made of the current values: a new URL then shows them (the fields are uncontrolled).
+// The search box and the sort control above the service list (home and catalog): one GET form, so it works without
+// JavaScript (the search button submits it). The sort has six choices (featured, best sellers, new arrivals, price both
+// ways, name); the server names them, so this component knows only their values. With JavaScript a new sort applies at
+// once, empty and default values stay out of the URL, the page number starts again at 1 and the list's anchor keeps it
+// in view. The other filters ride along as hidden fields. Give it a `key` made of the current values: a new URL then
+// shows them (the fields are uncontrolled).
 import { useId, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Search } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
-import { Input, Select } from "@/components/ui/input";
+import { Input, Select, type SelectOption } from "@/components/ui/input";
 
 export type ListToolbarLabels = {
   search: string;
   searchPlaceholder: string;
   searchSubmit: string;
   sort: string;
-  sortFeatured: string;
-  sortTitle: string;
+  /** Every sort of the control, in display order, named in the page's language (`featured` first: the default). */
+  sorts: SelectOption[];
 };
 
 export type ListToolbarProps = {
@@ -24,8 +26,9 @@ export type ListToolbarProps = {
   /** The list's anchor (`#all-services`). */
   hash: string;
   q: string;
-  sort: "featured" | "title";
-  /** Active filters to keep (categories, brand, carrier, country, price), as name/value pairs (names may repeat). */
+  /** The current sort (`featured`, `popular`, `newest`, `price_asc`, `price_desc` or `title`). */
+  sort: string;
+  /** Active filters to keep (category, stock, type, brand, carrier, country, price), as name/value pairs (names may repeat). */
   keep: [string, string][];
   labels: ListToolbarLabels;
   /** A control at the end of the sort row (the phone "Filters" button; a `type="button"`, so it never submits). */
@@ -76,18 +79,17 @@ export function ListToolbar({ action, hash, q, sort, keep, labels, extra }: List
         fieldClassName="min-w-0 flex-[1_1_16rem]"
       />
       <div className="flex items-center gap-2.5 max-sm:w-full">
-        <label htmlFor={sortId} className="whitespace-nowrap text-small text-ink-muted">
+        {/* On a phone the visible label would squeeze the select (the longer sort names were cut off); it stays the select's accessible name. */}
+        <label htmlFor={sortId} className="whitespace-nowrap text-small text-ink-muted max-sm:sr-only">
           {labels.sort}
         </label>
         <Select
           id={sortId}
           name="sort"
+          wrapperClassName="min-w-0 max-sm:flex-1"
           defaultValue={sort}
           onChange={(event) => event.currentTarget.form?.requestSubmit()}
-          options={[
-            { value: "featured", label: labels.sortFeatured },
-            { value: "title", label: labels.sortTitle },
-          ]}
+          options={labels.sorts}
         />
         {extra ? <div className="ms-auto">{extra}</div> : null}
       </div>

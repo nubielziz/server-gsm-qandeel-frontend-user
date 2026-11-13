@@ -18,7 +18,7 @@ export default async function MerchantRegisterPage() {
   return (
     <>
       <AuthHeading title={t.register.title} subtitle={t.register.subtitle} />
-      <Suspense fallback={<FormSkeleton fields={6} hint />}>
+      <Suspense fallback={<FormSkeleton fields={6} hint turnstile />}>
         <MerchantRegisterForm locale={locale} countries={countryOptions(locale)} t={{ fields: t.fields, shared: t.shared, register: t.register }} />
       </Suspense>
     </>
