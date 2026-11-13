@@ -22,11 +22,14 @@ export function errorText(t: ErrorMessages): ErrorText {
   // Field codes come in both cases from the API (`INVALID_IMEI` as a problem code, `invalid_imei` on a field).
   const fieldText = (code: string) =>
     fieldTexts[code] ?? fieldTexts[code.toLowerCase()] ?? fieldTexts[code.toUpperCase()] ?? fieldTexts.fallback;
+  // Seconds up to two minutes ("42 s"), then whole minutes rounded up ("about 15 min"): never a shorter wait than the API said.
+  const retryText = (seconds: number) =>
+    seconds >= 120 ? fmt(t.retryInMinutes, { minutes: Math.ceil(seconds / 60) }) : fmt(t.retryIn, { seconds });
   return {
     message(error) {
       if (!isApiError(error)) return codes.fallback;
       let text = codes[error.code] ?? codes.fallback;
-      if (error.code === "RATE_LIMITED" && error.retryAfter) text += ` ${fmt(t.retryIn, { seconds: error.retryAfter })}`;
+      if (error.code === "RATE_LIMITED" && error.retryAfter) text += ` ${retryText(error.retryAfter)}`;
       return text;
     },
     field(error) {

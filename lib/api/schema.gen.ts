@@ -39,6 +39,7 @@ export type GetClientApiKeysResponse = Array<{
   revokedAt: IsoDateTime | null;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
+  createdByStaff?: boolean;
 }>;
 
 // ── POST /client/api-keys — New API key
@@ -67,6 +68,7 @@ export type PostClientApiKeysResponse = {
     revokedAt: IsoDateTime | null;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
+    createdByStaff?: boolean;
   };
   secret: string;
 };
@@ -97,6 +99,7 @@ export type PatchClientApiKeysByIdResponse = {
   revokedAt: IsoDateTime | null;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
+  createdByStaff?: boolean;
 };
 
 // ── DELETE /client/api-keys/:id — Revoke a key
@@ -121,7 +124,7 @@ export type PostClientAuthLoginBody = {
 };
 /** 200 */
 export type PostClientAuthLoginResponse = {
-  next: "totp" | "done";
+  next: "password" | "totp" | "done";
 };
 
 // ── POST /client/auth/logout — Sign out and end the session
@@ -153,6 +156,19 @@ export type GetClientAuthMeResponse = {
   };
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
+  locale: "en" | "ar";
+  address: string;
+  taxId: string;
+  mustChangePassword: boolean;
+};
+
+// ── POST /client/auth/password/change — Replace a temporary password
+export type PostClientAuthPasswordChangeBody = {
+  password: string;
+};
+/** 200 */
+export type PostClientAuthPasswordChangeResponse = {
+  next: "totp" | "done";
 };
 
 // ── POST /client/auth/password/forgot — Send a password reset link
@@ -183,12 +199,27 @@ export type PostClientAuthRegisterBody = {
 /** 204 */
 export type PostClientAuthRegisterResponse = void;
 
+// ── POST /client/auth/sign-in — Sign in as a merchant or a customer with one form
+export type PostClientAuthSignInBody = {
+  email: string;
+  password: string;
+};
+/** 200 */
+export type PostClientAuthSignInResponse = {
+  kind: "merchant" | "customer";
+  next: "password" | "totp" | "done";
+};
+
 // ── POST /client/auth/verify-email — Verify the email with the token
 export type PostClientAuthVerifyEmailBody = {
   token: string;
 };
 /** 204 */
 export type PostClientAuthVerifyEmailResponse = void;
+
+// ── POST /client/auth/verify-email/resend — Resend the verification email
+/** 204 */
+export type PostClientAuthVerifyEmailResendResponse = void;
 
 // ── GET /client/commissions — My commissions
 export type GetClientCommissionsQuery = {
@@ -623,6 +654,70 @@ export type PutClientNotificationPreferencesResponse = {
   }>;
 };
 
+// ── GET /client/notifications — My notifications
+export type GetClientNotificationsQuery = {
+  /** First row to return (0-based, inclusive). Default 0. */
+  _start?: number;
+  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 100 rows. */
+  _end?: number;
+  /** Comma-separated sort fields. Allowed: createdAt, id. Default: createdAt desc. */
+  _sort?: string;
+  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
+  _order?: string;
+  /** Keep rows where category equals (repeat the key for IN) the value. */
+  category?: Array<"announcement" | "marketing" | "order" | "payment" | "wallet" | "billing" | "support" | "account" | "alert">;
+  /** `true` for unread items only, `false` for read ones. */
+  unread?: "true" | "false";
+  /** The reader’s page language; default: a customer’s saved language, English for the others. */
+  locale?: "en" | "ar";
+};
+/** 200 */
+export type GetClientNotificationsResponse = Array<{
+  /** Numeric record id. */
+  id: Id;
+  category: "announcement" | "marketing" | "order" | "payment" | "wallet" | "billing" | "support" | "account" | "alert";
+  /** Plain text: render it as text, never as HTML. */
+  title: string;
+  /** Plain text with line breaks: render it as text, never as HTML. */
+  body: string;
+  /** A site path without the language prefix (for example `/account/orders`), or `null`. */
+  link: string | null;
+  /** The language `title` and `body` are in. */
+  locale: "en" | "ar";
+  readAt: IsoDateTime | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  /** Set for an item that came from a broadcast. */
+  campaignId: Id | null;
+  /** Set for an item that came from an event (an order result, a low balance). */
+  event: string | null;
+}>;
+
+// ── POST /client/notifications/read-all — Mark all notifications read
+export type PostClientNotificationsReadAllBody = {
+  /** The newest item id the screen showed: an item that arrived after it stays unread. Omit for every item. */
+  upToId?: Id;
+};
+/** 200 */
+export type PostClientNotificationsReadAllResponse = {
+  updated: number;
+};
+
+// ── GET /client/notifications/unread-count — How many notifications are unread
+/** 200 */
+export type GetClientNotificationsUnreadCountResponse = {
+  /** Capped at 100: show "99+" when it is 100. */
+  unread: number;
+};
+
+// ── POST /client/notifications/:id/read — Mark a notification read
+export type PostClientNotificationsByIdReadParams = {
+  /** Numeric record id. */
+  id: Id;
+};
+/** 204 */
+export type PostClientNotificationsByIdReadResponse = void;
+
 // ── GET /client/orders — My orders
 export type GetClientOrdersQuery = {
   /** First row to return (0-based, inclusive). Default 0. */
@@ -875,12 +970,15 @@ export type GetClientPricesExportQuery = {
 /** 200 text/csv */
 export type GetClientPricesExportResponse = Blob;
 
-// ── PATCH /client/profile — Update name, company, phone and country
+// ── PATCH /client/profile — Update the merchant profile
 export type PatchClientProfileBody = {
   name?: string;
   company?: string;
   phone?: string;
   country?: string;
+  locale?: "en" | "ar";
+  address?: string;
+  taxId?: string;
 };
 /** 200 */
 export type PatchClientProfileResponse = {
@@ -906,6 +1004,10 @@ export type PatchClientProfileResponse = {
   };
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
+  locale: "en" | "ar";
+  address: string;
+  taxId: string;
+  mustChangePassword: boolean;
 };
 
 // ── GET /client/referrals — My referral link and referred merchants
@@ -1314,6 +1416,26 @@ export type PostStoreV1AuthVerifyResponse = {
   createdAt: IsoDateTime;
 };
 
+// ── GET /store/v1/categories — List the storefront categories
+export type GetStoreV1CategoriesQuery = {
+  locale?: "en" | "ar";
+};
+/** 200 */
+export type GetStoreV1CategoriesResponse = {
+  locale: "en" | "ar";
+  categories: Array<{
+    /** Numeric record id. */
+    id: Id;
+    /** `<id>-<words>`: only the number before the first hyphen counts. */
+    slug: string;
+    /** The name in the requested language (the English name when there is no Arabic one). */
+    name: string;
+    type: "imei" | "server" | "remote" | "file";
+    /** Services with a switched-on page in the language that can be bought now. */
+    serviceCount: number;
+  }>;
+};
+
 // ── POST /store/v1/checkout-sessions — Open a checkout
 export type PostStoreV1CheckoutSessionsBody = {
   /** The service page the buyer is on (`id` of `GET /store/v1/services`). */
@@ -1405,6 +1527,8 @@ export type PostStoreV1CheckoutSessionsResponse = {
     name: string;
     supports3ds: boolean;
   }>;
+  /** Feature 21: true when the store balance is switched on and this checkout was opened by a signed-in customer, so `POST /store/v1/checkout-sessions/:token/balance-payment` may pay it (with that customer signed in). Never the balance itself: read it from `GET /store/v1/me/wallet`. */
+  balancePayable: boolean;
   /** The tracking token of the order this payment created (`GET /store/v1/orders/:token`); null until the checkout is paid. The holder of the checkout token is the buyer, so the shop can send them to their order without an account. */
   trackingToken: string | null;
 };
@@ -1476,8 +1600,46 @@ export type GetStoreV1CheckoutSessionsByTokenResponse = {
     name: string;
     supports3ds: boolean;
   }>;
+  /** Feature 21: true when the store balance is switched on and this checkout was opened by a signed-in customer, so `POST /store/v1/checkout-sessions/:token/balance-payment` may pay it (with that customer signed in). Never the balance itself: read it from `GET /store/v1/me/wallet`. */
+  balancePayable: boolean;
   /** The tracking token of the order this payment created (`GET /store/v1/orders/:token`); null until the checkout is paid. The holder of the checkout token is the buyer, so the shop can send them to their order without an account. */
   trackingToken: string | null;
+};
+
+// ── POST /store/v1/checkout-sessions/:token/balance-payment — Pay a checkout from the store balance
+export type PostStoreV1CheckoutSessionsByTokenBalancePaymentParams = {
+  /** The checkout token. */
+  token: string;
+};
+/** 201 */
+export type PostStoreV1CheckoutSessionsByTokenBalancePaymentResponse = {
+  payment: {
+    /** Numeric record id. */
+    id: Id;
+    /** `PAY-<id>`. */
+    reference: string;
+    /** `captured`; a replay says what refunds made of it since (`refunded`, `partial_refund`). */
+    status: string;
+    method: "balance";
+    /** The checkout's currency. */
+    currency: string;
+    /** The gross in the checkout's currency, as the checkout showed it. */
+    amount: Money;
+    /** The gross in USD: what left the store balance. */
+    amountUsd: Money;
+  };
+  order: {
+    /** Numeric record id. */
+    id: Id;
+    /** The public tracking token of the new order. */
+    trackingToken: string;
+  };
+  wallet: {
+    /** The store balance after the payment (USD). */
+    balance: Money;
+    /** What can be spent now: `0.0000` while on hold or switched off. */
+    available: Money;
+  };
 };
 
 // ── POST /store/v1/checkout-sessions/:token/consents — Record the consents of a checkout
@@ -1588,6 +1750,25 @@ export type GetStoreV1ConfigResponse = {
   }>;
 };
 
+// ── POST /store/v1/files — Upload a receipt
+/** multipart/form-data with one part named `file`. */
+export type PostStoreV1FilesBody = FormData;
+/** 201 */
+export type PostStoreV1FilesResponse = {
+  /** What a File service order takes as its input file (`fileId`), or a KYC submission or a receipt. */
+  id: Id;
+  /** The base name of the file, without control characters, at most 200 characters. */
+  filename: string;
+  /** Bytes. */
+  size: number;
+  /** The media type the client declared (`application/octet-stream` when it sent none). */
+  mime: string;
+  /** Hex SHA-256 of the content. */
+  sha256: string;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+};
+
 // ── GET /store/v1/help — List help articles
 export type GetStoreV1HelpQuery = {
   /** First row to return (0-based, inclusive). Default 0. */
@@ -1643,6 +1824,17 @@ export type GetStoreV1HelpBySlugResponse = {
   updatedAt: IsoDateTime;
 };
 
+// ── POST /store/v1/help/:slug/vote — Vote on a help article
+export type PostStoreV1HelpBySlugVoteParams = {
+  slug: string;
+};
+export type PostStoreV1HelpBySlugVoteBody = {
+  /** `true` for "yes, it helped", `false` for "no". */
+  helpful: boolean;
+};
+/** 204 */
+export type PostStoreV1HelpBySlugVoteResponse = void;
+
 // ── POST /store/v1/imei/check — Check an IMEI
 export type PostStoreV1ImeiCheckBody = {
   /** 15 digits; spaces and dashes are ignored. */
@@ -1675,6 +1867,13 @@ export type PostStoreV1ImeiCheckResponse = {
   checkedAt: IsoDateTime;
 };
 
+// ── POST /store/v1/marketing/unsubscribe/:token — Stop marketing email
+export type PostStoreV1MarketingUnsubscribeByTokenParams = {
+  token: string;
+};
+/** 204 */
+export type PostStoreV1MarketingUnsubscribeByTokenResponse = void;
+
 // ── GET /store/v1/me — My account
 /** 200 */
 export type GetStoreV1MeResponse = {
@@ -1695,8 +1894,11 @@ export type GetStoreV1MeResponse = {
   createdAt: IsoDateTime;
 };
 
-// ── PATCH /store/v1/me — Change language, currency and marketing consent
+// ── PATCH /store/v1/me — Change name, phone, country, language, currency and marketing consent
 export type PatchStoreV1MeBody = {
+  name?: string;
+  phone?: string;
+  country?: string;
   /** `en` or `ar`. */
   locale?: string;
   currency?: string;
@@ -1747,6 +1949,70 @@ export type PostStoreV1MeDataExportResponse = {
   dueAt: IsoDateTime;
 };
 
+// ── GET /store/v1/me/notifications — My notifications
+export type GetStoreV1MeNotificationsQuery = {
+  /** First row to return (0-based, inclusive). Default 0. */
+  _start?: number;
+  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 100 rows. */
+  _end?: number;
+  /** Comma-separated sort fields. Allowed: createdAt, id. Default: createdAt desc. */
+  _sort?: string;
+  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
+  _order?: string;
+  /** Keep rows where category equals (repeat the key for IN) the value. */
+  category?: Array<"announcement" | "marketing" | "order" | "payment" | "wallet" | "billing" | "support" | "account" | "alert">;
+  /** `true` for unread items only, `false` for read ones. */
+  unread?: "true" | "false";
+  /** The reader’s page language; default: a customer’s saved language, English for the others. */
+  locale?: "en" | "ar";
+};
+/** 200 */
+export type GetStoreV1MeNotificationsResponse = Array<{
+  /** Numeric record id. */
+  id: Id;
+  category: "announcement" | "marketing" | "order" | "payment" | "wallet" | "billing" | "support" | "account" | "alert";
+  /** Plain text: render it as text, never as HTML. */
+  title: string;
+  /** Plain text with line breaks: render it as text, never as HTML. */
+  body: string;
+  /** A site path without the language prefix (for example `/account/orders`), or `null`. */
+  link: string | null;
+  /** The language `title` and `body` are in. */
+  locale: "en" | "ar";
+  readAt: IsoDateTime | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  /** Set for an item that came from a broadcast. */
+  campaignId: Id | null;
+  /** Set for an item that came from an event (an order result, a low balance). */
+  event: string | null;
+}>;
+
+// ── POST /store/v1/me/notifications/read-all — Mark all notifications read
+export type PostStoreV1MeNotificationsReadAllBody = {
+  /** The newest item id the screen showed: an item that arrived after it stays unread. Omit for every item. */
+  upToId?: Id;
+};
+/** 200 */
+export type PostStoreV1MeNotificationsReadAllResponse = {
+  updated: number;
+};
+
+// ── GET /store/v1/me/notifications/unread-count — How many notifications are unread
+/** 200 */
+export type GetStoreV1MeNotificationsUnreadCountResponse = {
+  /** Capped at 100: show "99+" when it is 100. */
+  unread: number;
+};
+
+// ── POST /store/v1/me/notifications/:id/read — Mark a notification read
+export type PostStoreV1MeNotificationsByIdReadParams = {
+  /** Numeric record id. */
+  id: Id;
+};
+/** 204 */
+export type PostStoreV1MeNotificationsByIdReadResponse = void;
+
 // ── GET /store/v1/me/orders — My orders and their status
 export type GetStoreV1MeOrdersQuery = {
   /** First row to return (0-based, inclusive). Default 0. */
@@ -1796,6 +2062,344 @@ export type PostStoreV1MePasswordBody = {
 /** 204 */
 export type PostStoreV1MePasswordResponse = void;
 
+// ── GET /store/v1/me/wallet — My store balance
+/** 200 */
+export type GetStoreV1MeWalletResponse = {
+  /** The master switch: false hides Add Funds and Pay from balance; a balance is still shown. */
+  enabled: boolean;
+  /** Whether an automatic (card) method can appear. */
+  cardTopUps: boolean;
+  /** Always USD. */
+  currency: string;
+  /** Customer side; negative only after a lost top-up chargeback. */
+  balance: Money;
+  /** Always 0.0000 for a customer (the merchant wallet shape). */
+  reserved: Money;
+  /** Always 0.0000 for a customer. */
+  creditLimit: Money;
+  /** What can be spent now: 0.0000 while frozen, switched off or negative, else the balance. */
+  available: Money;
+  frozen: {
+    /** ISO 8601 UTC time with milliseconds. */
+    at: IsoDateTime;
+  } | null;
+  pendingTopUps: {
+    count: number;
+    /** The net the unpaid top-ups would add. */
+    amount: Money;
+  };
+  limits: {
+    /** Decimal string with exactly 4 fraction digits. */
+    minTopUp: Money;
+    /** Decimal string with exactly 4 fraction digits. */
+    maxTopUp: Money;
+    /** Decimal string with exactly 4 fraction digits. */
+    maxBalance: Money;
+    /** How much more top-ups may add: maxBalance minus the balance and the pending top-ups, never below zero. */
+    room: Money;
+    /** Top-ups still allowed in the trailing 24 hours. */
+    topUpsLeftToday: number;
+    /** USD still allowed in top-ups in the trailing 24 hours. */
+    amountLeftToday: Money;
+  };
+};
+
+// ── GET /store/v1/me/wallet/statement — My store balance statement
+export type GetStoreV1MeWalletStatementQuery = {
+  /** First row to return (0-based, inclusive). Default 0. */
+  _start?: number;
+  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 1000 rows. */
+  _end?: number;
+  /** Comma-separated sort fields. Allowed: createdAt. Default: createdAt desc. */
+  _sort?: string;
+  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
+  _order?: string;
+  /** Keep rows where createdAt is greater than or equal to the value. */
+  createdAt_gte?: string;
+  /** Keep rows where createdAt is less than or equal to the value. */
+  createdAt_lte?: string;
+};
+/** 200 */
+export type GetStoreV1MeWalletStatementResponse = Array<{
+  /** The ledger entry id. */
+  id: Id;
+  /** Numeric record id. */
+  transactionId: Id;
+  /** deposit, b2c_payment, refund, adjustment or chargeback. */
+  kind: string;
+  /** English; a staff adjustment reads "Balance adjustment". */
+  memo: string;
+  /** The order the line is about, when it is one. */
+  orderId: Id | null;
+  /** Signed from the customer side: a top-up is positive, a payment negative. */
+  amount: Money;
+  /** Decimal string with exactly 4 fraction digits. */
+  balanceAfter: Money;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+}>;
+
+// ── GET /store/v1/me/wallet/top-up-methods — My top-up methods
+export type GetStoreV1MeWalletTopUpMethodsQuery = {
+  /** First row to return (0-based, inclusive). Default 0. */
+  _start?: number;
+  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 1000 rows. */
+  _end?: number;
+  /** Comma-separated sort fields. Allowed: name. Default: name asc. */
+  _sort?: string;
+  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
+  _order?: string;
+};
+/** 200 */
+export type GetStoreV1MeWalletTopUpMethodsResponse = Array<{
+  /** Numeric record id. */
+  id: Id;
+  code: string;
+  name: string;
+  /** Manual: staff review the receipt. Automatic: the gateway confirms and the wallet credits itself. */
+  kind: "manual" | "automatic";
+  methodType: "bank" | "card" | "usdt" | "wise";
+  /** Exact decimal number as a string. */
+  feePercent: Decimal;
+  /** Decimal string with exactly 4 fraction digits. */
+  feeFixed: Money;
+  /** `0.0000` = no minimum. */
+  minAmount: Money;
+  /** The lower of the gateway maximum and the merchant group limit per deposit; `0.0000` = no maximum. */
+  maxAmount: Money;
+  currency: string;
+  holdHours: number;
+  /** The transfer details of a manual method; empty for an automatic one. */
+  instructions: string;
+}>;
+
+// ── GET /store/v1/me/wallet/top-ups — My top-ups
+export type GetStoreV1MeWalletTopUpsQuery = {
+  /** First row to return (0-based, inclusive). Default 0. */
+  _start?: number;
+  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 1000 rows. */
+  _end?: number;
+  /** Comma-separated sort fields. Allowed: createdAt. Default: createdAt desc. */
+  _sort?: string;
+  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
+  _order?: string;
+};
+/** 200 */
+export type GetStoreV1MeWalletTopUpsResponse = Array<{
+  /** Numeric record id. */
+  id: Id;
+  /** The top-up number (`INV-2026-0042`). */
+  number: string;
+  status: "awaiting_payment" | "in_review" | "credited" | "rejected" | "cancelled";
+  /** What the customer pays (USD). */
+  amount: Money;
+  /** Decimal string with exactly 4 fraction digits. */
+  fee: Money;
+  /** What the balance receives: amount minus fee. */
+  netAmount: Money;
+  /** Always USD. */
+  currency: string;
+  method: {
+    /** Numeric record id. */
+    id: Id;
+    code: string;
+    name: string;
+    kind: "manual" | "automatic";
+    methodType: "bank" | "card" | "usdt" | "wise";
+  };
+  /** The bank or gateway reference, once paid. */
+  reference: string | null;
+  receiptUploaded: boolean;
+  /** Why staff rejected it (status `rejected`). */
+  rejectionReason: string | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  creditedAt: IsoDateTime | null;
+}>;
+
+// ── POST /store/v1/me/wallet/top-ups — Start a top-up
+export type PostStoreV1MeWalletTopUpsBody = {
+  /** A decimal above zero with at most four places, in USD. */
+  amount: string;
+  /** Numeric record id. */
+  gatewayId: Id;
+};
+/** 201 */
+export type PostStoreV1MeWalletTopUpsResponse = {
+  /** Numeric record id. */
+  id: Id;
+  /** The top-up number (`INV-2026-0042`). */
+  number: string;
+  status: "awaiting_payment" | "in_review" | "credited" | "rejected" | "cancelled";
+  /** What the customer pays (USD). */
+  amount: Money;
+  /** Decimal string with exactly 4 fraction digits. */
+  fee: Money;
+  /** What the balance receives: amount minus fee. */
+  netAmount: Money;
+  /** Always USD. */
+  currency: string;
+  method: {
+    /** Numeric record id. */
+    id: Id;
+    code: string;
+    name: string;
+    kind: "manual" | "automatic";
+    methodType: "bank" | "card" | "usdt" | "wise";
+  };
+  /** The bank or gateway reference, once paid. */
+  reference: string | null;
+  receiptUploaded: boolean;
+  /** Why staff rejected it (status `rejected`). */
+  rejectionReason: string | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  creditedAt: IsoDateTime | null;
+  /** The transfer details of a manual method. */
+  instructions?: string;
+  /** The hosted payment page of an automatic method. */
+  paymentUrl?: string;
+};
+
+// ── GET /store/v1/me/wallet/top-ups/:id — One of my top-ups
+export type GetStoreV1MeWalletTopUpsByIdParams = {
+  /** Numeric record id. */
+  id: Id;
+};
+/** 200 */
+export type GetStoreV1MeWalletTopUpsByIdResponse = {
+  /** Numeric record id. */
+  id: Id;
+  /** The top-up number (`INV-2026-0042`). */
+  number: string;
+  status: "awaiting_payment" | "in_review" | "credited" | "rejected" | "cancelled";
+  /** What the customer pays (USD). */
+  amount: Money;
+  /** Decimal string with exactly 4 fraction digits. */
+  fee: Money;
+  /** What the balance receives: amount minus fee. */
+  netAmount: Money;
+  /** Always USD. */
+  currency: string;
+  method: {
+    /** Numeric record id. */
+    id: Id;
+    code: string;
+    name: string;
+    kind: "manual" | "automatic";
+    methodType: "bank" | "card" | "usdt" | "wise";
+  };
+  /** The bank or gateway reference, once paid. */
+  reference: string | null;
+  receiptUploaded: boolean;
+  /** Why staff rejected it (status `rejected`). */
+  rejectionReason: string | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  creditedAt: IsoDateTime | null;
+  /** The transfer details of a manual method. */
+  instructions?: string;
+  /** The hosted payment page of an automatic method. */
+  paymentUrl?: string;
+};
+
+// ── POST /store/v1/me/wallet/top-ups/:id/cancel — Cancel a top-up
+export type PostStoreV1MeWalletTopUpsByIdCancelParams = {
+  /** Numeric record id. */
+  id: Id;
+};
+/** 200 */
+export type PostStoreV1MeWalletTopUpsByIdCancelResponse = {
+  /** Numeric record id. */
+  id: Id;
+  /** The top-up number (`INV-2026-0042`). */
+  number: string;
+  status: "awaiting_payment" | "in_review" | "credited" | "rejected" | "cancelled";
+  /** What the customer pays (USD). */
+  amount: Money;
+  /** Decimal string with exactly 4 fraction digits. */
+  fee: Money;
+  /** What the balance receives: amount minus fee. */
+  netAmount: Money;
+  /** Always USD. */
+  currency: string;
+  method: {
+    /** Numeric record id. */
+    id: Id;
+    code: string;
+    name: string;
+    kind: "manual" | "automatic";
+    methodType: "bank" | "card" | "usdt" | "wise";
+  };
+  /** The bank or gateway reference, once paid. */
+  reference: string | null;
+  receiptUploaded: boolean;
+  /** Why staff rejected it (status `rejected`). */
+  rejectionReason: string | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  creditedAt: IsoDateTime | null;
+  /** The transfer details of a manual method. */
+  instructions?: string;
+  /** The hosted payment page of an automatic method. */
+  paymentUrl?: string;
+};
+
+// ── POST /store/v1/me/wallet/top-ups/:id/receipt — Attach the transfer receipt
+export type PostStoreV1MeWalletTopUpsByIdReceiptParams = {
+  /** Numeric record id. */
+  id: Id;
+};
+export type PostStoreV1MeWalletTopUpsByIdReceiptBody = {
+  /** Numeric record id. */
+  fileId: Id;
+  reference?: string;
+};
+/** 201 */
+export type PostStoreV1MeWalletTopUpsByIdReceiptResponse = {
+  /** Numeric record id. */
+  id: Id;
+  /** The top-up number (`INV-2026-0042`). */
+  number: string;
+  status: "awaiting_payment" | "in_review" | "credited" | "rejected" | "cancelled";
+  /** What the customer pays (USD). */
+  amount: Money;
+  /** Decimal string with exactly 4 fraction digits. */
+  fee: Money;
+  /** What the balance receives: amount minus fee. */
+  netAmount: Money;
+  /** Always USD. */
+  currency: string;
+  method: {
+    /** Numeric record id. */
+    id: Id;
+    code: string;
+    name: string;
+    kind: "manual" | "automatic";
+    methodType: "bank" | "card" | "usdt" | "wise";
+  };
+  /** The bank or gateway reference, once paid. */
+  reference: string | null;
+  receiptUploaded: boolean;
+  /** Why staff rejected it (status `rejected`). */
+  rejectionReason: string | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  creditedAt: IsoDateTime | null;
+  /** The transfer details of a manual method. */
+  instructions?: string;
+  /** The hosted payment page of an automatic method. */
+  paymentUrl?: string;
+};
+
+// ── GET /store/v1/media/:name — Download a service picture
+export type GetStoreV1MediaByNameParams = {
+  /** `<sha256>.<jpg|png|webp>`. */
+  name: string;
+};
+/** 200 image/* */
+export type GetStoreV1MediaByNameResponse = Blob;
+
 // ── GET /store/v1/orders/:token — Track an order
 export type GetStoreV1OrdersByTokenParams = {
   /** The tracking token. */
@@ -1836,6 +2440,38 @@ export type GetStoreV1OrdersByTokenReceiptParams = {
 };
 /** 200 application/pdf */
 export type GetStoreV1OrdersByTokenReceiptResponse = Blob;
+
+// ── GET /store/v1/pages — List the published pages
+export type GetStoreV1PagesQuery = {
+  /** First row to return (0-based, inclusive). Default 0. */
+  _start?: number;
+  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 100 rows. */
+  _end?: number;
+  /** Comma-separated sort fields. Allowed: publishedAt, title, id. Default: publishedAt desc. */
+  _sort?: string;
+  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
+  _order?: string;
+  /** Case-insensitive text search over: title. */
+  q?: string;
+  /** Keep rows where kind equals (repeat the key for IN) the value. */
+  kind?: Array<"country" | "model" | "brand" | "carrier" | "tool" | "static" | "blog">;
+  /** The language: `en` or `ar`. */
+  locale?: string;
+};
+/** 200 */
+export type GetStoreV1PagesResponse = Array<{
+  kind: "country" | "model" | "brand" | "carrier" | "tool" | "static" | "blog";
+  slug: string;
+  locale: string;
+  title: string;
+  /** `''` when none. */
+  seoDescription: string;
+  /** The page is live but must stay out of search results and sitemaps. */
+  noindex: boolean;
+  publishedAt: IsoDateTime | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  updatedAt: IsoDateTime;
+}>;
 
 // ── GET /store/v1/pages/:slug — Get a public page
 export type GetStoreV1PagesBySlugQuery = {
@@ -1881,7 +2517,7 @@ export type GetStoreV1ServicesQuery = {
   _start?: number;
   /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 100 rows. */
   _end?: number;
-  /** Comma-separated sort fields. Allowed: featured, sort, title. Default: featured desc, sort asc, title asc. */
+  /** Comma-separated sort fields. Allowed: featured, sort, title, popular, listedAt, price. Default: featured desc, sort asc, title asc. */
   _sort?: string;
   /** Comma-separated directions (asc or desc), one per sort field in the same order. */
   _order?: string;
@@ -1897,12 +2533,22 @@ export type GetStoreV1ServicesQuery = {
   featured?: Array<"true" | "false">;
   /** Keep rows where locale equals (repeat the key for IN) the value. */
   locale?: Array<"en" | "ar">;
+  /** Keep rows where type equals (repeat the key for IN) the value. */
+  type?: Array<"imei" | "server" | "remote" | "file">;
+  /** Keep rows where categoryId equals (repeat the key for IN) the value. */
+  categoryId?: string[];
+  /** Keep rows where availability equals (repeat the key for IN) the value. */
+  availability?: Array<"in_stock" | "on_request">;
   /** The buyer's country: the tax of its window is added. Without it no tax is added. */
   buyerCountry?: string;
   /** The buyer's region, for the countries that tax by region. */
   region?: string;
   /** The currency to show prices in (one `GET /store/v1/config` lists). Default: USD. */
   currency?: string;
+  /** Lowest `price.gross` to show (inclusive), in `currency`. */
+  minPrice?: string;
+  /** Highest `price.gross` to show (inclusive), in `currency`. Not below `minPrice`. */
+  maxPrice?: string;
 };
 /** 200 */
 export type GetStoreV1ServicesResponse = Array<{
@@ -1919,8 +2565,27 @@ export type GetStoreV1ServicesResponse = Array<{
   country: string;
   isFeatured: boolean;
   type: "imei" | "server" | "remote" | "file";
-  /** How long it takes, as text. */
+  /** How long it takes, as text (English, or the supplier's own words). */
   deliveryTime: string;
+  /** The catalog category of the service (what `GET /store/v1/categories` lists). */
+  category: {
+    /** Numeric record id. */
+    id: Id;
+    /** `<id>-<words>`: only the number before the first hyphen counts. */
+    slug: string;
+    /** The category name in the requested language (the English name when there is no Arabic one). */
+    name: string;
+  };
+  /** `in_stock`: the available inventory codes cover the smallest order, so it is delivered at once; `on_request`: processed after the order. Both can be bought. Never a count. */
+  availability: "in_stock" | "on_request";
+  /** The expected delivery time in minutes (the service SLA); the site formats it per language. */
+  deliveryMinutes: number;
+  /** A delivery note in this page's language that replaces `deliveryMinutes` on screen; `''` when none. */
+  etaText: string;
+  /** When the page first went on the site; never resets. `null` for pages from before it was recorded. */
+  listedAt: IsoDateTime | null;
+  /** The picture of the service: a root-relative path `/store/v1/media/<sha256>.<jpg|png|webp>` (immutable, cached for a year); `null` when it has none (show the picture of the service type). */
+  imageUrl: string | null;
   price: {
     /** The currency of net, tax and gross. */
     currency: string;
@@ -1967,8 +2632,27 @@ export type GetStoreV1ServicesBySlugResponse = {
   country: string;
   isFeatured: boolean;
   type: "imei" | "server" | "remote" | "file";
-  /** How long it takes, as text. */
+  /** How long it takes, as text (English, or the supplier's own words). */
   deliveryTime: string;
+  /** The catalog category of the service (what `GET /store/v1/categories` lists). */
+  category: {
+    /** Numeric record id. */
+    id: Id;
+    /** `<id>-<words>`: only the number before the first hyphen counts. */
+    slug: string;
+    /** The category name in the requested language (the English name when there is no Arabic one). */
+    name: string;
+  };
+  /** `in_stock`: the available inventory codes cover the smallest order, so it is delivered at once; `on_request`: processed after the order. Both can be bought. Never a count. */
+  availability: "in_stock" | "on_request";
+  /** The expected delivery time in minutes (the service SLA); the site formats it per language. */
+  deliveryMinutes: number;
+  /** A delivery note in this page's language that replaces `deliveryMinutes` on screen; `''` when none. */
+  etaText: string;
+  /** When the page first went on the site; never resets. `null` for pages from before it was recorded. */
+  listedAt: IsoDateTime | null;
+  /** The picture of the service: a root-relative path `/store/v1/media/<sha256>.<jpg|png|webp>` (immutable, cached for a year); `null` when it has none (show the picture of the service type). */
+  imageUrl: string | null;
   price: {
     /** The currency of net, tax and gross. */
     currency: string;
@@ -1987,7 +2671,6 @@ export type GetStoreV1ServicesBySlugResponse = {
   };
   /** Markdown. */
   descriptionMd: string;
-  etaText: string;
   /** Markdown. */
   requirementsMd: string;
   seoTitle: string;
@@ -2010,6 +2693,11 @@ export type GetStoreV1ServicesBySlugResponse = {
   faqs: Array<{
     question: string;
     answerMd: string;
+  }>;
+  /** The switched-on pages of the same service in the other languages (for the language switch); empty when none. */
+  alternates: Array<{
+    locale: "en" | "ar";
+    slug: string;
   }>;
 };
 
@@ -2163,10 +2851,13 @@ export interface ApiRoutes {
   "POST /client/auth/login": { query: never; params: never; body: PostClientAuthLoginBody; response: PostClientAuthLoginResponse; status: 200 };
   "POST /client/auth/logout": { query: never; params: never; body: never; response: PostClientAuthLogoutResponse; status: 204 };
   "GET /client/auth/me": { query: never; params: never; body: never; response: GetClientAuthMeResponse; status: 200 };
+  "POST /client/auth/password/change": { query: never; params: never; body: PostClientAuthPasswordChangeBody; response: PostClientAuthPasswordChangeResponse; status: 200 };
   "POST /client/auth/password/forgot": { query: never; params: never; body: PostClientAuthPasswordForgotBody; response: PostClientAuthPasswordForgotResponse; status: 204 };
   "POST /client/auth/password/reset": { query: never; params: never; body: PostClientAuthPasswordResetBody; response: PostClientAuthPasswordResetResponse; status: 204 };
   "POST /client/auth/register": { query: never; params: never; body: PostClientAuthRegisterBody; response: PostClientAuthRegisterResponse; status: 204 };
+  "POST /client/auth/sign-in": { query: never; params: never; body: PostClientAuthSignInBody; response: PostClientAuthSignInResponse; status: 200 };
   "POST /client/auth/verify-email": { query: never; params: never; body: PostClientAuthVerifyEmailBody; response: PostClientAuthVerifyEmailResponse; status: 204 };
+  "POST /client/auth/verify-email/resend": { query: never; params: never; body: never; response: PostClientAuthVerifyEmailResendResponse; status: 204 };
   "GET /client/commissions": { query: GetClientCommissionsQuery; params: never; body: never; response: GetClientCommissionsResponse; status: 200 };
   "GET /client/dashboard": { query: never; params: never; body: never; response: GetClientDashboardResponse; status: 200 };
   "POST /client/files": { query: never; params: never; body: PostClientFilesBody; response: PostClientFilesResponse; status: 201 };
@@ -2179,6 +2870,10 @@ export interface ApiRoutes {
   "POST /client/kyc": { query: never; params: never; body: PostClientKycBody; response: PostClientKycResponse; status: 201 };
   "GET /client/notification-preferences": { query: never; params: never; body: never; response: GetClientNotificationPreferencesResponse; status: 200 };
   "PUT /client/notification-preferences": { query: never; params: never; body: PutClientNotificationPreferencesBody; response: PutClientNotificationPreferencesResponse; status: 200 };
+  "GET /client/notifications": { query: GetClientNotificationsQuery; params: never; body: never; response: GetClientNotificationsResponse; status: 200 };
+  "POST /client/notifications/read-all": { query: never; params: never; body: PostClientNotificationsReadAllBody; response: PostClientNotificationsReadAllResponse; status: 200 };
+  "GET /client/notifications/unread-count": { query: never; params: never; body: never; response: GetClientNotificationsUnreadCountResponse; status: 200 };
+  "POST /client/notifications/:id/read": { query: never; params: PostClientNotificationsByIdReadParams; body: never; response: PostClientNotificationsByIdReadResponse; status: 204 };
   "GET /client/orders": { query: GetClientOrdersQuery; params: never; body: never; response: GetClientOrdersResponse; status: 200 };
   "POST /client/orders": { query: never; params: never; body: PostClientOrdersBody; response: PostClientOrdersResponse; status: 201 };
   "GET /client/orders/export": { query: never; params: never; body: never; response: GetClientOrdersExportResponse; status: 200 };
@@ -2212,22 +2907,41 @@ export interface ApiRoutes {
   "POST /store/v1/auth/password/forgot": { query: never; params: never; body: PostStoreV1AuthPasswordForgotBody; response: PostStoreV1AuthPasswordForgotResponse; status: 204 };
   "POST /store/v1/auth/password/set": { query: never; params: never; body: PostStoreV1AuthPasswordSetBody; response: PostStoreV1AuthPasswordSetResponse; status: 204 };
   "POST /store/v1/auth/verify": { query: never; params: never; body: PostStoreV1AuthVerifyBody; response: PostStoreV1AuthVerifyResponse; status: 200 };
+  "GET /store/v1/categories": { query: GetStoreV1CategoriesQuery; params: never; body: never; response: GetStoreV1CategoriesResponse; status: 200 };
   "POST /store/v1/checkout-sessions": { query: never; params: never; body: PostStoreV1CheckoutSessionsBody; response: PostStoreV1CheckoutSessionsResponse; status: 201 };
   "GET /store/v1/checkout-sessions/:token": { query: never; params: GetStoreV1CheckoutSessionsByTokenParams; body: never; response: GetStoreV1CheckoutSessionsByTokenResponse; status: 200 };
+  "POST /store/v1/checkout-sessions/:token/balance-payment": { query: never; params: PostStoreV1CheckoutSessionsByTokenBalancePaymentParams; body: never; response: PostStoreV1CheckoutSessionsByTokenBalancePaymentResponse; status: 201 };
   "POST /store/v1/checkout-sessions/:token/consents": { query: never; params: PostStoreV1CheckoutSessionsByTokenConsentsParams; body: PostStoreV1CheckoutSessionsByTokenConsentsBody; response: PostStoreV1CheckoutSessionsByTokenConsentsResponse; status: 201 };
   "POST /store/v1/checkout-sessions/:token/pay": { query: never; params: PostStoreV1CheckoutSessionsByTokenPayParams; body: PostStoreV1CheckoutSessionsByTokenPayBody; response: PostStoreV1CheckoutSessionsByTokenPayResponse; status: 201 };
   "GET /store/v1/config": { query: never; params: never; body: never; response: GetStoreV1ConfigResponse; status: 200 };
+  "POST /store/v1/files": { query: never; params: never; body: PostStoreV1FilesBody; response: PostStoreV1FilesResponse; status: 201 };
   "GET /store/v1/help": { query: GetStoreV1HelpQuery; params: never; body: never; response: GetStoreV1HelpResponse; status: 200 };
   "GET /store/v1/help/:slug": { query: never; params: GetStoreV1HelpBySlugParams; body: never; response: GetStoreV1HelpBySlugResponse; status: 200 };
+  "POST /store/v1/help/:slug/vote": { query: never; params: PostStoreV1HelpBySlugVoteParams; body: PostStoreV1HelpBySlugVoteBody; response: PostStoreV1HelpBySlugVoteResponse; status: 204 };
   "POST /store/v1/imei/check": { query: never; params: never; body: PostStoreV1ImeiCheckBody; response: PostStoreV1ImeiCheckResponse; status: 200 };
+  "POST /store/v1/marketing/unsubscribe/:token": { query: never; params: PostStoreV1MarketingUnsubscribeByTokenParams; body: never; response: PostStoreV1MarketingUnsubscribeByTokenResponse; status: 204 };
   "GET /store/v1/me": { query: never; params: never; body: never; response: GetStoreV1MeResponse; status: 200 };
   "PATCH /store/v1/me": { query: never; params: never; body: PatchStoreV1MeBody; response: PatchStoreV1MeResponse; status: 200 };
   "POST /store/v1/me/data-delete": { query: never; params: never; body: never; response: PostStoreV1MeDataDeleteResponse; status: 201 };
   "POST /store/v1/me/data-export": { query: never; params: never; body: never; response: PostStoreV1MeDataExportResponse; status: 201 };
+  "GET /store/v1/me/notifications": { query: GetStoreV1MeNotificationsQuery; params: never; body: never; response: GetStoreV1MeNotificationsResponse; status: 200 };
+  "POST /store/v1/me/notifications/read-all": { query: never; params: never; body: PostStoreV1MeNotificationsReadAllBody; response: PostStoreV1MeNotificationsReadAllResponse; status: 200 };
+  "GET /store/v1/me/notifications/unread-count": { query: never; params: never; body: never; response: GetStoreV1MeNotificationsUnreadCountResponse; status: 200 };
+  "POST /store/v1/me/notifications/:id/read": { query: never; params: PostStoreV1MeNotificationsByIdReadParams; body: never; response: PostStoreV1MeNotificationsByIdReadResponse; status: 204 };
   "GET /store/v1/me/orders": { query: GetStoreV1MeOrdersQuery; params: never; body: never; response: GetStoreV1MeOrdersResponse; status: 200 };
   "POST /store/v1/me/password": { query: never; params: never; body: PostStoreV1MePasswordBody; response: PostStoreV1MePasswordResponse; status: 204 };
+  "GET /store/v1/me/wallet": { query: never; params: never; body: never; response: GetStoreV1MeWalletResponse; status: 200 };
+  "GET /store/v1/me/wallet/statement": { query: GetStoreV1MeWalletStatementQuery; params: never; body: never; response: GetStoreV1MeWalletStatementResponse; status: 200 };
+  "GET /store/v1/me/wallet/top-up-methods": { query: GetStoreV1MeWalletTopUpMethodsQuery; params: never; body: never; response: GetStoreV1MeWalletTopUpMethodsResponse; status: 200 };
+  "GET /store/v1/me/wallet/top-ups": { query: GetStoreV1MeWalletTopUpsQuery; params: never; body: never; response: GetStoreV1MeWalletTopUpsResponse; status: 200 };
+  "POST /store/v1/me/wallet/top-ups": { query: never; params: never; body: PostStoreV1MeWalletTopUpsBody; response: PostStoreV1MeWalletTopUpsResponse; status: 201 };
+  "GET /store/v1/me/wallet/top-ups/:id": { query: never; params: GetStoreV1MeWalletTopUpsByIdParams; body: never; response: GetStoreV1MeWalletTopUpsByIdResponse; status: 200 };
+  "POST /store/v1/me/wallet/top-ups/:id/cancel": { query: never; params: PostStoreV1MeWalletTopUpsByIdCancelParams; body: never; response: PostStoreV1MeWalletTopUpsByIdCancelResponse; status: 200 };
+  "POST /store/v1/me/wallet/top-ups/:id/receipt": { query: never; params: PostStoreV1MeWalletTopUpsByIdReceiptParams; body: PostStoreV1MeWalletTopUpsByIdReceiptBody; response: PostStoreV1MeWalletTopUpsByIdReceiptResponse; status: 201 };
+  "GET /store/v1/media/:name": { query: never; params: GetStoreV1MediaByNameParams; body: never; response: GetStoreV1MediaByNameResponse; status: 200 };
   "GET /store/v1/orders/:token": { query: never; params: GetStoreV1OrdersByTokenParams; body: never; response: GetStoreV1OrdersByTokenResponse; status: 200 };
   "GET /store/v1/orders/:token/receipt": { query: never; params: GetStoreV1OrdersByTokenReceiptParams; body: never; response: GetStoreV1OrdersByTokenReceiptResponse; status: 200 };
+  "GET /store/v1/pages": { query: GetStoreV1PagesQuery; params: never; body: never; response: GetStoreV1PagesResponse; status: 200 };
   "GET /store/v1/pages/:slug": { query: GetStoreV1PagesBySlugQuery; params: GetStoreV1PagesBySlugParams; body: never; response: GetStoreV1PagesBySlugResponse; status: 200 };
   "GET /store/v1/services": { query: GetStoreV1ServicesQuery; params: never; body: never; response: GetStoreV1ServicesResponse; status: 200 };
   "GET /store/v1/services/:slug": { query: GetStoreV1ServicesBySlugQuery; params: GetStoreV1ServicesBySlugParams; body: never; response: GetStoreV1ServicesBySlugResponse; status: 200 };

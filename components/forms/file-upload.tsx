@@ -1,14 +1,21 @@
 "use client";
-// Uploads files to `POST /client/files` (merchant session; one multipart part `file`, 1 B – 25 MiB, 20/min per IP)
-// and reports the stored files (`{ id, filename, size, mime … }`) so a form can send their ids as `fileId` (orders),
-// `fileIds` (KYC, 1–5 PDF/JPEG/PNG) or a receipt `fileId` (invoices). Labels come from the caller (server strings).
+// Uploads files to `POST /client/files` (merchant session, 1 B – 25 MiB) or `POST /store/v1/files` (customer session,
+// top-up receipt, 1 B – 5 MiB, 413 above): one multipart part `file`, 20/min per IP. It reports the stored files
+// (`{ id, filename, size, mime … }`, the same shape on both routes) so a form can send their ids as `fileId` (orders,
+// receipts), `fileIds` (KYC, 1–5 PDF/JPEG/PNG). Labels come from the caller (server strings).
 import { useId, useRef, useState } from "react";
 import { FileUp, Loader2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api/browser";
 import type { UploadedFile } from "@/lib/api/types";
 import { useErrorText } from "@/lib/i18n/error-text";
 
-const MAX_BYTES = 25 * 1024 * 1024;
+/** The merchant route's own limit (`POST /client/files`); a form may ask for less with `maxBytes`. */
+const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
+/** The customer route's own limit (`POST /store/v1/files`): the server answers 413 PAYLOAD_TOO_LARGE above it. */
+const STORE_MAX_BYTES = 5 * 1024 * 1024;
+
+/** The upload route: the merchant surface (default) or the customer's. The CSRF token follows the path (lib/api/browser.ts). */
+export type FileUploadEndpoint = "/client/files" | "/store/v1/files";
 
 export type FileUploadLabels = {
   /** Visible label of the control. */
@@ -31,6 +38,10 @@ export type FileUploadProps = {
   accept?: string[];
   /** Maximum number of files (1 = single file). */
   max?: number;
+  /** Where the files go: `/client/files` (merchant, default) or `/store/v1/files` (customer). */
+  endpoint?: FileUploadEndpoint;
+  /** Largest file in bytes (default: the endpoint's own limit, 25 MiB for `/client/files`, 5 MiB for `/store/v1/files`). A larger file shows `labels.tooLarge` and is not sent. */
+  maxBytes?: number;
   required?: boolean;
   disabled?: boolean;
 };
@@ -41,10 +52,20 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function FileUpload({ labels, onChange, accept = [], max = 1, required, disabled }: FileUploadProps) {
+export function FileUpload({
+  labels,
+  onChange,
+  accept = [],
+  max = 1,
+  endpoint = "/client/files",
+  maxBytes,
+  required,
+  disabled,
+}: FileUploadProps) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const errorText = useErrorText();
+  const limit = maxBytes ?? (endpoint === "/store/v1/files" ? STORE_MAX_BYTES : DEFAULT_MAX_BYTES);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +83,7 @@ export function FileUpload({ labels, onChange, accept = [], max = 1, required, d
     setBusy(true);
     try {
       for (const file of picked) {
-        if (file.size > MAX_BYTES || file.size === 0) {
+        if (file.size > limit || file.size === 0) {
           setError(labels.tooLarge);
           continue;
         }
@@ -70,7 +91,7 @@ export function FileUpload({ labels, onChange, accept = [], max = 1, required, d
           setError(labels.wrongType);
           continue;
         }
-        uploaded.push(await api.upload<UploadedFile>("/client/files", file));
+        uploaded.push(await api.upload<UploadedFile>(endpoint, file));
       }
     } catch (e) {
       setError(errorText.message(e));

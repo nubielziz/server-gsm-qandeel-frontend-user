@@ -17,6 +17,7 @@ const tones: { [K in StatusKind]: Record<string, BadgeTone> } = {
   checkout: { open: "warning", paid: "success", expired: "neutral" },
   request: { open: "neutral", in_progress: "warning", completed: "success", rejected: "danger" },
   verification: { verified: "success", unverified: "warning" },
+  topUp: { awaiting_payment: "warning", in_review: "warning", credited: "success", rejected: "danger", cancelled: "neutral" },
 };
 
 const toneIcons: Record<BadgeTone, LucideIcon> = {
@@ -39,7 +40,7 @@ function humanize(status: string): string {
 }
 
 export type StatusBadgeProps = Omit<BadgeProps, "tone" | "icon" | "children"> & {
-  /** The status family: `order`, `invoice`, `ticket`, `account`, `kyc`, `delivery`, `checkout`, `request`, `verification`. */
+  /** The status family: `order`, `invoice`, `ticket`, `account`, `kyc`, `delivery`, `checkout`, `request`, `verification`, `topUp`. */
   kind: StatusKind;
   /** The raw API value, e.g. `completed`, `open`, `in_progress`. */
   status: string;

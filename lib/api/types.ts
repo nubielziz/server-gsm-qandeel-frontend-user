@@ -11,7 +11,15 @@ export type StorePaymentMethod = StoreConfig["paymentMethods"][number];
 export type StoreServiceCard = S.GetStoreV1ServicesResponse[number];
 export type StoreServiceDetail = S.GetStoreV1ServicesBySlugResponse;
 export type StoreServicesQuery = S.GetStoreV1ServicesQuery;
+/** One category of `GET /store/v1/categories` (`serviceCount` is not narrowed by any other filter). */
+export type StoreCategory = S.GetStoreV1CategoriesResponse["categories"][number];
 export type StorePage = S.GetStoreV1PagesBySlugResponse;
+/** One row of `GET /store/v1/pages` (no body): what the sitemap and page lists need. */
+export type StorePageListItem = S.GetStoreV1PagesResponse[number];
+/** `in_stock` (the smallest order is delivered at once) or `on_request`. Never a count. */
+export type ServiceAvailability = StoreServiceCard["availability"];
+/** `quantity` of a service page: `{ min, max, options }`; `options` are fixed packs, empty = any number from min to max. */
+export type StoreQuantityRule = StoreServiceDetail["quantity"];
 export type HelpArticle = S.GetStoreV1HelpResponse[number];
 export type HelpArticleDetail = S.GetStoreV1HelpBySlugResponse;
 export type ImeiCheckResult = S.PostStoreV1ImeiCheckResponse;
@@ -30,10 +38,33 @@ export type Ticket = S.GetStoreV1TicketsByTokenResponse;
 export type TicketInput = S.PostStoreV1TicketsBody;
 export type TicketCreated = S.PostStoreV1TicketsResponse;
 export type TicketMessage = Ticket["messages"][number];
+export type StoreMeInput = S.PatchStoreV1MeBody;
+export type StoreUploadedFile = S.PostStoreV1FilesResponse;
+
+// ── Store: customer wallet (`/store/v1/me/wallet*`, always USD)
+export type CustomerWallet = S.GetStoreV1MeWalletResponse;
+export type CustomerStatementLine = S.GetStoreV1MeWalletStatementResponse[number];
+export type TopUpMethod = S.GetStoreV1MeWalletTopUpMethodsResponse[number];
+export type TopUp = S.GetStoreV1MeWalletTopUpsResponse[number];
+/** A top-up with `instructions` (manual) or `paymentUrl` (automatic) while it awaits payment. */
+export type TopUpDetail = S.GetStoreV1MeWalletTopUpsByIdResponse;
+export type TopUpStatus = TopUp["status"];
+export type BalancePaymentResult = S.PostStoreV1CheckoutSessionsByTokenBalancePaymentResponse;
+
+// ── Store: notification center (`/store/v1/me/notifications*`)
+export type NotificationItem = S.GetStoreV1MeNotificationsResponse[number];
+export type NotificationCategory = NotificationItem["category"];
+/** `{ unread }`, capped at 100: show "99+" when it is 100. */
+export type UnreadCount = S.GetStoreV1MeNotificationsUnreadCountResponse;
 
 // ── Merchant (/client)
 export type MerchantMe = S.GetClientAuthMeResponse;
 export type MerchantLoginResult = S.PostClientAuthLoginResponse;
+/** `POST /client/auth/sign-in`: the smart sign-in. `kind` names the area, `next` the step still to do. */
+export type SmartSignInInput = S.PostClientAuthSignInBody;
+export type SmartSignInResult = S.PostClientAuthSignInResponse;
+export type MerchantPasswordChangeResult = S.PostClientAuthPasswordChangeResponse;
+export type MerchantProfileInput = S.PatchClientProfileBody;
 export type MerchantDashboard = S.GetClientDashboardResponse;
 export type MerchantOrder = S.GetClientOrdersResponse[number];
 export type MerchantOrderDetail = S.GetClientOrdersByIdResponse;

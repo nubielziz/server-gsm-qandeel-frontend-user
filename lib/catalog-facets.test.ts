@@ -27,6 +27,12 @@ function card(fields: Partial<StoreServiceCard> & { gross?: string }): StoreServ
     isFeatured: false,
     type: "imei",
     deliveryTime: "1 day",
+    category: { id: 1, slug: "1-general", name: "General" },
+    availability: "on_request",
+    deliveryMinutes: 1440,
+    etaText: "",
+    listedAt: null,
+    imageUrl: null,
     price: { currency: "USD", fxRate: "1.00000000", net: gross, tax: "0.0000", gross, taxRate: "0", taxCountry: null },
     ...rest,
   };

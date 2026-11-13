@@ -14,6 +14,48 @@ Rules: `CLAUDE.md`. Images to add: `docs/IMAGE-PROMPTS.md`.
 | M5 | Customer account (overview, orders, settings, privacy requests) and support tickets (new, conversation, rating) | done (2026-11-09, `6bee86a`) |
 | M6 | Merchant portal: dashboard, catalog + ordering, orders, wallet, top-ups, invoices (`230b7b3`); settings, security/2FA/sessions, notifications, KYC, API keys, webhooks, referrals (`5e0a8d2`) | done (2026-11-09) |
 
+## Backend handoff implementation (from 2026-11-13; plan: `IMPLEMENTATION-PLAN.md`)
+Everything in `../STOREFRONT-BACKEND-HANDOFF.md` (features 20–26) and the open items of `../STOREFRONT-HANDOFF.md`, in 16
+features and 4 waves. Planned once by Fable 5.2; per feature one Sonnet 5.5 implementer (extra-high effort), one Opus 5.5
+review, one Sonnet 5.5 fix; then the lead's check (second review round). ≤ 4 agents at once. Tests run only against the
+isolated demo API (:3100, Mailpit); the owner's API (:3000) is never written to. One local commit per wave.
+
+### Wave 0: foundation (2026-11-13)
+- **F00 API layer:** `lib/api/store-query.ts` (all new list filters/sorts: `type`, `categoryId`, `availability`,
+  `minPrice`/`maxPrice`, `popular`/`listedAt`/`price`; safe paging window), readers `listStoreCategories`,
+  `listContentPages`; `api.signIn()` keeps the smart sign-in's CSRF token under the surface `kind` names (D2);
+  `lib/api/idempotency.ts` (one key per request signature; reset after success or `IDEMPOTENCY_KEY_REUSED`); error texts
+  `WALLET_FROZEN`, `WALLET_DISABLED`, wallet field codes, waits in minutes; `next.config.ts`: `images.localPatterns`
+  (`/images/**`, `/store/v1/media/**`), catalog cache `{stale 60, revalidate 30, expire 300}` (availability ≤ 5 min old),
+  `NEXT_OUTPUT=standalone`, `GSM_API_REWRITE_ORIGIN`.
+- **F01 shared helpers:** `lib/quantity.ts` (one per order / exact N / range / packs, texts keyed on `invalid_quantity`,
+  "From" prices), `lib/store/delivery.ts` (`etaText` else `deliveryMinutes` per language, stock hint); strings in
+  `common`/`portal`/`store` (availability, delivery, quantity, top-up statuses, sorts, help vote, neutral tracking texts);
+  `StatusBadge` kind `topUp`; `FileUpload` takes the store upload endpoint (5 MiB).
+- **F02 production image:** `Dockerfile` (3 stages, `node:26-slim`, standalone, non-root, health check), `.dockerignore`,
+  `docs/DEPLOY.md`, `lib/app-routes.test.ts` (no site pages under `/client` or `/store`). Image `gsm-site:w0` built
+  against :3100 and run: healthy; `/robots.txt`, `/en`, `/ar` 200; API rewrite and the image optimizer (site images and
+  `/store/v1/media/*` pictures) 200; no `.env` inside; runs as `node`.
+- **F03 e2e harness:** `e2e/admin.ts` (staff session with TOTP via node:crypto, cached in `e2e/.auth/`; ~25 admin helpers),
+  `e2e/global-setup.ts` (idempotent; never switches anything off), `e2e/harness.spec.ts`; `helpers.ts` gains shared
+  helpers (`freshCustomer`, `freshMerchant`, `stubTurnstile` …). The e2e guard now decides dev/production env files by
+  the port under test. **Demo DB (`gsm_storefront`) changes made by the setup** (a `dev-backend.sh reset` undoes them; the
+  next e2e run recreates them): customer wallet on; manual gateway `cliq-e2e`; JOD with 2 decimals; quantity rules on
+  services 8 (range 2–50), 9 (packs 5/10/25), 10 (exact 5); stock codes on services 4 (≥ 20) and 15 `SRV-Z3X-10`
+  (fixes the old failing merchant instant-order test); a picture on listing 13.
+- **Checks:** typecheck and ESLint clean; 173 unit tests; `next build` 171 pages (home and catalog still partial
+  prerender, 30 s / 5 min); e2e harness + routing + store + checkout + merchant on desktop + mobile: 152 passed,
+  16 skipped (harness is desktop-only; 1 old skip), 0 failed.
+
+| Feature | Wave | Implement (Sonnet) | Review (Opus) | Fix (Sonnet) | Calls | Lead check | Commit |
+|---|---|---|---|---|---|---|---|
+| F00 API and config | W0 | ✓ | accept, 3 minor | ✓ | 3/3 | ✓ | W0 |
+| F01 Shared helpers and strings | W0 | ✓ | accept, 1 minor | ✓ | 3/3 | ✓ | W0 |
+| F02 Docker image | W0 | ✓ | accept, 2 minor (docs) | ✓ | 3/3 | ✓ | W0 |
+| F03 e2e harness | W0 | ✓ | fix, 2 major | ✓ | 3/3 | ✓ | W0 |
+
+Agent calls so far: Fable 1 (plan) + 12 (W0).
+
 ## Wiring (changed 2026-11-09, late evening, at the owner's request)
 - **Dev site (`npm run dev`, :5175) → the isolated demo API (:3100) since 2026-11-10**, at the owner's request (to
   see the home page with data). `.env.development.local`: `GSM_API_ORIGIN=http://localhost:3100`; start the API with

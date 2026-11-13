@@ -1,4 +1,5 @@
 // Shared strings: brand, header and footer, the auth shell, generic actions, pagination, status labels, service types,
+// availability, delivery lines, quantity rules and per-unit prices (built by lib/quantity.ts and lib/store/delivery.ts),
 // empty / error texts. Server Components read them with `const t = await getMessages(common)`; Client Components get
 // the pieces they need as props (or through <UiTextProvider>, components/ui/ui-text.tsx, for the generic `ui` group).
 import { defineMessages } from "../define";
@@ -24,6 +25,8 @@ export const common = defineMessages({
       support: "Support",
       merchants: "For merchants",
       menu: "Menu",
+      allCategories: "All categories",
+      categories: "Categories",
     },
     header: {
       skipToContent: "Skip to content",
@@ -47,6 +50,9 @@ export const common = defineMessages({
       language: "Language",
       signedInAsCustomer: "Customer",
       signedInAsMerchant: "Merchant",
+      notifications: "Notifications",
+      storeBalance: "Store balance",
+      myWallet: "Wallet",
     },
     languageNames: { en: "English", ar: "العربية" },
     footer: {
@@ -169,6 +175,13 @@ export const common = defineMessages({
       checkout: { open: "Awaiting payment", paid: "Paid", expired: "Expired" },
       request: { open: "Received", in_progress: "In progress", completed: "Completed", rejected: "Rejected" },
       verification: { verified: "Verified", unverified: "Not verified" },
+      topUp: {
+        awaiting_payment: "Awaiting payment",
+        in_review: "In review",
+        credited: "Credited",
+        rejected: "Rejected",
+        cancelled: "Cancelled",
+      },
     },
 
     serviceType: {
@@ -176,6 +189,45 @@ export const common = defineMessages({
       server: "Server credits",
       remote: "Remote activation",
       file: "File service",
+    },
+
+    /** Whether a service is delivered at once from stock or processed after the order. Never a stock count. */
+    availability: {
+      inStock: "In stock",
+      onRequest: "On request",
+      instant: "Instant delivery",
+    },
+
+    /** Delivery lines. `{time}` comes from formatMinutes (lib/merchant/format.ts); `{note}` is the staff delivery note. */
+    delivery: {
+      label: "Delivery",
+      within: "Delivered within {time}",
+      whileStock: "Instant delivery while stock lasts, otherwise within {time}",
+      whileStockNote: "Instant delivery while stock lasts. Otherwise: {note}",
+    },
+
+    /** Quantity rules and per-unit prices (lib/quantity.ts builds the sentences). `{price}` is a formatted amount. */
+    quantity: {
+      one: "1 per order",
+      exact: "{count} per order",
+      range: "{min} to {max} per order",
+      packs: "Packs of {options}",
+      invalidRange: "Enter a quantity from {min} to {max}.",
+      invalidPacks: "Choose one of these quantities: {options}.",
+      invalidExact: "This service sells {count} per order.",
+      perUnit: "per unit",
+      from: "From {price}",
+      exactFor: "{count} for {price}",
+      packFor: "{count} for about {price}",
+      subtotal: {
+        zero: "Subtotal ({count} units)",
+        one: "Subtotal (1 unit)",
+        two: "Subtotal ({count} units)",
+        few: "Subtotal ({count} units)",
+        many: "Subtotal ({count} units)",
+        other: "Subtotal ({count} units)",
+      },
+      estimated: "Estimated",
     },
 
     states: {
@@ -209,6 +261,8 @@ export const common = defineMessages({
       support: "الدعم",
       merchants: "للتجّار",
       menu: "القائمة",
+      allCategories: "جميع الفئات",
+      categories: "الفئات",
     },
     header: {
       skipToContent: "تخطَّ إلى المحتوى",
@@ -232,6 +286,9 @@ export const common = defineMessages({
       language: "اللغة",
       signedInAsCustomer: "عميل",
       signedInAsMerchant: "تاجر",
+      notifications: "الإشعارات",
+      storeBalance: "رصيد المتجر",
+      myWallet: "المحفظة",
     },
     languageNames: { en: "English", ar: "العربية" },
     footer: {
@@ -351,6 +408,13 @@ export const common = defineMessages({
       checkout: { open: "بانتظار الدفع", paid: "مدفوع", expired: "منتهي" },
       request: { open: "تم الاستلام", in_progress: "قيد المعالجة", completed: "مكتمل", rejected: "مرفوض" },
       verification: { verified: "تم التحقق", unverified: "لم يتم التحقق" },
+      topUp: {
+        awaiting_payment: "بانتظار الدفع",
+        in_review: "قيد المراجعة",
+        credited: "أُضيف إلى الرصيد",
+        rejected: "مرفوض",
+        cancelled: "ملغى",
+      },
     },
 
     serviceType: {
@@ -358,6 +422,42 @@ export const common = defineMessages({
       server: "أرصدة سيرفر",
       remote: "تفعيل عن بُعد",
       file: "خدمة ملفات",
+    },
+
+    availability: {
+      inStock: "متوفر",
+      onRequest: "عند الطلب",
+      instant: "تسليم فوري",
+    },
+
+    delivery: {
+      label: "التسليم",
+      within: "يُسلَّم خلال {time}",
+      whileStock: "تسليم فوري ما دام المخزون متوفرًا، وإلا خلال {time}",
+      whileStockNote: "تسليم فوري ما دام المخزون متوفرًا. وإلا: {note}",
+    },
+
+    quantity: {
+      one: "1 لكل طلب",
+      exact: "{count} لكل طلب",
+      range: "من {min} إلى {max} لكل طلب",
+      packs: "حزم من {options}",
+      invalidRange: "أدخل كمية من {min} إلى {max}.",
+      invalidPacks: "اختر إحدى هذه الكميات: {options}.",
+      invalidExact: "تُباع هذه الخدمة بكمية {count} لكل طلب.",
+      perUnit: "للوحدة",
+      from: "ابتداءً من {price}",
+      exactFor: "{count} بسعر {price}",
+      packFor: "{count} بنحو {price}",
+      subtotal: {
+        zero: "المجموع الفرعي ({count} وحدة)",
+        one: "المجموع الفرعي (وحدة واحدة)",
+        two: "المجموع الفرعي (وحدتان)",
+        few: "المجموع الفرعي ({count} وحدات)",
+        many: "المجموع الفرعي ({count} وحدة)",
+        other: "المجموع الفرعي ({count} وحدة)",
+      },
+      estimated: "تقديري",
     },
 
     states: {

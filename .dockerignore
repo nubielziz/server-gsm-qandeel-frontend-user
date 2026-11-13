@@ -1,0 +1,15 @@
+# Build context of the production image (Dockerfile, docs/DEPLOY.md): no secrets, no local state, no tests.
+node_modules
+.next
+.git
+# Environment files hold local API addresses and keys: they never enter the image (build values are --build-arg).
+.env*
+!.env.example
+e2e
+test-results
+playwright-report
+screenshots
+.serena
+*.tsbuildinfo
+docs
+*.md
