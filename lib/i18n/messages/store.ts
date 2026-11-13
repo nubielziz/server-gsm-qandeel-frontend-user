@@ -16,6 +16,7 @@ export const store = defineMessages({
         pointNoAccount: "No account needed",
         pointAccount: "All your orders in one account",
         cta: "Browse services",
+        from: "Starting from",
         artAlt: "Smartphones",
       },
       quick: {
@@ -24,6 +25,7 @@ export const store = defineMessages({
         label: "IMEI number",
         placeholder: "Enter the 15-digit IMEI",
         submit: "Check IMEI",
+        hint: "Dial *#06# on the device to see its IMEI.",
       },
       promo: {
         eyebrow: "Already ordered?",
@@ -38,12 +40,9 @@ export const store = defineMessages({
       },
       featured: {
         title: "Featured services",
-        description: "Popular services, priced in your currency.",
       },
-      brands: {
-        title: "Shop by brand",
-        description: "Find the services for your device.",
-        chipLabel: "Show {brand} services",
+      browse: {
+        title: "Shop by brand or carrier",
       },
       how: {
         title: "How it works",
@@ -56,7 +55,59 @@ export const store = defineMessages({
       },
       all: {
         title: "More services",
-        description: "A selection from the catalog.",
+      },
+      collections: {
+        title: "Featured collections",
+        kinds: {
+          brand: "Brand",
+          country: "Country",
+          network: "Carrier",
+        },
+        from: "From",
+        cta: "Explore collection",
+        ctaLabel: "Explore collection: {name}",
+      },
+      products: {
+        title: "All services",
+        openCatalog: "Open the catalog",
+        searchSubmit: "Search",
+        showMore: "Show {count} more",
+        showLess: "Show fewer",
+        categories: "Categories",
+        priceRange: "Price range",
+        minPrice: "Minimum price",
+        maxPrice: "Maximum price",
+        priceChip: "Price: {from} to {to}",
+      },
+      explore: {
+        title: "More from GSM Store",
+        merchants: {
+          tag: "For merchants",
+          title: "Resell at group prices",
+          point1: "Group prices",
+          point2: "Wallet",
+          point3: "API access",
+          cta: "Become a merchant",
+          artAlt: "A phone repair workbench",
+        },
+        help: {
+          tag: "Help center",
+          title: "Answers before you order",
+          point1: "Orders",
+          point2: "Unlocking",
+          point3: "Payments",
+          cta: "Open the help center",
+          artAlt: "An open notebook beside a smartphone",
+        },
+        support: {
+          tag: "Support",
+          title: "Talk to our team",
+          point1: "Open a ticket",
+          point2: "Answered by email",
+          point3: "No account needed",
+          cta: "Contact support",
+          artAlt: "A headset on a desk",
+        },
       },
       empty: {
         title: "No services are listed yet",
@@ -77,9 +128,6 @@ export const store = defineMessages({
       brand: "Brand",
       network: "Carrier",
       country: "Country",
-      allBrands: "All brands",
-      allNetworks: "All carriers",
-      allCountries: "All countries",
       sort: "Sort by",
       sortFeatured: "Featured",
       sortTitle: "Name (A to Z)",
@@ -113,7 +161,17 @@ export const store = defineMessages({
       deliveryShort: "{time}",
       viewService: "View {title}",
       orderService: "Order {title}",
+      quickView: "Quick view: {title}",
       priceFrom: "Price",
+    },
+
+    quickView: {
+      eyebrow: "Quick view",
+      details: "View full details",
+      missingTitle: "This service is not available",
+      missingText: "It may have been removed or renamed. Browse the catalog to find a similar service.",
+      browse: "Browse services",
+      place: "Carrier and country",
     },
 
     service: {
@@ -290,6 +348,7 @@ export const store = defineMessages({
         pointNoAccount: "دون الحاجة إلى حساب",
         pointAccount: "كل طلباتك في حساب واحد",
         cta: "تصفّح الخدمات",
+        from: "تبدأ الأسعار من",
         artAlt: "هواتف ذكية",
       },
       quick: {
@@ -298,6 +357,7 @@ export const store = defineMessages({
         label: "رقم IMEI",
         placeholder: "أدخل رقم IMEI من 15 خانة",
         submit: "افحص الرقم",
+        hint: "اطلب الرمز \u200E*#06#\u200E على الجهاز لإظهار رقم IMEI.",
       },
       promo: {
         eyebrow: "هل طلبت مسبقًا؟",
@@ -312,12 +372,9 @@ export const store = defineMessages({
       },
       featured: {
         title: "خدمات مميّزة",
-        description: "خدمات شائعة بأسعار بعملتك.",
       },
-      brands: {
-        title: "تسوّق حسب العلامة التجارية",
-        description: "اعثر على الخدمات المناسبة لجهازك.",
-        chipLabel: "عرض خدمات {brand}",
+      browse: {
+        title: "تسوّق حسب العلامة التجارية أو الشبكة",
       },
       how: {
         title: "كيف يعمل المتجر",
@@ -330,7 +387,59 @@ export const store = defineMessages({
       },
       all: {
         title: "خدمات أخرى",
-        description: "مختارات من الكتالوج.",
+      },
+      collections: {
+        title: "مجموعات مميّزة",
+        kinds: {
+          brand: "علامة تجارية",
+          country: "بلد",
+          network: "شبكة",
+        },
+        from: "ابتداءً من",
+        cta: "استكشف المجموعة",
+        ctaLabel: "استكشف المجموعة: {name}",
+      },
+      products: {
+        title: "جميع الخدمات",
+        openCatalog: "افتح الكتالوج",
+        searchSubmit: "بحث",
+        showMore: "عرض {count} أخرى",
+        showLess: "عرض أقل",
+        categories: "الفئات",
+        priceRange: "نطاق السعر",
+        minPrice: "أقل سعر",
+        maxPrice: "أعلى سعر",
+        priceChip: "السعر: من {from} إلى {to}",
+      },
+      explore: {
+        title: "المزيد من GSM Store",
+        merchants: {
+          tag: "للتجّار",
+          title: "أعد البيع بأسعار المجموعات",
+          point1: "أسعار المجموعات",
+          point2: "محفظة",
+          point3: "واجهة API",
+          cta: "سجّل كتاجر",
+          artAlt: "طاولة عمل لصيانة الهواتف",
+        },
+        help: {
+          tag: "مركز المساعدة",
+          title: "إجابات قبل أن تطلب",
+          point1: "الطلبات",
+          point2: "فك الشبكات",
+          point3: "الدفع",
+          cta: "افتح مركز المساعدة",
+          artAlt: "دفتر مفتوح بجانب هاتف ذكي",
+        },
+        support: {
+          tag: "الدعم",
+          title: "تحدّث إلى فريقنا",
+          point1: "افتح تذكرة",
+          point2: "الرد عبر البريد الإلكتروني",
+          point3: "دون الحاجة إلى حساب",
+          cta: "تواصل مع الدعم",
+          artAlt: "سماعة رأس على مكتب",
+        },
       },
       empty: {
         title: "لا توجد خدمات معروضة بعد",
@@ -351,9 +460,6 @@ export const store = defineMessages({
       brand: "العلامة التجارية",
       network: "الشبكة",
       country: "البلد",
-      allBrands: "كل العلامات التجارية",
-      allNetworks: "كل الشبكات",
-      allCountries: "كل البلدان",
       sort: "الترتيب",
       sortFeatured: "المميّزة أولًا",
       sortTitle: "الاسم (أ إلى ي)",
@@ -387,7 +493,17 @@ export const store = defineMessages({
       deliveryShort: "{time}",
       viewService: "عرض {title}",
       orderService: "اطلب {title}",
+      quickView: "نظرة سريعة: {title}",
       priceFrom: "السعر",
+    },
+
+    quickView: {
+      eyebrow: "نظرة سريعة",
+      details: "عرض التفاصيل الكاملة",
+      missingTitle: "هذه الخدمة غير متاحة",
+      missingText: "ربما أُزيلت أو تغيّر اسمها. تصفّح الكتالوج للعثور على خدمة مشابهة.",
+      browse: "تصفّح الخدمات",
+      place: "الشبكة والبلد",
     },
 
     service: {

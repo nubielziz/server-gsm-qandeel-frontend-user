@@ -7,17 +7,20 @@ export type CardProps = ComponentProps<"div"> & {
   as?: ElementType;
   /** `default` white, `muted` grey fill without shadow, `inverse` near-black with white text. */
   tone?: "default" | "muted" | "inverse";
+  /** Corner radius: `card` (12px) or `panel` (16px). Default: `panel` for `inverse`, `card` for the others. */
+  radius?: "card" | "panel";
 };
 
 const tones = {
-  default: "rounded-card border border-line bg-surface shadow-card",
-  muted: "rounded-card border border-line bg-surface-muted",
-  inverse: "surface-inverse rounded-panel border border-inverse",
+  default: "border border-line bg-surface shadow-card",
+  muted: "border border-line bg-surface-muted",
+  inverse: "surface-inverse border border-inverse",
 } as const;
 
 /** A card surface. Compose with CardHeader / CardBody / CardFooter, or put your own padding inside. */
-export function Card({ as: Tag = "div", tone = "default", className, ...props }: CardProps) {
-  return <Tag className={cn("flex min-w-0 flex-col", tones[tone], className)} {...props} />;
+export function Card({ as: Tag = "div", tone = "default", radius, className, ...props }: CardProps) {
+  const panel = (radius ?? (tone === "inverse" ? "panel" : "card")) === "panel";
+  return <Tag className={cn("flex min-w-0 flex-col", panel ? "rounded-panel" : "rounded-card", tones[tone], className)} {...props} />;
 }
 
 export type CardHeaderProps = Omit<ComponentProps<"div">, "title"> & {

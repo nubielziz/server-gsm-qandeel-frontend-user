@@ -1,4 +1,5 @@
 // IconButton: a square button with only an icon. The accessible name is required.
+import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Spinner } from "./spinner";
@@ -19,6 +20,9 @@ const sizes: Record<IconButtonSize, string> = {
   md: "size-11 [&_svg]:size-5",
   lg: "size-12 [&_svg]:size-5",
 };
+
+const frame =
+  "relative inline-flex shrink-0 items-center justify-center rounded-control transition-colors duration-(--duration-fast) ease-standard";
 
 export type IconButtonProps = Omit<ComponentProps<"button">, "aria-label" | "children"> & {
   /** Accessible name and tooltip (e.g. "Close"). Required: an icon alone says nothing to a screen reader. */
@@ -51,7 +55,7 @@ export function IconButton({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        "relative inline-flex shrink-0 items-center justify-center rounded-control transition-colors duration-(--duration-fast) ease-standard",
+        frame,
         "disabled:pointer-events-none disabled:opacity-50",
         variants[variant],
         sizes[size],
@@ -61,5 +65,27 @@ export function IconButton({
     >
       {loading ? <Spinner /> : children}
     </button>
+  );
+}
+
+export type IconButtonLinkProps = Omit<ComponentProps<typeof Link>, "aria-label" | "children" | "className" | "href"> & {
+  /** Accessible name and tooltip (e.g. "Order AT&T Unlock"). Required. */
+  label: string;
+  /** In-site path, already language-prefixed with `localePath`. */
+  href: string;
+  /** The icon: a lucide element. Mirror directional icons with `rtl:-scale-x-100`. */
+  children: ReactNode;
+  variant?: IconButtonVariant;
+  size?: IconButtonSize;
+  /** Extra classes for layout (margins, stacking). */
+  className?: string;
+};
+
+/** A link that looks like an IconButton (next/link): a square icon that navigates. */
+export function IconButtonLink({ label, children, variant = "ghost", size = "md", className, href, ...props }: IconButtonLinkProps) {
+  return (
+    <Link href={href} aria-label={label} title={label} className={cn(frame, variants[variant], sizes[size], className)} {...props}>
+      {children}
+    </Link>
   );
 }

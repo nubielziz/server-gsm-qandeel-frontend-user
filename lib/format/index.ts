@@ -100,9 +100,14 @@ export function compareMoney(a: string, b: string): -1 | 0 | 1 {
 }
 
 // ── IMEI helpers (the API checks too; these only give early feedback).
-/** Removes spaces and dashes, as the API does. */
+/**
+ * Removes spaces and dashes, as the API does, and turns Arabic-Indic (٠-٩) and Persian (۰-۹) digits into 0-9: an Arabic
+ * keyboard types those, and the API only takes Latin digits.
+ */
 export function normalizeImei(value: string): string {
-  return value.replace(/[\s-]/g, "");
+  return value
+    .replace(/[\s-]/g, "")
+    .replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (d) => String((d.charCodeAt(0) & 0xf) % 10));
 }
 
 /** 15 digits with a valid Luhn check digit. */

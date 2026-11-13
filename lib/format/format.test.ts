@@ -38,6 +38,9 @@ describe("formatMoney", () => {
 describe("IMEI helpers", () => {
   it("normalizes like the API (spaces and dashes)", () => {
     expect(normalizeImei("49-015420 323751 8")).toBe("490154203237518");
+    expect(normalizeImei("٤٩٠١٥٤٢٠٣٢٣٧٥١٨")).toBe("490154203237518");
+    expect(normalizeImei("۴۹۰۱۵۴۲۰۳۲۳۷۵۱۸")).toBe("490154203237518");
+    expect(isValidImei("٤٩٠١٥٤٢٠٣٢٣٧٥١٨")).toBe(true);
   });
   it("checks the Luhn digit", () => {
     expect(isValidImei("490154203237518")).toBe(true);

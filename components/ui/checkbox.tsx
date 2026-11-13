@@ -3,7 +3,7 @@ import { useId, type ComponentProps, type ReactNode } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-export type CheckboxProps = Omit<ComponentProps<"input">, "type" | "children"> & {
+export type CheckboxProps = Omit<ComponentProps<"input">, "type" | "children" | "size"> & {
   /** The visible label (the whole row is clickable). */
   label: ReactNode;
   /** Secondary text under the label, linked with aria-describedby. */
@@ -12,19 +12,35 @@ export type CheckboxProps = Omit<ComponentProps<"input">, "type" | "children"> &
   error?: string | undefined;
   /** Classes for the outer wrapper. */
   wrapperClassName?: string;
+  /**
+   * `md` (default): a 44px row with a 20px box. `sm`: a dense list row (filter lists): 32px with a mouse, 44px on touch
+   * screens, a 16px box and small text that turns bold when checked.
+   */
+  size?: "md" | "sm";
+  /** Content at the end of the row, e.g. a count "(8)" (part of the label). */
+  trailing?: ReactNode;
 };
 
 /** A checkbox with a 44px-high clickable row, optional description and error. */
-export function Checkbox({ label, description, error, className, wrapperClassName, id, ...props }: CheckboxProps) {
+export function Checkbox({ label, description, error, size = "md", trailing, className, wrapperClassName, id, ...props }: CheckboxProps) {
   const generated = useId();
   const inputId = id ?? `c${generated.replace(/:/g, "")}`;
   const descId = `${inputId}-desc`;
   const errorId = `${inputId}-error`;
   const describedBy = [description ? descId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;
+  const sm = size === "sm";
   return (
     <div className={wrapperClassName}>
-      <label htmlFor={inputId} className="flex min-h-11 items-start gap-3 py-2.5">
-        <span className="relative mt-0.5 grid size-5 shrink-0 place-items-center">
+      <label
+        htmlFor={inputId}
+        className={cn(
+          "flex",
+          sm
+            ? "min-h-8 items-center gap-2.5 rounded-badge py-1 text-small text-ink-muted transition-colors hover:text-ink has-checked:font-semibold has-checked:text-ink pointer-coarse:min-h-11"
+            : "min-h-11 items-start gap-3 py-2.5",
+        )}
+      >
+        <span className={cn("relative grid shrink-0 place-items-center", sm ? "size-4" : "mt-0.5 size-5")}>
           <input
             id={inputId}
             type="checkbox"
@@ -41,17 +57,22 @@ export function Checkbox({ label, description, error, className, wrapperClassNam
           <Check
             aria-hidden="true"
             strokeWidth={3}
-            className="pointer-events-none relative size-3.5 text-on-inverse opacity-0 peer-checked:opacity-100"
+            className={cn("pointer-events-none relative text-on-inverse opacity-0 peer-checked:opacity-100", sm ? "size-3" : "size-3.5")}
           />
         </span>
-        <span className="min-w-0">
-          <span className="block text-body font-medium text-ink">{label}</span>
-          {description ? (
-            <span id={descId} className="mt-0.5 block text-small text-ink-subtle">
-              {description}
-            </span>
-          ) : null}
-        </span>
+        {sm ? (
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+        ) : (
+          <span className="min-w-0">
+            <span className="block text-body font-medium text-ink">{label}</span>
+            {description ? (
+              <span id={descId} className="mt-0.5 block text-small text-ink-subtle">
+                {description}
+              </span>
+            ) : null}
+          </span>
+        )}
+        {trailing ? <span className="shrink-0 font-normal text-ink-subtle">{trailing}</span> : null}
       </label>
       <div id={errorId} aria-live="polite">
         {error ? <p className="ps-8 text-small font-medium text-danger-ink">{error}</p> : null}

@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { staticSlugParams } from "@/components/store/static-params";
 import { demoteHeadings } from "@/components/store/markdown-source";
 import { resolveService, otherLocale } from "@/components/store/resolve-service";
-import { ServiceArt, BrandLogo } from "@/components/store/service-art";
+import { ServiceArt } from "@/components/store/service-art";
 import { Accordion, MerchantPriceHint, ServicePrice, quantityText } from "@/components/store/service-parts";
 import { countryName } from "@/lib/countries";
 import { allListedServices, slugForService } from "@/lib/catalog";
@@ -26,7 +26,8 @@ import { store } from "@/lib/i18n/messages/store";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { siteImage } from "@/lib/site-images";
 
-export async function generateMetadata({ params }: PageProps<"/[lang]/services/[slug]">): Promise<Metadata> {
+/** Also the metadata of a quick view link opened directly (../../quick-view/[slug]): only `params.slug` is read. */
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const [{ slug }, locale] = await Promise.all([params, getLocale()]);
   const resolved = await resolveService(slug, locale);
   if (resolved.kind !== "found") return { robots: { index: false } };
@@ -93,13 +94,12 @@ async function ServiceContent({ params }: { params: Promise<{ slug: string }> })
       />
       <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <header className="min-w-0 overflow-hidden rounded-card border border-line bg-surface shadow-card lg:col-start-1">
-          <ServiceArt type={service.type} sizes="(min-width: 1024px) 60vw, 100vw" aspect="21 / 9" priority />
+          <ServiceArt type={service.type} brand={service.brand} sizes="(min-width: 1024px) 40vw, 100vw" aspect="21 / 9" fit="contain" priority />
           <div className="grid gap-4 p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone="inverse" shape="tag">
                 {c.serviceType[service.type]}
               </Badge>
-              <BrandLogo brand={service.brand} />
             </div>
             <h1 className="text-title text-ink">{service.title}</h1>
             {service.summary ? <p className="max-w-2xl text-subheading font-normal text-ink-muted">{service.summary}</p> : null}

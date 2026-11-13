@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "gen:api": "node scripts/gen-api-types.mjs",
+    "logos": "node scripts/logo-sizes.mjs",
     "gen:api:check": "node scripts/gen-api-types.mjs --check",
     "check": "npm run gen:api:check && npm run typecheck && npm run lint && npm run test && npm run build"
   },

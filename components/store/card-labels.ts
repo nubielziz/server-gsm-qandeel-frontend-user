@@ -8,6 +8,7 @@ export function serviceCardLabels(t: StoreMessages, common: CommonMessages): Ser
     orderNow: t.card.orderNow,
     delivery: t.card.delivery,
     orderService: t.card.orderService,
+    quickView: t.card.quickView,
     types: common.serviceType,
   };
 }

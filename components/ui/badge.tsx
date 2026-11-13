@@ -20,15 +20,18 @@ export type BadgeProps = Omit<ComponentProps<"span">, "children"> & {
   icon?: ReactNode;
   /** `pill` (fully rounded, default) or `tag` (6px radius). */
   shape?: "pill" | "tag";
+  /** A smaller upper-case label (11px, letter-spaced): the category tag of a card ("IMEI CHECK"). Short words only. */
+  caps?: boolean;
   children: ReactNode;
 };
 
 /** A small tinted label. Never rely on colour alone: the text (and ideally an icon) carries the meaning. */
-export function Badge({ tone = "neutral", icon, shape = "pill", className, children, ...props }: BadgeProps) {
+export function Badge({ tone = "neutral", icon, shape = "pill", caps, className, children, ...props }: BadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex w-fit items-center gap-1.5 whitespace-nowrap px-2.5 py-1 text-small font-semibold leading-none",
+        "inline-flex w-fit items-center gap-1.5 whitespace-nowrap py-1 leading-none",
+        caps ? "px-2 text-micro uppercase" : "px-2.5 text-small font-semibold",
         "[&_svg]:size-3.5 [&_svg]:shrink-0",
         shape === "pill" ? "rounded-full" : "rounded-badge",
         badgeToneClasses[tone],

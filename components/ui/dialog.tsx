@@ -10,7 +10,8 @@
 //  - Controlled (client forms):  <Drawer open={open} onClose={() => setOpen(false)} …>
 // A form that spans the body and the footer buttons can keep them apart: give the form an `id` and the submit button
 // `form="that-id"`.
-import { useEffect, useId, useRef, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import Link from "next/link";
+import { useEffect, useId, useRef, type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Button, type ButtonProps } from "./button";
@@ -166,4 +167,17 @@ export function DialogTrigger({ for: dialogId, ...props }: DialogTriggerProps) {
 /** A Button that closes the dialog it is inside (a "Cancel" button). */
 export function DialogClose(props: Omit<ButtonProps, "onClick">) {
   return <Button variant="secondary" onClick={(e) => e.currentTarget.closest("dialog")?.close()} {...props} />;
+}
+
+/** A next/link that closes the dialog it is inside before navigating (filter links in a drawer). Elsewhere a plain link. */
+export function DialogLink({ onClick, ...props }: ComponentProps<typeof Link>) {
+  return (
+    <Link
+      onClick={(event) => {
+        onClick?.(event);
+        event.currentTarget.closest("dialog")?.close();
+      }}
+      {...props}
+    />
+  );
 }

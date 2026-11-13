@@ -1,0 +1,190 @@
+"use client";
+// The filter form of the home page's service list (mockup "All Products" sidebar): Categories (the service types), the
+// price range, then brand, carrier and country. Each option is a checkbox with how many services it would show; several
+// options of one list add up. A GET form, so it works without JavaScript (its Apply button shows only then). With
+// JavaScript a change applies at once (a checkbox when ticked, the slider when released) without moving the page, so
+// the list updates beside it. Rendered twice: in the sidebar and in the phone drawer, which stays open while options are
+// picked. The ticks follow the URL: a filter removed elsewhere (a chip) clears its box here too.
+import { useId, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DialogLink } from "@/components/ui/dialog";
+import { RangeSlider } from "@/components/ui/range-slider";
+import { formatMoney } from "@/lib/format";
+import type { Locale } from "@/lib/i18n/config";
+import { fmt } from "@/lib/i18n/define";
+
+export type FilterOption = {
+  value: string;
+  label: string;
+  /** "(8)", formatted for the language. */
+  count: string;
+  selected: boolean;
+};
+
+export type FilterGroup = {
+  /** The query parameter (`type`, `brand`, `network`, `country`). */
+  name: string;
+  label: string;
+  options: FilterOption[];
+};
+
+export type PriceFilter = {
+  /** The slider's span in whole units of `currency`. */
+  min: number;
+  max: number;
+  /** The current [low, high]. */
+  value: [number, number];
+  currency: string;
+};
+
+export type ListFiltersLabels = {
+  priceRange: string;
+  minPrice: string;
+  maxPrice: string;
+  /** "Show {count} more" */
+  showMore: string;
+  showLess: string;
+  apply: string;
+  clear: string;
+};
+
+export type ListFiltersProps = {
+  /** The language-prefixed path of the page that shows the list. */
+  action: string;
+  /** Values the form sends along unchanged (search, sort). */
+  keep: [string, string][];
+  /** The first list (Categories), above the price range. */
+  categories: FilterGroup | null;
+  price: PriceFilter | null;
+  /** The lists under the price range (brand, carrier, country). */
+  groups: FilterGroup[];
+  locale: Locale;
+  labels: ListFiltersLabels;
+  /** Where "Clear all" goes; null when nothing is filtered. */
+  clearHref: string | null;
+};
+
+/** Options shown in a list before "Show N more". */
+const VISIBLE = 6;
+const legendClasses = "mb-1.5 text-small font-bold text-ink";
+
+const keyOf = (group: FilterGroup, option: FilterOption) => `${group.name}\u0000${option.value}`;
+
+export function ListFilters({ action, keep, categories, price, groups, locale, labels, clearHref }: ListFiltersProps) {
+  const router = useRouter();
+  const id = useId();
+  const formRef = useRef<HTMLFormElement>(null);
+  const lists = categories ? [categories, ...groups] : groups;
+
+  // The ticks are the URL's (from the server), changed at once on a click; a new URL resets them.
+  const fromUrl = lists.flatMap((group) => group.options.filter((option) => option.selected).map((option) => keyOf(group, option))).join("\u0001");
+  const [ticked, setTicked] = useState(() => new Set(fromUrl ? fromUrl.split("\u0001") : []));
+  const [seen, setSeen] = useState(fromUrl);
+  if (seen !== fromUrl) {
+    setSeen(fromUrl);
+    setTicked(new Set(fromUrl ? fromUrl.split("\u0001") : []));
+  }
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    for (const [key, value] of new FormData(event.currentTarget)) {
+      const text = typeof value === "string" ? value.trim() : "";
+      if (!text || (key === "sort" && text === "featured")) continue;
+      // The ends of the slider mean "no limit".
+      if (price && key === "min" && Number(text) <= price.min) continue;
+      if (price && key === "max" && Number(text) >= price.max) continue;
+      params.append(key, text);
+    }
+    const query = params.toString();
+    router.push(query ? `${action}?${query}` : action, { scroll: false });
+  }
+
+  function toggle(key: string, on: boolean, form: HTMLFormElement | null) {
+    setTicked((before) => {
+      const next = new Set(before);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+    form?.requestSubmit();
+  }
+
+  const list = (group: FilterGroup) => {
+    if (group.options.length === 0) return null;
+    const selectedAt = group.options.findIndex((option) => option.selected);
+    const shown =
+      selectedAt >= VISIBLE ? [...group.options.slice(0, VISIBLE - 1), group.options[selectedAt]] : group.options.slice(0, VISIBLE);
+    const rest = group.options.filter((option) => !shown.includes(option));
+    const box = (option: FilterOption) => {
+      const key = keyOf(group, option);
+      return (
+        <li key={key}>
+          <Checkbox
+            size="sm"
+            name={group.name}
+            value={option.value}
+            checked={ticked.has(key)}
+            onChange={(event) => toggle(key, event.currentTarget.checked, event.currentTarget.form)}
+            label={<bdi>{option.label}</bdi>}
+            trailing={<span className="num">{option.count}</span>}
+          />
+        </li>
+      );
+    };
+    return (
+      <fieldset key={group.name} className="m-0 min-w-0 border-0 p-0">
+        <legend className={legendClasses}>{group.label}</legend>
+        <ul>{shown.map(box)}</ul>
+        {rest.length > 0 ? (
+          <details className="group/more">
+            <summary className="flex min-h-8 w-fit cursor-pointer list-none items-center text-small font-semibold text-ink underline underline-offset-4 marker:hidden pointer-coarse:min-h-11 [&::-webkit-details-marker]:hidden">
+              <span className="group-open/more:hidden">{fmt(labels.showMore, { count: rest.length })}</span>
+              <span className="hidden group-open/more:inline">{labels.showLess}</span>
+            </summary>
+            <ul>{rest.map(box)}</ul>
+          </details>
+        ) : null}
+      </fieldset>
+    );
+  };
+
+  return (
+    <form ref={formRef} action={action} method="get" onSubmit={onSubmit} className="grid gap-5">
+      {keep.map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
+      {categories ? list(categories) : null}
+      {price ? (
+        <div role="group" aria-labelledby={`${id}-price`}>
+          <p id={`${id}-price`} className={legendClasses}>
+            {labels.priceRange}
+          </p>
+          <RangeSlider
+            min={price.min}
+            max={price.max}
+            value={price.value}
+            names={["min", "max"]}
+            labels={[labels.minPrice, labels.maxPrice]}
+            format={(n) => formatMoney(String(n), price.currency, locale, 0)}
+            onCommit={() => formRef.current?.requestSubmit()}
+            className="mt-2.5"
+          />
+        </div>
+      ) : null}
+      {groups.map(list)}
+      <noscript>
+        <Button type="submit" size="sm">
+          {labels.apply}
+        </Button>
+      </noscript>
+      {clearHref ? (
+        <DialogLink href={clearHref} scroll={false} className="inline-flex min-h-8 w-fit items-center text-small font-semibold text-ink underline underline-offset-4 pointer-coarse:min-h-11">
+          {labels.clear}
+        </DialogLink>
+      ) : null}
+    </form>
+  );
+}

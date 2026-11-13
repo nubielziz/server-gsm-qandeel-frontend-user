@@ -15,9 +15,17 @@ Rules: `CLAUDE.md`. Images to add: `docs/IMAGE-PROMPTS.md`.
 | M6 | Merchant portal: dashboard, catalog + ordering, orders, wallet, top-ups, invoices (`230b7b3`); settings, security/2FA/sessions, notifications, KYC, API keys, webhooks, referrals (`5e0a8d2`) | done (2026-11-09) |
 
 ## Wiring (changed 2026-11-09, late evening, at the owner's request)
-- **Dev site (`npm run dev`, :5175) → the owner's main API (:3000).** `.env.development.local`: `GSM_API_ORIGIN=http://localhost:3000`.
-  Its data is the owner's real dev DB (`gsm`): almost empty (1 currency, 0 services, 0 gateways), so the shop shows
-  empty states until staff add services in the console.
+- **Dev site (`npm run dev`, :5175) → the isolated demo API (:3100) since 2026-11-10**, at the owner's request (to
+  see the home page with data). `.env.development.local`: `GSM_API_ORIGIN=http://localhost:3100`; start the API with
+  `scripts/dev-backend.sh start`. Back to the owner's API: set `http://localhost:3000`, then restart `npm run dev`
+  (the origin is read only at start-up: `next.config.ts` rewrites and `lib/api/server.ts`). The owner's DB (`gsm`)
+  is almost empty (1 currency, 0 services, 0 gateways): the shop shows empty states there.
+- Demo data change (2026-11-10, DB `gsm_storefront` only, SQL): the 5 Arabic listings (ids 15–19, made on 2026-11-09
+  through the admin API) got the brand, carrier, country, sort and featured flag of their English listing, plus an
+  Arabic summary and ETA text, so the Arabic home shows the tiles and the featured section. Still 5 Arabic listings
+  (e2e expects 5, and T-Mobile English-only). A `dev-backend.sh reset` undoes it.
+- **Backend gaps (owner/lead):** listed in `docs/BACKEND-NEEDS.md` (listing content not editable in the admin API,
+  stock/availability, categories, localized delivery time, best sellers, new arrivals).
 - `backend/.env` (owner's file) got 3 lines: `CORS_ORIGINS` (console origins + :5175), `PORTAL_BASE_URL=http://localhost:5175/merchant`,
   `STORE_BASE_URL=http://localhost:5175`. The main API and worker were restarted detached with the owner's usual
   commands (`bun --watch src/main.ts`, `bun --watch src/worker.ts`); logs and PIDs in `/tmp/gsm-main-backend/`.
@@ -25,8 +33,129 @@ Rules: `CLAUDE.md`. Images to add: `docs/IMAGE-PROMPTS.md`.
   (the e2e suite needs the demo data). Start it with `scripts/dev-backend.sh start`.
 - Merchant `progammerabood@gmail.com` (main DB, id 2) has the password chosen by the owner (set with the backend's own
   policy check and argon2 hasher; verified by signing in through the site).
-- Mail on the main API is still Resend in test mode: it delivers only to the Resend account's own address
-  (`550` for everyone else). Owner to choose: verify a domain at Resend, or `MAIL_SMTP_URL=smtp://localhost:1025` (Mailpit).
+- Mail on the main API now goes out for real through Resend from `GSM <noreply@imei-hub.com>` (2026-11-13; see the section
+  "Mail through Resend on imei-hub.com" below). Its links still point at `http://localhost:5175` (dev `STORE_BASE_URL`).
+
+## Home page redesign (2026-11-10, uncommitted)
+Rebuilt after the mockup `screenshots/GSM Store E-Commerce Dashboard (1).png`, with only what the API has:
+- Page is `wide` like the header. Order: hero (lowest price "Starting from", streamed) + quick IMEI check + track card;
+  tiles strip (brands, then carriers when brands do not fill the row, each with its service count); featured services;
+  "How it works" beside four dense "More services" cards; three banners (merchants, help center, support).
+- `ServiceCard` is the compact mockup card everywhere (home and catalog): thumb + brand wordmark, type tag, title,
+  summary, delivery and carrier/country, price + "Order now". New `ServiceCardMini`.
+- Tokens: `text-hero`, `text-micro`, `sheen-inverse` / `sheen-surface` (lit surfaces, shown only while a card has no
+  image). Primitives: `Badge caps`, `Card radius`, `IconButtonLink`.
+- New image slots `home-merchants.jpg`, `home-help.jpg`, `home-support.jpg` (`docs/IMAGE-PROMPTS.md`). The `home-*`
+  images are mirrored on the Arabic site.
+- Checked 2026-11-10 on a copy against the demo API (:3100): typecheck, ESLint, 66 unit tests, `e2e/store.spec.ts`
+  34/34 (desktop + mobile), `next build` OK (home still partial prerender); screenshots at 1440 / 1024 / 768 / 390 px in
+  en and ar, with and without images, no horizontal overflow, no console errors.
+
+## Home: All services, Quick View, Featured collections (2026-11-10, uncommitted)
+The three mockup parts that were missing, adapted to the API (no categories, stock, cart or favourites, handoff §1.7):
+- **Featured collections** (`components/store/home-collections.tsx`): the brands, countries and carriers with the most
+  services (2+ each, at most 2 of a kind, 3 in all; `pickCollections` in `lib/catalog-facets.ts`), each with its count
+  and lowest price, opening `/services?brand=…|country=…|network=…`. Art: optional `collections/<kind>-<name>.jpg` on
+  the start side (`docs/IMAGE-PROMPTS.md`); a card with art is light, else the first one is dark. Hidden below 2.
+- **All services** (`components/store/home-products.tsx`): sidebar (drawer on phones) with brand / carrier / country
+  lists, each option a link with the count it would leave (`facetOptions`, worked out over the cached catalog, the
+  same rules as the API: other filters + search), search box, sort, 8 dense cards per page, chips, pages. State in the
+  home URL (`/en?brand=Apple&page=2#all-services`): works without JavaScript; the home's canonical is `/en`, `/ar`.
+- **Quick View**: an eye link on every card (`/[lang]/quick-view/<slug>`) is intercepted in the store layout's `@modal`
+  slot (`app/[lang]/(store)/@modal/(.)quick-view/[slug]`) and opens a large Modal over the page: type, chips, summary,
+  price (visitor currency), delivery, quantity, carrier/country, description, requirements, "View full details" and
+  "Buy now". Esc / backdrop / X go back in history. Opened directly, the URL is the service page (noindex, canonical
+  `/services/<slug>`). The frame shows only while the URL is a quick view (`usePathname` in its own `<Suspense>`), so a
+  link followed from inside removes it and Back shows it again (no catch-all slot page needed).
+- Shared pieces: `components/store/banner.tsx` (from home-parts: tag, side art, lit surface, arrow), `ActiveFilters`
+  chips (also on `/services`), `DialogLink`, `Pagination hash`.
+- Checked: typecheck, ESLint, 74 unit tests, `e2e/store.spec.ts` 42/42 (4 new × desktop + mobile) on the dev site,
+  `next build` OK (171 pages; home, both quick-view routes ◐; service pages still prerendered per slug). Full e2e on the
+  production build: 242 passed, 4 skipped, 2 failed: `merchant.spec.ts` "custom field … instant order" (both
+  projects), because the demo DB's stock of instant codes for service 15 is used up (17 sold, 0 left), not a code
+  change. Screenshots en/ar at 1440 / 1024 / 768 / 390 px: no horizontal overflow; console shows only Next's dev
+  "instant navigation" insight, also on untouched routes (`/en/help`).
+
+## Home list sidebar like the mockup (2026-11-10, uncommitted)
+- The "All services" sidebar is now the mockup's: Categories (the service types: the store API has no categories),
+  a two-thumb price range (`components/ui/range-slider.tsx`, values above the track, applies when released or 300 ms
+  after the last key press), then brand, carrier and country. Square checkboxes (`Checkbox size="sm"` with a count),
+  several options of one list add up (`brand=Apple&brand=Samsung`). A change applies at once without moving the page
+  (GET form, works without JavaScript); the phone drawer stays open while picking and closes with "Show results".
+- The home list is worked out in memory over the cached catalog (`homeList` in `lib/catalog.ts`, rules in
+  `lib/catalog-facets.ts`), since the API cannot filter by type or price; `allListedServices` now keeps the API's
+  default order (featured first). Price chips and slider values are laid out left-to-right in Arabic.
+- **Availability ("In stock only") is not built:** the store API has no stock field (see `docs/BACKEND-NEEDS.md` §1).
+- Checked: typecheck, ESLint, 78 unit tests, `e2e/store.spec.ts` 43 passed + 1 skipped (desktop + mobile), screenshots
+  en/ar at 1440 and the phone drawer at 390 px.
+
+## Brand and carrier logos (2026-11-10, uncommitted)
+- 86 logos in `public/images/brands/` (65: phone brands, GSM tools, games and apps) and `public/images/carriers/` (21),
+  transparent PNGs cropped to the logo, ~96 px high, ~680 KB in all. Sources: Simple Icons 16.37.0 (CC0 drawings, brand
+  colour), Wikimedia Commons (public-domain files), the owners' own sites (Umniah, STC, du, Turkcell, Korek, Jawwal,
+  Omantel, WE, Chimera, Octoplus, Z3X, Sigma, Halabtech, Free Fire, Doogee, Ulefone, Blackview). Every file, its source
+  and terms, how to add one, and what is still missing: `docs/LOGOS.md`. Trademarks of their owners.
+- Shown in place of the initials (brands) and the signal icon (carriers) on the home tiles and light collection cards.
+  For a service the brand's logo replaces the type picture (only a fallback): card corner (`ServiceMark`; a symbol logo
+  keeps the name beside it), quick view and service page (`ServiceArt brand`). Without a brand logo the type picture stays. `Logo`, `logoFile`, `logoSlug`,
+  `LOGO_ALIASES` in `components/store/service-art.tsx` (a longer name finds its first words: "Cricket Wireless" →
+  `cricket.png`). Sizes come from `lib/logo-sizes.json` (`npm run logos`, `scripts/logo-sizes.mjs`): reading a file
+  while rendering made Next report `Date.now()` during the prerender.
+- More Wikimedia logos (EE, Three, Zain, Mobily, Etisalat, Ooredoo, Rogers, Bell, Telus, Cricket …) were still
+  downloading at this point: the server limits the rate.
+- Checked: typecheck, ESLint, 78 unit tests, `e2e/store.spec.ts` 45 + 1 skipped, `next build` OK, screenshots of tiles,
+  cards and collections (no broken images, no console errors).
+
+## Catalog page uses the same list (2026-11-10, uncommitted)
+- `/services` and the home's "All services" are one component: `components/store/service-list.tsx`
+  (`loadServiceList` + `ServiceList`, configured per page: path, cards per page (home 8 dense, catalog 24 full cards),
+  anchor, drawer id). Same sidebar (categories, price range, brand / carrier / country checkboxes), toolbar, chips and
+  drawer; several brands/carriers/countries also work on `/services` now. The home's "Open the catalog" keeps every
+  filter. `catalogList` (was `homeList`) in `lib/catalog.ts`.
+- Removed: the old select-based `CatalogFilters` / store `FilterForm`, `catalogFacets`, `withoutParams` and the
+  "All brands/carriers/countries" strings (the merchant portal's own `FilterForm` is unchanged).
+- Picture per service: none in the API or from the suppliers (their synced fields have no image), so cards show
+  the type's picture: `docs/BACKEND-NEEDS.md` §7.
+- Checked: typecheck, ESLint, 78 unit tests, `e2e/store.spec.ts` 45 passed + 1 skipped, `next build` OK (171 pages,
+  `/[lang]` and `/[lang]/services` ◐), screenshots `/services` en/ar 1440 and 390 px, no overflow.
+
+## Site images added (2026-11-10, uncommitted)
+- The owner added 9 images (`home-*` ×5, `service-*` ×4). They were PNG data named `.jpg`: converted to real JPEG
+  (q86, same size in pixels, ~1.6 MB → 50–110 KB each). Then `sign-in-hero.jpg` and `og-default.jpg` (renamed from `sign-in-hero..png` / `og-default.jpg.png`, converted;
+  share image resized to 1200 × 630). Still missing: `logo-mark.png`. The sign-in image now fills the space under the
+  hero text instead of sitting behind it.
+- `siteImage()` checks the folder on every render in development (new files show without a restart); production
+  still checks once per run. Banner art is anchored right (mirrored in Arabic); the service page shows the whole image.
+- Checked: dev site en/ar at 1440/768/390, production build against the demo API (home, catalog, service page),
+  `e2e/store.spec.ts` 34/34.
+
+## Mail through Resend on imei-hub.com (2026-11-13, owner's request)
+- **Domain:** `imei-hub.com` is verified in Resend: a send from `noreply@imei-hub.com` is accepted, a control from an unverified
+  domain gets `550 … domain is not verified`. DNS (Cloudflare): DKIM `resend._domainkey` TXT ✓, `send` CNAME → `send.forge.rmta.net`
+  (SPF + MX for the return path) ✓, **no DMARC record** (owner: add `_dmarc` TXT `v=DMARC1; p=none; rua=mailto:<monitored address>`).
+  The Resend key in `backend/.env` is send-only, so the Resend API cannot read domains or delivery status.
+- **Config:** `backend/.env` `MAIL_FROM="GSM <noreply@imei-hub.com>"` (was `onboarding@resend.dev`, Resend test mode). The owner's
+  API and worker on :3000 reloaded (bun `--watch`). The 3 failed mails in DB `gsm` (2 merchant invitations, 1 approval, Nov 9–11)
+  were the test-mode `550`; they were not re-sent (real recipients: staff can re-send from the console).
+- **Backend fix (uncommitted, for the backend lead):** `classifyMailError` (`backend/src/modules/platform/notifications/mail-driver.ts`)
+  failed a 4xx answer at MAIL FROM/RCPT/DATA for good (nodemailer codes them `EENVELOPE`/`EMESSAGE`), so a Resend rate-limit reply
+  lost the mail; and a refused login (`EAUTH` 535, wrong or rotated key) failed every mail. Now the answer code decides (4xx retried,
+  5xx permanent) and a refused login is retried. +3 specs; mail specs 11/11, 7 mail integration files 158/158, backend typecheck OK.
+- **E2E guard:** `playwright.config.ts` refuses to run unless the site under test uses the isolated API (:3100). The dev site
+  points at :3000, which now sends real mail: e2e's made-up addresses would bounce and hurt the domain's reputation.
+- **Tested end to end** on the isolated backend (:3100; DB `gsm_storefront` migrated 20 → 31 in place) with its mail sent through a
+  scratch relay that passed only `@resend.dev` test sinks to Resend (everything else to Mailpit): customer sign-up (magic link),
+  customer reset, merchant registration (verify), merchant reset, staff invitation + re-send, approval, wallet adjustment,
+  `order.received` (balance payment) and `order.completed` (staff reply): 13 messages accepted by Resend, 0 refused, every row
+  `sent` on the first attempt. Links: `STORE_BASE_URL/sign-in?token=`, `PORTAL_BASE_URL/verify-email|set-password?token=`.
+- **Open (owner/backend lead):** DMARC record; a Reply-To (no inbox exists on imei-hub.com and ~13 templates say "reply to this
+  email": e.g. Cloudflare Email Routing for `support@` + an optional `MAIL_REPLY_TO` setting); production must set
+  `STORE_BASE_URL`/`PORTAL_BASE_URL`/`CONSOLE_BASE_URL` to the public https hosts (nothing refuses localhost in production);
+  `ALERTS_EMAIL_TO` is unset (alert mails fail "No alert recipient"); "Hi ," for nameless customers and "there" in Arabic mails;
+  the default order mails speak of an "unlock" for every service. The storefront still lacks the `/unsubscribe` page (handoff
+  backend §4.2): the visible unsubscribe link in marketing mails 404s.
+- **Agent usage:** one workflow (read-only): 3 agents (transport audit, content audit, flow recipes) + 8 verifiers; stopped before
+  further verify batches under the owner's new limits (≤ 3 agent calls per feature). 5 findings confirmed, 3 refuted.
 
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an

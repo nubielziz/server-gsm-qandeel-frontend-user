@@ -17,7 +17,7 @@ async function stubTurnstile(page: Page) {
 }
 
 test.describe("home", () => {
-  test("shows featured services priced in USD, brand chips and the quick IMEI form", async ({ page }) => {
+  test("shows featured services priced in USD, brand and carrier tiles and the quick IMEI form", async ({ page }) => {
     await page.goto("/en");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("IMEI checks");
     const featured = page.getByRole("region", { name: "Featured services" });
@@ -27,12 +27,108 @@ test.describe("home", () => {
       "href",
       "/en/checkout?service=atandt-usa-premier-unlock",
     );
-    await expect(page.getByRole("link", { name: "Show Apple services" })).toHaveAttribute("href", "/en/services?brand=Apple");
+    await expect(page.getByText("Starting from")).toBeVisible();
+    const tiles = page.getByRole("navigation", { name: "Shop by brand or carrier" });
+    await expect(tiles.getByRole("link", { name: "Apple 8 services" })).toHaveAttribute("href", "/en/services?brand=Apple");
+    await expect(tiles.getByRole("link", { name: "AT&T 1 service" })).toHaveAttribute("href", "/en/services?network=AT%26T");
+    await expect(tiles.getByRole("link", { name: "All services 11 services" })).toHaveAttribute("href", "/en/services");
+    const more = page.getByRole("region", { name: "More services" });
+    await expect(more.getByRole("article")).toHaveCount(4);
 
     // The quick check hands the number to the IMEI page.
     await page.getByLabel("IMEI number").first().fill("490154203237518");
     await page.getByRole("button", { name: "Check IMEI" }).first().click();
     await expect(page).toHaveURL(/\/en\/imei-check\?imei=490154203237518/);
+  });
+
+  test("featured collections are the biggest brands and countries and open the filtered catalog", async ({ page }) => {
+    await page.goto("/en");
+    const collections = page.getByRole("region", { name: "Featured collections" });
+    await expect(collections.getByRole("listitem")).toHaveCount(3);
+    await expect(collections.getByRole("link", { name: "Explore collection: Apple" })).toHaveAttribute("href", "/en/services?brand=Apple");
+    await expect(collections.getByRole("link", { name: "Explore collection: United States" })).toHaveAttribute(
+      "href",
+      "/en/services?country=US",
+    );
+    await expect(collections.getByText("8 services")).toBeVisible();
+  });
+
+  test("all services: 8 per page, sidebar checkboxes with counts, search; the state is in the home URL", async ({ page, isMobile }) => {
+    await page.goto("/en");
+    const list = page.getByRole("region", { name: /^All services/ });
+    await expect(list.getByRole("article")).toHaveCount(8);
+    await expect(list.getByText("Showing 1 to 8 of 11")).toBeVisible();
+
+    await list.getByRole("link", { name: "Next page" }).click();
+    await expect(page).toHaveURL(/\/en\?page=2#all-services$/);
+    await expect(list.getByRole("article")).toHaveCount(3);
+
+    // Sidebar on a desktop, drawer on a phone. A ticked box applies at once and starts again at page 1; several
+    // options of one list add up.
+    if (isMobile) await list.getByRole("button", { name: /^Filters/ }).click();
+    const filters = isMobile ? page.getByRole("dialog", { name: "Filters" }) : list.getByRole("complementary", { name: "Filters" });
+    await expect(filters.getByRole("group", { name: "Categories" }).getByRole("checkbox", { name: /^IMEI check/ })).toBeVisible();
+    const brands = filters.getByRole("group", { name: "Brand" });
+    await expect(brands.getByText("(8)")).toBeVisible();
+    await brands.getByRole("checkbox", { name: /^Samsung/ }).check();
+    await expect(page).toHaveURL(/\/en\?brand=Samsung$/);
+    await expect(brands.getByRole("checkbox", { name: /^Samsung/ })).toBeChecked();
+    await brands.getByRole("checkbox", { name: /^Apple/ }).check();
+    await expect(page).toHaveURL(/\/en\?brand=Apple&brand=Samsung$/);
+    if (isMobile) await filters.getByRole("button", { name: "Show results" }).click();
+    await expect(list.getByText("10 services")).toBeVisible();
+    await expect(list.getByRole("link", { name: "Remove filter: Samsung" })).toBeVisible();
+
+    // A chip removes one value; the search keeps the rest.
+    await list.getByRole("link", { name: "Remove filter: Apple" }).click();
+    await expect(page).toHaveURL(/\/en\?brand=Samsung#all-services$/);
+    await expect(list.getByRole("article")).toHaveCount(2);
+    const search = list.getByRole("searchbox", { name: "Search" });
+    await search.fill("kg lock");
+    await search.press("Enter");
+    await expect(page).toHaveURL(/\/en\?brand=Samsung&q=kg\+lock#all-services$/);
+    await expect(list.getByRole("article")).toHaveCount(1);
+    await expect(list.getByText("Samsung KG Lock Fix")).toBeVisible();
+  });
+
+  test("all services: the price range filters by the shown price; the slider works with the keyboard", async ({ page, isMobile }) => {
+    await page.goto("/en?max=14");
+    const list = page.getByRole("region", { name: /^All services/ });
+    await expect(list.getByRole("article")).toHaveCount(6);
+    await expect(list.getByRole("link", { name: "Remove filter: Price: $3 to $14" })).toBeVisible();
+    test.skip(isMobile, "the slider is the same component in the drawer");
+    const highest = list.getByRole("complementary", { name: "Filters" }).getByRole("slider", { name: "Maximum price" });
+    await expect(highest).toHaveValue("14");
+    await highest.focus();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/\/en\?max=16$/);
+    await expect(list.getByText("8 services")).toBeVisible();
+    await expect(highest).toBeFocused();
+  });
+
+  test("quick view opens a service in a dialog over the page; Esc closes it and the page stays", async ({ page }) => {
+    await page.goto("/en");
+    const featured = page.getByRole("region", { name: "Featured services" });
+    await featured.getByRole("link", { name: "Quick view: AT&T USA Premier Unlock" }).click();
+    const dialog = page.getByRole("dialog", { name: "AT&T USA Premier Unlock" });
+    await expect(dialog).toBeVisible();
+    await expect(page).toHaveURL(/\/en\/quick-view\/atandt-usa-premier-unlock$/);
+    await expect(dialog.getByText("$25.99")).toBeVisible();
+    await expect(dialog.getByRole("link", { name: "Buy now" })).toHaveAttribute("href", "/en/checkout?service=atandt-usa-premier-unlock");
+    await expect(dialog.getByRole("link", { name: "View full details" })).toHaveAttribute("href", "/en/services/atandt-usa-premier-unlock");
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(page).toHaveURL(/\/en$/);
+    await expect(featured.getByRole("article")).not.toHaveCount(0);
+  });
+
+  test("a quick view link opened directly is the service page, not indexed", async ({ page }) => {
+    await page.goto("/en/quick-view/atandt-usa-premier-unlock");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("AT&T USA Premier Unlock");
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/en\/services\/atandt-usa-premier-unlock$/);
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   });
 });
 
@@ -49,12 +145,12 @@ test.describe("catalog", () => {
     await expect(cards).toHaveCount(11);
   });
 
-  test("search narrows the list and an empty result offers to clear the filters", async ({ page, isMobile }) => {
+  test("search narrows the list and an empty result offers to clear the filters", async ({ page }) => {
     await page.goto("/en/services");
-    if (isMobile) await page.getByRole("button", { name: /^Filters/ }).click();
-    await page.getByRole("searchbox", { name: "Search", exact: true }).fill("verizon");
-    await page.getByRole("button", { name: "Show results" }).click();
-    await expect(page).toHaveURL(/q=verizon/);
+    const search = page.getByRole("searchbox", { name: "Search", exact: true });
+    await search.fill("verizon");
+    await search.press("Enter");
+    await expect(page).toHaveURL(/\/en\/services\?q=verizon$/);
     await expect(page.getByRole("article")).toHaveCount(1);
     await expect(page.getByText("Verizon iPhone Unlock").first()).toBeVisible();
 
@@ -62,6 +158,18 @@ test.describe("catalog", () => {
     await expect(page.getByText("No services match your filters")).toBeVisible();
     await page.getByRole("link", { name: "Clear filters" }).click();
     await expect(page.getByRole("article")).toHaveCount(11);
+  });
+
+  test("has the same filter sidebar as the home page: categories, price range, brand checkboxes", async ({ page, isMobile }) => {
+    await page.goto("/en/services");
+    if (isMobile) await page.getByRole("button", { name: /^Filters/ }).click();
+    const filters = isMobile ? page.getByRole("dialog", { name: "Filters" }) : page.getByRole("complementary", { name: "Filters" });
+    await expect(filters.getByRole("group", { name: "Categories" }).getByRole("checkbox", { name: /^IMEI check/ })).toBeVisible();
+    await expect(filters.getByRole("slider", { name: "Maximum price" })).toHaveValue("26");
+    await filters.getByRole("group", { name: "Brand" }).getByRole("checkbox", { name: /^Samsung/ }).check();
+    await expect(page).toHaveURL(/\/en\/services\?brand=Samsung$/);
+    if (isMobile) await filters.getByRole("button", { name: "Show results" }).click();
+    await expect(page.getByRole("article")).toHaveCount(2);
   });
 
   test("the Arabic catalog lists the Arabic listings only", async ({ page }) => {

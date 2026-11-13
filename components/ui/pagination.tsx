@@ -48,6 +48,8 @@ export type PaginationProps = {
   searchParams?: SearchParamsInput;
   /** Query parameter that holds the page (default `page`). */
   pageParam?: string;
+  /** A fragment added to every link (`#all-services`): a list in the middle of a page brings its own top into view. */
+  hash?: string;
   className?: string;
 };
 
@@ -55,11 +57,11 @@ const itemClasses =
   "inline-flex size-11 items-center justify-center rounded-control text-body font-semibold num transition-colors duration-(--duration-fast)";
 
 /** "{total} results", "Page X of Y" and previous / numbered / next links (phones show only previous / next). With one page only the total shows. */
-export async function Pagination({ total, pageSize, page, basePath, searchParams, pageParam = "page", className }: PaginationProps) {
+export async function Pagination({ total, pageSize, page, basePath, searchParams, pageParam = "page", hash = "", className }: PaginationProps) {
   const [locale, t] = await Promise.all([getLocale(), getMessages(common)]);
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const current = Math.min(Math.max(1, Math.floor(page) || 1), pages);
-  const href = (n: number) => pageHref(basePath, searchParams, n, pageParam);
+  const href = (n: number) => pageHref(basePath, searchParams, n, pageParam) + hash;
   const totalText = plural(locale, total, t.pagination.results, formatNumber(total, locale));
 
   return (
