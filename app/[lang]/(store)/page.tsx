@@ -5,10 +5,13 @@
 // The hero, quick check, promo, steps and banners are static. Everything that reads the catalog (language-specific
 // cached reads), the visitor's currency cookie or the URL's query streams in behind <Suspense> with skeletons of the
 // same size; the merchant banner is a small Client Component (no server read).
+// Motion: the hero row never animates (LCP). The blocks below it fade and rise in as they scroll into view (CSS
+// scroll-driven `.reveal` / `.reveal-grid`, globals.css); a client navigation to the page plays the shop's page enter.
 import { Suspense, type ReactNode } from "react";
 import type { Metadata } from "next";
 import { ArrowRight, Flame, PackageSearch } from "lucide-react";
 import { Container, Section } from "@/components/layout/container";
+import { PageTransition } from "@/components/layout/page-transition";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -44,7 +47,8 @@ import { common } from "@/lib/i18n/messages/common";
 import { store, type StoreMessages } from "@/lib/i18n/messages/store";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 
-const GRID = "grid gap-4 sm:grid-cols-2 xl:grid-cols-4";
+/** The featured cards. `reveal-grid`: below the fold they fade and rise in as they scroll into view (globals.css). */
+const GRID = "reveal-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4";
 const SKELETON_CARDS = 4;
 /** Tiles before the "All services" tile: eight tiles fill the row on a desktop. */
 const FILTER_TILES = 7;
@@ -61,58 +65,60 @@ export default async function HomePage(props: PageProps<"/[lang]">) {
   const [locale, t] = await Promise.all([getLocale(), getMessages(store)]);
 
   return (
-    <Container width="wide" className="grid gap-8 py-5 lg:gap-10 lg:py-6">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)]">
-        <HomeHero
-          locale={locale}
-          t={t.home}
-          thirdPoint={
-            <Suspense fallback={<li aria-hidden="true" className="h-[1lh] w-36 rounded-badge bg-inverse-raised" />}>
-              <GuestPointFromConfig t={t.home} />
-            </Suspense>
-          }
-          price={
-            <Suspense fallback={<HeroPriceSpace />}>
-              <LowestPrice locale={locale} label={t.home.hero.from} />
-            </Suspense>
-          }
-        />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 lg:grid-rows-[auto_1fr]">
-          <QuickImeiCard locale={locale} t={t.home} />
-          <TrackPromoCard locale={locale} t={t.home} />
+    <PageTransition>
+      <Container width="wide" className="grid gap-8 py-5 lg:gap-10 lg:py-6">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)]">
+          <HomeHero
+            locale={locale}
+            t={t.home}
+            thirdPoint={
+              <Suspense fallback={<li aria-hidden="true" className="h-[1lh] w-36 rounded-badge bg-inverse-raised" />}>
+                <GuestPointFromConfig t={t.home} />
+              </Suspense>
+            }
+            price={
+              <Suspense fallback={<HeroPriceSpace />}>
+                <LowestPrice locale={locale} label={t.home.hero.from} />
+              </Suspense>
+            }
+          />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 lg:grid-rows-[auto_1fr]">
+            <QuickImeiCard locale={locale} t={t.home} />
+            <TrackPromoCard locale={locale} t={t.home} />
+          </div>
         </div>
-      </div>
 
-      <MerchantBanner text={t.home.merchant.text} cta={t.home.merchant.cta} href={localePath(locale, "/merchant/services")} />
+        <MerchantBanner text={t.home.merchant.text} cta={t.home.merchant.cta} href={localePath(locale, "/merchant/services")} />
 
-      <Suspense fallback={<CatalogTilesSkeleton />}>
-        <Tiles locale={locale} />
-      </Suspense>
+        <Suspense fallback={<CatalogTilesSkeleton />}>
+          <Tiles locale={locale} />
+        </Suspense>
 
-      <Suspense fallback={<FeaturedSkeleton title={t.home.featured.title} />}>
-        <Featured locale={locale} />
-      </Suspense>
+        <Suspense fallback={<FeaturedSkeleton title={t.home.featured.title} />}>
+          <Featured locale={locale} />
+        </Suspense>
 
-      <Suspense fallback={<HowAndMore t={t.home} more={<MiniGridSkeleton count={MINI_CARDS} />} />}>
-        <HowAndBestSellers locale={locale} />
-      </Suspense>
+        <Suspense fallback={<HowAndMore t={t.home} more={<MiniGridSkeleton count={MINI_CARDS} />} />}>
+          <HowAndBestSellers locale={locale} />
+        </Suspense>
 
-      <Suspense fallback={<CollectionsSkeleton title={t.home.collections.title} />}>
-        <Collections locale={locale} />
-      </Suspense>
+        <Suspense fallback={<CollectionsSkeleton title={t.home.collections.title} />}>
+          <Collections locale={locale} />
+        </Suspense>
 
-      <Suspense fallback={<NewArrivalsSkeleton title={t.home.newArrivals.title} />}>
-        <NewArrivals locale={locale} />
-      </Suspense>
+        <Suspense fallback={<NewArrivalsSkeleton title={t.home.newArrivals.title} />}>
+          <NewArrivals locale={locale} />
+        </Suspense>
 
-      <Suspense fallback={<HomeProductsSkeleton t={t.home.products} />}>
-        <HomeProducts searchParams={props.searchParams} />
-      </Suspense>
+        <Suspense fallback={<HomeProductsSkeleton t={t.home.products} />}>
+          <HomeProducts searchParams={props.searchParams} />
+        </Suspense>
 
-      <Section headingId="home-explore" title={t.home.explore.title}>
-        <DestinationBanners locale={locale} t={t.home.explore} />
-      </Section>
-    </Container>
+        <Section reveal headingId="home-explore" title={t.home.explore.title}>
+          <DestinationBanners locale={locale} t={t.home.explore} />
+        </Section>
+      </Container>
+    </PageTransition>
   );
 }
 
@@ -176,7 +182,7 @@ async function Featured({ locale }: { locale: Locale }) {
   }
   const labels = serviceCardLabels(t, c);
   return (
-    <Section headingId="home-featured" title={t.home.featured.title} actions={<ViewAll locale={locale} />}>
+    <Section reveal headingId="home-featured" title={t.home.featured.title} actions={<ViewAll locale={locale} />}>
       <div className={GRID}>
         {featured.data.map((service) => (
           <ServiceCard key={service.id} service={service} locale={locale} decimals={currency.decimals} labels={labels} />
@@ -189,7 +195,7 @@ async function Featured({ locale }: { locale: Locale }) {
 /** The featured section's heading and a row of card skeletons while the catalog streams in. */
 function FeaturedSkeleton({ title }: { title: string }) {
   return (
-    <Section headingId="home-featured" title={title}>
+    <Section reveal headingId="home-featured" title={title}>
       <ServiceGridSkeleton count={SKELETON_CARDS} className={GRID} />
     </Section>
   );
@@ -201,7 +207,7 @@ async function Collections({ locale }: { locale: Locale }) {
   const collections = await catalogCollections(locale, currency.code);
   if (collections.length < 2) return null;
   return (
-    <Section headingId="home-collections" title={t.home.collections.title}>
+    <Section reveal headingId="home-collections" title={t.home.collections.title}>
       <CollectionBanners
         collections={collections}
         locale={locale}
@@ -215,7 +221,7 @@ async function Collections({ locale }: { locale: Locale }) {
 
 function CollectionsSkeleton({ title }: { title: string }) {
   return (
-    <Section headingId="home-collections" title={title}>
+    <Section reveal headingId="home-collections" title={title}>
       <CollectionBannersSkeleton />
     </Section>
   );
@@ -268,7 +274,7 @@ async function NewArrivals({ locale }: { locale: Locale }) {
   if (list.data.length === 0) return null;
   const labels = serviceCardLabels(t, c);
   return (
-    <Section headingId="home-new-arrivals" title={t.home.newArrivals.title} actions={<ViewAll locale={locale} sort="newest" />}>
+    <Section reveal headingId="home-new-arrivals" title={t.home.newArrivals.title} actions={<ViewAll locale={locale} sort="newest" />}>
       <MiniGrid>
         {list.data.map((service) => (
           <ServiceCardMini key={service.id} service={service} locale={locale} decimals={currency.decimals} labels={labels} />
@@ -281,7 +287,7 @@ async function NewArrivals({ locale }: { locale: Locale }) {
 /** The new arrivals' heading and a row of dense card skeletons while the catalog streams in. */
 function NewArrivalsSkeleton({ title }: { title: string }) {
   return (
-    <Section headingId="home-new-arrivals" title={title}>
+    <Section reveal headingId="home-new-arrivals" title={title}>
       <MiniGridSkeleton count={MINI_CARDS} />
     </Section>
   );

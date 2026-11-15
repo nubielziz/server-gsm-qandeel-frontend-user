@@ -4,6 +4,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Container, PageHeader } from "@/components/layout/container";
+import { PageTransition } from "@/components/layout/page-transition";
 import { UnsubscribeForm } from "@/components/store/unsubscribe-form";
 import { Card, CardBody } from "@/components/ui/card";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
@@ -18,22 +19,24 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function UnsubscribePage() {
   const [locale, t] = await Promise.all([getLocale(), getMessages(notifications)]);
   return (
-    <Container width="narrow" className="py-8 lg:py-12">
-      <PageHeader title={t.unsubscribe.title} />
-      <Card className="mt-6">
-        <CardBody>
-          <Suspense
-            fallback={
-              <div aria-busy="true" className="grid gap-5">
-                <SkeletonText lines={2} />
-                <Skeleton className="h-12 w-64 max-w-full rounded-control" />
-              </div>
-            }
-          >
-            <UnsubscribeForm locale={locale} t={t.unsubscribe} />
-          </Suspense>
-        </CardBody>
-      </Card>
-    </Container>
+    <PageTransition>
+      <Container width="narrow" className="py-8 lg:py-12">
+        <PageHeader title={t.unsubscribe.title} />
+        <Card className="mt-6">
+          <CardBody>
+            <Suspense
+              fallback={
+                <div aria-busy="true" className="grid gap-5">
+                  <SkeletonText lines={2} />
+                  <Skeleton className="h-12 w-64 max-w-full rounded-control" />
+                </div>
+              }
+            >
+              <UnsubscribeForm locale={locale} t={t.unsubscribe} />
+            </Suspense>
+          </CardBody>
+        </Card>
+      </Container>
+    </PageTransition>
   );
 }

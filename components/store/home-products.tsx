@@ -40,7 +40,8 @@ export async function HomeProducts({ searchParams }: { searchParams: Promise<Sea
 /** "All services (11 services)" and the link to the catalog page with the same filters. */
 function SectionHeading({ t, total, catalogHref }: { t: StoreMessages["home"]["products"]; total?: string; catalogHref?: string }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+    // reveal: fades and rises in as it scrolls into view, like the other home sections' headings (globals.css).
+    <div className="reveal flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
       <h2 id={HEADING_ID} className="text-heading text-ink">
         {t.title}
         {total ? <span className="ms-2 text-body font-normal text-ink-subtle">({total})</span> : null}

@@ -30,6 +30,12 @@ export function servicePicture(imageUrl: string | null | undefined): string | nu
 
 export type LogoFolder = "brands" | "carriers";
 
+/**
+ * The picture of a service card (logo, picture or type icon) grows to 1.03 inside its frame while the card is hovered
+ * (`group/card`, service-card.tsx). Only a transform: nothing around it moves.
+ */
+const CARD_ZOOM = "transition-[scale] duration-(--duration-slow) ease-glide group-hover/card:scale-[1.03]";
+
 /** A name as a logo file name: "AT&T" → `at-t`, "T-Mobile" → `t-mobile`, "Bell Canada" → `bell-canada`. */
 export function logoSlug(name: string): string {
   return name
@@ -90,10 +96,12 @@ export type LogoProps = {
   /** Default: the name. Pass "" when the name is written next to the logo. */
   alt?: string;
   size?: keyof typeof logoSizes;
+  /** Extra classes (motion, such as the card zoom); not for its size. */
+  className?: string;
 };
 
 /** A brand or carrier logo at its real proportions, or nothing when there is no file. */
-export function Logo({ folder, name, alt, size = "md" }: LogoProps) {
+export function Logo({ folder, name, alt, size = "md", className }: LogoProps) {
   const file = name ? logoFile(folder, name) : null;
   const src = file ? siteImage(file) : null;
   if (!file || !src) return null;
@@ -105,7 +113,7 @@ export function Logo({ folder, name, alt, size = "md" }: LogoProps) {
       alt={alt ?? name}
       width={box.width}
       height={box.height}
-      className={cn("w-auto shrink-0 object-contain", logoSizes[size])}
+      className={cn("w-auto shrink-0 object-contain", logoSizes[size], className)}
     />
   );
 }
@@ -208,21 +216,21 @@ export function ServiceThumb({
   if (picture) {
     return (
       <span className={cn("relative block shrink-0 overflow-hidden rounded-control bg-surface-sunken", box)}>
-        <Image src={picture} alt="" fill sizes="64px" preload={priority} className="object-cover" />
+        <Image src={picture} alt="" fill sizes="64px" preload={priority} className={cn("object-cover", CARD_ZOOM)} />
       </span>
     );
   }
   if (siteImage(file)) {
     return (
       <span className={cn("relative block shrink-0 overflow-hidden rounded-control", box)}>
-        <ImageSlot file={file} alt="" sizes="64px" priority={priority} />
+        <ImageSlot file={file} alt="" sizes="64px" priority={priority} className={CARD_ZOOM} />
       </span>
     );
   }
   const Icon = serviceTypeIcons[type];
   return (
     <span aria-hidden="true" className={cn("grid shrink-0 place-items-center rounded-control bg-surface-sunken text-ink", box)}>
-      <Icon className="size-1/2" strokeWidth={1.75} />
+      <Icon className={cn("size-1/2", CARD_ZOOM)} strokeWidth={1.75} />
     </span>
   );
 }
@@ -261,11 +269,11 @@ export function ServiceMark({
       <span className="flex min-w-0 flex-1 items-center gap-2">
         {isSymbolLogo("brands", brand) ? (
           <>
-            <Logo folder="brands" name={brand} alt="" size={size} />
+            <Logo folder="brands" name={brand} alt="" size={size} className={CARD_ZOOM} />
             {name}
           </>
         ) : (
-          <Logo folder="brands" name={brand} size={size} />
+          <Logo folder="brands" name={brand} size={size} className={CARD_ZOOM} />
         )}
       </span>
     );

@@ -3,11 +3,14 @@
 // mobile menu drawer); everything inside is server-rendered and handed over as slots.
 // The menu drawer is uncontrolled (`id` mode) and its button is a native `show-modal` command, so the menu opens from the
 // server HTML at first paint instead of after hydration (plan P4.1: 13 of 15 early taps were lost before).
+// The desktop nav row is NavRow (./nav-row.tsx: the sliding pill). The header is named `site-header` for view
+// transitions (`.vt-site-header`, globals.css): it stays still while a page change animates the content below it.
 import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Menu as MenuIcon, Search, X } from "lucide-react";
 import { Drawer, openDialog } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { Container } from "./container";
+import { NavRow } from "./nav-row";
 
 export type StoreHeaderFrameProps = {
   logo: ReactNode;
@@ -45,7 +48,7 @@ export function StoreHeaderFrame({ logo, search, switchers, account, nav, drawer
   }, [searchOpen]);
 
   return (
-    <header className="border-b border-line bg-surface">
+    <header className="vt-site-header border-b border-line bg-surface">
       <Container width="wide" className="flex h-16 items-center gap-2 sm:gap-3 lg:gap-6">
         {logo}
         <div className="hidden min-w-0 flex-1 justify-center lg:flex">
@@ -84,9 +87,7 @@ export function StoreHeaderFrame({ logo, search, switchers, account, nav, drawer
       ) : null}
 
       <div className="hidden border-t border-line lg:block">
-        <Container width="wide" className="flex h-14 items-center gap-1">
-          {nav}
-        </Container>
+        <NavRow>{nav}</NavRow>
       </div>
 
       <Drawer id={menuId} side="start" size="sm" title={labels.menuTitle}>

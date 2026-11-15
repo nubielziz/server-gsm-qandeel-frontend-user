@@ -63,10 +63,16 @@ export function cardPrefetch(index: number | undefined): true | "auto" {
   return index !== undefined && index < PREFETCH_CARDS ? true : "auto";
 }
 
-/** The box of both card sizes: lifts on hover and shows the focus ring of its stretched title link. */
+/**
+ * The box of both card sizes. On hover it rises 2px with a softer, larger shadow and its picture grows a little inside
+ * its frame (`group/card`, service-art.tsx); while it is up, a 2px strip under it still counts as the card, so the
+ * pointer at its bottom edge does not make it bob. It shows the focus ring of its stretched title link.
+ */
 const frame =
-  "group relative flex min-w-0 flex-col rounded-card border border-line bg-surface shadow-card " +
-  "transition-[border-color,box-shadow] duration-(--duration-base) ease-standard hover:border-line-strong hover:shadow-raised " +
+  "group group/card relative flex min-w-0 flex-col rounded-card border border-line bg-surface shadow-card " +
+  "transition-[translate,border-color,box-shadow] duration-(--duration-base) ease-standard " +
+  "hover:-translate-y-0.5 hover:border-line-strong hover:shadow-lift " +
+  "hover:before:absolute hover:before:inset-x-0 hover:before:top-full hover:before:h-0.5 " +
   "has-[.card-link:focus-visible]:outline-2 has-[.card-link:focus-visible]:outline-offset-2 has-[.card-link:focus-visible]:outline-focus";
 
 /**

@@ -58,7 +58,8 @@ export async function StoreFooter() {
   ];
 
   return (
-    <footer aria-label={t.footer.label} className="surface-inverse mt-16">
+    // vt-site-footer: held still while a page change animates the content above it (globals.css, page transitions).
+    <footer aria-label={t.footer.label} className="vt-site-footer surface-inverse mt-16">
       <Container width="wide" className="py-12 lg:py-14">
         <div className="grid gap-10 lg:grid-cols-[1.4fr_repeat(4,1fr)]">
           <div className="max-w-sm">

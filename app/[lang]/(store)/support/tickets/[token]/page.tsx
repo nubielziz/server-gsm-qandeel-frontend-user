@@ -18,6 +18,7 @@ import { TicketCsatForm } from "@/components/support/ticket-csat-form";
 import { TicketMessages } from "@/components/support/ticket-messages";
 import { TicketReplyForm } from "@/components/support/ticket-reply-form";
 import { Container, PageHeader } from "@/components/layout/container";
+import { PageTransition } from "@/components/layout/page-transition";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { ButtonLink } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
@@ -131,10 +132,12 @@ async function TicketContent({ params }: { params: PageProps<"/[lang]/support/ti
 export default function TicketPage({ params }: PageProps<"/[lang]/support/tickets/[token]">) {
   return (
     // min-h keeps the footer below the first screen while the ticket streams in, so nothing visible moves.
-    <Container className="min-h-[56rem] py-8 sm:py-12">
-      <Suspense fallback={<TicketSkeleton />}>
-        <TicketContent params={params} />
-      </Suspense>
-    </Container>
+    <PageTransition>
+      <Container className="min-h-[56rem] py-8 sm:py-12">
+        <Suspense fallback={<TicketSkeleton />}>
+          <TicketContent params={params} />
+        </Suspense>
+      </Container>
+    </PageTransition>
   );
 }

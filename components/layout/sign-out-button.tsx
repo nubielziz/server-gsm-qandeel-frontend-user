@@ -55,7 +55,7 @@ export function SignOutButton({ surface, label, pendingLabel, variant = "menu", 
       className={cn(
         variant === "menu"
           ? "flex min-h-11 w-full items-center gap-3 rounded-control px-3 text-start text-body font-medium text-ink transition-colors hover:bg-surface-muted focus-visible:bg-surface-muted disabled:opacity-60"
-          : "inline-flex h-11 items-center justify-center gap-2 rounded-control border border-line-strong bg-surface px-5 text-body font-semibold text-ink transition-colors hover:bg-surface-muted disabled:opacity-60",
+          : "btn-motion btn-lift-soft inline-flex h-11 items-center justify-center gap-2 rounded-control border border-line-strong bg-surface px-5 text-body font-semibold text-ink hover:border-ink disabled:opacity-60",
         "[&_svg]:size-[18px] [&_svg]:shrink-0",
         variant === "menu" && "[&_svg]:text-ink-muted",
         className,

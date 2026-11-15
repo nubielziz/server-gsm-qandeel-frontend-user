@@ -9,13 +9,8 @@ import { siteImage } from "@/lib/site-images";
 
 export type BannerTone = "inverse" | "light";
 
-/** The arrow of a link button: it leans towards where the link goes while its `group` button is hovered. */
-export const linkArrow = (
-  <ArrowRight
-    aria-hidden="true"
-    className="transition-transform duration-(--duration-base) ease-standard group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5"
-  />
-);
+/** The arrow of a link button (`endIcon`), mirrored in Arabic. The button leans it towards where the link goes on hover. */
+export const linkArrow = <ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />;
 
 /** A short upper-case label in an outlined tag (mockup "FEATURED PRODUCT"). */
 export function OutlineTag({ tone, children }: { tone: BannerTone; children: ReactNode }) {

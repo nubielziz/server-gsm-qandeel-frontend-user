@@ -60,6 +60,11 @@
   --shadow-card: 0 1px 2px 0 rgb(17 17 17 / 0.04);
   --shadow-raised: 0 6px 16px -4px rgb(17 17 17 / 0.1), 0 2px 4px -2px rgb(17 17 17 / 0.06);
   --shadow-overlay: 0 24px 64px -16px rgb(17 17 17 / 0.35), 0 8px 24px -8px rgb(17 17 17 / 0.18);
+  /* A hovered card: softer and larger than `raised`, the card seems to float (service cards, components/store/service-card.tsx). */
+  --shadow-lift: 0 16px 32px -14px rgb(17 17 17 / 0.16), 0 4px 10px -6px rgb(17 17 17 / 0.08);
+  /* Hovered buttons (.btn-lift, .btn-lift-soft below): a soft shadow under the black button, a lighter one under an outlined one. */
+  --shadow-button: 0 6px 14px -6px rgb(17 17 17 / 0.38);
+  --shadow-button-soft: 0 4px 10px -6px rgb(17 17 17 / 0.16);
 
   /* ── Font ───────────────────────────────────────────────────────────────────────────────────────────────── */
   --font-sans: var(--font-inter), var(--font-plex-arabic), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -116,8 +121,11 @@
 
   /* ── Motion ─────────────────────────────────────────────────────────────────────────────────────────────── */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  /* A long, soft ease-out for things that travel: the nav pill's slide, the page enter, a card's picture, scroll reveals. */
+  --ease-glide: cubic-bezier(0.22, 1, 0.36, 1);
   --duration-fast: 120ms;
   --duration-base: 200ms;
+  --duration-slow: 300ms; /* the nav pill's slide, a card's picture */
 
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;
   --animate-toast-in: toast-in var(--duration-base) var(--ease-standard);
@@ -157,6 +165,12 @@
   /* +1 in left-to-right, −1 in right-to-left: lets transforms (drawer slide, chevrons) follow the writing direction. */
   --inline-dir: 1;
   color-scheme: light;
+  /* Motion distances (no utilities): how far a new page rises on a client navigation, how far a block rises while it
+     scrolls into view, how much scrolling that takes, and how much later each next card of a grid row starts. */
+  --rise-page: 8px;
+  --rise-reveal: 12px;
+  --reveal-distance: 6rem;
+  --reveal-step: 1.25rem;
 }
 :root[dir="rtl"] {
   --inline-dir: -1;
@@ -357,10 +371,197 @@ html:lang(ar) *::after {
     animation-duration: 2s !important;
     animation-iteration-count: infinite !important;
   }
+  /* `*` does not reach the view transition pseudo-elements: a page swaps at once. (Scroll reveals are only declared for
+     `no-preference`, see "Scroll reveals"; button lifts, card lifts and the nav pill are transitions, instant above.) */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
+/* ── Page transitions (React <ViewTransition>, components/layout/page-transition.tsx) ──────────────────────────────
+   Every shop page is wrapped in a ViewTransition with `enter="page-enter" exit="page-exit" default="none"`: on a client
+   navigation the old page fades out quickly and the new one fades in and rises a little. Nothing else animates: the
+   header and footer are named and held still (they are the anchor), the rest of the document swaps at once, and the
+   overlay lets clicks through. A first load never animates (no transition runs on hydration), so the LCP is untouched. */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(root),
+::view-transition-old(site-header),
+::view-transition-old(site-footer) {
+  display: none;
+}
+::view-transition-new(root),
+::view-transition-new(site-header),
+::view-transition-new(site-footer) {
+  animation: none;
+}
+::view-transition-group(site-header),
+::view-transition-group(site-footer) {
+  animation: none;
+  z-index: 100;
+}
+.vt-site-header {
+  view-transition-name: site-header;
+}
+.vt-site-footer {
+  view-transition-name: site-footer;
+}
+::view-transition-old(.page-exit) {
+  animation: page-exit var(--duration-fast) var(--ease-standard) both;
+}
+/* Starts while the old page is half gone, so the two pages barely overlap. */
+::view-transition-new(.page-enter) {
+  animation: page-enter var(--duration-base) var(--ease-glide) calc(var(--duration-fast) / 2) both;
+}
+@keyframes page-exit {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--rise-page));
+  }
+}
+
+/* ── Scroll reveals ──────────────────────────────────────────────────────────────────────────────────────────────────
+   `.reveal` (a block) and `.reveal-grid` (each child of a grid) fade in and rise as they scroll into view: a CSS
+   scroll-driven animation (no JavaScript), fully shown once their top is `--reveal-distance` above the bottom of the
+   screen. Whatever is already in view on load is at its end state, so never use them on the hero or anything that is
+   always above the fold. Cards of a grid row start one `--reveal-step` apart (by column of a 4-column row, counted from
+   the start side, so Arabic runs right to left). Inside a block that already reveals nothing reveals twice. Browsers
+   without scroll-driven animations, print and reduced motion show everything as it is. */
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--rise-reveal));
+  }
+}
+@media screen and (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    /* Longhands only: a later `animation` shorthand would reset the timeline. The 1ms duration is turned into the
+       whole scroll range (and some engines need a non-zero one). */
+    .reveal,
+    .reveal-grid > * {
+      animation-name: reveal-in;
+      animation-duration: 1ms;
+      animation-timing-function: var(--ease-glide);
+      animation-fill-mode: both;
+      animation-timeline: view();
+      animation-range: entry 0% entry var(--reveal-distance);
+    }
+    .reveal-grid > :nth-child(4n + 2) {
+      animation-range: entry var(--reveal-step) entry calc(var(--reveal-distance) + var(--reveal-step));
+    }
+    .reveal-grid > :nth-child(4n + 3) {
+      animation-range: entry calc(2 * var(--reveal-step)) entry calc(var(--reveal-distance) + 2 * var(--reveal-step));
+    }
+    .reveal-grid > :nth-child(4n + 4) {
+      animation-range: entry calc(3 * var(--reveal-step)) entry calc(var(--reveal-distance) + 3 * var(--reveal-step));
+    }
+    :is(.reveal, .reveal-grid > *) :is(.reveal, .reveal-grid > *) {
+      animation-name: none;
+    }
+  }
 }
 
 /* ── Components that need more than utilities ───────────────────────────────────────────────────────────── */
 @layer components {
+  /* Button motion (components/ui/button.tsx, icon-button.tsx and the few look-alikes that carry these classes).
+     `.btn-motion`: colours, background, border and underline ease at --duration-fast, the shadow and the lift at
+     --duration-base, and a press scales to 0.97. `.btn-lift` (the black button) rises 1px with a soft shadow on hover,
+     `.btn-lift-soft` (outlined) the same with a lighter shadow. `.btn-end-icon` (the wrapper of a button's end icon,
+     usually an arrow) leans 3px towards where the reading goes. Only transform, colours and shadows change, never the
+     size; a disabled, aria-disabled or busy button never moves. In this layer, a utility on the element (a caller's
+     `translate`, `shadow`) wins over these. */
+  .btn-motion {
+    transition-property: color, background-color, border-color, text-decoration-color, text-decoration-thickness, box-shadow, translate, scale;
+    transition-duration:
+      var(--duration-fast), var(--duration-fast), var(--duration-fast), var(--duration-fast), var(--duration-fast),
+      var(--duration-base), var(--duration-base), var(--duration-fast);
+    transition-timing-function: var(--ease-standard);
+  }
+  .btn-end-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    transition: translate var(--duration-base) var(--ease-standard);
+  }
+  @media (hover: hover) {
+    .btn-motion:not(:disabled, [aria-disabled="true"], [aria-busy="true"]):hover .btn-end-icon {
+      translate: calc(var(--inline-dir) * 3px) 0;
+    }
+    .btn-lift:not(:disabled, [aria-disabled="true"], [aria-busy="true"]):hover {
+      translate: 0 -1px;
+      box-shadow: var(--shadow-button);
+    }
+    .btn-lift-soft:not(:disabled, [aria-disabled="true"], [aria-busy="true"]):hover {
+      translate: 0 -1px;
+      box-shadow: var(--shadow-button-soft);
+    }
+  }
+  .btn-motion:not(:disabled, [aria-disabled="true"], [aria-busy="true"]):active {
+    translate: 0 0;
+    scale: 0.97;
+    box-shadow: none;
+  }
+
+  /* Desktop nav row of the shop header (components/layout/nav-row.tsx; links carry `.nav-item`). One black pill marks
+     the selected link: the current page's (`aria-current`), else the row's default ("All services", `data-nav-default`)
+     on pages without one, such as the home page.
+     - Server HTML, before hydration and without JavaScript (`.nav-row` without `data-pill`): the selected link itself
+       is the black box.
+     - Once the pill is placed (`data-pill`): the pill draws the box and slides to the next selected link; the link it
+       covers is `data-pill-on` (white text), switched by the script when the pill covers half of it, so the text colour
+       follows the slide. A selected link never shows the hover grey (it would cover the arriving pill). */
+  .nav-item {
+    color: var(--color-ink-muted);
+    transition:
+      color var(--duration-fast) var(--ease-standard),
+      background-color var(--duration-fast) var(--ease-standard);
+  }
+  @media (hover: hover) {
+    .nav-item:hover {
+      color: var(--color-ink);
+      background-color: var(--color-surface-muted);
+    }
+  }
+  .nav-row:not([data-pill]) a.nav-item[aria-current="page"],
+  .nav-row:not([data-pill]):not(:has(a.nav-item[aria-current="page"])) .nav-item[data-nav-default] {
+    color: var(--color-on-inverse);
+    background-color: var(--color-inverse);
+  }
+  .nav-row[data-pill] a.nav-item[aria-current="page"],
+  .nav-row[data-pill]:not(:has(a.nav-item[aria-current="page"])) .nav-item[data-nav-default],
+  .nav-row[data-pill] .nav-item[data-pill-on] {
+    background-color: transparent;
+    transition-property: color;
+  }
+  .nav-row[data-pill] .nav-item.nav-item[data-pill-on] {
+    color: var(--color-on-inverse);
+  }
+  /* Placed from the measured offsets of the link (physical px, the same in both writing directions), so `left`/`top`
+     are physical on purpose. */
+  .nav-pill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: none;
+    border-radius: 9999px;
+    background-color: var(--color-inverse);
+    pointer-events: none;
+    transition-property: translate, width, height;
+    transition-duration: var(--duration-slow);
+    transition-timing-function: var(--ease-glide);
+  }
+  .nav-row[data-pill] .nav-pill {
+    display: block;
+  }
+
   /* Skeleton: a calm sunken block with a light sweep. */
   .skeleton {
     display: block;

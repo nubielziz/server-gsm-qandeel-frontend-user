@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Headset } from "lucide-react";
 import { Container } from "@/components/layout/container";
+import { PageTransition } from "@/components/layout/page-transition";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { ButtonLink } from "@/components/ui/button";
@@ -50,11 +51,13 @@ export async function generateStaticParams() {
 
 export default function HelpArticlePage(props: PageProps<"/[lang]/help/[slug]">) {
   return (
-    <Container width="narrow" className="py-8 lg:py-10">
-      <Suspense fallback={<ArticleSkeleton />}>
-        <Article params={props.params} />
-      </Suspense>
-    </Container>
+    <PageTransition>
+      <Container width="narrow" className="py-8 lg:py-10">
+        <Suspense fallback={<ArticleSkeleton />}>
+          <Article params={props.params} />
+        </Suspense>
+      </Container>
+    </PageTransition>
   );
 }
 

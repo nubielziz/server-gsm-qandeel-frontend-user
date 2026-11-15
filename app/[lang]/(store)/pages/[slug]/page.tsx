@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Scale } from "lucide-react";
 import { Container } from "@/components/layout/container";
+import { PageTransition } from "@/components/layout/page-transition";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Markdown } from "@/components/ui/markdown";
@@ -36,11 +37,13 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/pages/[slu
 
 export default function ContentPage(props: PageProps<"/[lang]/pages/[slug]">) {
   return (
-    <Container width="narrow" className="py-8 lg:py-10">
-      <Suspense fallback={<PageSkeleton />}>
-        <Page params={props.params} />
-      </Suspense>
-    </Container>
+    <PageTransition>
+      <Container width="narrow" className="py-8 lg:py-10">
+        <Suspense fallback={<PageSkeleton />}>
+          <Page params={props.params} />
+        </Suspense>
+      </Container>
+    </PageTransition>
   );
 }
 

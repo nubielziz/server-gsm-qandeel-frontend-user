@@ -44,7 +44,8 @@ export function CopyButton({ value, label, copiedLabel, iconOnly, className }: C
       title={iconOnly ? shown : undefined}
       className={cn(
         "relative inline-flex h-10 items-center justify-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-small font-semibold text-ink",
-        "touch-target transition-colors hover:bg-surface-muted active:bg-surface-sunken",
+        // Moves like a secondary button (globals.css, "Button motion").
+        "btn-motion btn-lift-soft touch-target hover:border-ink active:bg-surface-muted",
         iconOnly && "w-10 px-0",
         className,
       )}

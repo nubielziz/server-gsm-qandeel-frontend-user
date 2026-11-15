@@ -1,4 +1,6 @@
 // IconButton: a square button with only an icon. The accessible name is required.
+// Motion as Button (globals.css, "Button motion"): colours ease and a press scales to 0.97; the primary rises 1px with a
+// soft shadow on hover, the secondary's border turns ink and it rises a little; disabled or busy buttons never move.
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -9,8 +11,8 @@ export type IconButtonSize = "sm" | "md" | "lg";
 
 const variants: Record<IconButtonVariant, string> = {
   ghost: "text-ink hover:bg-surface-sunken active:bg-surface-sunken",
-  secondary: "border border-line-strong bg-surface text-ink hover:bg-surface-muted active:bg-surface-sunken",
-  primary: "bg-inverse text-on-inverse hover:bg-inverse-raised active:bg-inverse-raised",
+  secondary: "btn-lift-soft border border-line-strong bg-surface text-ink hover:border-ink active:bg-surface-muted",
+  primary: "btn-lift bg-inverse text-on-inverse hover:bg-inverse-raised active:bg-inverse-raised",
   inverse: "bg-surface text-ink hover:bg-surface-sunken active:bg-surface-sunken",
   danger: "bg-danger text-on-inverse hover:bg-danger-ink active:bg-danger-ink",
 };
@@ -21,8 +23,7 @@ const sizes: Record<IconButtonSize, string> = {
   lg: "size-12 [&_svg]:size-5",
 };
 
-const frame =
-  "relative inline-flex shrink-0 items-center justify-center rounded-control transition-colors duration-(--duration-fast) ease-standard";
+const frame = "btn-motion relative inline-flex shrink-0 items-center justify-center rounded-control";
 
 export type IconButtonProps = Omit<ComponentProps<"button">, "aria-label" | "children"> & {
   /** Accessible name and tooltip (e.g. "Close"). Required: an icon alone says nothing to a screen reader. */

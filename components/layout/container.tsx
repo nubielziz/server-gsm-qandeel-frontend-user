@@ -25,16 +25,21 @@ export type SectionProps = {
   actions?: ReactNode;
   /** Id of the heading, so `aria-labelledby` can name the section. */
   headingId?: string;
+  /**
+   * The heading row fades and rises in as it scrolls into view (`.reveal`, globals.css "Scroll reveals"). For sections
+   * below the fold; the content reveals itself (a `.reveal-grid` of cards, a `.reveal` block).
+   */
+  reveal?: boolean;
   className?: string;
   children: ReactNode;
 };
 
 /** A vertical block of a page with an optional heading row. Spacing between sections: use `grid gap-8` on the parent. */
-export function Section({ title, description, actions, headingId, className, children }: SectionProps) {
+export function Section({ title, description, actions, headingId, reveal, className, children }: SectionProps) {
   return (
     <section aria-labelledby={title ? headingId : undefined} className={cn("grid gap-4", className)}>
       {title || actions ? (
-        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div className={cn("flex flex-wrap items-end justify-between gap-x-4 gap-y-2", reveal && "reveal")}>
           <div className="min-w-0">
             {title ? (
               <h2 id={headingId} className="text-heading text-ink">

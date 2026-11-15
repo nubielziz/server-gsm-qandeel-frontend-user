@@ -1,18 +1,18 @@
-// StoreHeader (mockup "E-Commerce"): logo, search, currency and language, account area, then a nav row with a black
-// "All services" pill and the "All categories" menu. There is no cart, no favourites, no bell and no social sign-in (the
-// API has none).
+// StoreHeader (mockup "E-Commerce"): logo, search, currency and language, account area, then a nav row ("All services",
+// the "All categories" menu and the other links) whose black pill marks the current page's link and slides to the next
+// one (components/layout/nav-row.tsx); on pages without a current link (the home page) it rests on "All services".
+// There is no cart, no favourites, no bell and no social sign-in (the API has none).
 // Mobile: a compact bar (logo, search toggle, account, menu button) and a start-side drawer with the nav, the same
 // categories in a `<details>` block, and the pickers.
 // Static shell: only the account area and the currency picker read request data, each inside its own <Suspense>. The
 // categories are a cached catalog read (components/layout/category-menu.tsx): a change shows when the cache turns over.
 // The two "All services" links use `prefetch={true}`: their prefetch carries the catalog's first page (cached, URL data),
-// so the list shows at once on the click (plan P3.1, Next docs "Optimizing prefetching"). The pill is hidden below `lg`
+// so the list shows at once on the click (plan P3.1, Next docs "Optimizing prefetching"). The nav row is hidden below `lg`
 // and the drawer link is not in the viewport while the drawer is closed, so each costs a server render only when seen.
 import { Headset, LayoutGrid, ScanSearch, Store, PackageSearch, LifeBuoy } from "lucide-react";
 import { localePath } from "@/lib/i18n/config";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
-import { ButtonLink } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { AccountArea } from "./account-area";
 import { CategoryDrawerList, CategoryMenu, loadMenuCategories } from "./category-menu";
@@ -22,9 +22,12 @@ import { Logo } from "./logo";
 import { NavLink } from "./nav-link";
 import { StoreHeaderFrame } from "./store-header-frame";
 
+// The nav row's items. Colours, hover and the selected look are `.nav-item` in globals.css (they depend on the pill's
+// state); one weight for every link, so selecting one never changes the row's widths. 40 px high like the old pill,
+// with a 44 px touch target.
 const navLinkClasses =
-  "relative inline-flex h-11 items-center gap-2 rounded-control px-3 text-body font-medium text-ink-muted transition-colors " +
-  "hover:bg-surface-muted hover:text-ink aria-[current=page]:font-bold aria-[current=page]:text-ink [&_svg]:size-4 [&_svg]:shrink-0";
+  "nav-item touch-target relative inline-flex h-10 items-center gap-2 rounded-full px-3 text-body font-medium " +
+  "[&_svg]:size-4 [&_svg]:shrink-0";
 
 const drawerLinkClasses =
   "flex min-h-12 items-center gap-3 rounded-control px-3 text-body font-semibold text-ink transition-colors hover:bg-surface-muted " +
@@ -47,10 +50,12 @@ export async function StoreHeader() {
 
   const nav = (
     <>
-      {/* prefetch: the catalog's first page comes with the prefetch, not after the click (plan P3.1). */}
-      <ButtonLink href={p("/services")} prefetch size="sm" pill startIcon={<LayoutGrid aria-hidden="true" />}>
+      {/* prefetch: the catalog's first page comes with the prefetch, not after the click (plan P3.1).
+          data-nav-default: the pill rests here on pages without a current link (the home page). */}
+      <NavLink href={p("/services")} prefetch data-nav-default className={navLinkClasses}>
+        <LayoutGrid aria-hidden="true" />
         {t.nav.allServices}
-      </ButtonLink>
+      </NavLink>
       <CategoryMenu
         categories={categories}
         locale={locale}

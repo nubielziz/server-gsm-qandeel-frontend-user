@@ -8,6 +8,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { PackageSearch } from "lucide-react";
 import { Container, PageHeader } from "@/components/layout/container";
+import { PageTransition } from "@/components/layout/page-transition";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -32,23 +33,25 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ServicesPage(props: PageProps<"/[lang]/services">) {
   const [locale, t] = await Promise.all([getLocale(), getMessages(store)]);
   return (
-    <Container className="py-8 lg:py-10">
-      <PageHeader
-        eyebrow={
-          <Breadcrumbs
-            label={t.catalog.breadcrumbLabel}
-            items={[{ label: t.catalog.breadcrumbHome, href: localePath(locale) }, { label: t.catalog.title }]}
-          />
-        }
-        title={t.catalog.title}
-        description={t.catalog.description}
-      />
-      <div className="mt-6">
-        <Suspense fallback={<ServiceListSkeleton config={CONFIG} rows={6} />}>
-          <Catalog searchParams={props.searchParams} />
-        </Suspense>
-      </div>
-    </Container>
+    <PageTransition>
+      <Container className="py-8 lg:py-10">
+        <PageHeader
+          eyebrow={
+            <Breadcrumbs
+              label={t.catalog.breadcrumbLabel}
+              items={[{ label: t.catalog.breadcrumbHome, href: localePath(locale) }, { label: t.catalog.title }]}
+            />
+          }
+          title={t.catalog.title}
+          description={t.catalog.description}
+        />
+        <div className="mt-6">
+          <Suspense fallback={<ServiceListSkeleton config={CONFIG} rows={6} />}>
+            <Catalog searchParams={props.searchParams} />
+          </Suspense>
+        </div>
+      </Container>
+    </PageTransition>
   );
 }
 

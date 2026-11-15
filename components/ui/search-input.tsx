@@ -69,7 +69,8 @@ export function SearchInput({
         aria-label={submitLabel}
         title={submitLabel}
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-e-control bg-inverse text-on-inverse transition-colors hover:bg-inverse-raised",
+          // btn-motion: the background eases and a press scales it (globals.css); no lift, it is joined to the field.
+          "btn-motion inline-flex shrink-0 items-center justify-center rounded-e-control bg-inverse text-on-inverse hover:bg-inverse-raised",
           large ? "w-13" : "w-11",
         )}
       >

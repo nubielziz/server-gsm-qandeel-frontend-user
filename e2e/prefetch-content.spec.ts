@@ -76,7 +76,11 @@ test.describe("content in the prefetch (P3.1, P3.2, P3.3)", () => {
     const link = isMobile
       ? page.getByRole("region", { name: "Featured services" }).getByRole("link", { name: "View all" })
       : page.getByRole("banner").getByRole("link", { name: "All services", exact: true });
-    await link.scrollIntoViewIfNeeded();
+    // The header's links are NavLinks: the shell's link is replaced when its <Suspense> resolves, and the nav row marks
+    // itself `data-pill` once it is hydrated and has placed its pill (components/layout/nav-row.tsx). Wait for that, or the
+    // locator can resolve the replaced link.
+    await page.locator("[data-pill]").first().waitFor({ state: "attached" });
+    await expect(async () => link.scrollIntoViewIfNeeded({ timeout: 2_000 })).toPass({ timeout: 15_000 });
     await rsc.idle();
 
     const release = await holdRsc(page);

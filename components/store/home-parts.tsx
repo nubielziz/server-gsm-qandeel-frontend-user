@@ -5,6 +5,7 @@
 import Form from "next/form";
 import Link from "next/link";
 import {
+  ArrowRight,
   Headset,
   LayoutGrid,
   LifeBuoy,
@@ -34,6 +35,14 @@ import { ServiceCardMiniSkeleton } from "./service-card";
 import { Logo, logoFile } from "./service-art";
 
 type Home = StoreMessages["home"];
+
+/** The quick check's submit arrow: it leans 3px towards the reading direction while its `group` button is hovered, like a button's end icon. */
+const submitArrow = (
+  <ArrowRight
+    aria-hidden="true"
+    className="transition-[translate] duration-(--duration-base) ease-standard group-hover:translate-x-[calc(var(--inline-dir)*3px)] rtl:-scale-x-100"
+  />
+);
 
 /** One feature point of the hero (an icon and a short text). */
 export function HeroPoint({ icon, text }: { icon: ReactNode; text: string }) {
@@ -97,7 +106,7 @@ export function HomeHero({ locale, t, thirdPoint, price }: { locale: Locale; t: 
         </ul>
         <div className="grid justify-items-start gap-4">
           {price}
-          <ButtonLink href={localePath(locale, "/services")} variant="inverse" className="group" endIcon={arrow}>
+          <ButtonLink href={localePath(locale, "/services")} variant="inverse" endIcon={arrow}>
             {t.hero.cta}
           </ButtonLink>
         </div>
@@ -132,7 +141,7 @@ export function QuickImeiCard({ locale, t }: { locale: Locale; t: Home }) {
           required
           trailing={
             <IconButton type="submit" variant="primary" size="sm" label={t.quick.submit} className="group">
-              {arrow}
+              {submitArrow}
             </IconButton>
           }
         />
@@ -159,7 +168,7 @@ export function TrackPromoCard({ locale, t }: { locale: Locale; t: Home }) {
         <p className="text-micro uppercase text-on-inverse-muted">{t.promo.eyebrow}</p>
         <h2 className="text-heading text-on-inverse">{t.promo.title}</h2>
         <p className="max-w-[18rem] text-small text-on-inverse-muted">{t.promo.text}</p>
-        <ButtonLink href={localePath(locale, "/track")} variant="inverse" size="sm" className="group mt-1.5" endIcon={arrow}>
+        <ButtonLink href={localePath(locale, "/track")} variant="inverse" size="sm" className="mt-1.5" endIcon={arrow}>
           {t.promo.cta}
         </ButtonLink>
       </div>
@@ -210,8 +219,9 @@ function TileMark({ tile }: { tile: CatalogTile }) {
 export function CatalogTiles({ tiles, all, locale, label }: { tiles: CatalogTile[]; all: { name: string; count: string }; locale: Locale; label: string }) {
   const services = localePath(locale, "/services");
   return (
-    // `min-w-0`: as a grid item the strip must scroll inside the page, not widen it.
-    <nav aria-label={label} className="min-w-0">
+    // `min-w-0`: as a grid item the strip must scroll inside the page, not widen it. `reveal`: it fades and rises in as
+    // it scrolls into view on screens where it starts below the fold (globals.css).
+    <nav aria-label={label} className="reveal min-w-0">
       <ul className="-mx-gutter -my-1 flex gap-3 overflow-x-auto px-gutter py-1 lg:mx-0 lg:overflow-visible lg:px-0">
         {tiles.map((tile) => (
           <li key={`${tile.kind}:${tile.name}`} className="min-w-[8.5rem] flex-1 lg:min-w-0">
@@ -278,15 +288,19 @@ export function PanelHeading({ id, icon, title, action }: { id: string; icon: Re
  */
 export function HomePanel({ id, icon, title, action, children }: { id: string; icon: ReactNode; title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <Card as="section" aria-labelledby={id} className="p-5 sm:p-6">
+    // reveal: the panel fades and rises in as one block (its cards then do not reveal again, globals.css).
+    <Card as="section" aria-labelledby={id} className="reveal p-5 sm:p-6">
       <PanelHeading id={id} icon={icon} title={title} action={action} />
       <div className="mt-3 flex flex-1 flex-col">{children}</div>
     </Card>
   );
 }
 
-/** The grid of dense cards (`ServiceCardMini`): two columns on a phone, four from `md` up. `flex-1` fills a panel's body. */
-const MINI_GRID = "grid flex-1 grid-cols-2 gap-3 md:grid-cols-4";
+/**
+ * The grid of dense cards (`ServiceCardMini`): two columns on a phone, four from `md` up. `flex-1` fills a panel's body.
+ * `reveal-grid`: the cards fade and rise in as they scroll into view (globals.css; not again inside a revealing panel).
+ */
+const MINI_GRID = "reveal-grid grid flex-1 grid-cols-2 gap-3 md:grid-cols-4";
 
 /** Dense cards in a row: the best sellers panel and the new arrivals section. */
 export function MiniGrid({ children }: { children: ReactNode }) {
@@ -316,7 +330,7 @@ export function HowItWorks({ t, layout }: { t: Home["how"]; layout: "stack" | "r
   ];
   const stack = layout === "stack";
   return (
-    <Card as="section" aria-labelledby="home-how" className="h-full p-5 sm:p-6">
+    <Card as="section" aria-labelledby="home-how" className="reveal h-full p-5 sm:p-6">
       <PanelHeading id="home-how" icon={<ListOrdered aria-hidden="true" />} title={t.title} />
       <ol className={cn("mt-3 grid flex-1 gap-x-8 md:grid-cols-3", stack && "xl:grid-cols-1")}>
         {steps.map((step, i) => (
@@ -357,7 +371,7 @@ export function DestinationBanners({ locale, t }: { locale: Locale; t: Home["exp
     { key: "support", tone: "light", file: "home-support.jpg", icon: Headset, href: localePath(locale, "/support") },
   ];
   return (
-    <ul className="grid gap-4 lg:grid-cols-3">
+    <ul className="reveal-grid grid gap-4 lg:grid-cols-3">
       {banners.map(({ key, tone, file, icon: Icon, href }) => {
         const m = t[key];
         const inverse = tone === "inverse";
@@ -383,7 +397,7 @@ export function DestinationBanners({ locale, t }: { locale: Locale; t: Home["exp
                     ))}
                   </ul>
                 </div>
-                <ButtonLink href={href} variant={inverse ? "inverse" : "secondary"} size="sm" className="group mt-2" endIcon={arrow}>
+                <ButtonLink href={href} variant={inverse ? "inverse" : "secondary"} size="sm" className="mt-2" endIcon={arrow}>
                   {m.cta}
                 </ButtonLink>
               </div>

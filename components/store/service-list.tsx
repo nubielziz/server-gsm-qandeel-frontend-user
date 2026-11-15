@@ -63,9 +63,10 @@ const LAYOUT = { panel: "grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-
  * `hidden` / `lg:block` utilities (Tailwind's `@layer utilities`).
  */
 const NO_SCRIPT_CSS = "[data-list-filters-aside]{display:block}[data-list-filters-trigger]{display:none}";
+/** The cards' grids. `reveal-grid`: cards below the fold fade and rise in as they scroll into view (globals.css). */
 const GRIDS = {
-  mini: "grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4",
-  full: "grid gap-4 sm:grid-cols-2 xl:grid-cols-3",
+  mini: "reveal-grid grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4",
+  full: "reveal-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-3",
 } as const;
 
 /** The URL as a filter request. Text goes through `cleanText`: the API answers 500 to a NUL byte, and the page must not break on a crafted link. */

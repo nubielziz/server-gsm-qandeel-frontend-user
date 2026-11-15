@@ -118,7 +118,7 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
         <Link
           href={localePath(locale, "/merchant/wallet")}
           aria-label={`${t.header.wallet}: ${wallet.available} USD`}
-          className="hidden h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold transition-colors hover:bg-surface-muted sm:inline-flex"
+          className="btn-motion btn-lift-soft hidden h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold hover:border-ink sm:inline-flex"
         >
           <Wallet aria-hidden="true" className="size-[18px]" />
           <Money amount={wallet.available} currency="USD" locale={locale} />
@@ -127,7 +127,7 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
         <Link
           href={localePath(locale, "/account/wallet")}
           aria-label={`${t.header.storeBalance}: ${formatMoney(customerWallet.available, "USD", locale)}`}
-          className="hidden h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold transition-colors hover:bg-surface-muted sm:inline-flex"
+          className="btn-motion btn-lift-soft hidden h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold hover:border-ink sm:inline-flex"
         >
           <Wallet aria-hidden="true" className="size-[18px]" />
           <Money amount={customerWallet.available} currency="USD" locale={locale} />

@@ -53,8 +53,8 @@ export type PaginationProps = {
   className?: string;
 };
 
-const itemClasses =
-  "inline-flex size-11 items-center justify-center rounded-control text-body font-semibold num transition-colors duration-(--duration-fast)";
+/** Page links look like ghost buttons and move like them (`btn-motion`: the background eases, a press scales, globals.css). */
+const itemClasses = "btn-motion inline-flex size-11 items-center justify-center rounded-control text-body font-semibold num";
 
 /** "{total} results", "Page X of Y" and previous / numbered / next links (phones show only previous / next). With one page only the total shows. */
 export async function Pagination({ total, pageSize, page, basePath, searchParams, pageParam = "page", hash = "", className }: PaginationProps) {

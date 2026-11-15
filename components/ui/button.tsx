@@ -1,4 +1,9 @@
 // Button and ButtonLink: the only way to draw a button in pages. Server-compatible (no hooks).
+// Motion (globals.css, "Button motion"): every variant eases its colours and presses to 0.97 (`btn-motion`); the
+// primary rises 1px with a soft shadow on hover (`btn-lift`), the secondary's border turns ink and it rises a little
+// (`btn-lift-soft`); ghost, inverse and danger only change their background; the link's underline grows. An end icon
+// leans 3px towards the reading direction on hover (mirrored in Arabic); a start icon stays. Disabled or busy buttons
+// never move.
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -8,18 +13,16 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "inverse" | "dan
 export type ButtonSize = "sm" | "md" | "lg";
 
 const base =
-  "relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-semibold " +
-  "transition-colors duration-(--duration-fast) ease-standard select-none " +
+  "btn-motion relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-semibold select-none " +
   "disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 " +
   "aria-busy:disabled:opacity-100 " +
   "[&_svg]:size-[1.125em] [&_svg]:shrink-0";
 
 const variants: Record<ButtonVariant, string> = {
   /** Near-black filled: the main action of a screen. */
-  primary: "rounded-control bg-inverse text-on-inverse hover:bg-inverse-raised active:bg-inverse-raised",
+  primary: "btn-lift rounded-control bg-inverse text-on-inverse hover:bg-inverse-raised active:bg-inverse-raised",
   /** White with a border: the secondary action next to a primary. */
-  secondary:
-    "rounded-control border border-line-strong bg-surface text-ink hover:bg-surface-muted active:bg-surface-sunken",
+  secondary: "btn-lift-soft rounded-control border border-line-strong bg-surface text-ink hover:border-ink active:bg-surface-muted",
   /** No box until hovered: toolbars, table row actions. */
   ghost: "rounded-control text-ink hover:bg-surface-sunken active:bg-surface-sunken",
   /** White on dark surfaces (e.g. "Add funds" on the dark balance card). */
@@ -64,9 +67,14 @@ export function buttonClasses({ variant = "primary", size = "md", block, pill, c
 type CommonProps = ButtonClassOptions & {
   /** Icon (a lucide element) before the label. Mirror directional icons with `rtl:-scale-x-100`. */
   startIcon?: ReactNode;
-  /** Icon after the label. */
+  /** Icon after the label (usually an arrow): it leans towards the reading direction on hover. */
   endIcon?: ReactNode;
 };
+
+/** The end icon in the wrapper that moves it on hover (`.btn-end-icon`, globals.css), or nothing. */
+function EndIcon({ icon }: { icon: ReactNode }) {
+  return icon ? <span className="btn-end-icon">{icon}</span> : null;
+}
 
 export type ButtonProps = Omit<ComponentProps<"button">, "className"> &
   CommonProps & {
@@ -100,7 +108,7 @@ export function Button({
       <span className={cn("inline-flex items-center justify-center gap-2", loading && "opacity-0")}>
         {startIcon}
         {children}
-        {endIcon}
+        <EndIcon icon={endIcon} />
       </span>
       {loading ? (
         <span className="absolute inset-0 flex items-center justify-center">
@@ -138,7 +146,7 @@ export function ButtonLink({
     <>
       {startIcon}
       {children}
-      {endIcon}
+      <EndIcon icon={endIcon} />
     </>
   );
   if (external) {

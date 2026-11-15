@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { LifeBuoy, SearchX } from "lucide-react";
 import { Container, PageHeader } from "@/components/layout/container";
+import { PageTransition } from "@/components/layout/page-transition";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -33,18 +34,20 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function HelpPage(props: PageProps<"/[lang]/help">) {
   const [locale, t, c] = await Promise.all([getLocale(), getMessages(store), getMessages(common)]);
   return (
-    <Container width="narrow" className="py-8 lg:py-10">
-      <PageHeader
-        eyebrow={
-          <Breadcrumbs label={c.workspace.breadcrumbLabel} items={[{ label: t.home.title, href: localePath(locale) }, { label: t.help.title }]} />
-        }
-        title={t.help.title}
-        description={t.help.description}
-      />
-      <Suspense fallback={<HelpSkeleton rows={8} chips={5} />}>
-        <HelpList searchParams={props.searchParams} />
-      </Suspense>
-    </Container>
+    <PageTransition>
+      <Container width="narrow" className="py-8 lg:py-10">
+        <PageHeader
+          eyebrow={
+            <Breadcrumbs label={c.workspace.breadcrumbLabel} items={[{ label: t.home.title, href: localePath(locale) }, { label: t.help.title }]} />
+          }
+          title={t.help.title}
+          description={t.help.description}
+        />
+        <Suspense fallback={<HelpSkeleton rows={8} chips={5} />}>
+          <HelpList searchParams={props.searchParams} />
+        </Suspense>
+      </Container>
+    </PageTransition>
   );
 }
 

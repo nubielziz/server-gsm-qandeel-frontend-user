@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import type { Metadata } from "next";
 import { ArrowLeft, Download, Headset, PackageX } from "lucide-react";
 import { Container } from "@/components/layout/container";
+import { PageTransition } from "@/components/layout/page-transition";
 import { Alert } from "@/components/ui/alert";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
@@ -33,11 +34,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function TrackedOrderPage(props: PageProps<"/[lang]/track/[token]">) {
   return (
-    <Container className="py-8 lg:py-10">
-      <Suspense fallback={<OrderSkeleton />}>
-        <Order params={props.params} />
-      </Suspense>
-    </Container>
+    <PageTransition>
+      <Container className="py-8 lg:py-10">
+        <Suspense fallback={<OrderSkeleton />}>
+          <Order params={props.params} />
+        </Suspense>
+      </Container>
+    </PageTransition>
   );
 }
 

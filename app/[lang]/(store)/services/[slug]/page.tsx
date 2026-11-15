@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight, TriangleAlert } from "lucide-react";
 import { Container } from "@/components/layout/container";
+import { PageTransition } from "@/components/layout/page-transition";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
@@ -69,11 +70,13 @@ export async function generateStaticParams() {
 
 export default function ServicePage(props: PageProps<"/[lang]/services/[slug]">) {
   return (
-    <Container className="py-8 lg:py-10">
-      <Suspense fallback={<ServiceSkeleton />}>
-        <ServiceContent params={props.params} />
-      </Suspense>
-    </Container>
+    <PageTransition>
+      <Container className="py-8 lg:py-10">
+        <Suspense fallback={<ServiceSkeleton />}>
+          <ServiceContent params={props.params} />
+        </Suspense>
+      </Container>
+    </PageTransition>
   );
 }
 

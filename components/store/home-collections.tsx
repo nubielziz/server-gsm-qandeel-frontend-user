@@ -51,7 +51,8 @@ export type CollectionBannersProps = {
 export function CollectionBanners({ collections, locale, decimals, t, countText }: CollectionBannersProps) {
   const services = localePath(locale, "/services");
   return (
-    <ul className={cn(GRID, collections.length === 3 && "lg:grid-cols-3")}>
+    // reveal-grid: the banners fade and rise in as they scroll into view, one after the other (globals.css).
+    <ul className={cn(GRID, "reveal-grid", collections.length === 3 && "lg:grid-cols-3")}>
       {collections.map((collection, i) => {
         const file = collectionArtFile(collection.kind, collection.value);
         const hasArt = file !== null && siteImage(file) !== null;
@@ -104,7 +105,7 @@ export function CollectionBanners({ collections, locale, decimals, t, countText 
                   href={`${services}?${collection.kind}=${encodeURIComponent(collection.value)}`}
                   variant={inverse ? "inverse" : "secondary"}
                   size="sm"
-                  className="group mt-2"
+                  className="mt-2"
                   endIcon={linkArrow}
                   aria-label={fmt(t.ctaLabel, { name })}
                 >
