@@ -1,17 +1,19 @@
-// The customer wallet (plan F21, BH §3.1, §3.2): the balance cards, notices (on hold, below zero, switched off) and the
-// statement with a date range, 25 rows a page. The wallet is USD; in another shop currency an "about …" line follows.
-// The frame (heading) is static; the wallet and the statement are personal and never cached, so they are read at request
-// time (`apiSessionGet`, no-store) and stream behind <Suspense> with a skeleton. The wallet is the request's one shared
+// The customer wallet (plan F21, F33, BH §3.1, §3.2, §3.3): the balance cards, notices (on hold, below zero, switched off), the
+// customer's latest top-ups and the statement with a date range, 25 rows a page. The wallet is USD; in another shop currency an
+// "about …" line follows. "Add funds" leads to /account/wallet/add-funds, a top-up row to its own page.
+// The frame (heading) is static; the wallet, the top-ups and the statement are personal and never cached, so they are read at
+// request time (`apiSessionGet`, no-store) and stream behind <Suspense> with a skeleton. The wallet is the request's one shared
 // read (`readCustomerWallet`), also used by the layout's nav item and pill.
-// `?topUp=<id>` (the return of an online top-up) is accepted and ignored until the top-up poller (F33) reads it; a
-// failed read shows the request reference, and a signed-out answer goes to the sign-in page.
+// `?topUp=<id>` (the return of an online top-up) shows a notice that follows that top-up until it is credited, rejected or two
+// minutes have passed (`TopUpReturnPoller`), then refreshes the page. A failed read shows the request reference, and a
+// signed-out answer goes to the sign-in page.
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Plus, ReceiptText, Wallet } from "lucide-react";
+import { Landmark, Plus, ReceiptText, Wallet } from "lucide-react";
 import { apiSessionList } from "@/lib/api/server";
 import { isApiError } from "@/lib/api/errors";
-import type { CustomerStatementLine } from "@/lib/api/types";
+import type { CustomerStatementLine, TopUp } from "@/lib/api/types";
 import { getCurrency } from "@/lib/currency";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { localePath, type Locale } from "@/lib/i18n/config";
@@ -20,11 +22,12 @@ import { errorText } from "@/lib/i18n/error-text-core";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { errors } from "@/lib/i18n/messages/errors";
+import { topUps } from "@/lib/i18n/messages/top-ups";
 import { wallet } from "@/lib/i18n/messages/wallet";
 import { ltr } from "@/lib/merchant/format";
 import { first, type SearchParams } from "@/lib/merchant/lists";
 import { settle } from "@/lib/merchant/load";
-import { parsePage } from "@/lib/api/query";
+import { listQuery, parsePage } from "@/lib/api/query";
 import { approximateIn } from "@/lib/wallet/convert";
 import { CUSTOMER_STATEMENT_PER_PAGE, customerStatementRows, parseStatementRange, statementQuery, walletCapabilities } from "@/lib/wallet/view";
 import { readCustomerWallet } from "@/components/layout/account-area";
@@ -33,6 +36,8 @@ import { RetryButton } from "@/components/merchant/retry-button";
 import { WalletBalanceCards } from "@/components/wallet/balance-cards";
 import { StatementRangeForm } from "@/components/wallet/statement-range-form";
 import { StatementTable } from "@/components/wallet/statement-table";
+import { TopUpReturnPoller } from "@/components/wallet/top-up-return-poller";
+import { TopUpsTable } from "@/components/wallet/top-ups-table";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -47,6 +52,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const SIGNED_OUT_CODES = new Set(["UNAUTHORIZED", "ACCOUNT_SUSPENDED", "IP_NOT_ALLOWED"]);
+
+/** How many top-ups the wallet page lists (the newest first). */
+const TOP_UPS_ON_PAGE = 10;
 
 /** A signed-out answer (handoff §3.4) goes to the customer sign-in page, which comes back here; anything else returns. */
 function leaveIfSignedOut(error: unknown, locale: Locale, next: string): void {
@@ -81,16 +89,21 @@ function LoadError({ error, title, retry, locale }: { error: unknown; title: str
 }
 
 async function WalletContent({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const [locale, t, c, sp] = await Promise.all([getLocale(), getMessages(wallet), getMessages(common), searchParams]);
+  const [locale, t, c, tu, sp] = await Promise.all([getLocale(), getMessages(wallet), getMessages(common), getMessages(topUps), searchParams]);
   const base = localePath(locale, "/account/wallet");
+  const topUpsBase = localePath(locale, "/account/wallet/top-ups");
+  // The return of an online payment names the top-up: only digits can be one (a hand-made value shows no notice).
+  const returned = first(sp.topUp);
+  const returnedTopUp = /^[1-9]\d{0,15}$/.test(returned) ? returned : null;
   const range = parseStatementRange({ from: first(sp.from), to: first(sp.to) });
   const page = parsePage(sp.page);
   const filters = { from: range.from || undefined, to: range.to || undefined };
 
-  const [read, currency, statement] = await Promise.all([
+  const [read, currency, statement, latest] = await Promise.all([
     readCustomerWallet(),
     getCurrency().catch(() => null),
     settle(apiSessionList<CustomerStatementLine>("/store/v1/me/wallet/statement", { query: statementQuery(range, page) })),
+    settle(apiSessionList<TopUp>("/store/v1/me/wallet/top-ups", { query: listQuery({ start: 0, end: TOP_UPS_ON_PAGE }) })),
   ]);
 
   if (!read.ok) {
@@ -164,8 +177,31 @@ async function WalletContent({ searchParams }: { searchParams: Promise<SearchPar
       );
   }
 
+  // The latest top-ups: a table (a list on phones) with a link to each one's page. A wallet that is switched off and has
+  // never had a top-up shows no card at all; a failed read shows inside the card, the rest of the page stays.
+  let topUpsBody = null;
+  if (!latest.ok) {
+    leaveIfSignedOut(latest.error, locale, base);
+    topUpsBody = <LoadError error={latest.error} title={tu.list.errorTitle} retry={tu.list.retry} locale={locale} />;
+  } else if (latest.data.data.length > 0) {
+    topUpsBody = (
+      <TopUpsTable
+        rows={latest.data.data}
+        locale={locale}
+        hrefBase={topUpsBase}
+        labels={{ caption: tu.list.caption, columns: tu.list.columns, view: tu.list.view, statuses: c.status.topUp }}
+      />
+    );
+  } else if (caps.canAddFunds) {
+    // No second "Add funds" link here: the balance card already has the one button.
+    topUpsBody = <EmptyState compact icon={<Landmark aria-hidden="true" />} title={tu.list.emptyTitle} description={tu.list.emptyText} />;
+  }
+
   return (
     <div className="grid gap-4">
+      {returnedTopUp ? (
+        <TopUpReturnPoller id={returnedTopUp} href={`${topUpsBase}/${returnedTopUp}`} locale={locale} labels={tu.poller} />
+      ) : null}
       {caps.frozen && w.frozen ? (
         // The reason stays with staff: only the date is shown.
         <Alert tone="warning" title={t.notices.frozenTitle}>
@@ -212,6 +248,13 @@ async function WalletContent({ searchParams }: { searchParams: Promise<SearchPar
             : undefined
         }
       />
+
+      {topUpsBody ? (
+        <Card as="section" aria-labelledby="top-ups-title">
+          <CardHeader title={<span id="top-ups-title">{tu.list.title}</span>} description={tu.list.description} />
+          <div className="mt-4 border-t border-line">{topUpsBody}</div>
+        </Card>
+      ) : null}
 
       <Card as="section" aria-labelledby="statement-title">
         <CardHeader title={<span id="statement-title">{t.statement.title}</span>} description={t.statement.description} />

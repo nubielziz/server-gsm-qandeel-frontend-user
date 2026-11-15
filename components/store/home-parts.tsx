@@ -30,6 +30,7 @@ import { localePath, type Locale } from "@/lib/i18n/config";
 import type { StoreMessages } from "@/lib/i18n/messages/store";
 import { siteImage } from "@/lib/site-images";
 import { BannerArt, OutlineTag, linkArrow as arrow, litSurface } from "./banner";
+import { ServiceCardMiniSkeleton } from "./service-card";
 import { Logo, logoFile } from "./service-art";
 
 type Home = StoreMessages["home"];
@@ -253,8 +254,40 @@ export function PanelHeading({ id, icon, title, action }: { id: string; icon: Re
 }
 
 /**
+ * A panel card with a heading row (`PanelHeading`) and a body that fills the card: the "Best sellers" list beside "How
+ * it works". `id` names the heading, so the card is a region with the panel's title as its name.
+ */
+export function HomePanel({ id, icon, title, action, children }: { id: string; icon: ReactNode; title: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <Card as="section" aria-labelledby={id} className="p-5 sm:p-6">
+      <PanelHeading id={id} icon={icon} title={title} action={action} />
+      <div className="mt-3 flex flex-1 flex-col">{children}</div>
+    </Card>
+  );
+}
+
+/** The grid of dense cards (`ServiceCardMini`): two columns on a phone, four from `md` up. `flex-1` fills a panel's body. */
+const MINI_GRID = "grid flex-1 grid-cols-2 gap-3 md:grid-cols-4";
+
+/** Dense cards in a row: the best sellers panel and the new arrivals section. */
+export function MiniGrid({ children }: { children: ReactNode }) {
+  return <div className={MINI_GRID}>{children}</div>;
+}
+
+/** `MiniGrid` while the catalog loads: the same grid of cards of the same size. */
+export function MiniGridSkeleton({ count }: { count: number }) {
+  return (
+    <div className={MINI_GRID}>
+      {Array.from({ length: count }, (_, i) => (
+        <ServiceCardMiniSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
+/**
  * "How it works": three numbered steps in a panel card. `stack` lists them under each other from `xl` up (beside the
- * "More services" panel); `row` keeps them side by side (when the panel stands alone).
+ * "Best sellers" panel); `row` keeps them side by side (when the panel stands alone).
  */
 export function HowItWorks({ t, layout }: { t: Home["how"]; layout: "stack" | "row" }) {
   const steps = [

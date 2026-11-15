@@ -45,8 +45,8 @@ test.describe("home", () => {
     await expect(tiles.getByRole("link", { name: "Apple 8 services" })).toHaveAttribute("href", "/en/services?brand=Apple");
     await expect(tiles.getByRole("link", { name: "AT&T 1 service" })).toHaveAttribute("href", "/en/services?network=AT%26T");
     await expect(tiles.getByRole("link", { name: "All services 11 services" })).toHaveAttribute("href", "/en/services");
-    const more = page.getByRole("region", { name: "More services" });
-    await expect(more.getByRole("article")).toHaveCount(4);
+    const bestSellers = page.getByRole("region", { name: "Best sellers" });
+    await expect(bestSellers.getByRole("article")).toHaveCount(4);
 
     // The quick check hands the number to the IMEI page.
     await page.getByLabel("IMEI number").first().fill("490154203237518");

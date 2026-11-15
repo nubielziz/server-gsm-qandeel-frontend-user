@@ -96,7 +96,8 @@ test.describe("customer wallet", () => {
     await expect(main(page).getByRole("columnheader")).toHaveCount(0);
   });
 
-  test("the return address of an online top-up (?topUp=) is accepted and ignored", async ({ page }) => {
+  // F33 (W3) shows a notice for the returning top-up; an id that is not the customer's must not break the wallet page.
+  test("the return address of an online top-up (?topUp=) with an unknown id still shows the wallet", async ({ page }) => {
     await freshCustomer(page);
     await go(page, "/en/account/wallet?topUp=123");
     await expect(page.getByRole("heading", { level: 1, name: "Wallet" })).toBeVisible();

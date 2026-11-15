@@ -53,8 +53,11 @@ export const store = defineMessages({
         step3Title: "Track your order",
         step3Text: "Follow your order from payment to delivery with your tracking link.",
       },
-      all: {
-        title: "More services",
+      bestSellers: {
+        title: "Best sellers",
+      },
+      newArrivals: {
+        title: "New arrivals",
       },
       collections: {
         title: "Featured collections",
@@ -398,8 +401,11 @@ export const store = defineMessages({
         step3Title: "تابع طلبك",
         step3Text: "تابع طلبك من الدفع حتى التسليم عبر رابط التتبّع.",
       },
-      all: {
-        title: "خدمات أخرى",
+      bestSellers: {
+        title: "الأكثر مبيعًا",
+      },
+      newArrivals: {
+        title: "وصل حديثًا",
       },
       collections: {
         title: "مجموعات مميّزة",

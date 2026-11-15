@@ -1,4 +1,4 @@
-// One help article: question, answer (Markdown), category, updated date, and a way to reach support.
+// One help article: question, answer (Markdown), category, updated date, a helpful vote, and a way to reach support.
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -12,6 +12,7 @@ import { Markdown } from "@/components/ui/markdown";
 import { staticSlugParams } from "@/components/store/static-params";
 import { demoteHeadings } from "@/components/store/markdown-source";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
+import { HelpVote } from "@/components/store/help-vote";
 import { getHelpArticle, listHelpArticles } from "@/lib/api/public";
 import { formatDate } from "@/lib/format";
 import { dirOf, isLocale, localePath } from "@/lib/i18n/config";
@@ -87,6 +88,17 @@ async function Article({ params }: { params: Promise<{ slug: string }> }) {
         </header>
         <Markdown source={demoteHeadings(article.answerMd)} className="mt-5" />
       </article>
+      <HelpVote
+        articleId={article.id}
+        slug={article.slug}
+        labels={{
+          question: t.help.voteQuestion,
+          yes: t.help.voteYes,
+          no: t.help.voteNo,
+          thanks: t.help.voteThanks,
+          error: t.help.voteError,
+        }}
+      />
       <Card className="mt-6">
         <CardBody className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -119,6 +131,7 @@ function ArticleSkeleton() {
         <Skeleton className="h-4 w-40" />
         <SkeletonText lines={2} className="mt-2" />
       </div>
+      <Skeleton className="mt-6 h-[7.75rem] rounded-card sm:h-[5.875rem]" />
       <Skeleton className="mt-6 h-[6.5rem] rounded-card" />
       <Skeleton className="mt-6 h-11 w-48" />
     </div>

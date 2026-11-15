@@ -1,7 +1,9 @@
-// sitemap.xml: both languages. Services are matched across languages by id (their slugs differ), help articles and the legal
-// documents in force come from the API. Content pages cannot be listed (the API has no list route for them).
+// sitemap.xml: both languages. Services are matched across languages by id (their slugs differ); help articles, content
+// pages (`GET /store/v1/pages`, newest first, without bodies) and the legal documents in force come from the API. A content
+// page that is marked `noindex` is live but never listed here; drafts and legal documents are not in the page list at all.
 import type { MetadataRoute } from "next";
-import { getStoreConfig, listHelpArticles } from "@/lib/api/public";
+import { getStoreConfig, listContentPages, listHelpArticles } from "@/lib/api/public";
+import type { StorePageListItem } from "@/lib/api/types";
 import { allListedServices } from "@/lib/catalog";
 import { LOCALES, localePath, type Locale } from "@/lib/i18n/config";
 
@@ -9,6 +11,19 @@ const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:5175").repla
 const url = (locale: Locale, path = "/") => `${site}${localePath(locale, path)}`;
 
 type Entry = MetadataRoute.Sitemap[number];
+
+/** The page route takes at most 100 rows a request. */
+const PAGE_ROWS = 100;
+
+/** Every published content page of one language: 100 a request, until the API's total is reached. */
+async function allContentPages(locale: Locale): Promise<StorePageListItem[]> {
+  const rows: StorePageListItem[] = [];
+  for (let start = 0; ; start += PAGE_ROWS) {
+    const page = await listContentPages({ locale, start, end: start + PAGE_ROWS });
+    rows.push(...page.data);
+    if (page.data.length === 0 || start + PAGE_ROWS >= page.total) return rows;
+  }
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: Entry[] = [];
@@ -60,6 +75,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   } catch {
     // The API is unreachable: serve the static pages only rather than failing the sitemap.
+  }
+
+  // Content pages (landing pages, tools, blog, static pages). Their own guard keeps a failing page list from dropping the
+  // entries above. A page of one language has no known twin in the other (the slugs differ), so there are no alternates.
+  try {
+    for (const locale of LOCALES) {
+      for (const page of await allContentPages(locale)) {
+        if (page.noindex) continue;
+        entries.push({ url: url(locale, `/pages/${encodeURIComponent(page.slug)}`), lastModified: page.updatedAt, changeFrequency: "monthly", priority: 0.5 });
+      }
+    }
+  } catch {
+    // The page list is unreachable: the sitemap keeps what it has.
   }
   return entries;
 }

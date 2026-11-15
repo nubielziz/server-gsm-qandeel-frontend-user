@@ -86,8 +86,11 @@ test.describe("opening a checkout", () => {
     await expect(page.getByText("•••7518").filter({ visible: true })).toBeVisible();
     await expect(page.getByText("e2•••@example.com")).toBeVisible();
     await expect(page.getByRole("radio", { name: /Card gateway/ })).toBeChecked();
-    // No wallet, PayPal or Vodafone Cash: customers pay with the gateways the session lists.
-    await expect(page.getByText(/wallet|PayPal|Vodafone/i)).toHaveCount(0);
+    // No PayPal or Vodafone Cash, and no balance choice on a guest checkout (only a checkout a signed-in customer opened can
+    // be paid from the store balance, see balance-payment.spec.ts): guests pay with the gateways the session lists.
+    await expect(page.getByText(/PayPal|Vodafone/i)).toHaveCount(0);
+    await expect(page.getByRole("radio", { name: /Store balance/ })).toHaveCount(0);
+    await expect(page.getByRole("main").getByText(/store balance/i)).toHaveCount(0);
   });
 
   test("the first click without details shows the errors and opens the drawer on the IMEI", async ({ page }) => {

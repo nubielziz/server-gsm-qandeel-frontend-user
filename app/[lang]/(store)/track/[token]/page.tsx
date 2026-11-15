@@ -9,13 +9,13 @@ import { Alert } from "@/components/ui/alert";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { CopyButton } from "@/components/ui/copy-button";
 import { DescriptionItem, DescriptionList } from "@/components/ui/description-list";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { CopyPageLink } from "@/components/store/copy-page-link";
 import { OrderTimeline } from "@/components/store/order-timeline";
+import { ResultCodes } from "@/components/store/result-codes";
 import { isApiError } from "@/lib/api/errors";
 import { BusyState } from "@/components/ui/busy-state";
 import { apiSessionGet } from "@/lib/api/server";
@@ -126,12 +126,18 @@ async function Order({ params }: { params: Promise<{ token: string }> }) {
               <CardHeader title={t.track.resultTitle} description={t.track.resultNote} />
               <CardBody className="grid gap-4">
                 {order.result.code ? (
-                  <div className="flex flex-wrap items-start gap-3 rounded-control border border-line bg-surface-muted p-4">
-                    <pre dir="auto" className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-body text-ink">
-                      {order.result.code}
-                    </pre>
-                    <CopyButton value={order.result.code} label={c.actions.copy} copiedLabel={c.actions.copied} />
-                  </div>
+                  // A stocked service answers with its codes one per line: a list with a Copy button each (BH §14.5).
+                  <ResultCodes
+                    code={order.result.code}
+                    locale={locale}
+                    labels={{
+                      title: t.track.codesTitle,
+                      copyAll: t.track.copyAll,
+                      copyCode: t.track.copyCode,
+                      copy: c.actions.copy,
+                      copied: c.actions.copied,
+                    }}
+                  />
                 ) : null}
                 {order.result.comment ? (
                   <div>

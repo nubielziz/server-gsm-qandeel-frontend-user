@@ -1,12 +1,13 @@
 // Shop home (mockup "E-Commerce", adapted to the API): dark hero with the quick IMEI check and the track promo, the brand
-// tiles, featured services, "how it works" beside a dense list of more services, the featured collections, the list of
-// all services (filters, search, sort, pages: its state is in the home URL) and banners to the rest of the site.
+// tiles, featured services, "how it works" beside the best sellers (a dense row of the API's `popular` sort), the
+// featured collections, the new arrivals (a dense row of its `listedAt` sort), the list of all services (filters, search,
+// sort, pages: its state is in the home URL) and banners to the rest of the site. A section whose list is empty is left out.
 // The hero, quick check, promo, steps and banners are static. Everything that reads the catalog (language-specific
 // cached reads), the visitor's currency cookie or the URL's query streams in behind <Suspense> with skeletons of the
 // same size; the merchant banner is a small Client Component (no server read).
 import { Suspense, type ReactNode } from "react";
 import type { Metadata } from "next";
-import { ArrowRight, PackageSearch, Sparkles } from "lucide-react";
+import { ArrowRight, Flame, PackageSearch } from "lucide-react";
 import { Container, Section } from "@/components/layout/container";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,17 +22,20 @@ import {
   HeroPrice,
   HeroPriceSpace,
   HomeHero,
+  HomePanel,
   HowItWorks,
-  PanelHeading,
+  MiniGrid,
+  MiniGridSkeleton,
   QuickImeiCard,
   TrackPromoCard,
   type CatalogTile,
 } from "@/components/store/home-parts";
 import { CollectionBanners, CollectionBannersSkeleton } from "@/components/store/home-collections";
 import { HomeProducts, HomeProductsSkeleton } from "@/components/store/home-products";
-import { ServiceCard, ServiceCardMini, ServiceCardMiniSkeleton, ServiceGridSkeleton } from "@/components/store/service-card";
+import { ServiceCard, ServiceCardMini, ServiceGridSkeleton } from "@/components/store/service-card";
 import { getStoreConfig, listStoreServices } from "@/lib/api/public";
 import { catalogCollections, catalogCounts, lowestPrice, type CatalogCount } from "@/lib/catalog";
+import { sortQuery, type ListSort } from "@/lib/catalog-facets";
 import { getCurrency } from "@/lib/currency";
 import { formatNumber } from "@/lib/format";
 import { localePath, type Locale } from "@/lib/i18n/config";
@@ -41,12 +45,11 @@ import { store, type StoreMessages } from "@/lib/i18n/messages/store";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 
 const GRID = "grid gap-4 sm:grid-cols-2 xl:grid-cols-4";
-const MINI_GRID = "grid flex-1 grid-cols-2 gap-3 md:grid-cols-4";
 const SKELETON_CARDS = 4;
 /** Tiles before the "All services" tile: eight tiles fill the row on a desktop. */
 const FILTER_TILES = 7;
-/** One row of dense cards beside "How it works". */
-const MORE_SERVICES = 4;
+/** One row of dense cards: the best sellers beside "How it works" and the new arrivals. */
+const MINI_CARDS = 4;
 
 /** The filtered states of the home list (`/en?brand=Apple`) are the same page: one canonical URL per language. */
 export async function generateMetadata(): Promise<Metadata> {
@@ -90,12 +93,16 @@ export default async function HomePage(props: PageProps<"/[lang]">) {
         <Featured locale={locale} />
       </Suspense>
 
-      <Suspense fallback={<HowAndMore t={t.home} more={<MiniGridSkeleton />} />}>
-        <HowAndMoreServices locale={locale} />
+      <Suspense fallback={<HowAndMore t={t.home} more={<MiniGridSkeleton count={MINI_CARDS} />} />}>
+        <HowAndBestSellers locale={locale} />
       </Suspense>
 
       <Suspense fallback={<CollectionsSkeleton title={t.home.collections.title} />}>
         <Collections locale={locale} />
+      </Suspense>
+
+      <Suspense fallback={<NewArrivalsSkeleton title={t.home.newArrivals.title} />}>
+        <NewArrivals locale={locale} />
       </Suspense>
 
       <Suspense fallback={<HomeProductsSkeleton t={t.home.products} />}>
@@ -123,10 +130,12 @@ async function LowestPrice({ locale, label }: { locale: Locale; label: string })
   return <HeroPrice amount={price.gross} currency={price.currency} locale={locale} decimals={currency.decimals} label={label} />;
 }
 
-async function ViewAll({ locale }: { locale: Locale }) {
+/** "View all": the whole catalog, or in the sort of the section that links ("Best sellers" → `?sort=popular`). */
+async function ViewAll({ locale, sort }: { locale: Locale; sort?: Exclude<ListSort, "featured"> }) {
   const c = await getMessages(common);
+  const services = localePath(locale, "/services");
   return (
-    <ButtonLink href={localePath(locale, "/services")} variant="ghost" size="sm" className="-me-3.5 -mb-1.5" endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}>
+    <ButtonLink href={sort ? `${services}?sort=${sort}` : services} variant="ghost" size="sm" className="-me-3.5 -mb-1.5" endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}>
       {c.actions.viewAll}
     </ButtonLink>
   );
@@ -204,47 +213,68 @@ function CollectionsSkeleton({ title }: { title: string }) {
   );
 }
 
-/** "How it works" and, beside it from `xl` up, the panel of more services. The steps fill the row when it is alone. */
+/** "How it works" and, beside it from `xl` up, the "Best sellers" panel. The steps fill the row when it is alone. */
 function HowAndMore({ t, more, action }: { t: StoreMessages["home"]; more: ReactNode; action?: ReactNode }) {
   if (!more) return <HowItWorks t={t.how} layout="row" />;
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,9fr)]">
       <HowItWorks t={t.how} layout="stack" />
-      <Card as="section" aria-labelledby="home-more" className="p-5 sm:p-6">
-        <PanelHeading id="home-more" icon={<Sparkles aria-hidden="true" />} title={t.all.title} action={action} />
-        <div className="mt-3 flex flex-1 flex-col">{more}</div>
-      </Card>
+      <HomePanel id="home-best-sellers" icon={<Flame aria-hidden="true" />} title={t.bestSellers.title} action={action}>
+        {more}
+      </HomePanel>
     </div>
   );
 }
 
-/** A selection of the other (not featured) services, by title, as dense cards. Only the steps when every service is featured. */
-async function HowAndMoreServices({ locale }: { locale: Locale }) {
+/**
+ * The four best sellers (`_sort=popular&_order=desc`, BH §2.2) as dense cards, priced in the visitor's currency. Only
+ * the steps when the catalog lists nothing. "View all" opens the catalog in the same sort.
+ */
+async function HowAndBestSellers({ locale }: { locale: Locale }) {
   const [t, c, currency] = await Promise.all([getMessages(store), getMessages(common), getCurrency()]);
-  const list = await listStoreServices({ locale, currency: currency.code, featured: false, sort: "title", start: 0, end: MORE_SERVICES });
+  const list = await listStoreServices({ locale, currency: currency.code, ...sortQuery("popular"), start: 0, end: MINI_CARDS });
   if (list.data.length === 0) return <HowAndMore t={t.home} more={null} />;
   const labels = serviceCardLabels(t, c);
   return (
     <HowAndMore
       t={t.home}
-      action={<ViewAll locale={locale} />}
+      action={<ViewAll locale={locale} sort="popular" />}
       more={
-        <div className={MINI_GRID}>
+        <MiniGrid>
           {list.data.map((service) => (
             <ServiceCardMini key={service.id} service={service} locale={locale} decimals={currency.decimals} labels={labels} />
           ))}
-        </div>
+        </MiniGrid>
       }
     />
   );
 }
 
-function MiniGridSkeleton() {
+/**
+ * The four newest listings (`_sort=listedAt&_order=desc`, BH §2.2) as dense cards, after the featured collections. A
+ * section, not a badge: "new" never depends on the clock (plan D18). Nothing when the catalog lists nothing.
+ */
+async function NewArrivals({ locale }: { locale: Locale }) {
+  const [t, c, currency] = await Promise.all([getMessages(store), getMessages(common), getCurrency()]);
+  const list = await listStoreServices({ locale, currency: currency.code, ...sortQuery("newest"), start: 0, end: MINI_CARDS });
+  if (list.data.length === 0) return null;
+  const labels = serviceCardLabels(t, c);
   return (
-    <div className={MINI_GRID}>
-      {Array.from({ length: MORE_SERVICES }, (_, i) => (
-        <ServiceCardMiniSkeleton key={i} />
-      ))}
-    </div>
+    <Section headingId="home-new-arrivals" title={t.home.newArrivals.title} actions={<ViewAll locale={locale} sort="newest" />}>
+      <MiniGrid>
+        {list.data.map((service) => (
+          <ServiceCardMini key={service.id} service={service} locale={locale} decimals={currency.decimals} labels={labels} />
+        ))}
+      </MiniGrid>
+    </Section>
+  );
+}
+
+/** The new arrivals' heading and a row of dense card skeletons while the catalog streams in. */
+function NewArrivalsSkeleton({ title }: { title: string }) {
+  return (
+    <Section headingId="home-new-arrivals" title={title}>
+      <MiniGridSkeleton count={MINI_CARDS} />
+    </Section>
   );
 }

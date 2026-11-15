@@ -158,6 +158,21 @@ export const checkout = defineMessages({
         none: "No payment method is available right now. Please try again later or contact support.",
         required: "Choose a payment method.",
       },
+      balance: {
+        title: "Store balance",
+        available: "Available: {amount}",
+        takesUsd: "This order takes {amount} from your balance.",
+        methodsDescription: "Pay from your store balance, or choose a method that takes you to a secure payment page.",
+        signIn: "Sign in to pay from your store balance.",
+        signInAction: "Sign in",
+        reopen:
+          "This checkout was opened without your account, so it cannot be paid from your store balance. Start a new checkout while signed in to use it.",
+        reopenAction: "Start a new checkout",
+        frozen: "Your store balance is on hold, so it cannot be used to pay. Contact support if you have questions.",
+        insufficient: "Your balance is lower than this order: {available} available, {total} needed.",
+        addFunds: "Add funds",
+        paying: "Paying from your balance…",
+      },
       summary: {
         title: "Order summary",
         tax: "Tax ({rate})",
@@ -181,6 +196,10 @@ export const checkout = defineMessages({
         maintenance: "Payments are temporarily unavailable because of maintenance. Please try again soon.",
         maintenanceUntil: "Expected back around {time}.",
         contactSupport: "Contact support",
+        signInRequired: "Sign in to pay from your balance. Your session may have ended.",
+        forbidden:
+          "This checkout was opened by another account or as a guest, so it cannot be paid from your balance. Start a new checkout while signed in to use it.",
+        insufficient: "Your store balance is lower than the total of this order. Add funds, or pay another way.",
       },
     },
 
@@ -388,6 +407,21 @@ export const checkout = defineMessages({
         none: "لا توجد طريقة دفع متاحة حاليًا. حاول لاحقًا أو تواصل مع الدعم.",
         required: "اختر طريقة الدفع.",
       },
+      balance: {
+        title: "رصيد المتجر",
+        available: "المتاح: {amount}",
+        takesUsd: "سيُخصم من رصيدك {amount} لهذا الطلب.",
+        methodsDescription: "ادفع من رصيدك في المتجر، أو اختر طريقة تنقلك إلى صفحة دفع آمنة.",
+        signIn: "سجّل الدخول للدفع من رصيدك في المتجر.",
+        signInAction: "تسجيل الدخول",
+        reopen:
+          "فُتح هذا الطلب بدون حسابك، لذلك لا يمكن دفعه من رصيدك في المتجر. ابدأ طلبًا جديدًا وأنت مسجّل الدخول لتستخدم رصيدك.",
+        reopenAction: "ابدأ طلبًا جديدًا",
+        frozen: "رصيدك في المتجر معلّق، لذلك لا يمكن استخدامه للدفع. تواصل مع الدعم إذا كانت لديك أسئلة.",
+        insufficient: "رصيدك أقل من قيمة هذا الطلب: المتاح {available} والمطلوب {total}.",
+        addFunds: "إضافة رصيد",
+        paying: "جارٍ الدفع من رصيدك…",
+      },
       summary: {
         title: "ملخص الطلب",
         tax: "الضريبة ({rate})",
@@ -411,6 +445,10 @@ export const checkout = defineMessages({
         maintenance: "الدفع غير متاح مؤقتًا بسبب الصيانة. يرجى المحاولة قريبًا.",
         maintenanceUntil: "يُتوقع أن يعود نحو {time}.",
         contactSupport: "تواصل مع الدعم",
+        signInRequired: "سجّل الدخول للدفع من رصيدك. ربما انتهت جلستك.",
+        forbidden:
+          "فُتح هذا الطلب بحساب آخر أو كضيف، لذلك لا يمكن دفعه من رصيدك. ابدأ طلبًا جديدًا وأنت مسجّل الدخول لتستخدم رصيدك.",
+        insufficient: "رصيدك في المتجر أقل من إجمالي هذا الطلب. أضف رصيدًا، أو ادفع بطريقة أخرى.",
       },
     },
 

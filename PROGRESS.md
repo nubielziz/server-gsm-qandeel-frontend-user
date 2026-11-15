@@ -61,8 +61,12 @@ isolated demo API (:3100, Mailpit); the owner's API (:3000) is never written to.
 | F21 Customer wallet | W2 | ✓ | fix, 3 major (2 spec locators; date fields overflow at 360/390 px) | ✓ | 3/3 | ✓ | W2 |
 | F22 Merchant account | W2 | ✓ | accept, 1 minor (gate warning off screen); manual gate check PASS | ✓ | 3/3 | ✓ | W2 |
 | F23 Site API gaps | W2 | ✓ | fix, 2 major (settings nav overflow on phones; spec locator), 1 minor (skeleton height) | ✓ | 3/3 | ✓ | W2 |
+| F30 Balance payment | W3 | ✓ | fix, 1 major (focus lost after a payment error), 2 minor | ✓ | 3/3 | ✓ | W3 |
+| F31 Home sections and category menu | W3 | ✓ | fix, 1 major (spec matched the hidden previous route), 1 minor | ✓ | 3/3 | ✓ | W3 |
+| F32 Content, tracking, codes | W3 | ✓ | fix, 1 major (long codes overflow at 360 px) | ✓ | 3/3 | ✓ | W3 |
+| F33 Add Funds | W3 | ✓ | fix, 1 major (receipt error focus race), 2 minor (daily limit on the gross; toast text) | ✓ | 3/3 | ✓ | W3 |
 
-Agent calls so far: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2).
+Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
 
 ### Wave 1: sign-in, notifications, catalog, service display (2026-11-13)
 - **F10 smart sign-in:** one email + password form on `POST /client/auth/sign-in` (Turnstile); the answer's `kind` opens
@@ -120,6 +124,26 @@ Agent calls so far: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2).
   passed on both projects when run again; `wallet-disabled` (exclusive) passed alone and switched the setting back on;
   regression (auth, smart-sign-in, notifications, unsubscribe, store, catalog-filters, service-display, routing, support,
   harness) 280 passed / 16 skipped / 0 failed; desktop + mobile.
+
+### Wave 3: balance payment, home sections, content and codes, Add Funds (2026-11-15)
+- **F30 balance payment:** the review page offers "Store balance" beside the card when the session says `balancePayable`
+  (picked by default when ready); one click pays through `POST …/balance-payment` (no body, no Content-Type, its own
+  idempotency key; in-progress waits and retries, a reused key retries once) and goes straight to tracking. States: sign
+  in, not enough balance (figures and Add funds), on hold, reopen as a signed-in checkout; 401 never signs out, 403 offers a
+  new checkout, 402/409 refresh the choice. USD gross compared as money, never as floats.
+- **F31 home sections and category menu:** Best sellers (`popular`, newest first) and New arrivals (`listedAt`) with four
+  cards and View all links that keep the sort; an "All categories" menu in the desktop nav and a Categories block in the
+  phone drawer (`Name (count)`, keyboard and Escape).
+- **F32 content and tracking:** the sitemap lists every published content page in both languages (noindex skipped); the
+  help article has a Yes/No vote (thanks, 429 wait); tracking shows delivered codes one per line with Copy and Copy all
+  (long codes wrap); the pending text promises no time.
+- **F33 Add Funds:** `/account/wallet/add-funds` (methods and limits read on the server, client checks against the method
+  and the daily limits on the gross, one key per attempt), `/account/wallet/top-ups/[id]` (status, staff instructions and
+  rejection reason as text, receipt upload, cancel), a Top-ups card on the wallet page and the `?topUp=` return notice.
+- **Lead:** the W2 fallout title in `e2e/wallet.spec.ts` (`?topUp=` now shows a notice).
+- **Checks:** typecheck and ESLint clean; 456 unit tests; build OK; first W3 run 166 passed / 2 failed (the F31 spec);
+  after the review fixes the **full suite with the exclusive specs, nothing else running: 611 passed / 29 skipped /
+  0 failed** (desktop + mobile).
 
 ## Wiring (changed 2026-11-09, late evening, at the owner's request)
 - **Dev site (`npm run dev`, :5175) → the isolated demo API (:3100) since 2026-11-10**, at the owner's request (to
