@@ -1,9 +1,11 @@
 "use client";
 // StoreHeaderFrame: the interactive skeleton of the shop header. It only holds the two toggles (mobile search row and
 // mobile menu drawer); everything inside is server-rendered and handed over as slots.
-import { useEffect, useRef, useState, type ReactNode } from "react";
+// The menu drawer is uncontrolled (`id` mode) and its button is a native `show-modal` command, so the menu opens from the
+// server HTML at first paint instead of after hydration (plan P4.1: 13 of 15 early taps were lost before).
+import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Menu as MenuIcon, Search, X } from "lucide-react";
-import { Drawer } from "@/components/ui/dialog";
+import { Drawer, openDialog } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { Container } from "./container";
 
@@ -22,11 +24,21 @@ export type StoreHeaderFrameProps = {
   labels: { openSearch: string; closeSearch: string; openMenu: string; menuTitle: string };
 };
 
+/**
+ * Closes the menu drawer when a link inside it is clicked (after hydration; before it, the link does a full page load).
+ * The drawer is uncontrolled, so the dialog element itself is closed.
+ */
+function closeOnLinkClick(event: MouseEvent<HTMLElement>) {
+  if (event.target instanceof Element && event.target.closest("a[href]")) event.currentTarget.closest("dialog")?.close();
+}
+
 /** The shop header layout: top bar, optional mobile search row, desktop nav row and the mobile menu drawer. */
 export function StoreHeaderFrame({ logo, search, switchers, account, nav, drawerContent, labels }: StoreHeaderFrameProps) {
   const [searchOpen, setSearchOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const searchRow = useRef<HTMLDivElement>(null);
+  // One id per header: Next can keep a previous page (and its header) hidden in the DOM, and a command finds the first
+  // element with its id.
+  const menuId = `${useId()}-menu`;
 
   useEffect(() => {
     if (searchOpen) searchRow.current?.querySelector("input")?.focus();
@@ -50,7 +62,14 @@ export function StoreHeaderFrame({ logo, search, switchers, account, nav, drawer
             {searchOpen ? <X aria-hidden="true" /> : <Search aria-hidden="true" />}
           </IconButton>
           <div className="ms-1">{account}</div>
-          <IconButton label={labels.openMenu} aria-haspopup="dialog" className="lg:hidden" onClick={() => setMenuOpen(true)}>
+          <IconButton
+            label={labels.openMenu}
+            aria-haspopup="dialog"
+            className="lg:hidden"
+            command="show-modal"
+            commandfor={menuId}
+            onClick={() => openDialog(menuId)}
+          >
             <MenuIcon aria-hidden="true" />
           </IconButton>
         </div>
@@ -70,14 +89,8 @@ export function StoreHeaderFrame({ logo, search, switchers, account, nav, drawer
         </Container>
       </div>
 
-      <Drawer side="start" size="sm" open={menuOpen} onClose={() => setMenuOpen(false)} title={labels.menuTitle}>
-        <div
-          onClick={(e) => {
-            if (e.target instanceof Element && e.target.closest("a[href]")) setMenuOpen(false);
-          }}
-        >
-          {drawerContent}
-        </div>
+      <Drawer id={menuId} side="start" size="sm" title={labels.menuTitle}>
+        <div onClick={closeOnLinkClick}>{drawerContent}</div>
       </Drawer>
     </header>
   );

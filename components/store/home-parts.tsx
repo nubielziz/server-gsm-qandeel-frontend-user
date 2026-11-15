@@ -73,7 +73,17 @@ export function HeroPriceSpace() {
 export function HomeHero({ locale, t, thirdPoint, price }: { locale: Locale; t: Home; thirdPoint: ReactNode; price: ReactNode }) {
   return (
     <Card tone="inverse" className={cn("relative overflow-hidden lg:min-h-[25.5rem]", litSurface("home-hero.jpg", "inverse"))}>
-      <BannerArt file="home-hero.jpg" alt={t.hero.artAlt} sizes="(min-width: 768px) 45vw, 1px" priority tone="inverse" className="hidden w-3/5 md:block" />
+      {/* Eager instead of a preload: the largest image depends on the screen (this one from md up, the promo below it),
+          and Next's image docs advise against `preload` then. No high fetch priority, because phones hide this image
+          and the promo is their high-priority image (plan P4.2). */}
+      <BannerArt
+        file="home-hero.jpg"
+        alt={t.hero.artAlt}
+        sizes="(min-width: 768px) 45vw, 1px"
+        loading="eager"
+        tone="inverse"
+        className="hidden w-3/5 md:block"
+      />
       <div className="relative flex flex-1 flex-col items-start justify-center gap-5 p-6 sm:p-8 md:max-w-[39rem] lg:p-10">
         <OutlineTag tone="inverse">{t.hero.eyebrow}</OutlineTag>
         <div className="grid gap-3">
@@ -135,7 +145,16 @@ export function QuickImeiCard({ locale, t }: { locale: Locale; t: Home }) {
 export function TrackPromoCard({ locale, t }: { locale: Locale; t: Home }) {
   return (
     <Card tone="inverse" className={cn("relative flex-1 overflow-hidden", litSurface("home-promo.jpg", "inverse"))}>
-      <BannerArt file="home-promo.jpg" alt={t.promo.artAlt} sizes="(min-width: 1024px) 14rem, 55vw" tone="inverse" className="w-[55%]" />
+      {/* Above the fold on phones: load it at once and first (plan P4.2), not when lazy loading reaches it. */}
+      <BannerArt
+        file="home-promo.jpg"
+        alt={t.promo.artAlt}
+        sizes="(min-width: 1024px) 14rem, 55vw"
+        loading="eager"
+        fetchPriority="high"
+        tone="inverse"
+        className="w-[55%]"
+      />
       <div className={cn("relative flex flex-1 flex-col items-start justify-center gap-2.5 p-5 sm:p-6", siteImage("home-promo.jpg") && "max-w-[64%]")}>
         <p className="text-micro uppercase text-on-inverse-muted">{t.promo.eyebrow}</p>
         <h2 className="text-heading text-on-inverse">{t.promo.title}</h2>

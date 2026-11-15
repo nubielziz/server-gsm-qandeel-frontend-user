@@ -13,7 +13,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { Drawer } from "@/components/ui/dialog";
+import { DialogClose, DialogTrigger, Drawer, closeDialog, openDialog } from "@/components/ui/dialog";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Money } from "@/components/ui/money";
 import { Turnstile } from "@/components/turnstile";
@@ -130,6 +130,9 @@ export function CheckoutForm({
   const router = useRouter();
   const errorText = useErrorText();
   const drawerFormId = useId().replace(/:/g, "");
+  // The "Service requirements" drawer is uncontrolled (`id` mode): its triggers are native `show-modal` commands, so it
+  // opens from the server HTML before hydration (plan P4.1); code opens and closes it by this id.
+  const drawerId = `${drawerFormId}-drawer`;
 
   const { fields } = service;
   // The URL's quantity, checked once against the rule the page was rendered with (a rule that no longer allows it falls
@@ -152,7 +155,6 @@ export function CheckoutForm({
   const [quantity, setQuantity] = useState(String(initial.quantity));
   const [quantityNotice, setQuantityNotice] = useState(initial.changed);
   const [detailsSaved, setDetailsSaved] = useState(!needsDetails);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<FormError>();
   const [token, setToken] = useState<string | null>(null);
@@ -258,7 +260,7 @@ export function CheckoutForm({
   }
 
   function reveal(found: Record<string, string>) {
-    if (Object.keys(found).some((key) => DRAWER_FIELD.test(key))) setDrawerOpen(true);
+    if (Object.keys(found).some((key) => DRAWER_FIELD.test(key))) openDialog(drawerId);
     setTimeout(() => {
       const target =
         document.querySelector<HTMLElement>(`dialog[open] :is(${INVALID_SELECTOR})`) ??
@@ -282,7 +284,7 @@ export function CheckoutForm({
       return;
     }
     setDetailsSaved(true);
-    setDrawerOpen(false);
+    closeDialog(drawerId);
   }
 
   function describe(error: unknown): { fields: Record<string, string>; form?: FormError } {
@@ -463,16 +465,15 @@ export function CheckoutForm({
                   </div>
                 </div>
                 {needsDetails ? (
-                  <Button
+                  <DialogTrigger
+                    for={drawerId}
                     variant="secondary"
                     size="sm"
                     startIcon={detailsSaved ? <Pencil aria-hidden="true" /> : undefined}
-                    onClick={() => setDrawerOpen(true)}
-                    aria-haspopup="dialog"
                     className="self-start sm:self-center"
                   >
                     {detailsSaved ? labels.info.edit : labels.info.enter}
-                  </Button>
+                  </DialogTrigger>
                 ) : null}
               </div>
               {quantityNotice ? (
@@ -589,9 +590,9 @@ export function CheckoutForm({
                   <span aria-hidden="true" className="size-2.5 rounded-full bg-warning" />
                   {labels.summary.detailsRequired}
                 </span>
-                <Button variant="secondary" size="sm" onClick={() => setDrawerOpen(true)} aria-haspopup="dialog">
+                <DialogTrigger for={drawerId} variant="secondary" size="sm">
                   {labels.info.enter}
-                </Button>
+                </DialogTrigger>
               </div>
             ) : null}
 
@@ -678,23 +679,24 @@ export function CheckoutForm({
 
       {needsDetails ? (
         <Drawer
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
+          id={drawerId}
           eyebrow={labels.drawer.eyebrow}
           title={service.title}
           description={labels.drawer.description}
           footer={
             <>
-              <Button variant="secondary" onClick={() => setDrawerOpen(false)}>
+              <DialogClose command="close" commandfor={drawerId}>
                 {labels.drawer.cancel}
-              </Button>
+              </DialogClose>
               <Button type="submit" form={drawerFormId}>
                 {labels.drawer.save}
               </Button>
             </>
           }
         >
-          <form id={drawerFormId} onSubmit={saveDetails} noValidate className="grid gap-5">
+          {/* method="dialog": a Save tapped before hydration only closes the drawer, instead of a GET to this URL that
+              would drop `?service=` and put the IMEI in the address. After hydration saveDetails prevents it. */}
+          <form id={drawerFormId} method="dialog" onSubmit={saveDetails} noValidate className="grid gap-5">
             <div className="flex items-center justify-between gap-4 rounded-card bg-surface-muted p-4">
               <div className="min-w-0">
                 <p className="text-body font-semibold text-ink">{service.title}</p>

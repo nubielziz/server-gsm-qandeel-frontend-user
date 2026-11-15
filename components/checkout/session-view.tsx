@@ -7,7 +7,7 @@
 // - store balance (plan F30): POST …/consents → POST …/balance-payment with NO body, NO Content-Type and its own
 //   Idempotency-Key (never one a `/pay` call used) → 201 means the order exists at once (no webhook): go to tracking.
 //   A 401 or a 403 never signs anyone out here; the page says what to do instead.
-import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Banknote, Bitcoin, CircleCheck, Clock, CreditCard, Lock, ShieldCheck, Wallet } from "lucide-react";
@@ -30,6 +30,7 @@ import { localePath, type Locale } from "@/lib/i18n/config";
 import type { CheckoutMessages } from "@/lib/i18n/messages/checkout";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
 import { BALANCE_MAX_TRIES, balanceOption, balanceWaitMs, canPayFromBalance, showsBalanceChoice, type BalanceWallet } from "./balance-option";
+import { Countdown } from "./countdown";
 import { slot } from "./rich";
 
 type Labels = CheckoutMessages["session"];
@@ -54,33 +55,6 @@ export type SessionViewProps = {
    */
   balance: { signedIn: boolean; wallet: BalanceWallet | null };
 };
-
-// ── A clock that ticks once a second for every subscriber (no setState in effects, no drift between components).
-let nowSeconds = Math.floor(Date.now() / 1000);
-const tickListeners = new Set<() => void>();
-let tickTimer: ReturnType<typeof setInterval> | undefined;
-function subscribeTick(listener: () => void) {
-  tickListeners.add(listener);
-  nowSeconds = Math.floor(Date.now() / 1000);
-  tickTimer ??= setInterval(() => {
-    nowSeconds = Math.floor(Date.now() / 1000);
-    tickListeners.forEach((l) => l());
-  }, 1000);
-  return () => {
-    tickListeners.delete(listener);
-    if (tickListeners.size === 0 && tickTimer) {
-      clearInterval(tickTimer);
-      tickTimer = undefined;
-    }
-  };
-}
-const useNowSeconds = () => useSyncExternalStore(subscribeTick, () => nowSeconds, () => null);
-
-function clock(totalSeconds: number): string {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
 
 function methodIcon(code: string) {
   if (/crypto|usdt|btc/i.test(code)) return <Bitcoin aria-hidden="true" />;
@@ -147,16 +121,16 @@ export function SessionView({ session, locale, labels, quantityLabels, typeLabel
   const viaBalance = payWith === "balance" && canPayFromBalance(option);
   const canSubmit = viaBalance || session.paymentMethods.length > 0;
 
-  const now = useNowSeconds();
-  const secondsLeft = now === null ? null : Math.max(0, Math.ceil((new Date(session.expiresAt).getTime() - now * 1000) / 1000));
-  const expired = session.status === "expired" || (session.status === "open" && secondsLeft === 0);
-  const timedOut = session.status === "open" && secondsLeft === 0;
-  useEffect(() => {
-    if (!timedOut || refreshed.current) return;
+  // The clock is a leaf (<Countdown>), so only its text re-renders every second (plan P4.3). This page hears once, at zero.
+  const [timedOut, setTimedOut] = useState(false);
+  const expired = session.status === "expired" || (session.status === "open" && timedOut);
+  function onExpire() {
+    setTimedOut(true);
+    if (refreshed.current) return;
     refreshed.current = true;
     // The server reads the session as expired from now on: reload so the page and the server agree.
     router.refresh();
-  }, [timedOut, router]);
+  }
 
   // Focus goes to the error after React has committed the box (it does not exist before): the Pay button is disabled
   // while it loads, so it has dropped focus by then. Each failure sets a new error object, so a retry focuses again.
@@ -556,9 +530,7 @@ export function SessionView({ session, locale, labels, quantityLabels, typeLabel
         <CardBody className="grid gap-4">
           <p className="flex items-center gap-2 rounded-control bg-surface-muted px-3 py-2.5 text-small font-semibold text-ink" aria-label={labels.timerLabel}>
             <Clock aria-hidden="true" className="size-4 shrink-0 text-ink-muted" />
-            <span>
-              {fmt(labels.timer, { time: secondsLeft === null ? "--:--" : clock(secondsLeft) })}
-            </span>
+            <Countdown expiresAt={session.expiresAt} onExpire={onExpire} template={labels.timer} />
           </p>
           <DescriptionList>
             {/* The session's own totals: the net of all units, then the tax worked once on it. */}

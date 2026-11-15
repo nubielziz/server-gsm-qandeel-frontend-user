@@ -20,13 +20,24 @@ export type ImageSlotProps = {
   sizes: string;
   /** `cover` (default) crops to fill, `contain` shows the whole image. */
   fit?: "cover" | "contain";
-  /** Marks the image as the page's largest visible element (preloads it). Use on at most one image per page. */
+  /**
+   * Preloads the image with a `<link>` in the head (next/image `preload`). Use on at most one image per page, and never
+   * with `loading` or `fetchPriority`. Next's image docs prefer `loading="eager"` or `fetchPriority="high"` in most cases,
+   * and always when the largest image depends on the viewport.
+   */
   priority?: boolean;
+  /**
+   * `lazy` (default) waits until the image nears the viewport; `eager` loads it at once. Use `eager` for an image above
+   * the fold (plan P4.2: the home promo image painted about 1 s late on phones while lazy).
+   */
+  loading?: "lazy" | "eager";
+  /** The fetch priority hint: `high` for the image that is the largest above the fold on some screen. */
+  fetchPriority?: "high" | "low" | "auto";
   className?: string;
 };
 
 /** The site image `file` in an aspect-ratio box, or a neutral grey placeholder of the same size when the file is missing. */
-export function ImageSlot({ file, alt, aspect, objectPosition, sizes, fit = "cover", priority, className }: ImageSlotProps) {
+export function ImageSlot({ file, alt, aspect, objectPosition, sizes, fit = "cover", priority, loading, fetchPriority, className }: ImageSlotProps) {
   const src = siteImage(file);
   return (
     <div
@@ -40,6 +51,8 @@ export function ImageSlot({ file, alt, aspect, objectPosition, sizes, fit = "cov
           fill
           sizes={sizes}
           preload={priority}
+          loading={loading}
+          fetchPriority={fetchPriority}
           style={objectPosition ? { objectPosition } : undefined}
           className={fit === "cover" ? "object-cover" : "object-contain"}
         />

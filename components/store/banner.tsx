@@ -35,7 +35,10 @@ export type BannerArtProps = {
   file: string;
   alt: string;
   sizes: string;
-  priority?: boolean;
+  /** `eager` for a banner above the fold (the hero, the track promo); default `lazy`. See `ImageSlot`. */
+  loading?: "lazy" | "eager";
+  /** `high` for the banner that is the largest image above the fold on some screen. See `ImageSlot`. */
+  fetchPriority?: "high" | "low" | "auto";
   tone: BannerTone;
   /** The side of the card the image takes (default `end`); the text stands on the other side. */
   side?: "start" | "end";
@@ -49,7 +52,7 @@ export type BannerArtProps = {
  * left for `start`, docs/IMAGE-PROMPTS.md): the crop keeps that side, and Arabic mirrors the image so the subject stays
  * on the outer side.
  */
-export function BannerArt({ file, alt, sizes, priority, tone, side = "end", className }: BannerArtProps) {
+export function BannerArt({ file, alt, sizes, loading, fetchPriority, tone, side = "end", className }: BannerArtProps) {
   if (!siteImage(file)) return null;
   const end = side === "end";
   return (
@@ -58,7 +61,8 @@ export function BannerArt({ file, alt, sizes, priority, tone, side = "end", clas
         file={file}
         alt={alt}
         sizes={sizes}
-        priority={priority}
+        loading={loading}
+        fetchPriority={fetchPriority}
         objectPosition={end ? "right center" : "left center"}
         className="rtl:-scale-x-100"
       />
