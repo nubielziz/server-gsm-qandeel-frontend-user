@@ -28,6 +28,7 @@ import { Money } from "@/components/ui/money";
 import { Pagination } from "@/components/ui/pagination";
 import { Tabs } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import { PageTransition } from "@/components/layout/page-transition";
 
 const PAGE_SIZE = 25;
 const STATUSES = ["accrued", "approved", "reversed"] as const;
@@ -42,16 +43,18 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function ReferralsPage({ searchParams }: PageProps<"/[lang]/merchant/referrals">) {
   return (
-    <Suspense
-      fallback={
-        <div className="grid gap-4">
-          <PageHeaderSkeleton />
-          <ListSkeleton rows={3} rowHeight="h-48" />
-        </div>
-      }
-    >
-      <ReferralsContent searchParams={searchParams} />
-    </Suspense>
+    <PageTransition>
+      <Suspense
+        fallback={
+          <div className="grid gap-4">
+            <PageHeaderSkeleton />
+            <ListSkeleton rows={3} rowHeight="h-48" />
+          </div>
+        }
+      >
+        <ReferralsContent searchParams={searchParams} />
+      </Suspense>
+    </PageTransition>
   );
 }
 

@@ -40,3 +40,59 @@ describe("WorkspaceNavView: a reserved item (plan P1.4)", () => {
     expect(none).not.toContain("aria-current");
   });
 });
+
+describe("WorkspaceNavView: the rail (owner, 2026-11-15)", () => {
+  const badge = (
+    <>
+      <span aria-hidden="true" data-badge="">
+        3
+      </span>
+      <span className="sr-only">, 3 unread</span>
+    </>
+  );
+  const withBadge = items.map((item) => (item.href.endsWith("/notifications") ? { ...item, badge } : item));
+
+  it("the tooltip repeats the label for the eye only; the sr-only label and the badge's words are the name", () => {
+    const html = renderToStaticMarkup(<WorkspaceNavView items={withBadge} pathname="/en/account/orders" variant="rail" />);
+    expect(html).toMatch(/<span aria-hidden="true" class="rail-tip">Orders<\/span>/);
+    // Name: the sr-only label, then the badge's words, in that order inside the link.
+    expect(html).toMatch(
+      /href="\/en\/account\/notifications"[^>]*>.*<span class="sr-only">Notifications<\/span><span class="[^"]*"><span aria-hidden="true" data-badge="">3<\/span><span class="sr-only">, 3 unread<\/span><\/span>/,
+    );
+    // The badge lies over the icon's corner: absolute, so it moves nothing.
+    expect(html).toMatch(/<span class="absolute [^"]*"><span aria-hidden="true" data-badge="">/);
+  });
+
+  it("marks the current link for the CSS-only selected look (the square and the edge mark) before the indicator takes over", () => {
+    const html = renderToStaticMarkup(<WorkspaceNavView items={items} pathname="/en/account/orders" variant="rail" />);
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(html).toMatch(/<a aria-current="page" class="rail-link [^"]*" href="\/en\/account\/orders">/);
+    expect(html.match(/class="rail-mark"/g)).toHaveLength(3); // one per link, shown by CSS on the current one
+  });
+});
+
+describe("WorkspaceNavView: the phone tab bar", () => {
+  const tabs: WorkspaceNavItem[] = [
+    { href: "/en/account", label: "Overview", icon: <i data-icon="overview" />, match: "exact" },
+    { href: "/en/account/notifications", label: "Notifications", shortLabel: "Alerts", icon: <i data-icon="bell" />, badge: <b>2</b> },
+    { href: "/en/account/wallet", label: "Wallet", icon: <i data-icon="wallet" />, reserve: true },
+  ];
+
+  it("shows the short label, puts the badge on the icon pill and holds a reserved item's column", () => {
+    const html = renderToStaticMarkup(<WorkspaceNavView items={tabs} pathname="/en/account/notifications" variant="tabs" />);
+    expect(html).toContain(">Alerts</span>");
+    expect(html).not.toContain(">Notifications<");
+    expect(html).toMatch(
+      /aria-current="page" class="tab-link [^"]*" href="\/en\/account\/notifications"><span class="tab-icon [^"]*"><i data-icon="bell"><\/i><span class="absolute [^"]*"><b>2<\/b><\/span><\/span>/,
+    );
+    expect(html.match(/<li[ >]/g)).toHaveLength(3);
+    expect(html).not.toContain("/en/account/wallet");
+    expect(html).toMatch(/<li aria-hidden="true"><span class="block [^"]*"><\/span><\/li>/);
+  });
+
+  it("every tab is a full-height column: a touch target of at least 44px", () => {
+    const html = renderToStaticMarkup(<WorkspaceNavView items={tabs} pathname={null} variant="tabs" />);
+    for (const match of html.matchAll(/class="(tab-link [^"]*)"/g)) expect(match[1]).toContain("h-(--ws-tabbar-h)");
+    expect(html).toContain("auto-cols-fr grid-flow-col");
+  });
+});

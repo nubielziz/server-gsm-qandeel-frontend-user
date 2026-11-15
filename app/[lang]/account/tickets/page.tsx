@@ -22,6 +22,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination, pageHref } from "@/components/ui/pagination";
+import { PageTransition } from "@/components/layout/page-transition";
 
 const PAGE_SIZE = 20;
 
@@ -80,20 +81,22 @@ async function Tickets({ searchParams }: { searchParams: PageProps<"/[lang]/acco
 export default async function TicketsPage({ searchParams }: PageProps<"/[lang]/account/tickets">) {
   const [locale, t, s] = await Promise.all([getLocale(), getMessages(account), getMessages(support)]);
   return (
-    <div className="grid gap-4">
-      <PageHeader
-        variant="card"
-        title={t.tickets.title}
-        description={t.tickets.subtitle}
-        actions={
-          <ButtonLink href={localePath(locale, "/account/tickets/new")} startIcon={<Plus aria-hidden="true" />}>
-            {s.list.newTicket}
-          </ButtonLink>
-        }
-      />
-      <Suspense fallback={<ListSkeleton rows={6} toolbar={false} />}>
-        <Tickets searchParams={searchParams} />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="grid gap-4">
+        <PageHeader
+          variant="card"
+          title={t.tickets.title}
+          description={t.tickets.subtitle}
+          actions={
+            <ButtonLink href={localePath(locale, "/account/tickets/new")} startIcon={<Plus aria-hidden="true" />}>
+              {s.list.newTicket}
+            </ButtonLink>
+          }
+        />
+        <Suspense fallback={<ListSkeleton rows={6} toolbar={false} />}>
+          <Tickets searchParams={searchParams} />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }

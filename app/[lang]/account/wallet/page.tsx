@@ -45,6 +45,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Pagination, pageHref } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(wallet);
@@ -290,11 +291,13 @@ async function WalletContent({ searchParams }: { searchParams: Promise<SearchPar
 export default async function WalletPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const t = await getMessages(wallet);
   return (
-    <div className="grid gap-4">
-      <PageHeader variant="card" title={t.page.title} description={t.page.description} />
-      <Suspense fallback={<WalletSkeleton />}>
-        <WalletContent searchParams={searchParams} />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="grid gap-4">
+        <PageHeader variant="card" title={t.page.title} description={t.page.description} />
+        <Suspense fallback={<WalletSkeleton />}>
+          <WalletContent searchParams={searchParams} />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }

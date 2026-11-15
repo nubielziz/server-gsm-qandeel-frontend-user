@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination, pageHref } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
+import { PageTransition } from "@/components/layout/page-transition";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["pending", "processing", "completed", "rejected"] as const;
@@ -98,11 +99,13 @@ async function OrdersContent({ searchParams }: { searchParams: PageProps<"/[lang
 export default async function OrdersPage({ searchParams }: PageProps<"/[lang]/account/orders">) {
   const t = await getMessages(account);
   return (
-    <div className="grid gap-4">
-      <PageHeader variant="card" title={t.orders.title} description={t.orders.subtitle} />
-      <Suspense fallback={<OrdersSkeleton />}>
-        <OrdersContent searchParams={searchParams} />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="grid gap-4">
+        <PageHeader variant="card" title={t.orders.title} description={t.orders.subtitle} />
+        <Suspense fallback={<OrdersSkeleton />}>
+          <OrdersContent searchParams={searchParams} />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }

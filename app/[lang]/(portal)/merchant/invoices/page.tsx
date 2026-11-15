@@ -43,6 +43,7 @@ import {
   type InvoicesFilters,
   type SearchParams,
 } from "@/lib/merchant/lists";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(merchant);
@@ -52,30 +53,32 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const [locale, t] = await Promise.all([getLocale(), getMessages(merchant)]);
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        title={t.invoices.title}
-        description={t.invoices.description}
-        actions={
-          <ButtonLink href={localePath(locale, "/merchant/wallet/top-up")} startIcon={<Plus aria-hidden="true" />}>
-            {t.invoices.addFunds}
-          </ButtonLink>
-        }
-      />
-      <Suspense
-        fallback={
-          <div className="grid gap-6">
-            <StatsSkeleton />
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
-              <ListSkeleton rows={8} />
-              <div className="hidden h-[34rem] rounded-card bg-surface-sunken xl:block" aria-hidden="true" />
+    <PageTransition>
+      <div className="grid gap-6">
+        <PageHeader
+          title={t.invoices.title}
+          description={t.invoices.description}
+          actions={
+            <ButtonLink href={localePath(locale, "/merchant/wallet/top-up")} startIcon={<Plus aria-hidden="true" />}>
+              {t.invoices.addFunds}
+            </ButtonLink>
+          }
+        />
+        <Suspense
+          fallback={
+            <div className="grid gap-6">
+              <StatsSkeleton />
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
+                <ListSkeleton rows={8} />
+                <div className="hidden h-[34rem] rounded-card bg-surface-sunken xl:block" aria-hidden="true" />
+              </div>
             </div>
-          </div>
-        }
-      >
-        <Invoices searchParams={searchParams} />
-      </Suspense>
-    </div>
+          }
+        >
+          <Invoices searchParams={searchParams} />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }
 

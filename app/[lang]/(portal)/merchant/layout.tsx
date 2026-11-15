@@ -10,6 +10,10 @@
 // merchant is one); for a pending one the nav shrinks and the badge replaces the pill once the session is read.
 // A merchant with `mustChangePassword` (a temporary password from staff) is sent to the security page by the gate
 // around the page content (plan D5) until the password is changed.
+// Live badges (owner, 2026-11-15; components/layout/workspace-badges.tsx): the unread notifications, a dot while support
+// wrote something unseen, and the orders in progress, each its own uncached read in its own <Suspense>. Below `lg` a tab
+// bar holds Overview, Orders, Services, Wallet and Support (a pending merchant: Overview, Notifications
+// and Support); the drawer keeps the full list.
 import { Suspense, cache, type ReactNode } from "react";
 import Link from "next/link";
 import {
@@ -37,6 +41,7 @@ import { merchantSettings } from "@/lib/i18n/messages/merchant-settings";
 import { portal } from "@/lib/i18n/messages/portal";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { BellSkeleton, BellSlot } from "@/components/notifications/bell-slot";
+import { NotificationsNavBadge, OrdersNavBadge, SupportNavBadge } from "@/components/layout/workspace-badges";
 import { WorkspaceMainSkeleton, WorkspaceShell, type WorkspaceNavItem } from "@/components/layout/workspace-shell";
 import { MustChangePasswordGate } from "@/components/merchant/must-change-password-gate";
 import { Alert } from "@/components/ui/alert";
@@ -112,19 +117,48 @@ export default async function MerchantLayout({ children }: LayoutProps<"/[lang]/
   const p = (path: string) => localePath(locale, path);
   const icon = "size-5";
 
-  const overview: WorkspaceNavItem = { href: p("/merchant"), label: t.merchantNav.overview, icon: <LayoutDashboard aria-hidden="true" className={icon} />, match: "exact" };
+  const overview: WorkspaceNavItem = {
+    href: p("/merchant"),
+    label: t.merchantNav.overview,
+    shortLabel: t.tabs.overview,
+    icon: <LayoutDashboard aria-hidden="true" className={icon} />,
+    match: "exact",
+  };
   const notifications: WorkspaceNavItem = {
     href: p("/merchant/notifications"),
     label: t.merchantNav.notifications,
+    shortLabel: t.tabs.notifications,
     icon: <Bell aria-hidden="true" className={icon} />,
+    badge: <NotificationsNavBadge surface="merchant" />,
   };
   // Support is open to a merchant waiting for approval too (feature 28, plan B217): it is in both lists.
-  const support: WorkspaceNavItem = { href: p("/merchant/support"), label: t.merchantNav.support, icon: <Headset aria-hidden="true" className={icon} /> };
+  const support: WorkspaceNavItem = {
+    href: p("/merchant/support"),
+    label: t.merchantNav.support,
+    shortLabel: t.tabs.support,
+    icon: <Headset aria-hidden="true" className={icon} />,
+    badge: <SupportNavBadge surface="merchant" />,
+  };
+  const services: WorkspaceNavItem = {
+    href: p("/merchant/services"),
+    label: t.merchantNav.services,
+    shortLabel: t.tabs.services,
+    title: t.servicesTitle,
+    icon: <PlusCircle aria-hidden="true" className={icon} />,
+  };
+  const orders: WorkspaceNavItem = {
+    href: p("/merchant/orders"),
+    label: t.merchantNav.orders,
+    shortLabel: t.tabs.orders,
+    icon: <ClipboardList aria-hidden="true" className={icon} />,
+    badge: <OrdersNavBadge surface="merchant" />,
+  };
+  const wallet: WorkspaceNavItem = { href: p("/merchant/wallet"), label: t.merchantNav.wallet, shortLabel: t.tabs.wallet, icon: <Wallet aria-hidden="true" className={icon} /> };
   const approvedNav: WorkspaceNavItem[] = [
     overview,
-    { href: p("/merchant/services"), label: t.merchantNav.services, title: t.servicesTitle, icon: <PlusCircle aria-hidden="true" className={icon} /> },
-    { href: p("/merchant/orders"), label: t.merchantNav.orders, icon: <ClipboardList aria-hidden="true" className={icon} /> },
-    { href: p("/merchant/wallet"), label: t.merchantNav.wallet, icon: <Wallet aria-hidden="true" className={icon} /> },
+    services,
+    orders,
+    wallet,
     { href: p("/merchant/invoices"), label: t.merchantNav.invoices, icon: <ReceiptText aria-hidden="true" className={icon} /> },
     { href: p("/merchant/api-keys"), label: t.merchantNav.apiKeys, icon: <KeyRound aria-hidden="true" className={icon} /> },
     { href: p("/merchant/webhooks"), label: t.merchantNav.webhooks, icon: <Webhook aria-hidden="true" className={icon} /> },
@@ -133,13 +167,18 @@ export default async function MerchantLayout({ children }: LayoutProps<"/[lang]/
     support,
   ];
   const pendingNav: WorkspaceNavItem[] = [overview, notifications, support];
+  // The phone tab bar: the five places a merchant goes most (the bell in the header has the notifications); a merchant
+  // waiting for approval has only three places, so all of them.
+  const approvedTabs: WorkspaceNavItem[] = [overview, orders, services, wallet, support];
+  const pendingTabs: WorkspaceNavItem[] = pendingNav;
   const footerNav: WorkspaceNavItem[] = [
     { href: p("/merchant/settings"), label: t.merchantNav.settings, icon: <Settings aria-hidden="true" className={icon} /> },
   ];
 
   async function resolveNav() {
     const me = await getMerchant().catch(() => null);
-    return { nav: me?.status === "pending" ? pendingNav : approvedNav, footerNav };
+    const pending = me?.status === "pending";
+    return { nav: pending ? pendingNav : approvedNav, footerNav, tabs: pending ? pendingTabs : approvedTabs };
   }
 
   async function resolveUser() {
@@ -151,6 +190,7 @@ export default async function MerchantLayout({ children }: LayoutProps<"/[lang]/
     <WorkspaceShell
       nav={approvedNav}
       footerNav={footerNav}
+      tabs={approvedTabs}
       resolveNav={resolveNav}
       areaLabel={t.merchantArea}
       homeHref={p("/merchant")}
@@ -180,8 +220,12 @@ export default async function MerchantLayout({ children }: LayoutProps<"/[lang]/
       }
       search={{ action: p("/merchant/services"), label: t.searchServices, placeholder: t.searchServices, submitLabel: c.actions.search }}
     >
+      {/* The element between the boundary and the page keeps the streamed page from playing its enter transition on the
+          first load (React's streamed reveal animates a <ViewTransition> that is the first thing in the revealed content). */}
       <Suspense fallback={<WorkspaceMainSkeleton />}>
-        <MerchantMain locale={locale}>{children}</MerchantMain>
+        <div className="contents">
+          <MerchantMain locale={locale}>{children}</MerchantMain>
+        </div>
       </Suspense>
     </WorkspaceShell>
   );

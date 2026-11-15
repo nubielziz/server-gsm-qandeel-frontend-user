@@ -33,6 +33,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(topUps);
@@ -156,21 +157,23 @@ async function AddFundsContent() {
 export default async function AddFundsPage() {
   const [locale, t, w, c] = await Promise.all([getLocale(), getMessages(topUps), getMessages(wallet), getMessages(common)]);
   return (
-    <div className="grid gap-4">
-      <PageHeader
-        variant="card"
-        eyebrow={
-          <Breadcrumbs
-            label={c.workspace.breadcrumbLabel}
-            items={[{ label: w.page.title, href: localePath(locale, "/account/wallet") }, { label: t.add.title }]}
-          />
-        }
-        title={t.add.title}
-        description={t.add.description}
-      />
-      <Suspense fallback={<AddFundsSkeleton />}>
-        <AddFundsContent />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="grid gap-4">
+        <PageHeader
+          variant="card"
+          eyebrow={
+            <Breadcrumbs
+              label={c.workspace.breadcrumbLabel}
+              items={[{ label: w.page.title, href: localePath(locale, "/account/wallet") }, { label: t.add.title }]}
+            />
+          }
+          title={t.add.title}
+          description={t.add.description}
+        />
+        <Suspense fallback={<AddFundsSkeleton />}>
+          <AddFundsContent />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }

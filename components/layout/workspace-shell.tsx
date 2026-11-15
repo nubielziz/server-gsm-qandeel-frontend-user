@@ -1,8 +1,12 @@
 // WorkspaceShell (mockups Workspace / Settings / Invoices / Support): the frame of the signed-in areas.
-// Desktop (lg+): a dark icon rail (80px, rounded, sticky) with the logo, nav icons (accessible label + tooltip),
-// footer nav (settings) and the avatar; the main column starts with a white header card (breadcrumb + section title,
-// search, header slot such as the wallet pill, avatar menu). Below lg: a top bar with a menu button that opens a
-// start-side drawer with the labelled navigation.
+// Desktop (lg+): a dark icon rail (80px, rounded, sticky) at the start edge with the logo, nav icons (accessible label +
+// tooltip, live badges), footer nav (settings) and the avatar; the main column takes the rest of the width (up to a
+// comfortable 120rem, never leaving a strip at the start edge) and starts with a white header card (breadcrumb + section
+// title, search, header slot such as the wallet pill, avatar menu). Below lg: a top bar with a menu button that opens a
+// start-side drawer with the labelled navigation, and a fixed bottom tab bar with the key destinations.
+// The rail and the tab bar mark the current page with one sliding indicator each (sliding-nav.tsx). On a client
+// navigation the page plays the shop's enter/exit view transition (each page wraps itself in <PageTransition>) while the
+// rail, the header card and the tab bar are named and held still (globals.css "Page transitions").
 //
 // The frame is part of the static shell (plan P1.4; Next guide "Optimizing the static shell", "Keep static UI in the
 // shell"): the rail, the header card with the section title, the menu button and drawer, the account menu and the main
@@ -13,6 +17,7 @@
 // holes (wallet pill, bell) in `headerSlot` / `children`.
 import { Suspense, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { localePath } from "@/lib/i18n/config";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
@@ -23,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ChromeProviders } from "./chrome-providers";
 import { Logo } from "./logo";
 import { SkipLink } from "./skip-link";
+import { SlidingNav } from "./sliding-nav";
 import { ActiveWorkspaceNav, WorkspaceHeading, WorkspaceHeadingView, WorkspaceMobileNav } from "./workspace-nav";
 import { WorkspaceNavView, type WorkspaceNavItem } from "./workspace-nav-view";
 
@@ -34,6 +40,8 @@ export type WorkspaceNavLists = {
   nav: WorkspaceNavItem[];
   /** Secondary navigation pinned to the bottom of the rail (settings). */
   footerNav?: WorkspaceNavItem[];
+  /** The phone tab bar's destinations (4 or 5, with `shortLabel`s). */
+  tabs?: WorkspaceNavItem[];
 };
 
 /** The signed-in person. */
@@ -53,6 +61,11 @@ export type WorkspaceShellProps = {
   nav: WorkspaceNavItem[];
   /** Secondary navigation pinned to the bottom of the rail (settings), as the static shell shows it. */
   footerNav?: WorkspaceNavItem[];
+  /**
+   * The phone tab bar (below `lg`, where the rail is hidden), as the static shell shows it: 4 or 5 key destinations with
+   * short labels; the drawer keeps the full list. `resolveNav` returns the session's own list (`tabs`). Omit for none.
+   */
+  tabs?: WorkspaceNavItem[];
   /**
    * Reads the session and returns the final lists (the wallet item for a customer who has one, the short list of a merchant
    * waiting for approval). It runs inside <Suspense>; the static `nav` shows until it returns. Leave it out when every
@@ -80,8 +93,10 @@ export type WorkspaceShellProps = {
 /** Short screens (under 46rem) drop the rail's avatar to make room for the links (the header menu shows it too). */
 const RAIL_AVATAR_HIDE = "[@media(max-height:46rem)]:hidden";
 
+type NavVariant = "rail" | "drawer" | "tabs";
+
 /** The static nav list: the active link is marked where the pathname is known when the page is prerendered. */
-function StaticNav({ items, variant }: { items: WorkspaceNavItem[]; variant: "rail" | "drawer" }) {
+function StaticNav({ items, variant }: { items: WorkspaceNavItem[]; variant: NavVariant }) {
   return (
     <Suspense fallback={<WorkspaceNavView items={items} pathname={null} variant={variant} />}>
       <ActiveWorkspaceNav items={items} variant={variant} />
@@ -89,24 +104,33 @@ function StaticNav({ items, variant }: { items: WorkspaceNavItem[]; variant: "ra
   );
 }
 
+type NavGroup = "main" | "footer" | "tabs";
+
 type NavGroupProps = {
-  group: "main" | "footer";
-  variant: "rail" | "drawer";
+  group: NavGroup;
+  variant: NavVariant;
   nav: WorkspaceNavItem[];
   footerNav?: WorkspaceNavItem[];
+  tabs?: WorkspaceNavItem[];
   resolveNav?: () => Promise<WorkspaceNavLists>;
 };
+
+/** The items of one group of a set of lists. */
+function itemsOf(group: NavGroup, lists: WorkspaceNavLists): WorkspaceNavItem[] {
+  if (group === "main") return lists.nav;
+  return (group === "footer" ? lists.footerNav : lists.tabs) ?? [];
+}
 
 type ResolvedNavProps = Pick<NavGroupProps, "group" | "variant"> & { resolveNav: () => Promise<WorkspaceNavLists> };
 
 async function ResolvedNav({ group, variant, resolveNav }: ResolvedNavProps) {
   const lists = await resolveNav();
-  return <StaticNav items={group === "main" ? lists.nav : (lists.footerNav ?? [])} variant={variant} />;
+  return <StaticNav items={itemsOf(group, lists)} variant={variant} />;
 }
 
 /** One nav list: the static one in the shell, replaced by the session's own once `resolveNav` returns. */
-function NavGroup({ group, variant, nav, footerNav, resolveNav }: NavGroupProps) {
-  const fixed = <StaticNav items={group === "main" ? nav : (footerNav ?? [])} variant={variant} />;
+function NavGroup({ group, variant, nav, footerNav, tabs, resolveNav }: NavGroupProps) {
+  const fixed = <StaticNav items={itemsOf(group, { nav, footerNav, tabs })} variant={variant} />;
   if (!resolveNav) return fixed;
   return (
     <Suspense fallback={fixed}>
@@ -154,6 +178,7 @@ function UserTriggerFallback({ roleLabel }: { roleLabel: string }) {
 export async function WorkspaceShell({
   nav,
   footerNav,
+  tabs,
   resolveNav,
   areaLabel,
   homeHref,
@@ -166,23 +191,37 @@ export async function WorkspaceShell({
 }: WorkspaceShellProps) {
   const [locale, t] = await Promise.all([getLocale(), getMessages(common)]);
   const home = homeHref ?? localePath(locale);
-  const all = [...nav, ...(footerNav ?? [])];
+  // The heading only names the page: no badges in its props (each would be rendered for nothing).
+  const all = [...nav, ...(footerNav ?? [])].map((item) => ({ ...item, badge: undefined }));
   const headingProps = { areaLabel, areaHref: home, breadcrumbLabel: t.workspace.breadcrumbLabel };
-  const lists = { nav, footerNav, resolveNav };
+  const lists = { nav, footerNav, tabs, resolveNav };
+  const hasTabs = Boolean(tabs && tabs.length > 0);
 
   return (
     <ChromeProviders>
       <SkipLink />
       {/* `relative overflow-x-clip`: the page never scrolls sideways. A visually hidden (`sr-only`, absolute) label inside a
           table's scroll box has no positioned ancestor, so it escaped that box and widened the document (a blank strip
-          beside the frame, the rail pushed off screen). `clip` is not a scroll container: the sticky rail keeps working. */}
-      <div className="relative min-h-dvh overflow-x-clip bg-page p-3 sm:p-4">
-        <div className="mx-auto flex w-full max-w-[110rem] items-start gap-4">
-          {/* Rail (lg+). At least the screen's height; on a short screen it grows with its links (the merchant has ten)
-              instead of letting them spill below the dark panel. */}
-          <div className="surface-inverse sticky top-4 hidden min-h-[calc(100dvh-2rem)] w-20 shrink-0 flex-col items-center rounded-panel py-4 lg:flex">
+          beside the frame, the rail pushed off screen). `clip` is not a scroll container: the sticky rail keeps working.
+          No centred max width on the frame (owner, 2026-11-15): the rail sits at the start edge with the page padding
+          only, and the main column takes the rest. Below `lg` the bottom padding keeps the page clear of the tab bar. */}
+      <div
+        className={cn(
+          "relative min-h-dvh overflow-x-clip bg-page p-3 sm:p-4",
+          hasTabs && "pb-[calc(var(--ws-tabbar-h)+env(safe-area-inset-bottom,0px)+0.75rem)] sm:pb-[calc(var(--ws-tabbar-h)+env(safe-area-inset-bottom,0px)+1rem)] lg:pb-4",
+        )}
+      >
+        <div className="flex w-full items-start gap-4">
+          {/* Rail (lg+). At least the screen's height; on a short screen it grows with its links (the merchant has eleven)
+              instead of letting them spill below the dark panel. Above the main column (`z-20`): its tooltips reach over
+              the page. Named for page transitions: held still while the page changes. */}
+          <div className="surface-inverse vt-workspace-rail sticky top-4 z-20 hidden min-h-[calc(100dvh-2rem)] w-20 shrink-0 flex-col items-center rounded-panel py-4 lg:flex">
             <Logo variant="stacked" tone="inverse" href={home} />
-            <nav aria-label={t.workspace.navLabel} className="mt-5 flex min-h-0 w-full flex-1 flex-col justify-between px-4">
+            <SlidingNav
+              label={t.workspace.navLabel}
+              className="ws-rail relative mt-5 flex min-h-0 w-full flex-1 flex-col justify-between px-4"
+              indicatorClassName="ws-rail-indicator"
+            >
               <NavGroup group="main" variant="rail" {...lists} />
               <div className="grid justify-items-center gap-4">
                 {footerNav && footerNav.length > 0 ? <NavGroup group="footer" variant="rail" {...lists} /> : null}
@@ -191,11 +230,11 @@ export async function WorkspaceShell({
                   <RailAvatar resolveUser={resolveUser} />
                 </Suspense>
               </div>
-            </nav>
+            </SlidingNav>
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-col gap-4">
-            <header className="flex min-h-[4.5rem] items-center gap-3 rounded-card border border-line bg-surface px-3 py-2.5 shadow-card sm:px-5">
+          <div className="flex min-w-0 max-w-[120rem] flex-1 flex-col gap-4">
+            <header className="vt-workspace-header flex min-h-[4.5rem] items-center gap-3 rounded-card border border-line bg-surface px-3 py-2.5 shadow-card sm:px-5">
               <WorkspaceMobileNav brand={<Logo href={home} />} labels={{ open: t.workspace.openNav, title: t.workspace.navLabel }}>
                 <NavGroup group="main" variant="drawer" {...lists} />
                 {footerNav && footerNav.length > 0 ? (
@@ -246,6 +285,19 @@ export async function WorkspaceShell({
           </div>
         </div>
       </div>
+      {/* Phone tab bar (below lg): the key destinations, the active one marked by a pill that slides sideways. Fixed to
+          the bottom above the safe area; the frame's bottom padding keeps the page clear of it. Outside the frame so its
+          horizontal clip never reaches it. Named for page transitions: held still while the page changes. */}
+      {hasTabs ? (
+        <SlidingNav
+          label={t.workspace.tabsLabel}
+          target=".tab-icon"
+          className="ws-tabs vt-workspace-tabs fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-[env(safe-area-inset-bottom,0px)] lg:hidden"
+          indicatorClassName="ws-tab-indicator"
+        >
+          <NavGroup group="tabs" variant="tabs" {...lists} />
+        </SlidingNav>
+      ) : null}
     </ChromeProviders>
   );
 }

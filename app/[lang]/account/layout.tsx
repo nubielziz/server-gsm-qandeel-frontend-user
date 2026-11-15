@@ -8,6 +8,9 @@
 // shows or drops it. The pill steps aside on phones (below `sm`), like the merchant's, so the bell and the account menu
 // fit at 360 px; the wallet is one tap away in the navigation. "My tickets" (`/account/tickets`, feature 28) is the way into
 // support for a signed-in customer; the public form stays in the shop chrome (`/support`).
+// Live badges (owner, 2026-11-15; components/layout/workspace-badges.tsx): the unread notifications, a dot while support
+// wrote something unseen, and the orders in progress, each its own uncached read in its own <Suspense>. Below `lg` a tab
+// bar holds Overview, Orders, Wallet (when it shows), Notifications and My tickets; the drawer keeps the full list.
 import { Suspense } from "react";
 import Link from "next/link";
 import { Bell, ClipboardList, Headset, LayoutDashboard, Settings, Store, UserRound, Wallet } from "lucide-react";
@@ -20,6 +23,7 @@ import { portal } from "@/lib/i18n/messages/portal";
 import { readCustomerWallet } from "@/components/layout/account-area";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { BellSkeleton, BellSlot } from "@/components/notifications/bell-slot";
+import { NotificationsNavBadge, OrdersNavBadge, SupportNavBadge } from "@/components/layout/workspace-badges";
 import { WorkspaceMainSkeleton, WorkspaceShell, type WorkspaceNavItem } from "@/components/layout/workspace-shell";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { Money } from "@/components/ui/money";
@@ -58,17 +62,37 @@ export default async function AccountLayout({ children }: LayoutProps<"/[lang]/a
   const overview: WorkspaceNavItem = {
     href: p("/account"),
     label: t.customerNav.overview,
+    shortLabel: t.tabs.overview,
     icon: <LayoutDashboard aria-hidden="true" className={icon} />,
     match: "exact",
   };
-  const orders: WorkspaceNavItem = { href: p("/account/orders"), label: t.customerNav.orders, icon: <ClipboardList aria-hidden="true" className={icon} /> };
-  const wallet: WorkspaceNavItem = { href: p("/account/wallet"), label: t.customerNav.wallet, icon: <Wallet aria-hidden="true" className={icon} /> };
+  const orders: WorkspaceNavItem = {
+    href: p("/account/orders"),
+    label: t.customerNav.orders,
+    shortLabel: t.tabs.orders,
+    icon: <ClipboardList aria-hidden="true" className={icon} />,
+    badge: <OrdersNavBadge surface="customer" />,
+  };
+  const wallet: WorkspaceNavItem = {
+    href: p("/account/wallet"),
+    label: t.customerNav.wallet,
+    shortLabel: t.tabs.wallet,
+    icon: <Wallet aria-hidden="true" className={icon} />,
+  };
   const notifications: WorkspaceNavItem = {
     href: p("/account/notifications"),
     label: t.customerNav.notifications,
+    shortLabel: t.tabs.notifications,
     icon: <Bell aria-hidden="true" className={icon} />,
+    badge: <NotificationsNavBadge surface="customer" />,
   };
-  const tickets: WorkspaceNavItem = { href: p("/account/tickets"), label: t.customerNav.myTickets, icon: <Headset aria-hidden="true" className={icon} /> };
+  const tickets: WorkspaceNavItem = {
+    href: p("/account/tickets"),
+    label: t.customerNav.myTickets,
+    shortLabel: t.tabs.tickets,
+    icon: <Headset aria-hidden="true" className={icon} />,
+    badge: <SupportNavBadge surface="customer" />,
+  };
   const footerNav: WorkspaceNavItem[] = [
     { href: p("/account/settings"), label: t.customerNav.settings, icon: <Settings aria-hidden="true" className={icon} /> },
   ];
@@ -77,7 +101,9 @@ export default async function AccountLayout({ children }: LayoutProps<"/[lang]/a
   async function resolveNav() {
     const walletRead = await readCustomerWallet();
     const shows = walletRead.ok && walletCapabilities(walletRead.data).show;
-    return { nav: shows ? [overview, orders, wallet, notifications, tickets] : [overview, orders, notifications, tickets], footerNav };
+    // The tab bar holds the same five (four without the wallet): the drawer keeps Settings.
+    const nav = shows ? [overview, orders, wallet, notifications, tickets] : [overview, orders, notifications, tickets];
+    return { nav, footerNav, tabs: nav };
   }
 
   async function resolveUser() {
@@ -85,11 +111,14 @@ export default async function AccountLayout({ children }: LayoutProps<"/[lang]/a
     return { name: me.name || me.email, subtitle: t.customerRole };
   }
 
+  const staticNav = [overview, orders, { ...wallet, reserve: true }, notifications, tickets];
+
   return (
     <WorkspaceShell
       // The static shell assumes the wallet shows: its place is held, and `resolveNav` drops the slot when it does not.
-      nav={[overview, orders, { ...wallet, reserve: true }, notifications, tickets]}
+      nav={staticNav}
       footerNav={footerNav}
+      tabs={staticNav}
       resolveNav={resolveNav}
       areaLabel={t.customerArea}
       homeHref={p("/account")}
@@ -125,8 +154,12 @@ export default async function AccountLayout({ children }: LayoutProps<"/[lang]/a
       <Suspense fallback={null}>
         <CustomerGate locale={locale} />
       </Suspense>
-      {/* A page that waits for request data outside a boundary of its own shows this until it is ready. */}
-      <Suspense fallback={<WorkspaceMainSkeleton />}>{children}</Suspense>
+      {/* A page that waits for request data outside a boundary of its own shows this until it is ready. The element between
+          the boundary and the page keeps a streamed page from playing its enter transition on the first load (React's
+          streamed reveal animates a <ViewTransition> that is the first thing in the revealed content). */}
+      <Suspense fallback={<WorkspaceMainSkeleton />}>
+        <div className="contents">{children}</div>
+      </Suspense>
     </WorkspaceShell>
   );
 }

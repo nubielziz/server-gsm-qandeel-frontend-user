@@ -24,6 +24,7 @@ import { Card, CardBody, CardFooter, CardHeader } from "@/components/ui/card";
 import { DescriptionItem, DescriptionList } from "@/components/ui/description-list";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(account);
@@ -176,8 +177,10 @@ async function OverviewContent() {
 
 export default function AccountOverviewPage() {
   return (
-    <Suspense fallback={<OverviewSkeleton />}>
-      <OverviewContent />
-    </Suspense>
+    <PageTransition>
+      <Suspense fallback={<OverviewSkeleton />}>
+        <OverviewContent />
+      </Suspense>
+    </PageTransition>
   );
 }

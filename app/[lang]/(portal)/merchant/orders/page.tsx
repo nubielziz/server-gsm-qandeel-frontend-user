@@ -40,6 +40,7 @@ import {
   parseOrdersFilters,
   type SearchParams,
 } from "@/lib/merchant/lists";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(merchant);
@@ -49,20 +50,22 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const [locale, t] = await Promise.all([getLocale(), getMessages(merchant)]);
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        title={t.orders.title}
-        description={t.orders.description}
-        actions={
-          <ButtonLink href={localePath(locale, "/merchant/services")} startIcon={<Plus aria-hidden="true" />}>
-            {t.orders.newOrder}
-          </ButtonLink>
-        }
-      />
-      <Suspense fallback={<ListSkeleton rows={10} />}>
-        <Orders searchParams={searchParams} />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="grid gap-6">
+        <PageHeader
+          title={t.orders.title}
+          description={t.orders.description}
+          actions={
+            <ButtonLink href={localePath(locale, "/merchant/services")} startIcon={<Plus aria-hidden="true" />}>
+              {t.orders.newOrder}
+            </ButtonLink>
+          }
+        />
+        <Suspense fallback={<ListSkeleton rows={10} />}>
+          <Orders searchParams={searchParams} />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }
 

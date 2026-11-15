@@ -16,6 +16,7 @@ import { Alert } from "@/components/ui/alert";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { DescriptionItem, DescriptionList } from "@/components/ui/description-list";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(merchantSettings);
@@ -24,16 +25,18 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function VerificationPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="grid gap-4">
-          <CardSkeleton rows={2} footer={false} />
-          <CardSkeleton rows={2} />
-        </div>
-      }
-    >
-      <VerificationContent />
-    </Suspense>
+    <PageTransition>
+      <Suspense
+        fallback={
+          <div className="grid gap-4">
+            <CardSkeleton rows={2} footer={false} />
+            <CardSkeleton rows={2} />
+          </div>
+        }
+      >
+        <VerificationContent />
+      </Suspense>
+    </PageTransition>
   );
 }
 

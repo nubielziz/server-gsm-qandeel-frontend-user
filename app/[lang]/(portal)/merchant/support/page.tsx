@@ -24,6 +24,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination, pageHref } from "@/components/ui/pagination";
+import { PageTransition } from "@/components/layout/page-transition";
 
 const PAGE_SIZE = 20;
 
@@ -84,19 +85,21 @@ async function Tickets({ searchParams }: { searchParams: PageProps<"/[lang]/merc
 export default async function MerchantSupportPage({ searchParams }: PageProps<"/[lang]/merchant/support">) {
   const [locale, t, s] = await Promise.all([getLocale(), getMessages(portal), getMessages(support)]);
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        title={t.merchantSupport.title}
-        description={t.merchantSupport.subtitle}
-        actions={
-          <ButtonLink href={localePath(locale, "/merchant/support/new")} startIcon={<Plus aria-hidden="true" />}>
-            {s.list.newTicket}
-          </ButtonLink>
-        }
-      />
-      <Suspense fallback={<ListSkeleton rows={6} toolbar={false} />}>
-        <Tickets searchParams={searchParams} />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="grid gap-6">
+        <PageHeader
+          title={t.merchantSupport.title}
+          description={t.merchantSupport.subtitle}
+          actions={
+            <ButtonLink href={localePath(locale, "/merchant/support/new")} startIcon={<Plus aria-hidden="true" />}>
+              {s.list.newTicket}
+            </ButtonLink>
+          }
+        />
+        <Suspense fallback={<ListSkeleton rows={6} toolbar={false} />}>
+          <Tickets searchParams={searchParams} />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }

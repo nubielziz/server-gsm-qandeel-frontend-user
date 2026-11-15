@@ -6,7 +6,8 @@
 // The accessible name is a polite live region inside the link: it is the link's name and a screen reader hears a change.
 // Arrival animation (owner, 2026-11-15; rules in lib/notifications/bell-motion.ts): a live item swings the icon from its
 // top, pops the badge and rolls the number; a read rolls it down; reduced motion plays nothing. All of it is decoration:
-// the badge is aria-hidden and the live region above says the same as before. While the tab is hidden the title carries
+// the badge (count-badge.tsx, shared with the workspace navigation's Notifications item) is aria-hidden and the live region
+// says the same as before. While the tab is hidden the title carries
 // "(n) " (lib/notifications/title-badge.ts). Each ring also plays a soft chime (lib/notifications/chime.ts), unless the
 // visitor turned it off on the notifications page; it is extra feedback only.
 import Link from "next/link";
@@ -19,6 +20,7 @@ import { unreadText, unreadTextInline, type NotificationSurface } from "@/lib/no
 import { unreadStore } from "@/lib/notifications/unread-store";
 import { playRing } from "@/lib/notifications/bell-ring";
 import { notificationChime } from "@/lib/notifications/chime";
+import { CountBadge } from "./count-badge";
 import { useBellMotion, useTitleBadge } from "./use-bell-motion";
 
 export type BellProps = {
@@ -70,39 +72,11 @@ export function Bell({ surface, locale, href, initialCount, labels }: BellProps)
           symmetric, so RTL needs nothing. */}
       <BellIcon ref={iconRef} aria-hidden="true" className="size-5 origin-top" />
       {count > 0 ? (
-        <span
-          key={view.popKey}
-          aria-hidden="true"
-          dir="ltr"
-          className={cn(
-            "num absolute -end-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center overflow-hidden rounded-full bg-danger px-1 text-caption font-bold leading-none text-on-inverse",
-            view.pop === "pop" && "motion-safe:animate-badge-pop",
-            view.pop === "in" && "motion-safe:animate-badge-in",
-          )}
-        >
-          {/* The leaving number is laid over the badge (absolute), so only the new number sizes it: no width jump. It is
-              invisible at rest, so it shows only while its animation runs. */}
-          {view.roll ? (
-            <span
-              key={`out-${view.rollKey}`}
-              className={cn(
-                "absolute inset-0 flex items-center justify-center opacity-0",
-                view.roll.up ? "motion-safe:animate-count-out-up" : "motion-safe:animate-count-out-down",
-              )}
-            >
-              {view.roll.from}
-            </span>
-          ) : null}
-          <span
-            key={view.rollKey}
-            className={cn(
-              "inline-block",
-              view.roll && (view.roll.up ? "motion-safe:animate-count-in-up" : "motion-safe:animate-count-in-down"),
-            )}
-          >
-            {text}
-          </span>
-        </span>
+        <CountBadge
+          view={view}
+          text={text}
+          className="absolute -end-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-caption font-bold leading-none text-on-inverse"
+        />
       ) : null}
       <span className="sr-only" aria-live="polite">
         {count > 0 ? fmt(labels.bell, { count: text }) : labels.bellNone}

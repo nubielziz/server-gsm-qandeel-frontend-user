@@ -18,6 +18,7 @@ import { CardSkeleton } from "@/components/merchant-settings/skeletons";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { DescriptionItem, DescriptionList } from "@/components/ui/description-list";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(merchantSettings);
@@ -26,9 +27,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function ProfilePage() {
   return (
-    <Suspense fallback={<CardSkeleton rows={5} />}>
-      <ProfileContent />
-    </Suspense>
+    <PageTransition>
+      <Suspense fallback={<CardSkeleton rows={5} />}>
+        <ProfileContent />
+      </Suspense>
+    </PageTransition>
   );
 }
 

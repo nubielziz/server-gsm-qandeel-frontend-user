@@ -270,6 +270,9 @@
   --rise-reveal: 12px;
   --reveal-distance: 6rem;
   --reveal-step: 1.25rem;
+  /* The workspace's phone tab bar (components/layout/workspace-shell.tsx): its height above the safe area; the frame's
+     bottom padding, the toasts and the scroll padding make room for it. */
+  --ws-tabbar-h: 4rem;
 }
 :root[dir="rtl"] {
   --inline-dir: -1;
@@ -480,26 +483,51 @@ html:lang(ar) *::after {
   }
 }
 
+/* ── Workspace tab bar room ─────────────────────────────────────────────────────────────────────────────────
+   Below `lg`, while the workspace's tab bar is on the page, toasts sit above it and focused or linked targets scroll
+   clear of it. Unlayered on purpose: it must beat the toaster's own `bottom-*` utility. */
+@media (width < 64rem) {
+  :root:has(.ws-tabs) {
+    scroll-padding-bottom: calc(var(--ws-tabbar-h) + env(safe-area-inset-bottom, 0px) + 1rem);
+  }
+  :root:has(.ws-tabs) .toaster {
+    bottom: calc(var(--ws-tabbar-h) + env(safe-area-inset-bottom, 0px) + 0.75rem);
+  }
+}
+
 /* ── Page transitions (React <ViewTransition>, components/layout/page-transition.tsx) ──────────────────────────────
-   Every shop page is wrapped in a ViewTransition with `enter="page-enter" exit="page-exit" default="none"`: on a client
-   navigation the old page fades out quickly and the new one fades in and rises a little. Nothing else animates: the
-   header and footer are named and held still (they are the anchor), the rest of the document swaps at once, and the
-   overlay lets clicks through. A first load never animates (no transition runs on hydration), so the LCP is untouched. */
+   Every shop page and every workspace page (/account, /merchant) is wrapped in a ViewTransition with
+   `enter="page-enter" exit="page-exit" default="none"`: on a client navigation the old page fades out quickly and the new
+   one fades in and rises a little. Nothing else animates: the shop's header and footer, and the workspace's rail, header
+   card and phone tab bar, are named and held still (they are the anchor; their new image is live, so the rail's sliding
+   indicator still moves), the rest of the document swaps at once, and the overlay lets clicks through. The workspace
+   header's title crossfades in place (`workspace-title`, class `title-swap`, components/layout/workspace-nav.tsx). A first
+   load never animates (no transition runs on hydration, and nothing animated is the first thing of a streamed
+   boundary), so the LCP is untouched. */
 ::view-transition {
   pointer-events: none;
 }
 ::view-transition-old(root),
 ::view-transition-old(site-header),
-::view-transition-old(site-footer) {
+::view-transition-old(site-footer),
+::view-transition-old(workspace-rail),
+::view-transition-old(workspace-header),
+::view-transition-old(workspace-tabs) {
   display: none;
 }
 ::view-transition-new(root),
 ::view-transition-new(site-header),
-::view-transition-new(site-footer) {
+::view-transition-new(site-footer),
+::view-transition-new(workspace-rail),
+::view-transition-new(workspace-header),
+::view-transition-new(workspace-tabs) {
   animation: none;
 }
 ::view-transition-group(site-header),
-::view-transition-group(site-footer) {
+::view-transition-group(site-footer),
+::view-transition-group(workspace-rail),
+::view-transition-group(workspace-header),
+::view-transition-group(workspace-tabs) {
   animation: none;
   z-index: 100;
 }
@@ -508,6 +536,32 @@ html:lang(ar) *::after {
 }
 .vt-site-footer {
   view-transition-name: site-footer;
+}
+.vt-workspace-rail {
+  view-transition-name: workspace-rail;
+}
+.vt-workspace-header {
+  view-transition-name: workspace-header;
+}
+.vt-workspace-tabs {
+  view-transition-name: workspace-tabs;
+}
+/* The title keeps its box (the header sets its width), so the group stays put and only the two images crossfade; it is
+   drawn above the header card it sits in. */
+::view-transition-group(workspace-title) {
+  animation: none;
+  z-index: 101;
+}
+::view-transition-old(.title-swap) {
+  animation: page-exit var(--duration-fast) var(--ease-standard) both;
+}
+::view-transition-new(.title-swap) {
+  animation: title-in var(--duration-base) var(--ease-standard) calc(var(--duration-fast) / 2) both;
+}
+@keyframes title-in {
+  from {
+    opacity: 0;
+  }
 }
 ::view-transition-old(.page-exit) {
   animation: page-exit var(--duration-fast) var(--ease-standard) both;
@@ -657,6 +711,174 @@ html:lang(ar) *::after {
   }
   .nav-row[data-pill] .nav-pill {
     display: block;
+  }
+
+  /* Workspace rail and tab bar (components/layout/workspace-nav-view.tsx, sliding-nav.tsx; owner, 2026-11-15).
+     - Server HTML, before hydration and without JavaScript (the nav without `data-indicator`): the active link draws its
+       own selected look: the lighter square and the white mark on the rail's edge, the tinted pill in the tab bar.
+     - Once the indicator is placed (`data-indicator`): the indicator draws it and slides to the next link on a client
+       navigation (`translate` only, --duration-slow, --ease-glide; instant with reduced motion, see "Motion
+       preferences"). The active link never shows the hover square (it would cover the arriving indicator).
+     - The indicator is placed from measured physical offsets (the same px in both writing directions), so `left`/`top`
+       are physical on purpose; everything drawn around it (the mark, the tooltip, the badges) is logical, so Arabic
+       mirrors it: the mark sits on the rail's right edge and the tooltip opens to its left. */
+  .ws-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: none;
+    opacity: 0;
+    pointer-events: none;
+    transition: translate var(--duration-slow) var(--ease-glide);
+  }
+  [data-indicator] > .ws-indicator {
+    display: block;
+  }
+  .ws-rail-indicator {
+    border-radius: var(--radius-control);
+    background-color: var(--color-inverse-raised);
+  }
+  /* The mark on the rail's edge: 1rem outside the square, as the link's own mark below. */
+  .ws-rail-indicator::before,
+  .rail-mark {
+    content: "";
+    position: absolute;
+    inset-inline-start: -1rem;
+    top: calc(50% - 0.875rem);
+    width: 0.25rem;
+    height: 1.75rem;
+    border-start-end-radius: 9999px;
+    border-end-end-radius: 9999px;
+    background-color: var(--color-on-inverse);
+  }
+  .ws-tab-indicator {
+    border-radius: 9999px;
+    background-color: var(--color-surface-sunken);
+  }
+
+  .rail-link {
+    --badge-ring: var(--color-inverse);
+    --badge-count-bg: var(--color-on-inverse);
+    --badge-count-ink: var(--color-ink);
+    color: var(--color-on-inverse-muted);
+    transition:
+      color var(--duration-fast) var(--ease-standard),
+      background-color var(--duration-fast) var(--ease-standard);
+  }
+  .rail-link[aria-current="page"] {
+    color: var(--color-on-inverse);
+    background-color: var(--color-inverse-raised);
+  }
+  @media (hover: hover) {
+    .rail-link:hover {
+      color: var(--color-on-inverse);
+      background-color: var(--color-inverse-raised);
+    }
+  }
+  .rail-mark {
+    opacity: 0;
+  }
+  .rail-link[aria-current="page"] .rail-mark {
+    opacity: 1;
+  }
+  .ws-rail[data-indicator] .rail-link[aria-current="page"] {
+    background-color: transparent;
+  }
+  .ws-rail[data-indicator] .rail-link .rail-mark {
+    opacity: 0;
+  }
+
+  /* The rail's tooltip: a small dark label beside the rail on the end side, shown on hover (never on touch, where
+     nothing hovers) and on keyboard focus, with a short fade and slide away from the rail. Visual only (aria-hidden).
+     The rail is above the main column (`z-20`), so the tooltip is never covered; nothing clips it. */
+  .rail-tip {
+    position: absolute;
+    inset-inline-start: 100%;
+    margin-inline-start: 1.75rem;
+    z-index: 50;
+    white-space: nowrap;
+    pointer-events: none;
+    border-radius: var(--radius-control);
+    background-color: var(--color-inverse);
+    color: var(--color-on-inverse);
+    padding: 0.375rem 0.625rem;
+    font-size: var(--text-small);
+    line-height: var(--text-small--line-height);
+    font-weight: 600;
+    box-shadow: var(--shadow-raised);
+    opacity: 0;
+    translate: calc(var(--inline-dir) * -0.25rem) 0;
+    transition:
+      opacity var(--duration-fast) var(--ease-standard),
+      translate var(--duration-base) var(--ease-glide);
+  }
+  /* A small point towards the rail. */
+  .rail-tip::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: -0.25rem;
+    top: calc(50% - 0.25rem);
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 2px;
+    background-color: inherit;
+    rotate: 45deg;
+  }
+  @media (hover: hover) {
+    .rail-link:hover .rail-tip {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+  .rail-link:focus-visible .rail-tip {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  .drawer-link {
+    --badge-ring: var(--color-surface);
+    --badge-count-bg: var(--color-inverse);
+    --badge-count-ink: var(--color-on-inverse);
+  }
+  .drawer-link[aria-current="page"] {
+    --badge-ring: var(--color-inverse);
+    --badge-count-bg: var(--color-on-inverse);
+    --badge-count-ink: var(--color-ink);
+  }
+
+  .tab-link {
+    --badge-ring: var(--color-surface);
+    --badge-count-bg: var(--color-inverse);
+    --badge-count-ink: var(--color-on-inverse);
+    color: var(--color-ink-subtle);
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+  .tab-link[aria-current="page"] {
+    color: var(--color-ink);
+  }
+  .tab-link[aria-current="page"] .tab-icon {
+    background-color: var(--color-surface-sunken);
+  }
+  .ws-tabs[data-indicator] .tab-link[aria-current="page"] .tab-icon {
+    background-color: transparent;
+  }
+
+  /* The live badges (components/layout/workspace-badges.tsx): the colours follow the look they sit in (above); the ring
+     cuts the badge out of the icon behind it. */
+  .nav-badge {
+    box-shadow: 0 0 0 2px var(--badge-ring, var(--color-surface));
+  }
+  .nav-badge-alert {
+    background-color: var(--color-danger);
+    color: var(--color-on-inverse);
+  }
+  .nav-badge-count {
+    background-color: var(--badge-count-bg, var(--color-inverse));
+    color: var(--badge-count-ink, var(--color-on-inverse));
+  }
+  .nav-dot {
+    background-color: var(--color-danger);
+    box-shadow: 0 0 0 2px var(--badge-ring, var(--color-surface));
   }
 
   /* Skeleton: a calm sunken block with a light sweep. */

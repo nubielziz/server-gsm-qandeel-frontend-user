@@ -22,6 +22,7 @@ import { merchant, type MerchantMessages } from "@/lib/i18n/messages/merchant";
 import { formatMinutes } from "@/lib/merchant/format";
 import { settle } from "@/lib/merchant/load";
 import { fromMerchantRule, quantityRuleText } from "@/lib/quantity";
+import { PageTransition } from "@/components/layout/page-transition";
 
 const ID_PATTERN = /^[1-9]\d{0,15}$/;
 
@@ -32,9 +33,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function ServicePage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<ServiceSkeleton />}>
-      <Service params={params} />
-    </Suspense>
+    <PageTransition>
+      <Suspense fallback={<ServiceSkeleton />}>
+        <Service params={params} />
+      </Suspense>
+    </PageTransition>
   );
 }
 

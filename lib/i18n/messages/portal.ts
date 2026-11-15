@@ -30,6 +30,22 @@ export const portal = defineMessages({
       settings: "Settings",
       shop: "Back to the shop",
     },
+    // The phone tab bar's short labels (about ten characters: five columns on a 360px screen).
+    tabs: {
+      overview: "Overview",
+      orders: "Orders",
+      wallet: "Wallet",
+      notifications: "Alerts",
+      tickets: "Tickets",
+      services: "Services",
+      support: "Support",
+    },
+    // The live badges on the rail, the tab bar and the drawer: appended to the link's name ("Notifications, 3 unread").
+    navBadges: {
+      unread: ", {count} unread",
+      inProgress: ", {count} in progress",
+      newReply: ", new reply",
+    },
     // The merchant's support pages (`/merchant/support`): the list, a new ticket and the thread.
     merchantSupport: {
       metaTitle: "Support",
@@ -87,6 +103,20 @@ export const portal = defineMessages({
       myTickets: "تذاكري",
       settings: "الإعدادات",
       shop: "العودة إلى المتجر",
+    },
+    tabs: {
+      overview: "نظرة عامة",
+      orders: "الطلبات",
+      wallet: "المحفظة",
+      notifications: "الإشعارات",
+      tickets: "تذاكري",
+      services: "الخدمات",
+      support: "الدعم",
+    },
+    navBadges: {
+      unread: "، غير المقروءة: {count}",
+      inProgress: "، قيد التنفيذ: {count}",
+      newReply: "، رد جديد",
     },
     merchantSupport: {
       metaTitle: "الدعم",

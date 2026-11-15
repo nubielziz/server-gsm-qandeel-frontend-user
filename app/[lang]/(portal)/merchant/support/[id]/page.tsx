@@ -20,6 +20,7 @@ import { PageError } from "@/components/merchant/page-error";
 import { TicketView } from "@/components/support/ticket-view";
 import { ButtonLink } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(portal);
@@ -74,8 +75,10 @@ async function Thread({ params }: { params: PageProps<"/[lang]/merchant/support/
 
 export default function MerchantTicketPage({ params }: PageProps<"/[lang]/merchant/support/[id]">) {
   return (
-    <Suspense fallback={<ThreadSkeleton />}>
-      <Thread params={params} />
-    </Suspense>
+    <PageTransition>
+      <Suspense fallback={<ThreadSkeleton />}>
+        <Thread params={params} />
+      </Suspense>
+    </PageTransition>
   );
 }

@@ -30,6 +30,7 @@ import { common, statusLabel } from "@/lib/i18n/messages/common";
 import { merchant } from "@/lib/i18n/messages/merchant";
 import { isHttpUrl, labelOf } from "@/lib/merchant/format";
 import { settle } from "@/lib/merchant/load";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(merchant);
@@ -38,20 +39,22 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense
-      fallback={
-        <div className="grid gap-6" aria-hidden="true">
-          <Skeleton className="h-5 w-48" />
-          <Skeleton className="h-[5.5rem] rounded-card" />
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
-            <DetailSkeleton rows={9} />
-            <DetailSkeleton rows={5} />
+    <PageTransition>
+      <Suspense
+        fallback={
+          <div className="grid gap-6" aria-hidden="true">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-[5.5rem] rounded-card" />
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
+              <DetailSkeleton rows={9} />
+              <DetailSkeleton rows={5} />
+            </div>
           </div>
-        </div>
-      }
-    >
-      <InvoiceView params={params} />
-    </Suspense>
+        }
+      >
+        <InvoiceView params={params} />
+      </Suspense>
+    </PageTransition>
   );
 }
 

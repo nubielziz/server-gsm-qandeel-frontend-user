@@ -18,6 +18,7 @@ import { SignedInTicketForm } from "@/components/support/signed-in-ticket-form";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Card, CardBody } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageTransition } from "@/components/layout/page-transition";
 
 /** The recent orders offered in the picker. */
 const ORDER_CHOICES = 50;
@@ -60,24 +61,26 @@ async function NewTicketLoader() {
 export default async function NewMerchantTicketPage() {
   const [locale, t, c] = await Promise.all([getLocale(), getMessages(portal), getMessages(common)]);
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        eyebrow={
-          <Breadcrumbs
-            label={c.workspace.breadcrumbLabel}
-            items={[{ label: t.merchantSupport.title, href: localePath(locale, "/merchant/support") }, { label: t.merchantSupport.newTitle }]}
-          />
-        }
-        title={t.merchantSupport.newTitle}
-        description={t.merchantSupport.newSubtitle}
-      />
-      <Card>
-        <CardBody>
-          <Suspense fallback={<FormSkeleton />}>
-            <NewTicketLoader />
-          </Suspense>
-        </CardBody>
-      </Card>
-    </div>
+    <PageTransition>
+      <div className="grid gap-6">
+        <PageHeader
+          eyebrow={
+            <Breadcrumbs
+              label={c.workspace.breadcrumbLabel}
+              items={[{ label: t.merchantSupport.title, href: localePath(locale, "/merchant/support") }, { label: t.merchantSupport.newTitle }]}
+            />
+          }
+          title={t.merchantSupport.newTitle}
+          description={t.merchantSupport.newSubtitle}
+        />
+        <Card>
+          <CardBody>
+            <Suspense fallback={<FormSkeleton />}>
+              <NewTicketLoader />
+            </Suspense>
+          </CardBody>
+        </Card>
+      </div>
+    </PageTransition>
   );
 }

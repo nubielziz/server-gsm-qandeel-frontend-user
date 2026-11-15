@@ -16,6 +16,7 @@ import { ListSkeleton, PageHeaderSkeleton } from "@/components/merchant-settings
 import { WebhooksManager, type WebhookRow } from "@/components/merchant-settings/webhooks-manager";
 import { PageHeader } from "@/components/layout/container";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { PageTransition } from "@/components/layout/page-transition";
 
 const MAX_ENDPOINTS = 5;
 
@@ -26,16 +27,18 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function WebhooksPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="grid gap-4">
-          <PageHeaderSkeleton />
-          <ListSkeleton rows={2} rowHeight="h-48" />
-        </div>
-      }
-    >
-      <WebhooksContent />
-    </Suspense>
+    <PageTransition>
+      <Suspense
+        fallback={
+          <div className="grid gap-4">
+            <PageHeaderSkeleton />
+            <ListSkeleton rows={2} rowHeight="h-48" />
+          </div>
+        }
+      >
+        <WebhooksContent />
+      </Suspense>
+    </PageTransition>
   );
 }
 

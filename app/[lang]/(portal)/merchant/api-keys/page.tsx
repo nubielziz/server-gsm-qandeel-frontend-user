@@ -15,6 +15,7 @@ import { LoadError, PendingNotice, settle } from "@/components/merchant-settings
 import { ListSkeleton, PageHeaderSkeleton } from "@/components/merchant-settings/skeletons";
 import { PageHeader } from "@/components/layout/container";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { PageTransition } from "@/components/layout/page-transition";
 
 const MAX_LIVE_KEYS = 10;
 
@@ -25,16 +26,18 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function ApiKeysPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="grid gap-4">
-          <PageHeaderSkeleton />
-          <ListSkeleton rows={3} rowHeight="h-56" />
-        </div>
-      }
-    >
-      <ApiKeysContent />
-    </Suspense>
+    <PageTransition>
+      <Suspense
+        fallback={
+          <div className="grid gap-4">
+            <PageHeaderSkeleton />
+            <ListSkeleton rows={3} rowHeight="h-56" />
+          </div>
+        }
+      >
+        <ApiKeysContent />
+      </Suspense>
+    </PageTransition>
   );
 }
 

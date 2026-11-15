@@ -14,6 +14,7 @@ import { PasswordForm } from "@/components/merchant-settings/password-form";
 import { SessionsTable } from "@/components/merchant-settings/sessions-table";
 import { CardSkeleton } from "@/components/merchant-settings/skeletons";
 import { TwoFactor } from "@/components/merchant-settings/two-factor";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(merchantSettings);
@@ -22,17 +23,19 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function SecurityPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="grid gap-4">
-          <CardSkeleton rows={3} />
-          <CardSkeleton rows={1} />
-          <CardSkeleton rows={2} footer={false} />
-        </div>
-      }
-    >
-      <SecurityContent />
-    </Suspense>
+    <PageTransition>
+      <Suspense
+        fallback={
+          <div className="grid gap-4">
+            <CardSkeleton rows={3} />
+            <CardSkeleton rows={1} />
+            <CardSkeleton rows={2} footer={false} />
+          </div>
+        }
+      >
+        <SecurityContent />
+      </Suspense>
+    </PageTransition>
   );
 }
 

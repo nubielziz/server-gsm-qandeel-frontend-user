@@ -40,6 +40,7 @@ import {
 } from "@/lib/merchant/lists";
 import { quantityRule } from "@/lib/merchant/order-input";
 import { settle } from "@/lib/merchant/load";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(merchant);
@@ -49,12 +50,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ServicesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const t = await getMessages(merchant);
   return (
-    <div className="grid gap-6">
-      <PageHeader title={t.catalog.title} description={t.catalog.description} />
-      <Suspense fallback={<ListSkeleton rows={10} />}>
-        <Catalog searchParams={searchParams} />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="grid gap-6">
+        <PageHeader title={t.catalog.title} description={t.catalog.description} />
+        <Suspense fallback={<ListSkeleton rows={10} />}>
+          <Catalog searchParams={searchParams} />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }
 

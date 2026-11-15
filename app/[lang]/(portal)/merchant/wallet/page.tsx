@@ -26,6 +26,7 @@ import { merchant } from "@/lib/i18n/messages/merchant";
 import { settle } from "@/lib/merchant/load";
 import { STATEMENT_PER_PAGE, first, type SearchParams } from "@/lib/merchant/lists";
 import { merchantStatementRows } from "@/lib/wallet/view";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(merchant);
@@ -35,35 +36,37 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function WalletPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const [locale, t] = await Promise.all([getLocale(), getMessages(merchant)]);
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        title={t.wallet.title}
-        description={t.wallet.description}
-        actions={
-          <ButtonLink href={localePath(locale, "/merchant/wallet/top-up")} startIcon={<Plus aria-hidden="true" />}>
-            {t.wallet.addFunds}
-          </ButtonLink>
-        }
-      />
-      <Alert tone="info" icon={<Info aria-hidden="true" />}>
-        {t.wallet.onlineNote}
-      </Alert>
-      <Suspense
-        fallback={
-          <div className="grid gap-6">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
-              <Skeleton className="h-36 rounded-panel" />
-              <Skeleton className="h-36 rounded-card" />
-              <Skeleton className="h-36 rounded-card" />
-              <Skeleton className="h-36 rounded-card" />
+    <PageTransition>
+      <div className="grid gap-6">
+        <PageHeader
+          title={t.wallet.title}
+          description={t.wallet.description}
+          actions={
+            <ButtonLink href={localePath(locale, "/merchant/wallet/top-up")} startIcon={<Plus aria-hidden="true" />}>
+              {t.wallet.addFunds}
+            </ButtonLink>
+          }
+        />
+        <Alert tone="info" icon={<Info aria-hidden="true" />}>
+          {t.wallet.onlineNote}
+        </Alert>
+        <Suspense
+          fallback={
+            <div className="grid gap-6">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
+                <Skeleton className="h-36 rounded-panel" />
+                <Skeleton className="h-36 rounded-card" />
+                <Skeleton className="h-36 rounded-card" />
+                <Skeleton className="h-36 rounded-card" />
+              </div>
+              <ListSkeleton rows={10} toolbar={false} />
             </div>
-            <ListSkeleton rows={10} toolbar={false} />
-          </div>
-        }
-      >
-        <WalletContent searchParams={searchParams} />
-      </Suspense>
-    </div>
+          }
+        >
+          <WalletContent searchParams={searchParams} />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }
 

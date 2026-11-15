@@ -24,6 +24,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/pagination";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import { PageTransition } from "@/components/layout/page-transition";
 
 const PAGE_SIZE = 25;
 const ID_PATTERN = /^[1-9]\d{0,15}$/;
@@ -35,16 +36,18 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function WebhookDeliveriesPage({ params, searchParams }: PageProps<"/[lang]/merchant/webhooks/[id]">) {
   return (
-    <Suspense
-      fallback={
-        <div className="grid gap-4">
-          <PageHeaderSkeleton />
-          <ListSkeleton rows={2} rowHeight="h-40" />
-        </div>
-      }
-    >
-      <DeliveriesContent params={params} searchParams={searchParams} />
-    </Suspense>
+    <PageTransition>
+      <Suspense
+        fallback={
+          <div className="grid gap-4">
+            <PageHeaderSkeleton />
+            <ListSkeleton rows={2} rowHeight="h-40" />
+          </div>
+        }
+      >
+        <DeliveriesContent params={params} searchParams={searchParams} />
+      </Suspense>
+    </PageTransition>
   );
 }
 

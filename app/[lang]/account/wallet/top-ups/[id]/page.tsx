@@ -24,6 +24,7 @@ import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(topUps);
@@ -116,8 +117,10 @@ async function TopUpView({ params }: { params: Promise<{ id: string }> }) {
 
 export default function TopUpPage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<TopUpSkeleton />}>
-      <TopUpView params={params} />
-    </Suspense>
+    <PageTransition>
+      <Suspense fallback={<TopUpSkeleton />}>
+        <TopUpView params={params} />
+      </Suspense>
+    </PageTransition>
   );
 }

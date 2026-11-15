@@ -17,6 +17,7 @@ import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { merchant } from "@/lib/i18n/messages/merchant";
 import { settle } from "@/lib/merchant/load";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(merchant);
@@ -26,23 +27,25 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function TopUpPage() {
   const [locale, t, c] = await Promise.all([getLocale(), getMessages(merchant), getMessages(common)]);
   return (
-    <div className="grid gap-6">
-      <Breadcrumbs
-        label={c.workspace.breadcrumbLabel}
-        items={[{ label: t.wallet.title, href: localePath(locale, "/merchant/wallet") }, { label: t.topUp.title }]}
-      />
-      <PageHeader title={t.topUp.title} description={t.topUp.description} />
-      <Suspense
-        fallback={
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start" aria-hidden="true">
-            <Skeleton className="h-80 rounded-card" />
-            <Skeleton className="h-72 rounded-card" />
-          </div>
-        }
-      >
-        <Methods />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="grid gap-6">
+        <Breadcrumbs
+          label={c.workspace.breadcrumbLabel}
+          items={[{ label: t.wallet.title, href: localePath(locale, "/merchant/wallet") }, { label: t.topUp.title }]}
+        />
+        <PageHeader title={t.topUp.title} description={t.topUp.description} />
+        <Suspense
+          fallback={
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start" aria-hidden="true">
+              <Skeleton className="h-80 rounded-card" />
+              <Skeleton className="h-72 rounded-card" />
+            </div>
+          }
+        >
+          <Methods />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }
 

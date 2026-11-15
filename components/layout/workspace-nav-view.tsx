@@ -1,5 +1,8 @@
 // The look of the workspace navigation, as pure markup (no hooks) so the server can render a fallback without an
 // active item while the client version reads the pathname. See workspace-nav.tsx.
+// Three looks: the desktop rail (icons with a tooltip), the drawer (labelled rows) and the phone tab bar (icons with a
+// short label). The rail and the tab bar sit in a SlidingNav (sliding-nav.tsx): before it takes over (server HTML, no
+// JavaScript) the active link draws its own selected look from CSS (globals.css "Workspace rail and tab bar").
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -10,6 +13,8 @@ export type WorkspaceNavItem = {
   href: string;
   /** Short name: the rail tooltip, the drawer row and the breadcrumb. */
   label: string;
+  /** A shorter name for the phone tab bar (defaults to `label`). */
+  shortLabel?: string;
   /** The icon (a lucide element, e.g. `<LayoutDashboard aria-hidden="true" />`). */
   icon: ReactNode;
   /** Longer page title for the header card (defaults to `label`). */
@@ -23,18 +28,26 @@ export type WorkspaceNavItem = {
    * The item still names its page for the header title.
    */
   reserve?: boolean;
+  /**
+   * A live badge (the unread count, the support dot, the orders in progress: components/layout/workspace-badges.tsx). It
+   * streams in its own <Suspense> and adds its words to the link's accessible name ("Notifications, 3 unread"). The rail
+   * and the tab bar lay it over the icon's corner and the drawer at the row's end, so it never moves anything.
+   */
+  badge?: ReactNode;
 };
 
 export type WorkspaceNavViewProps = {
   items: WorkspaceNavItem[];
   /** The current pathname, or null for "none active". */
   pathname: string | null;
-  /** `rail` = icon buttons with tooltips on the dark rail; `drawer` = labelled rows. */
-  variant: "rail" | "drawer";
+  /** `rail` = icon buttons with tooltips on the dark rail; `drawer` = labelled rows; `tabs` = the phone tab bar. */
+  variant: "rail" | "drawer" | "tabs";
 };
 
-/** A list of nav links in the rail or drawer look, marking the one that matches `pathname`. */
+/** A list of nav links in the rail, drawer or tab bar look, marking the one that matches `pathname`. */
 export function WorkspaceNavView({ items, pathname, variant }: WorkspaceNavViewProps) {
+  const current = (item: WorkspaceNavItem) => (isActivePath(pathname, item.href, item.match) ? "page" : undefined);
+
   if (variant === "drawer") {
     return (
       <ul className="grid gap-1">
@@ -50,15 +63,16 @@ export function WorkspaceNavView({ items, pathname, variant }: WorkspaceNavViewP
             <li key={item.href}>
               <Link
                 href={item.href}
-                aria-current={isActivePath(pathname, item.href, item.match) ? "page" : undefined}
+                aria-current={current(item)}
                 className={cn(
-                  "flex min-h-12 items-center gap-3 rounded-control px-3 text-body font-semibold text-ink-muted transition-colors",
+                  "drawer-link flex min-h-12 items-center gap-3 rounded-control px-3 text-body font-semibold text-ink-muted transition-colors",
                   "hover:bg-surface-muted hover:text-ink aria-[current=page]:bg-inverse aria-[current=page]:text-on-inverse",
                   "[&_svg]:size-5 [&_svg]:shrink-0",
                 )}
               >
                 {item.icon}
                 {item.label}
+                {item.badge ? <span className="ms-auto inline-flex">{item.badge}</span> : null}
               </Link>
             </li>
           );
@@ -66,6 +80,39 @@ export function WorkspaceNavView({ items, pathname, variant }: WorkspaceNavViewP
       </ul>
     );
   }
+
+  if (variant === "tabs") {
+    // Equal columns: the indicator slides between same-size pills. 44px+ touch targets (the whole column is the link).
+    return (
+      <ul className="mx-auto grid max-w-xl auto-cols-fr grid-flow-col px-1">
+        {items.map((item) => {
+          if (item.reserve) {
+            return (
+              <li key={item.href} aria-hidden="true">
+                <span className="block h-(--ws-tabbar-h)" />
+              </li>
+            );
+          }
+          return (
+            <li key={item.href} className="min-w-0">
+              <Link
+                href={item.href}
+                aria-current={current(item)}
+                className="tab-link flex h-(--ws-tabbar-h) min-w-0 flex-col items-center justify-center gap-1 px-1 text-caption font-semibold"
+              >
+                <span className="tab-icon relative grid h-8 w-14 place-items-center rounded-full [&_svg]:size-5">
+                  {item.icon}
+                  {item.badge ? <span className="absolute -top-1 end-1.5 inline-flex">{item.badge}</span> : null}
+                </span>
+                <span className="max-w-full truncate">{item.shortLabel ?? item.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
   // Short screens (under 46rem, where the rail also drops its avatar): 44px buttons and tighter gaps; under 41rem 40px and
   // tighter still (the merchant has eleven links since feature 28's Support), so the merchant's
   // links fit a 1366×768 laptop window without the rail growing past the screen.
@@ -83,28 +130,17 @@ export function WorkspaceNavView({ items, pathname, variant }: WorkspaceNavViewP
           <li key={item.href} className="relative">
             <Link
               href={item.href}
-              aria-current={isActivePath(pathname, item.href, item.match) ? "page" : undefined}
-              className={cn(
-                "group relative grid size-12 place-items-center rounded-control text-on-inverse-muted transition-colors duration-(--duration-fast) [@media(max-height:46rem)]:size-11 [@media(max-height:41rem)]:size-10!",
-                "hover:bg-inverse-raised hover:text-on-inverse aria-[current=page]:bg-inverse-raised aria-[current=page]:text-on-inverse",
-                "[&_svg]:size-6",
-              )}
+              aria-current={current(item)}
+              className="rail-link relative grid size-12 place-items-center rounded-control [@media(max-height:46rem)]:size-11 [@media(max-height:41rem)]:size-10! [&_svg]:size-6"
             >
               {item.icon}
               <span className="sr-only">{item.label}</span>
-              {/* Active mark on the rail's inner edge, as in the mockups. */}
-              <span
-                aria-hidden="true"
-                className="absolute -start-4 h-7 w-1 rounded-e-full bg-on-inverse opacity-0 group-aria-[current=page]:opacity-100"
-              />
-              {/* Tooltip: hover and keyboard focus. Decorative: the sr-only label above is the accessible name. */}
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "pointer-events-none absolute start-full z-50 ms-4 whitespace-nowrap rounded-control bg-surface px-3 py-2 text-small font-semibold text-ink opacity-0 shadow-overlay",
-                  "transition-opacity duration-(--duration-fast) group-hover:opacity-100 group-focus-visible:opacity-100",
-                )}
-              >
+              {item.badge ? <span className="absolute end-1 top-1 inline-flex">{item.badge}</span> : null}
+              {/* The active mark on the rail's edge before the sliding indicator takes over (CSS only, globals.css). */}
+              <span aria-hidden="true" className="rail-mark" />
+              {/* Tooltip on hover (not on touch) and keyboard focus, beside the rail on the end side. Visual only: the
+                  sr-only label above (and the badge's words) are the accessible name. */}
+              <span aria-hidden="true" className="rail-tip">
                 {item.label}
               </span>
             </Link>

@@ -265,7 +265,12 @@ test.describe("merchant", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Notifications" })).toBeVisible();
     await expect(page.getByText("Your merchant account is waiting for approval").first()).toBeVisible();
     await expect(bell(page)).toHaveAccessibleName("Notifications, 2 unread");
-    if (!isMobile) await expect(page.getByRole("link", { name: "Notifications", exact: true })).toBeVisible(); // the rail's item
+    // The rail's item, with its live badge in its name (owner, 2026-11-15); the bell has the same name, so scope to the rail.
+    if (!isMobile) {
+      const rail = page.getByRole("navigation", { name: "Workspace navigation" });
+      // The badge words are their own visually hidden span, so the name reads "Notifications , 2 unread" (a joined space).
+      await expect(rail.getByRole("link", { name: /^Notifications\s*,\s*2 unread$/ })).toBeVisible();
+    }
 
     await expect(item(page, withLink).locator("[lang] > p")).toHaveText("Line A\nLine B", { useInnerText: true });
     await expect(item(page, withLink).getByRole("link", { name: "Open" })).toHaveAttribute("href", "/en/merchant/settings/notifications");

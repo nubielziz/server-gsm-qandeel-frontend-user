@@ -1,8 +1,10 @@
 "use client";
 // Client parts of the workspace shell: the active nav list and the header heading (both need the current pathname; the
 // server wraps them in <Suspense> with a pure fallback, see workspace-shell.tsx) and the mobile navigation drawer.
+// The heading crossfades when the section changes on a client navigation (a React <ViewTransition> pair named
+// `workspace-title`, globals.css "Page transitions"); a first load never animates.
 import { usePathname } from "next/navigation";
-import { useId, type MouseEvent, type ReactNode } from "react";
+import { useId, ViewTransition, type MouseEvent, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Drawer, openDialog } from "@/components/ui/dialog";
@@ -11,7 +13,7 @@ import { isActivePath } from "./active-path";
 import { WorkspaceNavView, type WorkspaceNavItem } from "./workspace-nav-view";
 
 /** The nav list with the active item marked from the current pathname. */
-export function ActiveWorkspaceNav({ items, variant }: { items: WorkspaceNavItem[]; variant: "rail" | "drawer" }) {
+export function ActiveWorkspaceNav({ items, variant }: { items: WorkspaceNavItem[]; variant: "rail" | "drawer" | "tabs" }) {
   return <WorkspaceNavView items={items} pathname={usePathname()} variant={variant} />;
 }
 
@@ -40,17 +42,28 @@ export function WorkspaceHeadingView({ areaLabel, areaHref, breadcrumbLabel, act
         items={active ? [{ label: areaLabel, href: areaHref }, { label: active.label }] : [{ label: areaLabel }]}
       />
       {/* Not a heading: the page renders its own h1. */}
-      <p className="min-h-7 truncate text-heading text-ink sm:mt-0.5">{active ? (active.title ?? active.label) : " "}</p>
+      <p className="min-h-7 truncate text-heading text-ink sm:mt-0.5">{active ? (active.title ?? active.label) : "\u00a0"}</p>
     </div>
   );
 }
 
-/** The header card's heading, from the active nav item. */
+/**
+ * The header card's heading, from the active nav item. A new section is a new key: the old heading and the new one form
+ * a named pair that crossfades in place on a client navigation (the block keeps its box, its width comes from the
+ * header, so nothing stretches). Only this client version carries the <ViewTransition>, never the server fallback: a
+ * fallback and its streamed content with the same name would pair up and crossfade on the first load (React's streamed
+ * reveal animates shared names). `default="none"`: nothing else animates it.
+ */
 export function WorkspaceHeading({
   items,
   ...rest
 }: { items: WorkspaceNavItem[] } & Omit<WorkspaceHeadingViewProps, "active">) {
-  return <WorkspaceHeadingView {...rest} active={activeItem(items, usePathname())} />;
+  const active = activeItem(items, usePathname());
+  return (
+    <ViewTransition key={active?.href ?? ""} name="workspace-title" share="title-swap" default="none">
+      <WorkspaceHeadingView {...rest} active={active} />
+    </ViewTransition>
+  );
 }
 
 export type WorkspaceMobileNavProps = {

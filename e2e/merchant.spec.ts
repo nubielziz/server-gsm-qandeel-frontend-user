@@ -677,3 +677,113 @@ test.describe("workspace frame", () => {
     if (me.company) expect(shell).not.toContain(me.company);
   });
 });
+
+// ── Rail and tab bar (owner, 2026-11-15) ──────────────────────────────────────────────────────────────────────────────
+// The rail sits at the start edge (no centred frame), its selection slides to the page a click opens, a hovered icon
+// shows its label beside the rail, the live badges add their words to the links' names, and below `lg` a tab bar holds
+// the key destinations. Read-only: the demo merchant is only looked at.
+
+test.describe("rail and tab bar", () => {
+  /** The rail's nav landmark (the drawer's has the same name but is hidden while closed). */
+  const rail = (page: Page, name = "Workspace navigation") => vis(page.getByRole("navigation", { name }));
+
+  test("the rail sits at the start edge of a wide screen, in English and in Arabic, with no sideways scroll", async ({ page, isMobile }) => {
+    test.skip(isMobile, "the rail shows from lg up");
+    // Regression (2026-11-15): the frame was centred at 110rem, leaving a strip of about 70px before the rail at 1920px.
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    for (const [lang, name] of [["en", "Workspace navigation"], ["ar", "التنقل في مساحة العمل"]] as const) {
+      await go(page, `/${lang}/merchant`);
+      const edges = await rail(page, name).evaluate((nav) => {
+        const panel = nav.parentElement!.getBoundingClientRect();
+        const width = document.documentElement.clientWidth;
+        // The reserved scrollbar gutter (scrollbar-gutter: stable) is not part of the page: measure from the page's own edge.
+        const edge = Math.min(width, document.documentElement.scrollWidth);
+        return {
+          start: document.documentElement.dir === "rtl" ? edge - panel.right : panel.left,
+          overflow: document.documentElement.scrollWidth - width,
+        };
+      });
+      expect(edges.start, `${lang}: room before the rail`).toBeGreaterThanOrEqual(0);
+      expect(edges.start, `${lang}: room before the rail`).toBeLessThanOrEqual(16.5); // the page padding only
+      expect(edges.overflow, `${lang}: the page scrolls sideways`).toBeLessThanOrEqual(0);
+    }
+  });
+
+  test("a hovered icon shows its label beside the rail, and the selection moves to the page a click opens", async ({ page, isMobile }) => {
+    test.skip(isMobile, "the rail shows from lg up");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await go(page, "/en/merchant");
+    const nav = rail(page);
+    // The indicator took over from the CSS-only look once the script ran.
+    await expect(nav).toHaveAttribute("data-indicator", "");
+    const invoices = nav.getByRole("link", { name: "Invoices", exact: true });
+
+    await invoices.hover();
+    const tip = invoices.locator(".rail-tip");
+    await expect(tip).toHaveText("Invoices");
+    await expect(tip).toHaveAttribute("aria-hidden", "true");
+    await expect(tip).toHaveCSS("opacity", "1");
+    // Beside the rail on the end side (right in English), clear of the dark panel.
+    const [tipBox, panelBox] = await Promise.all([tip.boundingBox(), nav.evaluate((el) => el.parentElement!.getBoundingClientRect().right)]);
+    expect(tipBox!.x).toBeGreaterThan(panelBox);
+
+    await invoices.click();
+    await expect(page).toHaveURL(/\/en\/merchant\/invoices$/);
+    await expect(invoices).toHaveAttribute("aria-current", "page");
+    // The indicator ends on the new link (it slid there; the test reads where it rests).
+    await expect
+      .poll(() =>
+        nav.evaluate((el) => {
+          const mark = el.querySelector<HTMLElement>(".ws-indicator")!;
+          const link = el.querySelector<HTMLElement>('a[aria-current="page"]')!;
+          const y = parseFloat(getComputedStyle(mark).translate.split(" ")[1] ?? "0");
+          return Math.round(Math.abs(y - (link.getBoundingClientRect().top - el.getBoundingClientRect().top)));
+        }),
+      )
+      .toBe(0);
+  });
+
+  test("the Orders item names the orders in progress when there are any", async ({ page, isMobile }) => {
+    test.skip(isMobile, "the rail shows from lg up");
+    await go(page, "/en/merchant/invoices");
+    const orders = rail(page).getByRole("link", { name: /^Orders/ });
+    await expect(orders).toHaveAttribute("href", "/en/merchant/orders");
+    await expect(orders).toHaveAccessibleName(/^Orders(, (\d+|99\+) in progress)?$/);
+  });
+
+  test("phone: a tab bar with the key destinations, the current one marked, 44px targets, never over the page", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await go(page, "/en/merchant/orders");
+    const bar = page.getByRole("navigation", { name: "Shortcuts", exact: true });
+    await expect(bar).toBeVisible();
+    const links = bar.getByRole("link");
+    await expect(links).toHaveCount(5);
+    expect(await links.evaluateAll((all) => all.map((a) => a.getAttribute("href")))).toEqual([
+      "/en/merchant",
+      "/en/merchant/orders",
+      "/en/merchant/services",
+      "/en/merchant/wallet",
+      "/en/merchant/support",
+    ]);
+    await expect(bar.getByRole("link", { name: /^Orders/ })).toHaveAttribute("aria-current", "page");
+    for (const height of await links.evaluateAll((all) => all.map((a) => a.getBoundingClientRect().height))) {
+      expect(height).toBeGreaterThanOrEqual(44);
+    }
+    const fit = await bar.evaluate((nav) => {
+      const frame = document.getElementById("main")!.closest<HTMLElement>(".overflow-x-clip")!;
+      return {
+        bottom: nav.getBoundingClientRect().bottom,
+        window: window.innerHeight,
+        height: nav.getBoundingClientRect().height,
+        padding: parseFloat(getComputedStyle(frame).paddingBottom),
+      };
+    });
+    expect(Math.abs(fit.bottom - fit.window)).toBeLessThanOrEqual(1);
+    expect(fit.padding, "the page's bottom padding keeps its end clear of the bar").toBeGreaterThanOrEqual(fit.height);
+    // The drawer keeps the full list.
+    await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeVisible();
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(bar).toBeHidden();
+  });
+});

@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(account);
@@ -193,11 +194,13 @@ async function SettingsContent() {
 export default async function AccountSettingsPage() {
   const t = await getMessages(account);
   return (
-    <div className="grid gap-4">
-      <PageHeader variant="card" title={t.settings.title} description={t.settings.subtitle} />
-      <Suspense fallback={<SettingsSkeleton />}>
-        <SettingsContent />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="grid gap-4">
+        <PageHeader variant="card" title={t.settings.title} description={t.settings.subtitle} />
+        <Suspense fallback={<SettingsSkeleton />}>
+          <SettingsContent />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }

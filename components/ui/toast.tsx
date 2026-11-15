@@ -69,14 +69,17 @@ const icons = {
   danger: <CircleAlert aria-hidden="true" className="text-danger" />,
 } as const;
 
-/** The live region that renders toasts, fixed to the bottom end corner. Mount once per layout. */
+/**
+ * The live region that renders toasts, fixed to the bottom end corner. Mount once per layout. `toaster`: below `lg` the
+ * workspace lifts it above its phone tab bar (globals.css "Workspace tab bar room").
+ */
 export function Toaster() {
   const list = useSyncExternalStore(subscribe, () => items, () => EMPTY);
   const text = useUiText();
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col items-stretch gap-2 sm:inset-x-auto sm:end-6 sm:bottom-6 sm:w-96"
+      className="toaster pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col items-stretch gap-2 sm:inset-x-auto sm:end-6 sm:bottom-6 sm:w-96"
     >
       {list.map((t) => (
         <div

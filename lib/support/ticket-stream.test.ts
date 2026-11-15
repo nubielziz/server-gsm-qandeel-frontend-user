@@ -15,12 +15,13 @@ type TicketStreamModule = typeof import("./ticket-stream");
 let acquireSurfaceTicketStream: TicketStreamModule["acquireSurfaceTicketStream"];
 let openTicketStream: TicketStreamModule["openTicketStream"];
 let ticketSurfaceLockName: TicketStreamModule["ticketSurfaceLockName"];
+let watchSurfaceTicketStream: TicketStreamModule["watchSurfaceTicketStream"];
 
 // A fresh module per test: the shared clients of the surfaces are module state.
 beforeEach(async () => {
   created.length = 0;
   vi.resetModules();
-  ({ acquireSurfaceTicketStream, openTicketStream, ticketSurfaceLockName } = await import("./ticket-stream"));
+  ({ acquireSurfaceTicketStream, openTicketStream, ticketSurfaceLockName, watchSurfaceTicketStream } = await import("./ticket-stream"));
 });
 
 describe("openTicketStream: the customer's own stream", () => {
@@ -80,5 +81,20 @@ describe("the merchant surface's ticket stream: shared and counted", () => {
     expect(again.client).toBe(merchant.client);
     again.release();
     expect(created[1].stop).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("watchSurfaceTicketStream: the workspace's support badge only listens", () => {
+  it("shares the surface's client, is no user of it, and never starts or stops it", () => {
+    const watch = watchSurfaceTicketStream("merchant");
+    expect(created).toHaveLength(1);
+    const client = created[0];
+    const handler = () => {};
+    watch.subscribe("ticket.updated", handler);
+    const page = acquireSurfaceTicketStream("merchant");
+    expect(created).toHaveLength(1); // the ticket page gets the same client
+    page.release();
+    // The page was the only user: the watcher does not keep the stream open.
+    expect(client.stop).toHaveBeenCalledTimes(1);
   });
 });

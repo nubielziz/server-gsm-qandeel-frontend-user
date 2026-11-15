@@ -19,6 +19,7 @@ import { common } from "@/lib/i18n/messages/common";
 import { merchant } from "@/lib/i18n/messages/merchant";
 import { portal } from "@/lib/i18n/messages/portal";
 import { settle } from "@/lib/merchant/load";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(merchant);
@@ -27,9 +28,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function MerchantDashboardPage() {
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <Dashboard />
-    </Suspense>
+    <PageTransition>
+      <Suspense fallback={<DashboardSkeleton />}>
+        <Dashboard />
+      </Suspense>
+    </PageTransition>
   );
 }
 

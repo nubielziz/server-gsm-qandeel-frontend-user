@@ -8,6 +8,7 @@ import { getLocale, getMessages } from "@/lib/i18n/server";
 import { LoadError, settle } from "@/components/merchant-settings/load";
 import { NotificationsForm } from "@/components/merchant-settings/notifications-form";
 import { CardSkeleton } from "@/components/merchant-settings/skeletons";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(merchantSettings);
@@ -16,16 +17,18 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function NotificationsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="grid gap-4">
-          <CardSkeleton rows={1} footer={false} />
-          <CardSkeleton rows={5} />
-        </div>
-      }
-    >
-      <NotificationsContent />
-    </Suspense>
+    <PageTransition>
+      <Suspense
+        fallback={
+          <div className="grid gap-4">
+            <CardSkeleton rows={1} footer={false} />
+            <CardSkeleton rows={5} />
+          </div>
+        }
+      >
+        <NotificationsContent />
+      </Suspense>
+    </PageTransition>
   );
 }
 

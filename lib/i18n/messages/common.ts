@@ -79,6 +79,8 @@ export const common = defineMessages({
       closeNav: "Close navigation",
       breadcrumbLabel: "Breadcrumb",
       accountMenu: "Account menu",
+      /** The phone tab bar's landmark (never "Workspace navigation": that names the rail and the drawer). */
+      tabsLabel: "Shortcuts",
     },
 
     /** Left panel of the sign-in and sign-up pages. */
@@ -315,6 +317,7 @@ export const common = defineMessages({
       closeNav: "إغلاق التنقل",
       breadcrumbLabel: "مسار التنقل",
       accountMenu: "قائمة الحساب",
+      tabsLabel: "اختصارات",
     },
 
     auth: {
