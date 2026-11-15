@@ -2,7 +2,8 @@
 // A server component that reads the session, so the page renders it inside <Suspense> with <NotificationListSkeleton />.
 // The tab and the page live in the URL (`?unread=1`, `?page=2`). Plan D11: `title` and `body` are plain text and are
 // rendered as React text nodes (line breaks by CSS), never as HTML; each item names its own language and direction; the
-// link goes through `notificationHref`; the list always asks for the page's language.
+// link goes through `notificationHref`; the list always asks for the page's language. <LiveRefresh /> keeps it current
+// from the live stream (feature 27): page 1 draws again in place, other pages get a "New notifications" pill.
 import { Bell, BellOff } from "lucide-react";
 import { redirect } from "next/navigation";
 import { isApiError } from "@/lib/api/errors";
@@ -33,6 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
 import { readUnreadCount } from "./bell-slot";
 import { CategoryIcon } from "./category-icon";
+import { LiveRefresh } from "./live-refresh";
 import { MarkAllRead, NotificationActions } from "./notification-actions";
 
 const PAGE_SIZE = 20;
@@ -85,6 +87,14 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
 
   return (
     <div className="grid gap-4">
+      <LiveRefresh
+        key={`${page}:${unreadOnly ? "unread" : "all"}`}
+        surface={surface}
+        page={page}
+        pageOneHref={pageHref(basePath, filters, 1)}
+        unreadIds={data.filter((item) => item.readAt === null).map((item) => item.id)}
+        labels={{ pill: t.live.pill, pillAction: t.live.pillAction }}
+      />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs label={t.tabsLabel} items={tabs} activeKey={unreadOnly ? "unread" : "all"} variant="pill" className="min-w-0" />
         {showMarkAll ? (

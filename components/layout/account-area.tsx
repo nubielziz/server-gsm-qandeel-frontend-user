@@ -20,6 +20,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/menu";
 import { Money } from "@/components/ui/money";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BellSkeleton, BellSlot } from "@/components/notifications/bell-slot";
 import Link from "next/link";
 import { SignOutButton } from "./sign-out-button";
 
@@ -103,6 +104,16 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
 
   return (
     <div className="flex items-center gap-2">
+      {/* The notification bell of the signed-in visitor (owner, 2026-11-15: the bell belongs in the shop header too, not only
+          in /account and /merchant). It mounts the live stream (feature 27), so a stream opens wherever a signed-in visitor
+          sees a bell; a signed-out visitor gets neither. A customer's bell when a customer is signed in, else the merchant's.
+          Its own Suspense: the unread count streams in without holding back the rest of the account area. Not in the compact
+          checkout header. */}
+      {compact ? null : (
+        <Suspense fallback={<BellSkeleton />}>
+          <BellSlot surface={customer ? "customer" : "merchant"} />
+        </Suspense>
+      )}
       {wallet ? (
         <Link
           href={localePath(locale, "/merchant/wallet")}

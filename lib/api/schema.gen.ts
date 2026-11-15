@@ -1186,6 +1186,16 @@ export type DeleteClientSessionsByIdParams = {
 /** 204 */
 export type DeleteClientSessionsByIdResponse = void;
 
+// ── GET /client/stream — My live event stream
+export type GetClientStreamQuery = {
+  /** The page language: the text of every item comes in it. */
+  locale?: "en" | "ar";
+  /** The last event id the page saw (`i9001`), for a new stream that should replay what it missed. */
+  cursor?: string;
+};
+/** 200 text/event-stream */
+export type GetClientStreamResponse = Blob;
+
 // ── POST /client/telegram/link — A one-time link to connect Telegram
 /** 201 */
 export type PostClientTelegramLinkResponse = {
@@ -2062,6 +2072,16 @@ export type PostStoreV1MePasswordBody = {
 /** 204 */
 export type PostStoreV1MePasswordResponse = void;
 
+// ── GET /store/v1/me/stream — My live event stream
+export type GetStoreV1MeStreamQuery = {
+  /** The page language: the text of every item comes in it. */
+  locale?: "en" | "ar";
+  /** The last event id the page saw (`i9001`), for a new stream that should replay what it missed. */
+  cursor?: string;
+};
+/** 200 text/event-stream */
+export type GetStoreV1MeStreamResponse = Blob;
+
 // ── GET /store/v1/me/wallet — My store balance
 /** 200 */
 export type GetStoreV1MeWalletResponse = {
@@ -2892,6 +2912,7 @@ export interface ApiRoutes {
   "GET /client/services/:id": { query: never; params: GetClientServicesByIdParams; body: never; response: GetClientServicesByIdResponse; status: 200 };
   "GET /client/sessions": { query: GetClientSessionsQuery; params: never; body: never; response: GetClientSessionsResponse; status: 200 };
   "DELETE /client/sessions/:id": { query: never; params: DeleteClientSessionsByIdParams; body: never; response: DeleteClientSessionsByIdResponse; status: 204 };
+  "GET /client/stream": { query: GetClientStreamQuery; params: never; body: never; response: GetClientStreamResponse; status: 200 };
   "POST /client/telegram/link": { query: never; params: never; body: never; response: PostClientTelegramLinkResponse; status: 201 };
   "GET /client/wallet": { query: never; params: never; body: never; response: GetClientWalletResponse; status: 200 };
   "GET /client/wallet/statement": { query: GetClientWalletStatementQuery; params: never; body: never; response: GetClientWalletStatementResponse; status: 200 };
@@ -2930,6 +2951,7 @@ export interface ApiRoutes {
   "POST /store/v1/me/notifications/:id/read": { query: never; params: PostStoreV1MeNotificationsByIdReadParams; body: never; response: PostStoreV1MeNotificationsByIdReadResponse; status: 204 };
   "GET /store/v1/me/orders": { query: GetStoreV1MeOrdersQuery; params: never; body: never; response: GetStoreV1MeOrdersResponse; status: 200 };
   "POST /store/v1/me/password": { query: never; params: never; body: PostStoreV1MePasswordBody; response: PostStoreV1MePasswordResponse; status: 204 };
+  "GET /store/v1/me/stream": { query: GetStoreV1MeStreamQuery; params: never; body: never; response: GetStoreV1MeStreamResponse; status: 200 };
   "GET /store/v1/me/wallet": { query: never; params: never; body: never; response: GetStoreV1MeWalletResponse; status: 200 };
   "GET /store/v1/me/wallet/statement": { query: GetStoreV1MeWalletStatementQuery; params: never; body: never; response: GetStoreV1MeWalletStatementResponse; status: 200 };
   "GET /store/v1/me/wallet/top-up-methods": { query: GetStoreV1MeWalletTopUpMethodsQuery; params: never; body: never; response: GetStoreV1MeWalletTopUpMethodsResponse; status: 200 };

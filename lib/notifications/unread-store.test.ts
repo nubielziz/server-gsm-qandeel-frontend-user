@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/errors";
-import { createUnreadStore, MAX_BACKOFF_MS, POLL_INTERVAL_MS, UNREAD_CAP, type UnreadEnv } from "./unread-store";
+import { createUnreadStore, LIVE_POLL_INTERVAL_MS, MAX_BACKOFF_MS, POLL_INTERVAL_MS, UNREAD_CAP, type UnreadEnv } from "./unread-store";
 
 /** A fake browser: a visibility switch and a count source that tests script. */
 function fakeEnv(options: { visible?: boolean } = {}) {
@@ -438,5 +438,109 @@ describe("failures", () => {
     await vi.advanceTimersByTimeAsync(minute); // success: back to the normal minute
     expect(fetchCount).toHaveBeenCalledTimes(4);
     stop();
+  });
+});
+
+describe("live stream", () => {
+  it("push takes a count from an event like a seed: it shows at once, clamps, and restarts the countdown", async () => {
+    const { env, fetchCount } = fakeEnv();
+    const store = createUnreadStore(env);
+    const listener = vi.fn();
+    const stop = store.subscribe("customer", listener);
+    store.push("customer", 4);
+    expect(store.getSnapshot("customer")).toBe(4);
+    expect(listener).toHaveBeenCalledTimes(1);
+    store.push("customer", 4);
+    expect(listener).toHaveBeenCalledTimes(1);
+    store.push("customer", 250);
+    expect(store.getSnapshot("customer")).toBe(UNREAD_CAP);
+
+    await vi.advanceTimersByTimeAsync(minute - 1);
+    expect(fetchCount).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchCount).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("push lifts a stop: an event proves the session works", async () => {
+    const { env, fetchCount } = fakeEnv();
+    const store = createUnreadStore(env);
+    const stop = store.subscribe("customer", () => {});
+    fetchCount.mockRejectedValueOnce(new ApiError({ status: 401, code: "UNAUTHORIZED" }));
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(10 * minute);
+    expect(fetchCount).toHaveBeenCalledTimes(1);
+    store.push("customer", 2);
+    await vi.advanceTimersByTimeAsync(minute);
+    expect(fetchCount).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  it("polls only every five minutes while the stream is open, and every minute again after it closes", async () => {
+    const { env, fetchCount } = fakeEnv();
+    const store = createUnreadStore(env);
+    store.seed("customer", 1);
+    const stop = store.subscribe("customer", () => {});
+    store.setLive("customer", true);
+
+    await vi.advanceTimersByTimeAsync(LIVE_POLL_INTERVAL_MS - 1);
+    expect(fetchCount).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchCount).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(LIVE_POLL_INTERVAL_MS);
+    expect(fetchCount).toHaveBeenCalledTimes(2);
+
+    store.setLive("customer", false);
+    await vi.advanceTimersByTimeAsync(minute - 1);
+    expect(fetchCount).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchCount).toHaveBeenCalledTimes(3);
+    stop();
+  });
+
+  it("asks at once when the stream closes after the short floor already passed", async () => {
+    const { env, fetchCount } = fakeEnv();
+    const store = createUnreadStore(env);
+    store.seed("customer", 1);
+    const stop = store.subscribe("customer", () => {});
+    store.setLive("customer", true);
+    await vi.advanceTimersByTimeAsync(3 * minute);
+    expect(fetchCount).not.toHaveBeenCalled();
+    store.setLive("customer", false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchCount).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("an event while live pushes the next safety poll five minutes out", async () => {
+    const { env, fetchCount } = fakeEnv();
+    const store = createUnreadStore(env);
+    const stop = store.subscribe("customer", () => {});
+    store.setLive("customer", true);
+    store.push("customer", 1);
+    await vi.advanceTimersByTimeAsync(4 * minute);
+    store.push("customer", 2);
+    await vi.advanceTimersByTimeAsync(4 * minute);
+    expect(fetchCount).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(minute);
+    expect(fetchCount).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("an action's refresh still asks at once while live, and each surface has its own flag", async () => {
+    const { env, fetchCount } = fakeEnv();
+    const store = createUnreadStore(env);
+    const stopCustomer = store.subscribe("customer", () => {});
+    const stopMerchant = store.subscribe("merchant", () => {});
+    store.seed("customer", 1);
+    store.seed("merchant", 1);
+    store.setLive("customer", true);
+    await store.refresh("customer");
+    expect(fetchCount).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(minute);
+    expect(fetchCount).toHaveBeenCalledTimes(2); // the merchant slot is not live: its minute passed
+    expect(fetchCount).toHaveBeenLastCalledWith("merchant");
+    stopCustomer();
+    stopMerchant();
   });
 });

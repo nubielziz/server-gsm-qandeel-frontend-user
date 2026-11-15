@@ -1,9 +1,13 @@
 "use client";
 // Toast: short confirmations ("Saved") that fade out by themselves. Mount <Toaster /> once in a layout; call
 // `toast.success("Saved")` from any Client Component or event handler. Announced politely to screen readers.
+// A toast may carry one link (`action`, for example "View" on a live notification) and the language of its own text.
+import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { dirOf, type Locale } from "@/lib/i18n/config";
+import { buttonClasses } from "./button";
 import { useUiText } from "./ui-text";
 
 export type ToastTone = "info" | "success" | "warning" | "danger";
@@ -14,9 +18,14 @@ export type ToastInput = {
   tone?: ToastTone;
   /** Milliseconds before it disappears (default 5000; 8000 for danger). */
   duration?: number;
+  /** One link under the text (a site path or URL; the toast goes away when it is followed). */
+  action?: { label: string; href: string };
+  /** The language of `title` and `description` when it is not the page's (sets `lang` and `dir` on the text). */
+  lang?: Locale;
 };
 
-type ToastItem = Required<Pick<ToastInput, "title" | "tone">> & { id: number; description?: string };
+type ToastItem = Required<Pick<ToastInput, "title" | "tone">> &
+  Pick<ToastInput, "action" | "lang"> & { id: number; description?: string };
 
 let items: ToastItem[] = [];
 let counter = 0;
@@ -34,9 +43,9 @@ export function dismissToast(id: number) {
 }
 
 /** Shows a toast and returns its id. Client-side only. */
-export function toast({ title, description, tone = "info", duration }: ToastInput): number {
+export function toast({ title, description, tone = "info", duration, action, lang }: ToastInput): number {
   const id = ++counter;
-  items = [...items.slice(-3), { id, title, description, tone }];
+  items = [...items.slice(-3), { id, title, description, tone, action, lang }];
   emit();
   setTimeout(() => dismissToast(id), duration ?? (tone === "danger" ? 8000 : 5000));
   return id;
@@ -79,8 +88,19 @@ export function Toaster() {
         >
           {icons[t.tone]}
           <div className="min-w-0 flex-1">
-            <p className="text-body font-semibold text-ink">{t.title}</p>
-            {t.description ? <p className="mt-0.5 text-small text-ink-muted">{t.description}</p> : null}
+            <div lang={t.lang} dir={t.lang ? dirOf(t.lang) : undefined}>
+              <p className="break-words text-body font-semibold text-ink">{t.title}</p>
+              {t.description ? <p className="mt-0.5 break-words text-small text-ink-muted">{t.description}</p> : null}
+            </div>
+            {t.action ? (
+              <Link
+                href={t.action.href}
+                onClick={() => dismissToast(t.id)}
+                className={buttonClasses({ variant: "secondary", size: "sm", className: "mt-3" })}
+              >
+                {t.action.label}
+              </Link>
+            ) : null}
           </div>
           <button
             type="button"

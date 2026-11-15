@@ -191,6 +191,9 @@ test.describe("customer", () => {
     await sendCampaign({ to: { type: "customer", id }, title: second, body: "two" });
     await waitForUnread(page, "customer", 2);
 
+    // Pinned to the page as drawn: the live stream would refresh it under the test (the live path is covered by
+    // realtime-notifications.spec.ts).
+    await page.route("**/store/v1/me/stream*", (route) => route.abort());
     await page.goto("/en/account/notifications");
     await expect(items(page)).toHaveCount(2);
     const newestOnScreen = await newestIdOnScreen(page);
@@ -226,6 +229,9 @@ test.describe("customer", () => {
     // The browser store asks for the count once a minute: let its clock jump instead of waiting.
     await page.clock.install();
     await page.route("**/store/v1/me/notifications/unread-count", (route) => route.fulfill({ json: { unread: 100 } }));
+    // Tests the poll alone: the stream's snapshot and its live floor would compete with the mocked count (the live path is
+    // covered by realtime-notifications.spec.ts).
+    await page.route("**/store/v1/me/stream*", (route) => route.abort());
     await page.goto("/en/account/notifications");
     const link = bell(page);
     await expect(link).toHaveAccessibleName("Notifications"); // the server's own first count is 0
@@ -287,6 +293,9 @@ test.describe("merchant", () => {
     await sendCampaign({ to: { type: "client", id }, title: older, body: "first" });
     await waitForUnread(page, "merchant", 1);
 
+    // Pinned to the page as drawn: the live stream would refresh it under the test (the live path is covered by
+    // realtime-notifications.spec.ts).
+    await page.route("**/client/stream*", (route) => route.abort());
     await page.goto("/en/merchant/notifications");
     await expect(items(page)).toHaveCount(1);
     const newestOnScreen = await newestIdOnScreen(page);

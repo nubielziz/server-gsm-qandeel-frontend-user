@@ -8,7 +8,10 @@
 // - `refresh` is for actions (an item was read): it ignores the floor but never runs two requests at once;
 // - 429 waits for `Retry-After` (at least a minute), other failures back off, and the last known count stays on screen;
 // - 401 and 403 stop the polling for good (the session is gone; the layout sends the visitor to sign-in on the next
-//   navigation). The store never signs anyone out and never changes a cookie.
+//   navigation). The store never signs anyone out and never changes a cookie;
+// - while the live stream is open (`setLive(surface, true)`, lib/realtime) the stream brings every change (`push`), so the
+//   poll only checks now and then: its floor is five minutes instead of one. A stream that closes sets the floor back
+//   and the store asks at once when the minute has already passed.
 // Import only from Client Components. `createUnreadStore` takes its dependencies so the tests need no browser.
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
@@ -18,6 +21,8 @@ import { NOTIFICATION_API, UNREAD_CAP, type NotificationSurface } from "./link";
 export { UNREAD_CAP };
 /** The least time between two polls of one surface. */
 export const POLL_INTERVAL_MS = 60_000;
+/** The same while the live stream is open: a safety poll for a doorbell that never rang (plan 27 §5). */
+export const LIVE_POLL_INTERVAL_MS = 300_000;
 /** The longest wait after a 429 or after repeated failures. */
 export const MAX_BACKOFF_MS = 10 * 60_000;
 
@@ -45,11 +50,17 @@ export type UnreadStore = {
   reconcile(surface: NotificationSurface, count: number): void;
   /** Asks the API now (after an action). Resolves when the request is over; it does nothing after a stop or during a 429 wait. */
   refresh(surface: NotificationSurface): Promise<void>;
+  /** A count a live stream event brought (`unread.changed`, `notification.created`, `notification.read`): the same as `seed`. */
+  push(surface: NotificationSurface, count: number): void;
+  /** Tells the store whether the live stream is open: the poll floor is `LIVE_POLL_INTERVAL_MS` while it is, `POLL_INTERVAL_MS` after. */
+  setLive(surface: NotificationSurface, live: boolean): void;
 };
 
 type Slot = {
   count: number | null;
   stopped: boolean;
+  /** The live stream is open: the poll floor is the long one. */
+  live: boolean;
   listeners: Set<() => void>;
   timer: ReturnType<typeof setTimeout> | undefined;
   stopVisibility: (() => void) | undefined;
@@ -82,6 +93,7 @@ export function createUnreadStore(env: UnreadEnv): UnreadStore {
     return {
       count: null,
       stopped: false,
+      live: false,
       listeners: new Set(),
       timer: undefined,
       stopVisibility: undefined,
@@ -91,6 +103,11 @@ export function createUnreadStore(env: UnreadEnv): UnreadStore {
       inFlight: false,
       again: false,
     };
+  }
+
+  /** The least time between two polls of this slot. */
+  function floorOf(slot: Slot): number {
+    return slot.live ? LIVE_POLL_INTERVAL_MS : POLL_INTERVAL_MS;
   }
 
   function clearTimer(slot: Slot) {
@@ -110,7 +127,7 @@ export function createUnreadStore(env: UnreadEnv): UnreadStore {
     clearTimer(slot);
     if (slot.stopped || slot.listeners.size === 0 || !env.isVisible()) return;
     const now = Date.now();
-    const floor = slot.lastAt === null ? 0 : slot.lastAt + POLL_INTERVAL_MS - now;
+    const floor = slot.lastAt === null ? 0 : slot.lastAt + floorOf(slot) - now;
     const delay = Math.max(0, floor, slot.blockedUntil - now);
     slot.timer = setTimeout(() => {
       slot.timer = undefined;
@@ -123,7 +140,7 @@ export function createUnreadStore(env: UnreadEnv): UnreadStore {
     const slot = slots[surface];
     if (slot.stopped) return;
     const now = Date.now();
-    if (now < slot.blockedUntil || (!force && slot.lastAt !== null && now - slot.lastAt < POLL_INTERVAL_MS)) {
+    if (now < slot.blockedUntil || (!force && slot.lastAt !== null && now - slot.lastAt < floorOf(slot))) {
       schedule(surface);
       return;
     }
@@ -214,6 +231,14 @@ export function createUnreadStore(env: UnreadEnv): UnreadStore {
     },
     refresh(surface) {
       return run(surface, true);
+    },
+    push: seedSlot,
+    setLive(surface, live) {
+      const slot = slots[surface];
+      if (slot.live === live) return;
+      slot.live = live;
+      // The floor moved: the armed timer is for the old one. When the stream closed and the short floor has passed, this polls now.
+      schedule(surface);
     },
   };
 }

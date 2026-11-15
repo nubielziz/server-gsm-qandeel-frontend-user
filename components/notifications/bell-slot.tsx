@@ -1,7 +1,8 @@
 // The bell of a workspace header, server side: reads the first unread count with the visitor's session so the bell has
 // its number in the first paint (plan D10). It reads cookies, so the layout renders it inside <Suspense> with
 // <BellSkeleton /> (the same 44 px square). A failed read is not an error for the page: the bell then starts without a
-// number and the browser store asks again at once.
+// number and the browser store asks again at once. It also mounts the live stream (notification-stream.tsx, renders
+// nothing): a stream is opened only where a bell is, never on a public page.
 import { cache } from "react";
 import { apiSessionGet } from "@/lib/api/server";
 import type { UnreadCount } from "@/lib/api/types";
@@ -11,6 +12,7 @@ import { notifications } from "@/lib/i18n/messages/notifications";
 import { NOTIFICATION_API, NOTIFICATIONS_PAGE, type NotificationSurface } from "@/lib/notifications/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Bell } from "./bell";
+import { NotificationStream } from "./notification-stream";
 
 /**
  * The unread count of a surface for this request (0 or more, the API caps it at 100), or null when it cannot be read.
@@ -32,13 +34,11 @@ export function BellSkeleton() {
 
 export async function BellSlot({ surface }: { surface: NotificationSurface }) {
   const [locale, t, initialCount] = await Promise.all([getLocale(), getMessages(notifications), readUnreadCount(surface)]);
+  const href = localePath(locale, NOTIFICATIONS_PAGE[surface]);
   return (
-    <Bell
-      surface={surface}
-      locale={locale}
-      href={localePath(locale, NOTIFICATIONS_PAGE[surface])}
-      initialCount={initialCount}
-      labels={{ bell: t.bell, bellNone: t.bellNone }}
-    />
+    <>
+      <Bell surface={surface} locale={locale} href={href} initialCount={initialCount} labels={{ bell: t.bell, bellNone: t.bellNone }} />
+      <NotificationStream surface={surface} locale={locale} href={href} labels={{ view: t.live.view, many: t.live.many }} />
+    </>
   );
 }

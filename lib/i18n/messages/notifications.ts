@@ -2,6 +2,7 @@
 // The API's own texts are English only: errors are translated by code (messages/errors.ts), the notifications' own
 // `title` and `body` come in the reader's language from the API and are shown as written.
 // "Unread" counts are written without number agreement ("Unread: 3") so Arabic needs no plural forms.
+// `live` is the live stream's own text (feature 27): the toast of a new notification and the "New notifications" pill.
 import { defineMessages } from "../define";
 
 export const notifications = defineMessages({
@@ -26,6 +27,12 @@ export const notifications = defineMessages({
     open: "Open",
     bell: "Notifications, {count} unread",
     bellNone: "Notifications",
+    live: {
+      view: "View",
+      many: "{count} new notifications",
+      pill: "New notifications",
+      pillAction: "Show",
+    },
     categories: {
       announcement: "Announcement",
       marketing: "Offers",
@@ -71,6 +78,12 @@ export const notifications = defineMessages({
     open: "فتح",
     bell: "الإشعارات، غير المقروءة: {count}",
     bellNone: "الإشعارات",
+    live: {
+      view: "عرض",
+      many: "{count} إشعارات جديدة",
+      pill: "إشعارات جديدة",
+      pillAction: "عرض",
+    },
     categories: {
       announcement: "إعلان",
       marketing: "عروض",
