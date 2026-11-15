@@ -10,17 +10,20 @@ import { ErrorTextProvider } from "@/lib/i18n/error-text";
 import { siteImage } from "@/lib/site-images";
 import "../globals.css";
 
+// Latin letters and digits on both languages. No `opsz` axis: the file stays a plain weight-only variable font
+// (48 KB instead of 73 KB), at the cost of slightly different glyph shapes at hero sizes (Next docs, font, `axes`).
 const inter = Inter({
   subsets: ["latin"],
-  axes: ["opsz"],
   variable: "--font-inter",
   display: "swap",
 });
 
-// Arabic glyphs only (unicode-range), so English pages never download it; not preloaded for the same reason.
+// Arabic glyphs, in three weights (400, 600, 700; a `font-medium` of 500 renders at 400 for Arabic). Inter leads the
+// font stack (globals.css), so Latin text and digits on Arabic pages are Inter and only Arabic script reaches this face.
+// Its unicode-range keeps English pages from downloading it; it is not preloaded for the same reason.
 const plexArabic = IBM_Plex_Sans_Arabic({
   subsets: ["arabic"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "600", "700"],
   variable: "--font-plex-arabic",
   display: "swap",
   preload: false,

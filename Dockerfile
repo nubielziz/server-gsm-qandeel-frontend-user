@@ -14,7 +14,9 @@ ARG NEXT_PUBLIC_SITE_URL
 ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
 ARG NEXT_PUBLIC_TIME_ZONE=UTC
 ARG NEXT_PUBLIC_API_PUBLIC_URL=
-ENV NEXT_TELEMETRY_DISABLED=1 NEXT_OUTPUT=standalone \
+# NEXT_COMPRESS=0 turns Next's own gzip off (next.config.ts `compress`, fixed into the standalone server at build time):
+# Caddy compresses in production (backend/deploy/Caddyfile, `encode zstd gzip`). Never expose this image without Caddy.
+ENV NEXT_TELEMETRY_DISABLED=1 NEXT_OUTPUT=standalone NEXT_COMPRESS=0 \
     GSM_API_ORIGIN=${GSM_API_ORIGIN} GSM_API_REWRITE_ORIGIN=${GSM_API_REWRITE_ORIGIN} \
     NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL} \
     NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY} \

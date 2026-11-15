@@ -1,5 +1,10 @@
 // Error texts by API code (the API's own text is English only: translate by `code`, handoff §3.3).
+// Also the texts of the error page (`page`, app/[lang]/error.tsx). The root layout hands this whole namespace to
+// <ErrorTextProvider>, so that client page needs no import of `common` (about 5 KB gzip in a chunk most routes load). The
+// page texts are read from `common`, so the wording stays in one place; only Server Components import this module's
+// values (a client import would pull `common` into the browser bundle again).
 import { defineMessages } from "../define";
+import { common } from "./common";
 
 export const errors = defineMessages({
   en: {
@@ -110,6 +115,15 @@ export const errors = defineMessages({
     requestId: "Reference: {id}",
     retryIn: "Try again in {seconds} s.",
     retryInMinutes: "Try again in about {minutes} min.",
+    page: {
+      brandName: common.en.brand.name,
+      logoAlt: common.en.brand.logoAlt,
+      title: common.en.states.errorPageTitle,
+      text: common.en.states.errorPageText,
+      retry: common.en.actions.retry,
+      goHome: common.en.actions.goHome,
+      reference: common.en.states.reference,
+    },
   },
   ar: {
     codes: {
@@ -219,6 +233,15 @@ export const errors = defineMessages({
     requestId: "المرجع: {id}",
     retryIn: "حاول مرة أخرى بعد {seconds} ث.",
     retryInMinutes: "حاول مرة أخرى بعد نحو {minutes} د.",
+    page: {
+      brandName: common.ar.brand.name,
+      logoAlt: common.ar.brand.logoAlt,
+      title: common.ar.states.errorPageTitle,
+      text: common.ar.states.errorPageText,
+      retry: common.ar.actions.retry,
+      goHome: common.ar.actions.goHome,
+      reference: common.ar.states.reference,
+    },
   },
 });
 

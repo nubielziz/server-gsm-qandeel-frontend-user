@@ -20,11 +20,15 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   // Shared (never personal) API reads. The API itself sends `max-age=30` on config and services.
-  // `catalog` carries availability (`in_stock` changes with the stock): a page nobody opened is at most 5 minutes
-  // behind. `expire: 300` is not under 5 minutes, so catalog reads stay in the prerendered shell (Next docs, cacheLife,
-  // "Prerendering behavior"). Personal data never uses a cache profile.
+  // `catalog` carries availability (`in_stock` changes with the stock). On the server it is refreshed in the
+  // background every 30 s (`revalidate`), and a page nobody opened is at most 5 minutes behind (`expire`).
+  // Neither `expire: 300` nor `stale: 300` is under 5 minutes, so catalog reads stay in the prerendered shell AND in the
+  // route's App Shell, which is what a prefetch carries (Next docs, cacheLife, "Prerendering behavior": a `stale`
+  // between 30 s and 5 min keeps the data out of the App Shell). `stale` itself only sets how long the router's
+  // client cache serves the page without asking the server ("Client cache behavior"); availability shown from that
+  // cache can be up to 5 minutes old, and checkout re-reads it on the server. Personal data never uses a cache profile.
   cacheLife: {
-    catalog: { stale: 60, revalidate: 30, expire: 300 },
+    catalog: { stale: 300, revalidate: 30, expire: 300 },
     content: { stale: 300, revalidate: 600, expire: 86400 },
   },
   // `NEXT_OUTPUT=standalone` (set by the Dockerfile) makes `next build` emit `.next/standalone`; every other build and
@@ -40,6 +44,14 @@ const nextConfig: NextConfig = {
     ],
   },
   poweredByHeader: false,
+  // Compression belongs to the reverse proxy in production: Caddy runs `encode zstd gzip` for the shop host
+  // (backend/deploy/Caddyfile). Next's own gzip flushes after every streamed chunk, so a page is about twice as big on
+  // the wire (measured on /en: 157 KB against 48-73 KB). The value is fixed into the build: the Dockerfile build stage sets
+  // `NEXT_COMPRESS=0`; every other build and a bare `next start` (lab, e2e) keep Next's gzip. docs/DEPLOY.md, section 7.
+  compress: process.env.NEXT_COMPRESS !== "0",
+  // 0: React writes every preload (fonts) as a <link> in the prerendered <head> instead of a `Link` response header.
+  // A regenerated shell (catalog pages revalidate every 30 s) loses that header, which started Inter about 600 ms late.
+  reactMaxHeadersLength: 0,
   turbopack: {
     // This app is its own root (an empty package-lock.json sits in the parent workspace folder).
     root: path.join(__dirname),

@@ -37,7 +37,8 @@ site:3000 ── server-side reads (Server Components) ──► GSM_API_ORIGIN 
 | `PORT`, `HOSTNAME` | at run time | The image sets `3000` and `0.0.0.0`. |
 
 - `NEXT_PUBLIC_*` values are written into the JavaScript at build time. Changing one needs a new image.
-- `NEXT_OUTPUT` and `NEXT_TELEMETRY_DISABLED` are set inside the `Dockerfile`; do not pass them.
+- `NEXT_OUTPUT`, `NEXT_COMPRESS` and `NEXT_TELEMETRY_DISABLED` are set inside the `Dockerfile`; do not pass them
+  (`NEXT_COMPRESS=0`: see section 7).
 - `.env*` files never enter the image (`.dockerignore`). Every build value is a `--build-arg`.
 - The `Dockerfile` stops at once when `GSM_API_ORIGIN`, `NEXT_PUBLIC_SITE_URL` or `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is empty.
 
@@ -111,6 +112,7 @@ On a running deployment:
 docker inspect --format '{{.State.Health.Status}}' <site container>   # healthy
 curl -fsS https://<SHOP_HOST>/robots.txt
 curl -fsSI https://<SHOP_HOST>/en                                      # 200
+curl -fsSI -H 'accept-encoding: zstd' https://<SHOP_HOST>/en | grep -i '^content-encoding'   # zstd, from Caddy (section 7)
 curl -fsS https://<SHOP_HOST>/store/v1/config                          # JSON from the API, not a page
 docker run --rm gsm-site:<tag> ls -a                                   # no .env file in the image
 ```
@@ -129,3 +131,31 @@ docker run --rm --network host -e PORT=5176 -e GSM_API_ORIGIN=http://localhost:3
 ```
 
 `1x00000000000000000000AA` is Cloudflare's always-pass test key. Never use it in production.
+The image built this way answers uncompressed when reached directly (section 7); that is expected.
+
+## 7. Compression
+
+Caddy compresses the site, not the Next server.
+
+- **Caddy:** `backend/deploy/Caddyfile` has `encode zstd gzip` in the `(common)` snippet that the shop host imports, so the
+  site's responses leave Caddy as zstd (gzip for clients without zstd). Caddy's `encode` decides by content type what it
+  compresses; the checks below cover a page and an in-app navigation payload (`rsc: 1`).
+- **The image:** the `Dockerfile` build stage sets `NEXT_COMPRESS=0`, which `next.config.ts` turns into `compress: false`.
+  The value is fixed into the standalone server when `next build` runs, so a run-time variable cannot change it. Next's own
+  gzip flushes after every streamed chunk, which makes a page about twice as large on the wire as proxy compression
+  (measured on `/en`: 157 KB from Next, 48 KB as zstd and 69-73 KB as gzip through a proxy).
+- **Never expose the `site` container without Caddy.** `compose.prod.yaml` publishes no port for it: it joins only the
+  `gsm` network, and Caddy is the one way in. Reached directly, it serves uncompressed responses.
+- **Other builds:** a plain `npm run build` and `next start` (the lab on :5176, the e2e runs) leave `NEXT_COMPRESS` unset and
+  keep Next's gzip, so they need no proxy.
+- **Streaming:** Caddy's `reverse_proxy` flushes at once when the upstream response has no `Content-Length` (Caddy docs,
+  `flush_interval`), so the streamed HTML still arrives in pieces. Check it on staging after the first deploy:
+
+```bash
+curl -sS -o /dev/null -D - -H 'accept-encoding: zstd' https://<SHOP_HOST>/en/services | grep -i '^content-encoding'   # zstd
+curl -sS -o /dev/null -D - -H 'accept-encoding: gzip' https://<SHOP_HOST>/en/services | grep -i '^content-encoding'   # gzip
+curl -sS -o /dev/null -D - -H 'accept-encoding: zstd' -H 'rsc: 1' https://<SHOP_HOST>/en/services | grep -i '^content-encoding'   # zstd
+curl -sS -o /dev/null -w 'first byte %{time_starttransfer}s, done %{time_total}s\n' --compressed https://<SHOP_HOST>/en/services
+```
+
+  The first byte must arrive before the body ends. If `content-encoding` is missing, the request did not go through Caddy.
