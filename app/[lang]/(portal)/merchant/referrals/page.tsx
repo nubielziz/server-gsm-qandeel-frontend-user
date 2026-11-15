@@ -26,7 +26,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Money } from "@/components/ui/money";
 import { Pagination } from "@/components/ui/pagination";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 import { PageTransition } from "@/components/layout/page-transition";
 
@@ -241,66 +241,68 @@ async function ReferralsContent({ searchParams }: { searchParams: PageProps<"/[l
             </form>
           </div>
         </CardBody>
-        <CardBody flush>
-          {!commissions.ok ? (
-            <LoadError error={commissions.error} locale={locale} />
-          ) : commissions.data.data.length === 0 ? (
-            <EmptyState
-              compact
-              icon={<Wallet aria-hidden="true" />}
-              title={filtered ? r.emptyFiltered : r.empty}
-              description={filtered ? r.emptyFilteredText : r.emptyText}
-              action={
-                filtered ? (
-                  <ButtonLink variant="secondary" href={base}>
-                    {t.referrals.tabs.all}
-                  </ButtonLink>
-                ) : undefined
-              }
-            />
-          ) : (
-            <Table stacked caption={r.caption}>
-              <TableHead>
-                <tr>
-                  <TableHeaderCell>{r.period}</TableHeaderCell>
-                  <TableHeaderCell>{r.merchant}</TableHeaderCell>
-                  <TableHeaderCell numeric>{r.basisAmount}</TableHeaderCell>
-                  <TableHeaderCell numeric>{r.percent}</TableHeaderCell>
-                  <TableHeaderCell numeric>{r.amount}</TableHeaderCell>
-                  <TableHeaderCell>{r.status}</TableHeaderCell>
-                  <TableHeaderCell>{r.approved}</TableHeaderCell>
-                </tr>
-              </TableHead>
-              <TableBody>
-                {commissions.data.data.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell label={r.period}>
-                      <span className="num" dir="ltr">
-                        {c.period}
-                      </span>
-                    </TableCell>
-                    <TableCell label={r.merchant}>
-                      <span dir="auto">{c.merchant.name}</span>
-                    </TableCell>
-                    <TableCell numeric label={r.basisAmount}>
-                      <Money amount={c.basisAmount} currency="USD" locale={locale} />
-                    </TableCell>
-                    <TableCell numeric label={r.percent}>
-                      {formatPercent(c.percent, locale)}
-                    </TableCell>
-                    <TableCell numeric label={r.amount}>
-                      <Money amount={c.amount} currency="USD" locale={locale} className="font-semibold" />
-                    </TableCell>
-                    <TableCell label={r.status}>
-                      <Badge tone={STATUS_TONES[c.status]}>{r.statuses[c.status]}</Badge>
-                    </TableCell>
-                    <TableCell label={r.approved}>{c.approvedAt ? utcDate(c.approvedAt, locale) : t.dash}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardBody>
+        <TabPanel activeKey={status ?? "all"}>
+          <CardBody flush>
+            {!commissions.ok ? (
+              <LoadError error={commissions.error} locale={locale} />
+            ) : commissions.data.data.length === 0 ? (
+              <EmptyState
+                compact
+                icon={<Wallet aria-hidden="true" />}
+                title={filtered ? r.emptyFiltered : r.empty}
+                description={filtered ? r.emptyFilteredText : r.emptyText}
+                action={
+                  filtered ? (
+                    <ButtonLink variant="secondary" href={base}>
+                      {t.referrals.tabs.all}
+                    </ButtonLink>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <Table stacked caption={r.caption}>
+                <TableHead>
+                  <tr>
+                    <TableHeaderCell>{r.period}</TableHeaderCell>
+                    <TableHeaderCell>{r.merchant}</TableHeaderCell>
+                    <TableHeaderCell numeric>{r.basisAmount}</TableHeaderCell>
+                    <TableHeaderCell numeric>{r.percent}</TableHeaderCell>
+                    <TableHeaderCell numeric>{r.amount}</TableHeaderCell>
+                    <TableHeaderCell>{r.status}</TableHeaderCell>
+                    <TableHeaderCell>{r.approved}</TableHeaderCell>
+                  </tr>
+                </TableHead>
+                <TableBody>
+                  {commissions.data.data.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell label={r.period}>
+                        <span className="num" dir="ltr">
+                          {c.period}
+                        </span>
+                      </TableCell>
+                      <TableCell label={r.merchant}>
+                        <span dir="auto">{c.merchant.name}</span>
+                      </TableCell>
+                      <TableCell numeric label={r.basisAmount}>
+                        <Money amount={c.basisAmount} currency="USD" locale={locale} />
+                      </TableCell>
+                      <TableCell numeric label={r.percent}>
+                        {formatPercent(c.percent, locale)}
+                      </TableCell>
+                      <TableCell numeric label={r.amount}>
+                        <Money amount={c.amount} currency="USD" locale={locale} className="font-semibold" />
+                      </TableCell>
+                      <TableCell label={r.status}>
+                        <Badge tone={STATUS_TONES[c.status]}>{r.statuses[c.status]}</Badge>
+                      </TableCell>
+                      <TableCell label={r.approved}>{c.approvedAt ? utcDate(c.approvedAt, locale) : t.dash}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardBody>
+        </TabPanel>
       </Card>
 
       {commissions.ok ? (

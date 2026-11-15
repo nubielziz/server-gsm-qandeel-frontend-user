@@ -78,12 +78,12 @@ describe("WorkspaceNavView: the phone tab bar", () => {
     { href: "/en/account/wallet", label: "Wallet", icon: <i data-icon="wallet" />, reserve: true },
   ];
 
-  it("shows the short label, puts the badge on the icon pill and holds a reserved item's column", () => {
+  it("shows the short label, puts the badge after the label (read after the name) and holds a reserved item's column", () => {
     const html = renderToStaticMarkup(<WorkspaceNavView items={tabs} pathname="/en/account/notifications" variant="tabs" />);
     expect(html).toContain(">Alerts</span>");
     expect(html).not.toContain(">Notifications<");
     expect(html).toMatch(
-      /aria-current="page" class="tab-link [^"]*" href="\/en\/account\/notifications"><span class="tab-icon [^"]*"><i data-icon="bell"><\/i><span class="absolute [^"]*"><b>2<\/b><\/span><\/span>/,
+      /aria-current="page" class="tab-link [^"]*" href="\/en\/account\/notifications"><span class="tab-icon [^"]*"><i data-icon="bell"><\/i><\/span><span class="max-w-full truncate">Alerts<\/span><span class="absolute [^"]*"><b>2<\/b><\/span>/,
     );
     expect(html.match(/<li[ >]/g)).toHaveLength(3);
     expect(html).not.toContain("/en/account/wallet");

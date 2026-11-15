@@ -20,7 +20,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { apiSessionGet, apiSessionList } from "@/lib/api/server";
 import type { Invoice, InvoiceDetail } from "@/lib/api/types";
 import { formatDate, formatNumber } from "@/lib/format";
@@ -183,25 +183,29 @@ async function Invoices({ searchParams }: { searchParams: Promise<SearchParams> 
                 />
               </FilterForm>
             </CardBody>
-            {rows.length === 0 ? (
-              filtered ? (
-                <EmptyState
-                  icon={<ReceiptText aria-hidden="true" />}
-                  title={t.invoices.emptyFilteredTitle}
-                  description={t.invoices.emptyFilteredText}
-                  action={<ButtonLink href={base} variant="secondary">{t.shared.clear}</ButtonLink>}
-                />
-              ) : (
-                <EmptyState
-                  icon={<ReceiptText aria-hidden="true" />}
-                  title={t.invoices.emptyTitle}
-                  description={t.invoices.emptyText}
-                  action={<ButtonLink href={localePath(locale, "/merchant/wallet/top-up")}>{t.invoices.emptyAction}</ButtonLink>}
-                />
-              )
-            ) : (
-              <InvoicesTable rows={rows} selectedId={selected?.id ?? null} filters={filters} base={base} locale={locale} t={t} c={c} />
-            )}
+            <TabPanel activeKey={filters.status}>
+              <div className="flex min-w-0 flex-col">
+                {rows.length === 0 ? (
+                  filtered ? (
+                    <EmptyState
+                      icon={<ReceiptText aria-hidden="true" />}
+                      title={t.invoices.emptyFilteredTitle}
+                      description={t.invoices.emptyFilteredText}
+                      action={<ButtonLink href={base} variant="secondary">{t.shared.clear}</ButtonLink>}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={<ReceiptText aria-hidden="true" />}
+                      title={t.invoices.emptyTitle}
+                      description={t.invoices.emptyText}
+                      action={<ButtonLink href={localePath(locale, "/merchant/wallet/top-up")}>{t.invoices.emptyAction}</ButtonLink>}
+                    />
+                  )
+                ) : (
+                  <InvoicesTable rows={rows} selectedId={selected?.id ?? null} filters={filters} base={base} locale={locale} t={t} c={c} />
+                )}
+              </div>
+            </TabPanel>
           </Card>
           <Pagination total={total} pageSize={INVOICES_PER_PAGE} page={filters.page} basePath={base} searchParams={sp} />
           <Card>

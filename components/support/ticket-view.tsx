@@ -2,7 +2,8 @@
 // thread (`/merchant/support/<id>`) (feature 28). Server component: the header, the cards and the fixed facts are static
 // output; everything that changes while the page is open (the messages, the status badge, the dates, the rating, the reply
 // box) is a client leaf inside `<TicketLive>` (`ticket-conversation.tsx`), which owns the state and the stream.
-// Conversation on the start side, ticket information on the end side (Support Tickets mockup).
+// Conversation on the start side, ticket information on the end side (Support Tickets mockup). A resolved ticket shows the
+// closed notice instead of the reply box, with "Open a new ticket" to `newTicketHref` (owner, 2026-11-15).
 import Link from "next/link";
 import type { Ticket } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
@@ -36,11 +37,13 @@ export type TicketViewProps = {
   breadcrumbs: BreadcrumbItem[];
   /** The related order as the area names it (`SF-12`, `#12`); `href` where the area has a page for it. */
   order: { text: string; href?: string } | null;
+  /** Where "Open a new ticket" of a closed ticket goes (lib/support/new-ticket-link.ts). */
+  newTicketHref: string;
 };
 
 const STATUSES: readonly TicketStatus[] = ["new", "open", "pending", "resolved"];
 
-export function TicketView({ locale, t, c, ticket, access, breadcrumbs, order }: TicketViewProps) {
+export function TicketView({ locale, t, c, ticket, access, breadcrumbs, order, newTicketHref }: TicketViewProps) {
   const i = t.ticket.info;
   const category = t.ticket.categories[ticket.category];
   const statuses = Object.fromEntries(STATUSES.map((status) => [status, statusLabel(c, "ticket", status)])) as Record<TicketStatus, string>;
@@ -71,6 +74,7 @@ export function TicketView({ locale, t, c, ticket, access, breadcrumbs, order }:
             <CardBody className="grid gap-6">
               <TicketConversation
                 locale={locale}
+                newTicketHref={newTicketHref}
                 t={{
                   conversation: t.ticket.conversation,
                   you: t.ticket.you,
@@ -79,6 +83,7 @@ export function TicketView({ locale, t, c, ticket, access, breadcrumbs, order }:
                   reply: t.ticket.reply,
                   csat: t.ticket.csat,
                   chat: t.ticket.chat,
+                  closed: t.ticket.closed,
                 }}
               />
             </CardBody>

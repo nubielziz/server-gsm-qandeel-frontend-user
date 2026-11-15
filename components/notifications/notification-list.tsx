@@ -31,7 +31,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination, pageHref } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { readUnreadCount } from "./bell-slot";
 import { CategoryIcon } from "./category-icon";
 import { LiveRefresh } from "./live-refresh";
@@ -106,90 +106,92 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
           />
         ) : null}
       </div>
-      <Card id={NOTIFICATION_FEED_ID} tabIndex={-1}>
-        {data.length === 0 ? (
-          unreadOnly ? (
-            <EmptyState
-              icon={<BellOff aria-hidden="true" />}
-              title={t.emptyUnreadTitle}
-              description={t.emptyUnreadText}
-              action={
-                <ButtonLink href={basePath} variant="secondary">
-                  {t.showAll}
-                </ButtonLink>
-              }
-            />
+      <TabPanel activeKey={unreadOnly ? "unread" : "all"}>
+        <Card id={NOTIFICATION_FEED_ID} tabIndex={-1}>
+          {data.length === 0 ? (
+            unreadOnly ? (
+              <EmptyState
+                icon={<BellOff aria-hidden="true" />}
+                title={t.emptyUnreadTitle}
+                description={t.emptyUnreadText}
+                action={
+                  <ButtonLink href={basePath} variant="secondary">
+                    {t.showAll}
+                  </ButtonLink>
+                }
+              />
+            ) : (
+              <EmptyState icon={<Bell aria-hidden="true" />} title={t.emptyTitle} description={t.emptyText} />
+            )
           ) : (
-            <EmptyState icon={<Bell aria-hidden="true" />} title={t.emptyTitle} description={t.emptyText} />
-          )
-        ) : (
-          <>
-            <ul className="divide-y divide-line">
-              {data.map((item) => {
-                const unread = item.readAt === null;
-                const titleId = `notification-${item.id}-title`;
-                const href = notificationHref(item.link, locale, surface);
-                const category = Object.hasOwn(categoryLabels, item.category) ? categoryLabels[item.category] : undefined;
-                return (
-                  <li
-                    key={item.id}
-                    data-notification-id={item.id}
-                    tabIndex={-1}
-                    className={cn(
-                      "grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 px-4 py-4 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto] sm:px-5",
-                      unread && "bg-surface-muted",
-                    )}
-                  >
-                    <span
+            <>
+              <ul className="divide-y divide-line">
+                {data.map((item) => {
+                  const unread = item.readAt === null;
+                  const titleId = `notification-${item.id}-title`;
+                  const href = notificationHref(item.link, locale, surface);
+                  const category = Object.hasOwn(categoryLabels, item.category) ? categoryLabels[item.category] : undefined;
+                  return (
+                    <li
+                      key={item.id}
+                      data-notification-id={item.id}
+                      tabIndex={-1}
                       className={cn(
-                        "grid size-10 place-items-center rounded-full [&_svg]:size-5",
-                        unread ? "bg-inverse text-on-inverse" : "bg-surface-sunken text-ink-muted",
+                        "grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 px-4 py-4 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto] sm:px-5",
+                        unread && "bg-surface-muted",
                       )}
                     >
-                      <CategoryIcon category={item.category} />
-                    </span>
-                    <div className="min-w-0">
-                      {/* The text is in the language the API chose for it, which may not be the page's. */}
-                      <div lang={item.locale} dir={dirOf(item.locale)}>
-                        <h2 id={titleId} className={cn("break-words text-body text-ink", unread ? "font-bold" : "font-semibold")}>
-                          {item.title}
-                        </h2>
-                        {item.body ? <p className="mt-1 whitespace-pre-line break-words text-body text-ink-muted">{item.body}</p> : null}
+                      <span
+                        className={cn(
+                          "grid size-10 place-items-center rounded-full [&_svg]:size-5",
+                          unread ? "bg-inverse text-on-inverse" : "bg-surface-sunken text-ink-muted",
+                        )}
+                      >
+                        <CategoryIcon category={item.category} />
+                      </span>
+                      <div className="min-w-0">
+                        {/* The text is in the language the API chose for it, which may not be the page's. */}
+                        <div lang={item.locale} dir={dirOf(item.locale)}>
+                          <h2 id={titleId} className={cn("break-words text-body text-ink", unread ? "font-bold" : "font-semibold")}>
+                            {item.title}
+                          </h2>
+                          {item.body ? <p className="mt-1 whitespace-pre-line break-words text-body text-ink-muted">{item.body}</p> : null}
+                        </div>
+                        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-small text-ink-subtle">
+                          {unread ? <Badge tone="inverse">{t.unread}</Badge> : null}
+                          {category ? (
+                            <>
+                              <span>{category}</span>
+                              <span aria-hidden="true">·</span>
+                            </>
+                          ) : null}
+                          <time dateTime={item.createdAt}>{formatDateTime(item.createdAt, locale)}</time>
+                        </p>
                       </div>
-                      <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-small text-ink-subtle">
-                        {unread ? <Badge tone="inverse">{t.unread}</Badge> : null}
-                        {category ? (
-                          <>
-                            <span>{category}</span>
-                            <span aria-hidden="true">·</span>
-                          </>
-                        ) : null}
-                        <time dateTime={item.createdAt}>{formatDateTime(item.createdAt, locale)}</time>
-                      </p>
-                    </div>
-                    {href || unread ? (
-                      <div className="max-sm:col-start-2 sm:self-start">
-                        <NotificationActions
-                          id={item.id}
-                          surface={surface}
-                          unread={unread}
-                          href={href}
-                          leavesList={unreadOnly}
-                          titleId={titleId}
-                          labels={{ open: t.open, markRead: t.markRead, markedRead: t.markedRead }}
-                        />
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-            <div className="border-t border-line px-5 py-4">
-              <Pagination total={total} pageSize={PAGE_SIZE} page={page} basePath={basePath} searchParams={filters} />
-            </div>
-          </>
-        )}
-      </Card>
+                      {href || unread ? (
+                        <div className="max-sm:col-start-2 sm:self-start">
+                          <NotificationActions
+                            id={item.id}
+                            surface={surface}
+                            unread={unread}
+                            href={href}
+                            leavesList={unreadOnly}
+                            titleId={titleId}
+                            labels={{ open: t.open, markRead: t.markRead, markedRead: t.markedRead }}
+                          />
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="border-t border-line px-5 py-4">
+                <Pagination total={total} pageSize={PAGE_SIZE} page={page} basePath={basePath} searchParams={filters} />
+              </div>
+            </>
+          )}
+        </Card>
+      </TabPanel>
     </div>
   );
 }

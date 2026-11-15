@@ -102,6 +102,8 @@ async function agentReply(id: number, body: string): Promise<number | undefined>
 }
 const agentTyping = (id: number) => adminCall("POST", `/admin/support-tickets/${id}/typing`, { json: { mode: "reply" } });
 const agentRead = (id: number, upToMessageId: number) => adminCall("POST", `/admin/support-tickets/${id}/read`, { json: { upToMessageId } });
+/** Staff close (`resolved`) or reopen (`open`) the ticket: the requester gets `ticket.updated`. */
+const setTicketStatus = (id: number, status: "resolved" | "open") => adminCall("PATCH", `/admin/support-tickets/${id}`, { json: { status } });
 
 type StaffFrame = { event: string; data: unknown };
 
@@ -338,6 +340,81 @@ test.describe("customer: the token page", () => {
     await agentTyping(id);
     await expect(page.getByText("فريق الدعم يكتب…")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("إرفاق ملف")).toBeVisible();
+  });
+});
+
+// ── Customer: a closed ticket (owner, 2026-11-15) ───────────────────────────────────────────────────────────────────
+// A resolved ticket takes no more messages from the requester (`409 TICKET_RESOLVED` from the API): the page swaps the reply
+// box for the closed notice, live, and brings the box back when staff reopen the ticket.
+
+test.describe("customer: a closed ticket", () => {
+  const notice = (page: Page) => page.getByRole("group", { name: "This ticket is closed" });
+
+  test("after staff resolve, the page shows the closed notice live and no reply box; after a reopen the box returns", async ({ page }) => {
+    const { number, token } = await fileTicket(page.request);
+    const id = await ticketIdOf(number);
+    const opened = streamOpened(page, `/store/v1/tickets/${token}/stream`);
+    await go(page, `/en/support/tickets/${token}`);
+    await hydrated(box(page));
+    await opened;
+    await page.waitForTimeout(500);
+    await markPage(page);
+    await expect(notice(page)).toHaveCount(0);
+
+    // The visitor is still writing when staff close the ticket.
+    await box(page).fill("A reply I never sent");
+    await setTicketStatus(id, "resolved");
+    await expect(notice(page)).toBeVisible({ timeout: 20_000 });
+    await expectNotReloaded(page);
+    // No reply box, no attach control, no send button; the draft is gone, and the notice says so.
+    await expect(box(page)).toHaveCount(0);
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Send reply" })).toHaveCount(0);
+    await expect(notice(page).getByText("The reply you were writing was not sent and has been cleared.")).toBeVisible();
+    await expect(notice(page).getByText("A reply I never sent")).toHaveCount(0);
+    // A guest's way on is the public form; the rating appears as before; the status badge follows.
+    await expect(notice(page).getByRole("link", { name: "Open a new ticket" })).toHaveAttribute("href", "/en/support");
+    await expect(page.getByRole("button", { name: "Send rating" })).toBeVisible();
+    await expect(page.getByText("Resolved").first()).toBeVisible();
+    // The notice sits in a polite live region, so its arrival is announced.
+    await expect(page.locator('[aria-live="polite"]').filter({ has: notice(page) })).toHaveCount(1);
+
+    // Staff reopen it: the box comes back (empty: the draft was discarded) and the notice goes, still with no reload.
+    await setTicketStatus(id, "open");
+    await expect(box(page)).toBeVisible({ timeout: 20_000 });
+    await expect(box(page)).toHaveValue("");
+    await expect(notice(page)).toHaveCount(0);
+    await expect(page.locator('input[type="file"]')).toHaveCount(1);
+    await expectNotReloaded(page);
+  });
+
+  test("a reply sent just after staff closed it (409 TICKET_RESOLVED) shows the notice and keeps the text to copy", async ({ page }) => {
+    const { number, token } = await fileTicket(page.request);
+    const id = await ticketIdOf(number);
+    // The stream is refused, so the page cannot hear about the close: only the refused send tells it.
+    await page.route(`**/store/v1/tickets/${token}/stream*`, (route) =>
+      route.fulfill({ status: 503, contentType: "application/problem+json", body: JSON.stringify({ status: 503, code: "UNAVAILABLE", title: "Unavailable" }) }),
+    );
+    await go(page, `/en/support/tickets/${token}`);
+    await hydrated(box(page));
+    await setTicketStatus(id, "resolved");
+
+    const text = `My question after the close ${tag()}`;
+    const answered = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith(`/tickets/${token}/messages`));
+    await box(page).fill(text);
+    await page.getByRole("button", { name: "Send reply" }).click();
+    const answer = await answered;
+    expect(answer.status()).toBe(409);
+    expect(((await answer.json()) as { code?: string }).code).toBe("TICKET_RESOLVED");
+
+    await expect(notice(page)).toBeVisible();
+    await expect(box(page)).toHaveCount(0);
+    // The text stays in the notice, read-only, to copy; it is not in the conversation.
+    const unsent = notice(page).getByRole("textbox", { name: "Your message (not sent)" });
+    await expect(unsent).toHaveValue(text);
+    await expect(unsent).toHaveAttribute("readonly", "");
+    await expect(log(page).getByText(text)).toHaveCount(0);
+    await expect(notice(page).getByText("was not sent and has been cleared")).toHaveCount(0);
   });
 });
 

@@ -1,6 +1,7 @@
 // New ticket for a signed-in customer (feature 28): the public form's fields without the email, the name and the security
 // check, and a picker with their recent orders. After saving, the customer lands on the ticket's conversation page. The frame
 // is static; the orders are read with the session, so the form streams behind <Suspense> with a same-size skeleton.
+// `?order=<id>` preselects that order in the picker ("Open a new ticket" of a closed ticket carries it).
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { apiSessionList } from "@/lib/api/server";
@@ -13,6 +14,7 @@ import { getLocale, getMessages } from "@/lib/i18n/server";
 import { account } from "@/lib/i18n/messages/account";
 import { common } from "@/lib/i18n/messages/common";
 import { support } from "@/lib/i18n/messages/support";
+import { orderParam } from "@/lib/support/new-ticket-link";
 import { orderLabel } from "@/components/account/orders-table";
 import { PageHeader } from "@/components/layout/container";
 import { SignedInTicketForm } from "@/components/support/signed-in-ticket-form";
@@ -40,8 +42,9 @@ function FormSkeleton() {
   );
 }
 
-async function NewTicketLoader() {
-  const [locale, s] = await Promise.all([getLocale(), getMessages(support)]);
+async function NewTicketLoader({ searchParams }: { searchParams: PageProps<"/[lang]/account/tickets/new">["searchParams"] }) {
+  const [locale, s, sp] = await Promise.all([getLocale(), getMessages(support), searchParams]);
+  const orderId = orderParam(sp.order);
   // The picker is a convenience: a failed read leaves it out and the ticket can still be opened.
   const orders = await apiSessionList<CustomerOrder>("/store/v1/me/orders", { query: listQuery({ start: 0, end: ORDER_CHOICES }) })
     .then((list) => list.data)
@@ -51,15 +54,20 @@ async function NewTicketLoader() {
       locale={locale}
       area="customer"
       t={{ form: s.form, newForm: s.newForm }}
-      orders={orders.map((order) => ({
-        id: order.id,
-        label: fmt(s.newForm.orderOption, { order: orderLabel(order.id), service: order.service.name, date: formatDate(order.createdAt, locale) }),
-      }))}
+      defaultOrderId={orderId}
+      orders={[
+        // An order older than the recent ones the picker lists: offered by its number alone.
+        ...(orderId !== null && !orders.some((order) => order.id === orderId) ? [{ id: orderId, label: orderLabel(orderId) }] : []),
+        ...orders.map((order) => ({
+          id: order.id,
+          label: fmt(s.newForm.orderOption, { order: orderLabel(order.id), service: order.service.name, date: formatDate(order.createdAt, locale) }),
+        })),
+      ]}
     />
   );
 }
 
-export default async function NewTicketPage() {
+export default async function NewTicketPage({ searchParams }: PageProps<"/[lang]/account/tickets/new">) {
   const [locale, t, c] = await Promise.all([getLocale(), getMessages(account), getMessages(common)]);
   return (
     <PageTransition>
@@ -78,7 +86,7 @@ export default async function NewTicketPage() {
         <Card>
           <CardBody>
             <Suspense fallback={<FormSkeleton />}>
-              <NewTicketLoader />
+              <NewTicketLoader searchParams={searchParams} />
             </Suspense>
           </CardBody>
         </Card>

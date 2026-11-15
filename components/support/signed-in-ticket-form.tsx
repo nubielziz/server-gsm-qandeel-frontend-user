@@ -25,17 +25,24 @@ export type SignedInTicketFormProps = {
   t: Pick<SupportMessages, "form" | "newForm">;
   /** The person's orders for the picker, already named for their area (`SF-12 · Service · Nov 9, 2026`). */
   orders: { id: number; label: string }[];
+  /** The order picked at first (`?order=`, from "Open a new ticket" of a closed ticket), when the picker offers it. */
+  defaultOrderId?: number | null;
 };
 
 const CATEGORIES: readonly Ticket["category"][] = ["refund", "delay", "failed_unlock", "billing", "wrong_imei", "howto", "presale", "other"];
 const SUBJECT_MAX = 150;
 const MESSAGE_MAX = 4000;
 
-export function SignedInTicketForm({ locale, area, t, orders }: SignedInTicketFormProps) {
+export function SignedInTicketForm({ locale, area, t, orders, defaultOrderId = null }: SignedInTicketFormProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
-  const [values, setValues] = useState({ subject: "", category: "other" as Ticket["category"], message: "", orderId: "" });
+  const [values, setValues] = useState(() => ({
+    subject: "",
+    category: "other" as Ticket["category"],
+    message: "",
+    orderId: defaultOrderId !== null && orders.some((order) => order.id === defaultOrderId) ? String(defaultOrderId) : "",
+  }));
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<FormFeedback>(NO_FEEDBACK);
   useFocusOnFeedback(feedback, form);

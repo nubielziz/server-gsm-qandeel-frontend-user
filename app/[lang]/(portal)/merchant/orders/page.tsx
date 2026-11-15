@@ -19,7 +19,7 @@ import { Money } from "@/components/ui/money";
 import { Pagination } from "@/components/ui/pagination";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { apiSessionList } from "@/lib/api/server";
 import type { MerchantOrder } from "@/lib/api/types";
 import { formatDate, formatNumber } from "@/lib/format";
@@ -145,31 +145,33 @@ async function Orders({ searchParams }: { searchParams: Promise<SearchParams> })
         />
       </div>
 
-      <Card>
-        {rows.length === 0 ? (
-          filtered ? (
-            <EmptyState
-              icon={<ClipboardList aria-hidden="true" />}
-              title={t.orders.emptyFilteredTitle}
-              description={t.orders.emptyFilteredText}
-              action={
-                <ButtonLink href={base} variant="secondary">
-                  {t.shared.clear}
-                </ButtonLink>
-              }
-            />
+      <TabPanel activeKey={filters.status}>
+        <Card>
+          {rows.length === 0 ? (
+            filtered ? (
+              <EmptyState
+                icon={<ClipboardList aria-hidden="true" />}
+                title={t.orders.emptyFilteredTitle}
+                description={t.orders.emptyFilteredText}
+                action={
+                  <ButtonLink href={base} variant="secondary">
+                    {t.shared.clear}
+                  </ButtonLink>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={<ClipboardList aria-hidden="true" />}
+                title={t.orders.emptyTitle}
+                description={t.orders.emptyText}
+                action={<ButtonLink href={localePath(locale, "/merchant/services")}>{t.orders.emptyAction}</ButtonLink>}
+              />
+            )
           ) : (
-            <EmptyState
-              icon={<ClipboardList aria-hidden="true" />}
-              title={t.orders.emptyTitle}
-              description={t.orders.emptyText}
-              action={<ButtonLink href={localePath(locale, "/merchant/services")}>{t.orders.emptyAction}</ButtonLink>}
-            />
-          )
-        ) : (
-          <OrdersTable rows={rows} locale={locale} t={t} c={c} />
-        )}
-      </Card>
+            <OrdersTable rows={rows} locale={locale} t={t} c={c} />
+          )}
+        </Card>
+      </TabPanel>
       <Pagination total={total} pageSize={ORDERS_PER_PAGE} page={filters.page} basePath={base} searchParams={sp} />
     </div>
   );

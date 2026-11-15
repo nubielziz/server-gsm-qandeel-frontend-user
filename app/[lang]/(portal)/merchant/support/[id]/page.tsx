@@ -14,6 +14,7 @@ import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { portal } from "@/lib/i18n/messages/portal";
 import { support } from "@/lib/i18n/messages/support";
+import { newTicketHref } from "@/lib/support/new-ticket-link";
 import { settle } from "@/lib/merchant/load";
 import { PageHeader } from "@/components/layout/container";
 import { PageError } from "@/components/merchant/page-error";
@@ -69,6 +70,7 @@ async function Thread({ params }: { params: PageProps<"/[lang]/merchant/support/
         { label: fmt(t.ticket.number, { number: ticket.number }) },
       ]}
       order={ticket.orderId ? { text: `#${ticket.orderId}`, href: localePath(locale, `/merchant/orders/${ticket.orderId}`) } : null}
+      newTicketHref={newTicketHref(locale, "merchant", ticket.orderId)}
     />
   );
 }

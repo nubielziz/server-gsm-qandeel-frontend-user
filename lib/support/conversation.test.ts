@@ -101,15 +101,16 @@ describe("messages: id order, once each", () => {
   });
 });
 
-describe("sent: the visitor writing reopens the ticket", () => {
-  it("moves a resolved or pending ticket back to open, clears the resolved date and the rating form", () => {
-    for (const status of ["resolved", "pending"] as const) {
-      const state = start({ status, resolvedAt: status === "resolved" ? "2026-11-15T10:00:09.000Z" : null, canRate: status === "resolved" });
-      const next = conversationReducer(state, { type: "sent", message: message(8, "you") });
-      expect(next.status).toBe("open");
-      expect(next.resolvedAt).toBeNull();
-      expect(next.canRate).toBe(false);
-    }
+describe("sent: the visitor writing moves a pending ticket to open, never reopens a resolved one", () => {
+  it("moves a pending ticket back to open", () => {
+    const next = conversationReducer(start({ status: "pending" }), { type: "sent", message: message(8, "you") });
+    expect(next.status).toBe("open");
+  });
+
+  it("leaves a resolved ticket resolved, with its date and its rating form (only staff reopen it)", () => {
+    const state = start({ status: "resolved", resolvedAt: "2026-11-15T10:00:09.000Z", canRate: true });
+    const next = conversationReducer(state, { type: "sent", message: message(8, "you") });
+    expect([next.status, next.resolvedAt, next.canRate]).toEqual(["resolved", "2026-11-15T10:00:09.000Z", true]);
   });
 
   it("leaves an open or new ticket as it is", () => {
@@ -121,6 +122,30 @@ describe("sent: the visitor writing reopens the ticket", () => {
   it("does not move the update time back", () => {
     const state = start({ updatedAt: "2026-11-15T12:00:00.000Z" });
     expect(conversationReducer(state, { type: "sent", message: message(8, "you") }).updatedAt).toBe("2026-11-15T12:00:00.000Z");
+  });
+});
+
+describe("closed: the API refused the visitor's message as 409 TICKET_RESOLVED", () => {
+  it("marks the ticket resolved and keeps everything else for the event or the read to fill in", () => {
+    const state = start({ status: "open" });
+    const next = conversationReducer(state, { type: "closed" });
+    expect(next.status).toBe("resolved");
+    expect(next.messages).toBe(state.messages);
+    expect(next.updatedAt).toBe(state.updatedAt);
+  });
+
+  it("is a no-op on a ticket already resolved", () => {
+    const state = start({ status: "resolved" });
+    expect(conversationReducer(state, { type: "closed" })).toBe(state);
+  });
+
+  it("the ticket.updated that follows (newer) brings the dates and the rating form", () => {
+    const closed = conversationReducer(start({ status: "open" }), { type: "closed" });
+    const next = conversationReducer(closed, {
+      type: "updated",
+      data: { status: "resolved", updatedAt: "2026-11-15T10:30:00.000Z", resolvedAt: "2026-11-15T10:30:00.000Z", canRate: true, csatScore: null },
+    });
+    expect([next.status, next.resolvedAt, next.canRate]).toEqual(["resolved", "2026-11-15T10:30:00.000Z", true]);
   });
 });
 

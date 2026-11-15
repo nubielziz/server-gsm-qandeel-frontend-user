@@ -98,13 +98,14 @@ export function WorkspaceNavView({ items, pathname, variant }: WorkspaceNavViewP
               <Link
                 href={item.href}
                 aria-current={current(item)}
-                className="tab-link flex h-(--ws-tabbar-h) min-w-0 flex-col items-center justify-center gap-1 px-1 text-caption font-semibold"
+                className="tab-link relative flex h-(--ws-tabbar-h) min-w-0 flex-col items-center justify-center gap-1 px-1 text-caption font-semibold"
               >
-                <span className="tab-icon relative grid h-8 w-14 place-items-center rounded-full [&_svg]:size-5">
-                  {item.icon}
-                  {item.badge ? <span className="absolute -top-1 end-1.5 inline-flex">{item.badge}</span> : null}
-                </span>
+                <span className="tab-icon relative grid h-8 w-14 place-items-center rounded-full [&_svg]:size-5">{item.icon}</span>
                 <span className="max-w-full truncate">{item.shortLabel ?? item.label}</span>
+                {/* After the label in the DOM so the name reads "Orders, 3 in progress"; drawn at the icon's top end corner. */}
+                {item.badge ? (
+                  <span className="absolute top-[calc(50%-1.75rem)] start-[calc(50%+0.875rem)] inline-flex">{item.badge}</span>
+                ) : null}
               </Link>
             </li>
           );

@@ -22,11 +22,17 @@
 //   sent at most once every 3 s (by the reply form); "Support is typing" lasts 6 s after the last event.
 // - A message that arrives scrolls the page to it only when the reader was at the end, else a "New message" button appears.
 //   A message the visitor sends always scrolls. Nothing here moves content: the lines and the button reserve or float.
+// - A resolved ticket is closed to the visitor (owner, 2026-11-15; lib/support/reply-area.ts): no reply box, no attach
+//   control, no typing ping, but a calm "This ticket is closed" notice (a polite live region) with the way to a new ticket.
+//   It follows the status live: a `ticket.updated` that resolves the ticket swaps the box for the notice (a draft is
+//   discarded, and the notice says so), a reopen brings the box back. A send that meets a ticket closed a moment ago
+//   (`409 TICKET_RESOLVED`) shows the notice with the visitor's text in it, and asks for a fresh read of the ticket.
 // No state is set from an effect: stream and DOM events call the reducer, and "New message" is worked out while rendering.
 import {
   createContext,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useReducer,
   useRef,
@@ -35,7 +41,7 @@ import {
   type Dispatch,
   type ReactNode,
 } from "react";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Lock } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
@@ -52,6 +58,7 @@ import {
   type ConversationState,
   type TicketSource,
 } from "@/lib/support/conversation";
+import { initialReplyArea, refusedAsClosed, replyAreaFor, unsentText } from "@/lib/support/reply-area";
 import { merchantAdapter, tokenAdapter, type TicketAdapter } from "@/lib/support/ticket-api";
 import { isAbout, type TicketStatus } from "@/lib/support/ticket-events";
 import { openTicketStream } from "@/lib/support/ticket-stream";
@@ -60,6 +67,8 @@ import { TicketCsatForm } from "@/components/support/ticket-csat-form";
 import { TicketMessages } from "@/components/support/ticket-messages";
 import { TicketReplyForm } from "@/components/support/ticket-reply-form";
 import { Alert } from "@/components/ui/alert";
+import { ButtonLink } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/input";
 import { DescriptionItem } from "@/components/ui/description-list";
 import { StatusBadge } from "@/components/ui/status-badge";
 
@@ -72,6 +81,8 @@ type TicketLiveValue = {
   state: ConversationState;
   dispatch: Dispatch<ConversationAction>;
   connection: ConnectionStore;
+  /** Asks for a fresh read of the ticket (merged with the other causes by the scheduler). */
+  refresh(): void;
 };
 
 const TicketLiveContext = createContext<TicketLiveValue | null>(null);
@@ -104,6 +115,8 @@ export function TicketLive({ number, access, source, children }: TicketLiveProps
   const adapter = useMemo(() => (merchantId ? merchantAdapter(merchantId) : tokenAdapter(token, number)), [token, merchantId, number]);
   const [state, dispatch] = useReducer(conversationReducer, source, initialState);
   const [connection] = useState(createConnectionStore);
+  // The scheduler lives in the effect below; event handlers reach it through this (a no-op while it is not running).
+  const requestRead = useRef<() => void>(() => undefined);
 
   // The link to the server: the stream, the fallback poll and the reads they ask for.
   useEffect(() => {
@@ -129,6 +142,7 @@ export function TicketLive({ number, access, source, children }: TicketLiveProps
     }
     // Reads are collected for 400 ms and are at least 2 s apart, however many causes ask.
     const scheduler = createRefreshScheduler({ timers: BROWSER_TIMERS, run: () => void reload() });
+    requestRead.current = () => scheduler.request();
 
     const handle = openTicketStream(adapter.stream);
     const { client } = handle;
@@ -172,6 +186,7 @@ export function TicketLive({ number, access, source, children }: TicketLiveProps
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
+      requestRead.current = () => undefined;
       document.removeEventListener("visibilitychange", onVisibility);
       window.clearInterval(timer);
       for (const stop of stops) stop();
@@ -189,7 +204,10 @@ export function TicketLive({ number, access, source, children }: TicketLiveProps
     return () => window.clearTimeout(timer);
   }, [typingUntil]);
 
-  const value = useMemo(() => ({ access, adapter, state, dispatch, connection }), [access, adapter, state, connection]);
+  const value = useMemo(
+    () => ({ access, adapter, state, dispatch, connection, refresh: () => requestRead.current() }),
+    [access, adapter, state, connection],
+  );
   return <TicketLiveContext.Provider value={value}>{children}</TicketLiveContext.Provider>;
 }
 
@@ -225,7 +243,10 @@ export function LiveTicketFacts({
 
 // ── The conversation ───────────────────────────────────────────────────────────────────────────────────────────────
 
-export type TicketConversationTexts = Pick<SupportMessages["ticket"], "conversation" | "you" | "team" | "sentAt" | "reply" | "csat" | "chat">;
+export type TicketConversationTexts = Pick<
+  SupportMessages["ticket"],
+  "conversation" | "you" | "team" | "sentAt" | "reply" | "csat" | "chat" | "closed"
+>;
 
 function subscribeVisibility(listener: () => void) {
   document.addEventListener("visibilitychange", listener);
@@ -243,9 +264,16 @@ function scrollToEnd(element: HTMLElement | null) {
 const noSubscribe = () => () => undefined;
 const canObserve = () => typeof IntersectionObserver !== "undefined";
 
-/** The messages, the typing and connection line, the rating (customers) and the reply form. */
-export function TicketConversation({ locale, t }: { locale: Locale; t: TicketConversationTexts }) {
-  const { access, adapter, state, dispatch, connection } = useTicketLive();
+export type TicketConversationProps = {
+  locale: Locale;
+  t: TicketConversationTexts;
+  /** "Open a new ticket" of the closed notice: the new-ticket form of the surface (lib/support/new-ticket-link.ts). */
+  newTicketHref: string;
+};
+
+/** The messages, the typing and connection line, the rating (customers) and the reply form, or the closed notice. */
+export function TicketConversation({ locale, t, newTicketHref }: TicketConversationProps) {
+  const { access, adapter, state, dispatch, connection, refresh } = useTicketLive();
   const end = useRef<HTMLDivElement>(null);
   const markedUpTo = useRef(0);
 
@@ -312,7 +340,24 @@ export function TicketConversation({ locale, t }: { locale: Locale; t: TicketCon
     );
   }, [adapter, dispatch, lastSupportId, state.seenByYou, visible, endShown]);
 
-  const hint = state.status === "resolved" ? t.reply.reopens : state.status === "pending" ? t.reply.pendingHint : undefined;
+  // The reply box or the closed notice: worked out while rendering from the live status (not from an effect). `drafting` is
+  // told by the box on every change the visitor makes.
+  const [drafting, setDrafting] = useState(false);
+  const [area, setArea] = useState(() => initialReplyArea(state.status));
+  const nextArea = replyAreaFor(area, state.status, drafting);
+  if (nextArea !== area) {
+    setArea(nextArea);
+    setDrafting(nextArea.closed ? false : nextArea.restore.trim() !== "");
+  }
+  const closed = nextArea.closed;
+  /** The API refused a message or a file as closed: the notice keeps the text, the ticket is read again for its dates. */
+  function onRefusedClosed(text: string) {
+    setArea((current) => (current.closed ? current : refusedAsClosed(current, text)));
+    dispatch({ type: "closed" });
+    refresh();
+  }
+
+  const hint = state.status === "pending" ? t.reply.pendingHint : undefined;
   const typing = state.typingUntil !== 0;
 
   return (
@@ -366,14 +411,97 @@ export function TicketConversation({ locale, t }: { locale: Locale; t: TicketCon
       ) : null}
 
       <div className="border-t border-line pt-5">
-        <TicketReplyForm
-          adapter={adapter}
-          locale={locale}
-          t={t.reply}
-          hint={hint}
-          onSent={(message) => dispatch({ type: "sent", message })}
-        />
+        {/* Always there, so the notice is announced when it appears. */}
+        <div aria-live="polite">
+          {closed ? (
+            <TicketClosedNotice
+              t={t.closed}
+              href={newTicketHref}
+              discarded={nextArea.discarded}
+              unsent={unsentText(nextArea)}
+              takeFocus={nextArea.live}
+            />
+          ) : null}
+        </div>
+        {closed ? null : (
+          <TicketReplyForm
+            adapter={adapter}
+            locale={locale}
+            t={t.reply}
+            hint={hint}
+            initialBody={nextArea.restore}
+            onSent={(message) => dispatch({ type: "sent", message })}
+            onDraft={setDrafting}
+            onClosed={onRefusedClosed}
+          />
+        )}
       </div>
     </>
+  );
+}
+
+/**
+ * "This ticket is closed": what a closed ticket shows instead of the reply box, with the way to a new ticket. `discarded`
+ * says the visitor's draft was thrown away; `unsent` is the text of a send refused as closed, shown read-only to copy.
+ * `takeFocus`: it replaced the box while the page was open, so it takes the focus the box had (never on page load).
+ */
+function TicketClosedNotice({
+  t,
+  href,
+  discarded,
+  unsent,
+  takeFocus,
+}: {
+  t: TicketConversationTexts["closed"];
+  href: string;
+  discarded: boolean;
+  unsent: string | null;
+  takeFocus: boolean;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    // The box (and the focus in it) just went away: keep a keyboard or screen reader user here instead of at the page top.
+    if (!takeFocus) return;
+    const active = document.activeElement;
+    if (!active || active === document.body) box.current?.focus({ preventScroll: true });
+  }, [takeFocus]);
+
+  return (
+    <div
+      ref={box}
+      tabIndex={-1}
+      role="group"
+      aria-labelledby={titleId}
+      className="flex items-start gap-3 rounded-card border border-line bg-surface-muted px-4 py-4"
+    >
+      <span className="mt-0.5 shrink-0 text-ink-muted [&_svg]:size-5">
+        <Lock aria-hidden="true" />
+      </span>
+      <div className="grid min-w-0 flex-1 gap-3">
+        <div>
+          <h3 id={titleId} className="text-body font-semibold text-ink">
+            {t.title}
+          </h3>
+          <p className="mt-0.5 text-body text-ink-muted">{t.text}</p>
+          {discarded ? <p className="mt-1 text-small text-ink-subtle">{t.discarded}</p> : null}
+        </div>
+        {unsent !== null ? (
+          <Textarea
+            name="unsent"
+            label={t.unsentLabel}
+            hint={t.unsentHint}
+            readOnly
+            rows={Math.min(6, Math.max(2, unsent.split("\n").length))}
+            value={unsent}
+          />
+        ) : null}
+        <div>
+          <ButtonLink href={href} variant="secondary" size="sm">
+            {t.newTicket}
+          </ButtonLink>
+        </div>
+      </div>
+    </div>
   );
 }

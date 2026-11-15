@@ -1,7 +1,8 @@
 // Server-rendered markup of the live ticket parts (the state machine is tested in lib/support/*.test.ts; the stream and the
 // timers need a browser and are covered by e2e/support-live.spec.ts). What this guards: the first state is the server's ticket,
 // the receipt, the reserved lines, the files as plain links, the rating only for customers, the hints by status, the
-// Arabic text, and that the reply box and the attach control are real labelled controls.
+// Arabic text, that the reply box and the attach control are real labelled controls, and that a resolved ticket shows the
+// closed notice instead of them (owner, 2026-11-15).
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ErrorTextProvider } from "@/lib/i18n/error-text";
@@ -32,7 +33,7 @@ const source = (overrides: Partial<TicketSource> = {}): TicketSource => ({
   ...overrides,
 });
 
-function render(options: { source?: TicketSource; access?: TicketAccess; locale?: "en" | "ar" } = {}) {
+function render(options: { source?: TicketSource; access?: TicketAccess; locale?: "en" | "ar"; newTicketHref?: string } = {}) {
   const locale = options.locale ?? "en";
   const t = support[locale].ticket;
   return renderToStaticMarkup(
@@ -41,7 +42,8 @@ function render(options: { source?: TicketSource; access?: TicketAccess; locale?
         <LiveTicketStatus labels={statuses} />
         <TicketConversation
           locale={locale}
-          t={{ conversation: t.conversation, you: t.you, team: t.team, sentAt: t.sentAt, reply: t.reply, csat: t.csat, chat: t.chat }}
+          newTicketHref={options.newTicketHref ?? `/${locale}/support`}
+          t={{ conversation: t.conversation, you: t.you, team: t.team, sentAt: t.sentAt, reply: t.reply, csat: t.csat, chat: t.chat, closed: t.closed }}
         />
       </TicketLive>
     </ErrorTextProvider>,
@@ -156,11 +158,50 @@ describe("the reply box", () => {
   });
 
   it("says why a reply matters by the live status", () => {
-    expect(render({ source: source({ status: "resolved" }) })).toContain("This ticket is resolved. Your reply reopens it.");
     expect(render({ source: source({ status: "pending" }) })).toContain("We are waiting for your reply.");
     const open = render({ source: source({ status: "open" }) });
-    expect(open).not.toContain("Your reply reopens it");
     expect(open).not.toContain("We are waiting for your reply.");
+    expect(open).not.toContain("This ticket is closed");
+    // The notice's live region is always there (empty while the ticket is open), so a close is announced.
+    expect(open).toMatch(/<div aria-live="polite"><\/div>/);
+  });
+});
+
+describe("a resolved ticket is closed: the notice instead of the reply box", () => {
+  it("has no reply box, no attach control and no send button, but the closed notice with the way to a new ticket", () => {
+    const html = render({ source: source({ status: "resolved", resolvedAt: "2026-11-15T10:08:00.000Z" }), newTicketHref: "/en/account/tickets/new?order=12" });
+    expect(html).not.toContain('name="body"');
+    expect(html).not.toContain('type="file"');
+    expect(html).not.toContain("Send reply");
+    expect(html).not.toContain("Your reply reopens it");
+    expect(html).toMatch(/<div aria-live="polite"><div tabindex="-1" role="group" aria-labelledby="[^"]+"/);
+    expect(html).toContain("This ticket is closed</h3>");
+    expect(html).toContain("If you still need help, open a new ticket.");
+    expect(html).toMatch(/<a[^>]*href="\/en\/account\/tickets\/new\?order=12"[^>]*>Open a new ticket/);
+    // Nothing was being written: no word about a discarded draft, no unsent text.
+    expect(html).not.toContain("was not sent");
+    expect(html).not.toContain('name="unsent"');
+  });
+
+  it("keeps the rating for a customer, and the conversation and its files readable", () => {
+    const html = render({ source: source({ status: "resolved", canRate: true }) });
+    expect(html).toContain("Send rating");
+    expect(html).toContain("This ticket is closed");
+    expect(html).toContain("We are on it");
+    expect(html).toContain('href="/store/v1/tickets/tok/files/9"');
+  });
+
+  it("a merchant's closed thread offers the portal's new-ticket form", () => {
+    const html = render({ access: { kind: "merchant", id: 7 }, source: source({ status: "resolved" }), newTicketHref: "/en/merchant/support/new" });
+    expect(html).toMatch(/href="\/en\/merchant\/support\/new"[^>]*>Open a new ticket/);
+    expect(html).not.toContain('name="body"');
+  });
+
+  it("is written in Arabic on an Arabic page", () => {
+    const html = render({ locale: "ar", source: source({ status: "resolved" }) });
+    expect(html).toContain("هذه التذكرة مغلقة");
+    expect(html).toContain("فتح تذكرة جديدة");
+    expect(html).not.toContain("This ticket is closed");
   });
 });
 

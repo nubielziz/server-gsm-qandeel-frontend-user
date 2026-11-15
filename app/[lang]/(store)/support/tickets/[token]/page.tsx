@@ -1,10 +1,12 @@
 // A support ticket, opened from the link in its email or from "My tickets" (`/support/tickets/<token>`). The token IS the
 // credential: the page is never indexed and sends no Referer. The ticket is read at request time, so it streams behind
 // <Suspense>; that read is the first state of the live conversation (`TicketView`, feature 28): messages, typing, seen
-// marks and files arrive through the ticket's own stream, with no reload and no `router.refresh()`.
+// marks and files arrive through the ticket's own stream, with no reload and no `router.refresh()`. A closed (resolved)
+// ticket offers a new one: the account's form to a signed-in customer (with the order), the public form to a guest.
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { apiSessionGet } from "@/lib/api/server";
+import { getCustomer } from "@/lib/api/session";
 import { isApiError } from "@/lib/api/errors";
 import { BusyState } from "@/components/ui/busy-state";
 import type { Ticket } from "@/lib/api/types";
@@ -13,6 +15,7 @@ import { fmt } from "@/lib/i18n/define";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { support } from "@/lib/i18n/messages/support";
+import { newTicketHref } from "@/lib/support/new-ticket-link";
 import { TicketView } from "@/components/support/ticket-view";
 import { Container, PageHeader } from "@/components/layout/container";
 import { PageTransition } from "@/components/layout/page-transition";
@@ -37,7 +40,14 @@ function TicketSkeleton() {
 }
 
 async function TicketContent({ params }: { params: PageProps<"/[lang]/support/tickets/[token]">["params"] }) {
-  const [{ token }, locale, t, c] = await Promise.all([params, getLocale(), getMessages(support), getMessages(common)]);
+  const [{ token }, locale, t, c, customer] = await Promise.all([
+    params,
+    getLocale(),
+    getMessages(support),
+    getMessages(common),
+    // Only decides where "Open a new ticket" goes: a failed session read must not break the page.
+    getCustomer().catch(() => null),
+  ]);
   let ticket: Ticket;
   try {
     ticket = await apiSessionGet<Ticket>(`/store/v1/tickets/${encodeURIComponent(token)}`);
@@ -67,6 +77,7 @@ async function TicketContent({ params }: { params: PageProps<"/[lang]/support/ti
       access={{ kind: "token", token }}
       breadcrumbs={[{ label: t.ticket.support, href: localePath(locale, "/support") }, { label: fmt(t.ticket.number, { number: ticket.number }) }]}
       order={ticket.orderId ? { text: `SF-${ticket.orderId}` } : null}
+      newTicketHref={newTicketHref(locale, customer ? "customer" : "guest", ticket.orderId)}
     />
   );
 }

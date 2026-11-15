@@ -268,6 +268,8 @@
      scrolls into view, how much scrolling that takes, and how much later each next card of a grid row starts. */
   --rise-page: 8px;
   --rise-reveal: 12px;
+  /* How far the view under link tabs slides when a tab is picked ("Link tab panels" below). */
+  --shift-tab: 8px;
   --reveal-distance: 6rem;
   --reveal-step: 1.25rem;
   /* The workspace's phone tab bar (components/layout/workspace-shell.tsx): its height above the safe area; the frame's
@@ -582,6 +584,46 @@ html:lang(ar) *::after {
   }
 }
 
+/* ── Link tab panels (components/ui/tabs.tsx <TabPanel>; owner, 2026-11-15) ─────────────────────────────────────────
+   A tab click swaps the view under the tabs with a short directional move: picking a tab towards the end side (left in
+   Arabic) brings the new list in from the end side while the old one leaves toward the start side, `--shift-tab` px and
+   a fade (old: --duration-fast, new: --duration-base). The direction comes from the link's transition type
+   (`tab-to-end` / `tab-to-start`, tabs-indicator.ts); everything else (first load, paging, filters, refreshes, the
+   browser's back and forward) swaps at once. The tab row is part of the root, which swaps at once, so it never fades and
+   its sliding indicator stays live. `--inline-dir` mirrors the move in Arabic; reduced motion makes it instant. */
+::view-transition-old(.tab-out-to-start),
+::view-transition-old(.tab-out-to-end) {
+  animation: tab-out var(--duration-fast) var(--ease-standard) both;
+}
+::view-transition-old(.tab-out-to-start) {
+  --tab-shift: calc(var(--inline-dir) * -1 * var(--shift-tab));
+}
+::view-transition-old(.tab-out-to-end) {
+  --tab-shift: calc(var(--inline-dir) * var(--shift-tab));
+}
+::view-transition-new(.tab-in-from-end),
+::view-transition-new(.tab-in-from-start) {
+  animation: tab-in var(--duration-base) var(--ease-glide) both;
+}
+::view-transition-new(.tab-in-from-end) {
+  --tab-shift: calc(var(--inline-dir) * var(--shift-tab));
+}
+::view-transition-new(.tab-in-from-start) {
+  --tab-shift: calc(var(--inline-dir) * -1 * var(--shift-tab));
+}
+@keyframes tab-out {
+  to {
+    opacity: 0;
+    transform: translateX(var(--tab-shift));
+  }
+}
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--tab-shift));
+  }
+}
+
 /* ── Scroll reveals ──────────────────────────────────────────────────────────────────────────────────────────────────
    `.reveal` (a block) and `.reveal-grid` (each child of a grid) fade in and rise as they scroll into view: a CSS
    scroll-driven animation (no JavaScript), fully shown once their top is `--reveal-distance` above the bottom of the
@@ -879,6 +921,89 @@ html:lang(ar) *::after {
   .nav-dot {
     background-color: var(--color-danger);
     box-shadow: 0 0 0 2px var(--badge-ring, var(--color-surface));
+  }
+
+  /* Link tabs (components/ui/tabs.tsx, tabs-nav.tsx; owner, 2026-11-15): the underline, or the black pill of
+     `variant="pill"`, slides and resizes to the new tab on a client navigation.
+     - Server HTML, before hydration and without JavaScript (the nav without `data-indicator`): the current tab draws its
+       own look: its `.tabs-mark` underline, or the black pill with white text.
+     - Once the indicator is placed (`data-indicator`): the indicator draws it. Three pieces (two round caps and a middle
+       stretched with `scale`, tabs-indicator.ts) move on `translate` and `scale` only, --duration-slow and --ease-glide;
+       instant with reduced motion (see "Motion preferences"). On the pill, a link's text turns white when the pill covers
+       half of it (a rule the nav renders itself, by href); a covered link never shows the hover background.
+     - Placed from measured physical offsets (the same px in both writing directions), so `left`/`top` and the caps'
+       corners are physical on purpose. */
+  .tabs-link {
+    color: var(--color-ink-muted);
+    transition:
+      color var(--duration-fast) var(--ease-standard),
+      background-color var(--duration-fast) var(--ease-standard);
+  }
+  .tabs-count {
+    background-color: var(--tabs-count-bg, var(--color-surface-sunken));
+    color: var(--tabs-count-ink, var(--color-ink-muted));
+    transition:
+      color var(--duration-fast) var(--ease-standard),
+      background-color var(--duration-fast) var(--ease-standard);
+  }
+  @media (hover: hover) {
+    .tabs-link:hover {
+      color: var(--color-ink);
+    }
+    .tabs-pill .tabs-link:not([aria-current="page"]):hover {
+      background-color: var(--color-surface-sunken);
+    }
+  }
+  .tabs-underline .tabs-link[aria-current="page"] {
+    color: var(--color-ink);
+  }
+  .tabs-underline:not([data-indicator]) .tabs-link[aria-current="page"] .tabs-mark {
+    background-color: var(--color-ink);
+  }
+  .tabs-pill:not([data-indicator]) .tabs-link[aria-current="page"] {
+    --tabs-count-bg: var(--color-inverse-raised);
+    --tabs-count-ink: var(--color-on-inverse);
+    color: var(--color-on-inverse);
+    background-color: var(--color-inverse);
+  }
+  .tabs-underline {
+    --tabs-indicator: var(--color-ink);
+  }
+  .tabs-pill {
+    --tabs-indicator: var(--color-inverse);
+  }
+  .tabs-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: none;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .tabs[data-indicator] > .tabs-indicator {
+    display: block;
+  }
+  .tabs-indicator > span {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: var(--tabs-indicator);
+    transition-property: translate, scale;
+    transition-duration: var(--duration-slow);
+    transition-timing-function: var(--ease-glide);
+  }
+  .tabs-cap-start {
+    border-top-left-radius: 9999px;
+    border-bottom-left-radius: 9999px;
+  }
+  .tabs-cap-end {
+    border-top-right-radius: 9999px;
+    border-bottom-right-radius: 9999px;
+  }
+  /* 100px = MIDDLE_BASE (tabs-indicator.ts): `scale` stretches it to the tab from its physical left edge. */
+  .tabs-middle {
+    width: 100px;
+    transform-origin: 0 0;
   }
 
   /* Skeleton: a calm sunken block with a light sweep. */

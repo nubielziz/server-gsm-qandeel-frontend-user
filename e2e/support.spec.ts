@@ -175,19 +175,28 @@ test.describe("new ticket form", () => {
     const box = await answer.boundingBox();
     const mine = await page.getByRole("log").getByText("Any news? Thank you.").boundingBox();
     expect(box!.x).toBeLessThan(mine!.x); // support (start side) sits left of you (end side) in English
-    await expect(page.getByText("This ticket is resolved. Your reply reopens it.")).toBeVisible();
+    // A resolved ticket is closed to the customer (owner, 2026-11-15): no reply box and no attach control, but the closed
+    // notice with the way to a new ticket (a guest: the public form; the order is not carried, its field takes a link).
+    const closed = page.getByRole("group", { name: "This ticket is closed" });
+    await expect(closed).toBeVisible();
+    await expect(closed.getByRole("link", { name: "Open a new ticket" })).toHaveAttribute("href", "/en/support");
+    await expect(page.locator('textarea[name="body"]')).toHaveCount(0);
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Send reply" })).toHaveCount(0);
 
+    // The rating still works on a closed ticket.
     await expect(page.getByRole("button", { name: "Send rating" })).toBeDisabled();
     await page.getByRole("radiogroup", { name: "Rating" }).getByText("5", { exact: true }).click();
     await page.getByRole("button", { name: "Send rating" }).click();
     await expect(page.getByText("Thank you for rating this ticket 5 out of 5.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Send rating" })).toHaveCount(0);
 
-    // Replying to a resolved ticket reopens it.
-    await page.locator('textarea[name="body"]').fill("One more question.");
-    await page.getByRole("button", { name: "Send reply" }).click();
-    await expect(page.getByRole("log").getByText("One more question.")).toBeVisible();
-    await expect(page.getByText("In progress").first()).toBeVisible();
+    // Writing on it is refused by the API itself: only staff reopen a ticket.
+    const refused = await page.request.post(`/store/v1/tickets/${page.url().split("/").pop()}/messages`, { data: { body: "One more question." } });
+    expect(refused.status()).toBe(409);
+    expect(((await refused.json()) as { code?: string }).code).toBe("TICKET_RESOLVED");
+    await expect(closed).toBeVisible();
+    await expect(page.getByRole("log").getByText("One more question.")).toHaveCount(0);
   });
 
   test("with an email only: no token comes back, the page says a link was emailed, the mail link opens the ticket", async ({ page }) => {

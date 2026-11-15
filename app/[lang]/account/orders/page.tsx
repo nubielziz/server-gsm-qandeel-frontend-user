@@ -19,7 +19,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination, pageHref } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { PageTransition } from "@/components/layout/page-transition";
 
 const PAGE_SIZE = 20;
@@ -62,36 +62,38 @@ async function OrdersContent({ searchParams }: { searchParams: PageProps<"/[lang
   return (
     <div className="grid gap-4">
       <Tabs label={t.orders.tabsLabel} items={tabs} activeKey={status ?? "all"} />
-      <Card>
-        {data.length === 0 ? (
-          status ? (
-            <EmptyState
-              icon={<ClipboardList aria-hidden="true" />}
-              title={fmt(t.orders.emptyFilteredTitle, { status: statusLabel(c, "order", status).toLowerCase() })}
-              description={t.orders.emptyFilteredText}
-              action={
-                <ButtonLink href={basePath} variant="secondary">
-                  {t.orders.showAll}
-                </ButtonLink>
-              }
-            />
+      <TabPanel activeKey={status ?? "all"}>
+        <Card>
+          {data.length === 0 ? (
+            status ? (
+              <EmptyState
+                icon={<ClipboardList aria-hidden="true" />}
+                title={fmt(t.orders.emptyFilteredTitle, { status: statusLabel(c, "order", status).toLowerCase() })}
+                description={t.orders.emptyFilteredText}
+                action={
+                  <ButtonLink href={basePath} variant="secondary">
+                    {t.orders.showAll}
+                  </ButtonLink>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={<ClipboardList aria-hidden="true" />}
+                title={t.orders.emptyTitle}
+                description={t.orders.emptyText}
+                action={<ButtonLink href={localePath(locale, "/services")}>{t.orders.browse}</ButtonLink>}
+              />
+            )
           ) : (
-            <EmptyState
-              icon={<ClipboardList aria-hidden="true" />}
-              title={t.orders.emptyTitle}
-              description={t.orders.emptyText}
-              action={<ButtonLink href={localePath(locale, "/services")}>{t.orders.browse}</ButtonLink>}
-            />
-          )
-        ) : (
-          <>
-            <OrdersTable orders={data} />
-            <div className="border-t border-line px-5 py-4">
-              <Pagination total={total} pageSize={PAGE_SIZE} page={page} basePath={basePath} searchParams={filters} />
-            </div>
-          </>
-        )}
-      </Card>
+            <>
+              <OrdersTable orders={data} />
+              <div className="border-t border-line px-5 py-4">
+                <Pagination total={total} pageSize={PAGE_SIZE} page={page} basePath={basePath} searchParams={filters} />
+              </div>
+            </>
+          )}
+        </Card>
+      </TabPanel>
     </div>
   );
 }

@@ -17,7 +17,7 @@ import { Input, Select } from "@/components/ui/input";
 import { Money } from "@/components/ui/money";
 import { Pagination } from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { apiSessionList } from "@/lib/api/server";
 import { listQuery } from "@/lib/api/query";
 import type { MerchantService } from "@/lib/api/types";
@@ -147,18 +147,20 @@ async function Catalog({ searchParams }: { searchParams: Promise<SearchParams> }
         />
       </div>
 
-      <Card>
-        {rows.length === 0 ? (
-          <EmptyState
-            icon={<PackageSearch aria-hidden="true" />}
-            title={filtered ? t.catalog.emptyTitle : t.catalog.emptyCatalogTitle}
-            description={filtered ? t.catalog.emptyText : t.catalog.emptyCatalogText}
-            action={filtered ? <ButtonLink href={base} variant="secondary">{t.shared.clear}</ButtonLink> : undefined}
-          />
-        ) : (
-          <ServicesTable rows={rows} locale={locale} t={t} c={c} />
-        )}
-      </Card>
+      <TabPanel activeKey={filters.type}>
+        <Card>
+          {rows.length === 0 ? (
+            <EmptyState
+              icon={<PackageSearch aria-hidden="true" />}
+              title={filtered ? t.catalog.emptyTitle : t.catalog.emptyCatalogTitle}
+              description={filtered ? t.catalog.emptyText : t.catalog.emptyCatalogText}
+              action={filtered ? <ButtonLink href={base} variant="secondary">{t.shared.clear}</ButtonLink> : undefined}
+            />
+          ) : (
+            <ServicesTable rows={rows} locale={locale} t={t} c={c} />
+          )}
+        </Card>
+      </TabPanel>
       <Pagination total={total} pageSize={SERVICES_PER_PAGE} page={filters.page} basePath={base} searchParams={sp} />
     </div>
   );

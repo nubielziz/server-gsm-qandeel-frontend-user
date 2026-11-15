@@ -4,7 +4,9 @@
 // The answer of the `POST` goes to `onSent`, which appends it to the conversation: there is no `router.refresh()` any
 // more, and the event the stream sends for the same message is ignored by id. The box tells the other side the visitor is
 // typing, at most once every 3 s (a refused ping is harmless and silent). Focus stays in the box after sending.
-// Replying reopens a resolved ticket and moves a pending one back to open (the page's hint says so).
+// Replying moves a pending ticket back to open (the page's hint says so). A resolved ticket shows no box at all (the
+// conversation shows the closed notice instead, owner 2026-11-15); a send or an upload that still meets one (staff closed it
+// a moment ago) answers `409 TICKET_RESOLVED`, which goes to `onClosed` with the box's text so the notice can keep it.
 import { useId, useReducer, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import { FileText, Paperclip, Send, X } from "lucide-react";
 import { isApiError } from "@/lib/api/errors";
@@ -27,6 +29,7 @@ import {
   type Chip,
 } from "@/lib/support/attachments";
 import { shouldSendTyping } from "@/lib/support/conversation";
+import { TICKET_RESOLVED } from "@/lib/support/reply-area";
 import type { TicketAdapter } from "@/lib/support/ticket-api";
 import { FormAlert } from "@/components/auth/form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "@/components/auth/form-errors";
@@ -41,22 +44,31 @@ export type TicketReplyFormProps = {
   adapter: Pick<TicketAdapter, "send" | "upload" | "typing">;
   locale: Locale;
   t: SupportMessages["ticket"]["reply"];
-  /** Shown above the box: "This ticket is resolved. Your reply reopens it." or "We are waiting for your reply." */
+  /** Shown above the box: "We are waiting for your reply." */
   hint?: string;
+  /** The text the box starts with (a message the API refused while the ticket was closed, back after a reopen). */
+  initialBody?: string;
   /** The message as the API stored it: the conversation appends it. */
   onSent(message: TicketMessage): void;
+  /** Whether the box holds unsent text or files, told on every change the visitor makes. */
+  onDraft?(drafting: boolean): void;
+  /** The API refused a message or a file because the ticket is closed: `text` is what the box held. */
+  onClosed?(text: string): void;
 };
+
+/** A message or file refused because staff resolved the ticket. */
+const refusedAsClosed = (error: unknown) => isApiError(error) && error.code === TICKET_RESOLVED;
 
 const BODY_MAX = 4000;
 
-export function TicketReplyForm({ adapter, locale, t, hint, onSent }: TicketReplyFormProps) {
+export function TicketReplyForm({ adapter, locale, t, hint, initialBody = "", onSent, onDraft, onClosed }: TicketReplyFormProps) {
   const errorText = useErrorText();
   const hintId = useId();
   const form = useRef<HTMLFormElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const nextKey = useRef(1);
   const lastTypingAt = useRef<number | null>(null);
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(initialBody);
   const [chips, dispatch] = useReducer(chipsReducer, [] as Chip[]);
   /** A sentence about the last pick that is not about one file (too many files). */
   const [pickNote, setPickNote] = useState<string | null>(null);
@@ -81,6 +93,7 @@ export function TicketReplyForm({ adapter, locale, t, hint, onSent }: TicketRepl
   function onType(event: ChangeEvent<HTMLTextAreaElement>) {
     const text = event.target.value;
     setBody(text);
+    onDraft?.(text.trim() !== "" || chips.length > 0);
     const now = Date.now();
     if (shouldSendTyping({ text, lastSentAt: lastTypingAt.current, now })) {
       lastTypingAt.current = now;
@@ -113,10 +126,14 @@ export function TicketReplyForm({ adapter, locale, t, hint, onSent }: TicketRepl
       if (!refused) uploads.push({ key, file });
     });
     dispatch({ type: "add", chips: added });
+    onDraft?.(body.trim() !== "" || chips.length + added.length > 0);
     for (const { key, file } of uploads) {
       adapter.upload(file).then(
         (uploaded) => dispatch({ type: "done", key, fileId: uploaded.id }),
-        (error: unknown) => dispatch({ type: "fail", key, error: uploadErrorText(error) }),
+        (error: unknown) => {
+          dispatch({ type: "fail", key, error: uploadErrorText(error) });
+          if (refusedAsClosed(error)) onClosed?.(box.current?.value ?? body);
+        },
       );
     }
   }
@@ -139,11 +156,14 @@ export function TicketReplyForm({ adapter, locale, t, hint, onSent }: TicketRepl
       setBody("");
       setPickNote(null);
       dispatch({ type: "clear" });
+      onDraft?.(false);
       toast.success(t.sent);
       onSent(message);
       box.current?.focus();
     } catch (error) {
-      setFeedback(feedbackFrom(error, errorText, ["body", "fileIds"]));
+      // Staff closed the ticket a moment ago: the conversation swaps the box for the closed notice, which keeps the text.
+      if (refusedAsClosed(error) && onClosed) onClosed(body);
+      else setFeedback(feedbackFrom(error, errorText, ["body", "fileIds"]));
     } finally {
       setBusy(false);
     }
@@ -198,7 +218,14 @@ export function TicketReplyForm({ adapter, locale, t, hint, onSent }: TicketRepl
                   <span className="num block text-ink-subtle">{chip.status === "uploading" ? t.uploading : formatFileSize(chip.size, locale)}</span>
                 )}
               </span>
-              <IconButton label={fmt(t.removeFile, { name: chip.name })} size="sm" onClick={() => dispatch({ type: "remove", key: chip.key })}>
+              <IconButton
+                label={fmt(t.removeFile, { name: chip.name })}
+                size="sm"
+                onClick={() => {
+                  dispatch({ type: "remove", key: chip.key });
+                  onDraft?.(body.trim() !== "" || chips.length > 1);
+                }}
+              >
                 <X aria-hidden="true" />
               </IconButton>
             </li>

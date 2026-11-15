@@ -748,7 +748,8 @@ test.describe("rail and tab bar", () => {
     await go(page, "/en/merchant/invoices");
     const orders = rail(page).getByRole("link", { name: /^Orders/ });
     await expect(orders).toHaveAttribute("href", "/en/merchant/orders");
-    await expect(orders).toHaveAccessibleName(/^Orders(, (\d+|99\+) in progress)?$/);
+    // The badge words are their own visually hidden span, so the name joins with a space before the comma.
+    await expect(orders).toHaveAccessibleName(/^Orders(\s*, (\d+|99\+) in progress)?$/);
   });
 
   test("phone: a tab bar with the key destinations, the current one marked, 44px targets, never over the page", async ({ page }) => {

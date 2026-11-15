@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchInput } from "@/components/ui/search-input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { firstParam, type SearchParams } from "@/components/store/search-params";
 import { Accordion } from "@/components/store/service-parts";
 import { listHelpArticles } from "@/lib/api/public";
@@ -95,50 +95,54 @@ async function HelpList({ searchParams }: { searchParams: Promise<SearchParams> 
         />
       ) : null}
 
-      {all.data.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon={<LifeBuoy aria-hidden="true" />}
-            title={t.help.noneTitle}
-            description={t.help.noneText}
-            action={
-              locale === "ar" ? (
-                <ButtonLink href={localePath("en", "/help")} variant="secondary">
-                  {t.help.noneAction}
-                </ButtonLink>
-              ) : undefined
-            }
-          />
-        </Card>
-      ) : articles.data.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon={<SearchX aria-hidden="true" />}
-            title={t.help.emptyTitle}
-            description={t.help.emptyText}
-            action={
-              <ButtonLink href={base} variant="secondary">
-                {t.help.emptyAction}
-              </ButtonLink>
-            }
-          />
-        </Card>
-      ) : (
-        <>
-          <p aria-live="polite" className="text-body font-semibold text-ink">
-            {plural(locale, articles.total, t.help.results, formatNumber(articles.total, locale))}
-          </p>
-          <Accordion
-            items={articles.data.map((article) => ({
-              id: article.id,
-              question: article.question,
-              answerMd: article.answerMd,
-              href: localePath(locale, `/help/${encodeURIComponent(article.slug)}`),
-              openLabel: t.help.openArticle,
-            }))}
-          />
-        </>
-      )}
+      <TabPanel activeKey={category || "all"}>
+        <div className="grid gap-5">
+          {all.data.length === 0 ? (
+            <Card>
+              <EmptyState
+                icon={<LifeBuoy aria-hidden="true" />}
+                title={t.help.noneTitle}
+                description={t.help.noneText}
+                action={
+                  locale === "ar" ? (
+                    <ButtonLink href={localePath("en", "/help")} variant="secondary">
+                      {t.help.noneAction}
+                    </ButtonLink>
+                  ) : undefined
+                }
+              />
+            </Card>
+          ) : articles.data.length === 0 ? (
+            <Card>
+              <EmptyState
+                icon={<SearchX aria-hidden="true" />}
+                title={t.help.emptyTitle}
+                description={t.help.emptyText}
+                action={
+                  <ButtonLink href={base} variant="secondary">
+                    {t.help.emptyAction}
+                  </ButtonLink>
+                }
+              />
+            </Card>
+          ) : (
+            <>
+              <p aria-live="polite" className="text-body font-semibold text-ink">
+                {plural(locale, articles.total, t.help.results, formatNumber(articles.total, locale))}
+              </p>
+              <Accordion
+                items={articles.data.map((article) => ({
+                  id: article.id,
+                  question: article.question,
+                  answerMd: article.answerMd,
+                  href: localePath(locale, `/help/${encodeURIComponent(article.slug)}`),
+                  openLabel: t.help.openArticle,
+                }))}
+              />
+            </>
+          )}
+        </div>
+      </TabPanel>
     </div>
   );
 }

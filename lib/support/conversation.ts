@@ -5,6 +5,8 @@
 //   (`sent`); the event with the same id is then ignored. Messages are kept in the order of their id, whatever the order
 //   they arrive in, and each id appears once.
 // - `ticket.updated` and a refetch replace status, dates and rating, but never with older data (`updatedAt` decides).
+// - A resolved ticket is closed to the visitor (owner, 2026-11-15): a message or file answers `409 TICKET_RESOLVED`
+//   (`closed`), and only staff reopen it (lib/support/reply-area.ts decides what the reply area shows).
 // - Each side has one "seen" mark: the highest message id of the OTHER side it has seen. Marks only move forward.
 // - "Support is typing" lasts 6 s after the last event and ends when a support message arrives.
 // - A visitor's own typing is sent at most once every 3 s; the visitor marks support's messages read only when the tab is
@@ -54,8 +56,10 @@ export type ConversationState = {
 export type ConversationAction =
   /** A message from an event or a refetch: appended in id order, ignored when its id is known. */
   | { type: "message"; message: TicketMessage }
-  /** The visitor's own message, from the answer of the `POST`: like `message`, and a reply reopens the ticket. */
+  /** The visitor's own message, from the answer of the `POST`: like `message`, and a reply moves a pending ticket to open. */
   | { type: "sent"; message: TicketMessage }
+  /** The API refused the visitor's message or file as `409 TICKET_RESOLVED`: the ticket is closed (the event, or a read, brings its dates). */
+  | { type: "closed" }
   | { type: "updated"; data: Pick<TicketUpdated, "status" | "updatedAt" | "resolvedAt" | "canRate" | "csatScore"> }
   | { type: "read"; by: "you" | "support"; upToMessageId: number }
   | { type: "typing"; now: number }
@@ -122,18 +126,20 @@ export function conversationReducer(state: ConversationState, action: Conversati
     }
     case "sent": {
       const messages = insertMessage(state.messages, action.message);
-      // The visitor writing on a resolved ticket reopens it; on a pending one it moves back to open (backend rule). The
-      // `ticket.updated` event, or the next refetch, corrects anything this guess got wrong.
-      const reopens = state.status === "resolved" || state.status === "pending";
+      // The visitor writing on a pending ticket moves it back to open (backend rule). A resolved ticket takes no messages
+      // from the visitor any more (`409 TICKET_RESOLVED`, the `closed` action), so a reply never reopens it: only staff do.
+      // The `ticket.updated` event, or the next refetch, corrects anything this guess got wrong.
+      const reopens = state.status === "pending";
       return {
         ...state,
         messages,
         status: reopens ? "open" : state.status,
-        resolvedAt: reopens ? null : state.resolvedAt,
-        canRate: reopens ? false : state.canRate,
         updatedAt: notOlder(action.message.createdAt, state.updatedAt) ? action.message.createdAt : state.updatedAt,
       };
     }
+    case "closed":
+      // The dates and the rating come with the `ticket.updated` event or the read this refusal asks for.
+      return state.status === "resolved" ? state : { ...state, status: "resolved" };
     case "updated": {
       if (!notOlder(action.data.updatedAt, state.updatedAt)) return state;
       const { status, updatedAt, resolvedAt, canRate, csatScore } = action.data;

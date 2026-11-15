@@ -48,6 +48,7 @@ export const errors = defineMessages({
       INTERNAL_ERROR: "Something went wrong on our side. Try again in a moment.",
       NETWORK_ERROR: "Could not reach the server. Check your connection and try again.",
       INVALID_RESPONSE: "The server sent an unexpected answer. Try again in a moment.",
+      TICKET_RESOLVED: "This ticket is closed. Open a new ticket if you still need help.",
       fallback: "Something went wrong. Please try again.",
     },
     fields: {
@@ -171,6 +172,7 @@ export const errors = defineMessages({
       INTERNAL_ERROR: "حدث خطأ من جهتنا. حاول مرة أخرى بعد قليل.",
       NETWORK_ERROR: "تعذّر الاتصال بالخادم. تحقّق من اتصالك وحاول مرة أخرى.",
       INVALID_RESPONSE: "أرسل الخادم ردًا غير متوقع. حاول مرة أخرى بعد قليل.",
+      TICKET_RESOLVED: "هذه التذكرة مغلقة. افتح تذكرة جديدة إن كنت لا تزال بحاجة إلى مساعدة.",
       fallback: "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
     },
     fields: {
