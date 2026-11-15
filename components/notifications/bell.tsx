@@ -4,14 +4,19 @@
 // the shared store (lib/notifications/unread-store.ts) keeps it fresh and every action on the page updates it at once.
 // A later server count (router.refresh) never overwrites the store: when it differs, the store asks the API again.
 // The accessible name is a polite live region inside the link: it is the link's name and a screen reader hears a change.
+// Arrival animation (owner, 2026-11-15; rules in lib/notifications/bell-motion.ts): a live item swings the icon from its
+// top, pops the badge and rolls the number; a read rolls it down; reduced motion plays nothing. All of it is decoration:
+// the badge is aria-hidden and the live region above says the same as before. While the tab is hidden the title carries
+// "(n) " (lib/notifications/title-badge.ts).
 import Link from "next/link";
 import { Bell as BellIcon } from "lucide-react";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
 import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
-import { unreadText, type NotificationSurface } from "@/lib/notifications/link";
+import { unreadText, unreadTextInline, type NotificationSurface } from "@/lib/notifications/link";
 import { unreadStore } from "@/lib/notifications/unread-store";
+import { useBellMotion, useTitleBadge } from "./use-bell-motion";
 
 export type BellProps = {
   surface: NotificationSurface;
@@ -38,22 +43,57 @@ export function Bell({ surface, locale, href, initialCount, labels }: BellProps)
 
   const count = polled ?? initialCount ?? 0;
   const text = unreadText(count, locale);
+  const { view, onAnimationEnd } = useBellMotion(surface, count, text);
+  // In an Arabic title "99+" must stay one left-to-right unit, or its "+" lands on the wrong side.
+  useTitleBadge(count, locale === "ar" ? unreadTextInline(count, locale) : text);
   return (
     <Link
       href={href}
+      onAnimationEnd={onAnimationEnd}
       className={cn(
         "relative inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-line-strong bg-surface text-ink",
         "transition-colors hover:bg-surface-muted",
       )}
     >
-      <BellIcon aria-hidden="true" className="size-5" />
+      {/* A new ring gets a new key, so the swing starts again from rest. It pivots on the top centre: symmetric, so RTL needs nothing. */}
+      <BellIcon
+        key={view.rings}
+        aria-hidden="true"
+        className={cn("size-5", view.ring && "origin-top motion-safe:animate-bell-ring")}
+      />
       {count > 0 ? (
         <span
+          key={view.popKey}
           aria-hidden="true"
           dir="ltr"
-          className="num absolute -end-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-caption font-bold leading-none text-on-inverse"
+          className={cn(
+            "num absolute -end-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center overflow-hidden rounded-full bg-danger px-1 text-caption font-bold leading-none text-on-inverse",
+            view.pop === "pop" && "motion-safe:animate-badge-pop",
+            view.pop === "in" && "motion-safe:animate-badge-in",
+          )}
         >
-          {text}
+          {/* The leaving number is laid over the badge (absolute), so only the new number sizes it: no width jump. It is
+              invisible at rest, so it shows only while its animation runs. */}
+          {view.roll ? (
+            <span
+              key={`out-${view.rollKey}`}
+              className={cn(
+                "absolute inset-0 flex items-center justify-center opacity-0",
+                view.roll.up ? "motion-safe:animate-count-out-up" : "motion-safe:animate-count-out-down",
+              )}
+            >
+              {view.roll.from}
+            </span>
+          ) : null}
+          <span
+            key={view.rollKey}
+            className={cn(
+              "inline-block",
+              view.roll && (view.roll.up ? "motion-safe:animate-count-in-up" : "motion-safe:animate-count-in-down"),
+            )}
+          >
+            {text}
+          </span>
         </span>
       ) : null}
       <span className="sr-only" aria-live="polite">

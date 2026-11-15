@@ -1,7 +1,8 @@
 "use client";
 // The buttons of the notifications page: "Open" and "Mark as read" on one item, and "Mark all as read" for the page.
 // Every action goes through the browser client (CSRF token of the area's surface), then refreshes the list
-// (`router.refresh()`) and the bell (`unreadStore.refresh`). A 404 on mark-read means the item is gone: the refreshed
+// (`router.refresh()`) and the bell (`unreadStore.refresh`), telling the bell first that its next lower count is a read
+// (the number rolls down, lib/notifications/bell-motion.ts). A 404 on mark-read means the item is gone: the refreshed
 // list shows what is left. A signed-out answer refreshes the route (the layout then asks to sign in); every other
 // failure, such as 403 CSRF_FAILED, is shown and never signs anyone out.
 import { ArrowRight, CheckCheck } from "lucide-react";
@@ -15,6 +16,7 @@ import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import { isSignedOutError } from "@/lib/merchant/signed-out";
+import { bellMotion } from "@/lib/notifications/bell-motion";
 import { NOTIFICATION_API, NOTIFICATION_FEED_ID, type NotificationSurface } from "@/lib/notifications/link";
 import { unreadStore } from "@/lib/notifications/unread-store";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -74,6 +76,7 @@ export function NotificationActions({ id, surface, unread, href, leavesList, tit
         return;
       }
     }
+    bellMotion.read(surface, null);
     void unreadStore.refresh(surface);
     startRefresh(() => router.refresh());
     (leavesList ? document.getElementById(NOTIFICATION_FEED_ID) : row)?.focus({ preventScroll: true });
@@ -84,7 +87,10 @@ export function NotificationActions({ id, surface, unread, href, leavesList, tit
     if (!unread) return;
     // Following the link also reads the item. Not awaited: a failure changes nothing for the visitor.
     api.post(readPath).then(
-      () => unreadStore.refresh(surface),
+      () => {
+        bellMotion.read(surface, null);
+        return unreadStore.refresh(surface);
+      },
       () => undefined,
     );
   }
@@ -139,6 +145,7 @@ export function MarkAllRead({ surface, locale, upToId, labels }: MarkAllReadProp
         return;
       }
     }
+    bellMotion.read(surface, null);
     void unreadStore.refresh(surface);
     startRefresh(() => router.refresh());
     // The button goes away once nothing is unread: move the focus to the feed.

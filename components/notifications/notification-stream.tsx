@@ -8,11 +8,14 @@
 // Toast rules: only `live: true` items (a replayed one is not news), only in a tab the visitor is looking at, not on the
 // notifications page (the list shows the item there), at most one toast every 3 s and the rest of the window as one
 // "{count} new notifications". The text is plain text (plan D11), in the item's own language.
+// The bell's animation (lib/notifications/bell-motion.ts) gets its cues here, before each count reaches the store: a
+// created item (it rings only when `live`, in a visible tab, at most once every 3 s) and a read (the number rolls down).
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { formatNumber } from "@/lib/format";
 import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
+import { bellMotion } from "@/lib/notifications/bell-motion";
 import { notificationHref, type NotificationSurface } from "@/lib/notifications/link";
 import { unreadStore } from "@/lib/notifications/unread-store";
 import { streamFor } from "@/lib/realtime/browser";
@@ -70,8 +73,12 @@ export function NotificationStream({ surface, locale, href, labels }: Notificati
 
     const stops = [
       client.subscribe("unread.changed", ({ unread }) => unreadStore.push(surface, unread)),
-      client.subscribe("notification.read", ({ unread }) => unreadStore.push(surface, unread)),
+      client.subscribe("notification.read", ({ unread }) => {
+        bellMotion.read(surface, unread);
+        unreadStore.push(surface, unread);
+      }),
       client.subscribe("notification.created", ({ item, unread, live }) => {
+        bellMotion.arrival(surface, unread, live);
         unreadStore.push(surface, unread);
         const { pathname: here, href: listHref } = latest.current;
         if (live && document.visibilityState === "visible" && !onNotificationsPage(here, listHref)) batcher.push(item);

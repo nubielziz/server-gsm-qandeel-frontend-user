@@ -131,6 +131,20 @@
   --animate-toast-in: toast-in var(--duration-base) var(--ease-standard);
   --animate-fade-in: fade-in var(--duration-base) var(--ease-standard);
 
+  /* The notification bell's arrival (owner, 2026-11-15; components/notifications/bell.tsx): the icon swings from its top
+     in decaying swings, the badge pops with a little overshoot, and its number rolls (up for a new item, down for a read).
+     Transform and opacity only, used with `motion-safe:` so reduced motion plays none of it. */
+  --ease-swing: cubic-bezier(0.37, 0, 0.63, 1); /* a pendulum: slow at each end of a swing */
+  --duration-ring: 600ms;
+  --duration-count: 250ms;
+  --animate-bell-ring: bell-ring var(--duration-ring) var(--ease-swing);
+  --animate-badge-pop: badge-pop var(--duration-slow) var(--ease-standard);
+  --animate-badge-in: badge-in var(--duration-slow) var(--ease-standard);
+  --animate-count-in-up: count-in-up var(--duration-count) var(--ease-glide) both;
+  --animate-count-out-up: count-out-up var(--duration-count) var(--ease-glide) both;
+  --animate-count-in-down: count-in-down var(--duration-count) var(--ease-glide) both;
+  --animate-count-out-down: count-out-down var(--duration-count) var(--ease-glide) both;
+
   @keyframes shimmer {
     0% {
       background-position: 100% 0;
@@ -155,6 +169,91 @@
     }
     to {
       opacity: 1;
+    }
+  }
+  /* Symmetric swings, so the same keyframes serve both writing directions. */
+  @keyframes bell-ring {
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+    15% {
+      transform: rotate(14deg);
+    }
+    37% {
+      transform: rotate(-12deg);
+    }
+    59% {
+      transform: rotate(8deg);
+    }
+    80% {
+      transform: rotate(-5deg);
+    }
+  }
+  @keyframes badge-pop {
+    0% {
+      transform: scale(0.6);
+    }
+    55% {
+      transform: scale(1.15);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  @keyframes badge-in {
+    0% {
+      opacity: 0;
+      transform: scale(0);
+    }
+    55% {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  /* The rolling number travels vertically only, so it needs no mirroring. */
+  @keyframes count-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes count-out-up {
+    from {
+      opacity: 1;
+      transform: none;
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-100%);
+    }
+  }
+  @keyframes count-in-down {
+    from {
+      opacity: 0;
+      transform: translateY(-100%);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes count-out-down {
+    from {
+      opacity: 1;
+      transform: none;
+    }
+    to {
+      opacity: 0;
+      transform: translateY(100%);
     }
   }
 }
