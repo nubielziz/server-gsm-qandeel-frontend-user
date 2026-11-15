@@ -93,6 +93,25 @@ test.describe("dashboard", () => {
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(main(page).getByRole("heading", { level: 1 })).toContainText("أهلًا بعودتك");
   });
+
+  test("the rail keeps all ten links on its dark panel in a short laptop window", async ({ page, isMobile }) => {
+    test.skip(isMobile, "the rail shows from lg up");
+    // Regression (2026-11-15): at 1366×657 (a 1366×768 laptop's browser window) the last links and Settings spilled
+    // below the rail, white on the light page.
+    for (const height of [657, 620]) {
+      await page.setViewportSize({ width: 1366, height });
+      await go(page, "/en/merchant");
+      const rail = vis(page.getByRole("navigation", { name: "Workspace navigation" }));
+      await expect(rail.getByRole("link")).toHaveCount(10);
+      const fit = await rail.evaluate((nav) => ({
+        panelBottom: nav.parentElement!.getBoundingClientRect().bottom,
+        lowestLink: Math.max(...[...nav.querySelectorAll("a")].map((a) => a.getBoundingClientRect().bottom)),
+        window: window.innerHeight,
+      }));
+      expect(fit.lowestLink, `${height}px`).toBeLessThanOrEqual(fit.panelBottom);
+      expect(fit.lowestLink, `${height}px`).toBeLessThanOrEqual(fit.window);
+    }
+  });
 });
 
 test.describe("catalog", () => {

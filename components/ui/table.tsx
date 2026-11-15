@@ -21,7 +21,9 @@ export type TableProps = ComponentProps<"table"> & {
 export function Table({ stacked, framed, caption, className, wrapperClassName, children, ...props }: TableProps) {
   return (
     <div
-      className={cn("w-full overflow-x-auto", framed && "rounded-card border border-line bg-surface", wrapperClassName)}
+      className={cn("relative w-full overflow-x-auto", framed && "rounded-card border border-line bg-surface", wrapperClassName)}
+      // `relative`: the visually hidden caption and header labels (`sr-only` is absolutely positioned) stay inside this
+      // scroll box instead of widening the page (2026-11-15: a blank strip beside the account frame at 768-1024px).
       // A scrolling box must be reachable by keyboard; it is a named region when the table has a caption.
       tabIndex={stacked ? undefined : 0}
       role={!stacked && caption ? "region" : undefined}

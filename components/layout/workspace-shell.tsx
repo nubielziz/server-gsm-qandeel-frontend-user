@@ -62,10 +62,14 @@ export async function WorkspaceShell({
   return (
     <ChromeProviders>
       <SkipLink />
-      <div className="min-h-dvh bg-page p-3 sm:p-4">
+      {/* `relative overflow-x-clip`: the page never scrolls sideways. A visually hidden (`sr-only`, absolute) label inside a
+          table's scroll box has no positioned ancestor, so it escaped that box and widened the document (a blank strip
+          beside the frame, the rail pushed off screen). `clip` is not a scroll container: the sticky rail keeps working. */}
+      <div className="relative min-h-dvh overflow-x-clip bg-page p-3 sm:p-4">
         <div className="mx-auto flex w-full max-w-[110rem] items-start gap-4">
-          {/* Rail (lg+) */}
-          <div className="surface-inverse sticky top-4 hidden h-[calc(100dvh-2rem)] w-20 shrink-0 flex-col items-center rounded-panel py-4 lg:flex">
+          {/* Rail (lg+). At least the screen's height; on a short screen it grows with its links (the merchant has ten)
+              instead of letting them spill below the dark panel. */}
+          <div className="surface-inverse sticky top-4 hidden min-h-[calc(100dvh-2rem)] w-20 shrink-0 flex-col items-center rounded-panel py-4 lg:flex">
             <Logo variant="stacked" tone="inverse" href={home} />
             <nav aria-label={t.workspace.navLabel} className="mt-5 flex min-h-0 w-full flex-1 flex-col justify-between px-4">
               <Suspense fallback={<WorkspaceNavView items={nav} pathname={null} variant="rail" />}>

@@ -122,6 +122,35 @@ test.describe("overview and orders (demo customer, read only)", () => {
     await expect(page.getByRole("link", { name: "مكتمل", exact: true })).toBeVisible();
   });
 
+  test("the workspace never scrolls sideways: the wide orders table scrolls in its card, no blank strip beside the frame", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "sets its own window sizes");
+    // Regression (2026-11-15): the orders table's visually hidden "Track" header escaped the table's scroll box and made
+    // the document wider than the window at 768-1024px: a blank strip on the left in Arabic, the rail cut in English.
+    for (const lang of ["en", "ar"]) {
+      for (const path of ["/account", "/account/orders"]) {
+        await go(page, `/${lang}${path}`);
+        await expect(page.getByRole("cell", { name: /SF-\d+$/ }).first()).toBeVisible();
+        for (const width of [1024, 900, 768]) {
+          await page.setViewportSize({ width, height: 800 });
+          // Above zero means the page scrolls sideways; the reserved scrollbar gutter can make the difference negative.
+          await expect
+            .poll(
+              () =>
+                page.evaluate(() =>
+                  Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+                ),
+              { message: `${lang}${path} at ${width}px` },
+            )
+            .toBe(0);
+        }
+        await page.setViewportSize({ width: 1440, height: 900 });
+      }
+    }
+  });
+
   test("signing out from the menu returns to the sign-in page", async ({ page }) => {
     await go(page, "/en/account");
     await page.getByRole("button", { name: "Account menu" }).click();

@@ -255,6 +255,9 @@ html:lang(ar) *::after {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     scroll-padding-top: 6rem;
+    /* Keep room for the vertical scrollbar on short pages too, so the layout does not jump sideways between short and
+       long pages or when a dialog locks scrolling (in Arabic the workspace rail moved 15px). */
+    scrollbar-gutter: stable;
   }
   body {
     font-size: var(--text-body);

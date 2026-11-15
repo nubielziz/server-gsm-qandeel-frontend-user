@@ -50,15 +50,17 @@ export function WorkspaceNavView({ items, pathname, variant }: WorkspaceNavViewP
       </ul>
     );
   }
+  // Short screens (under 46rem, where the rail also drops its avatar): 44px buttons and tighter gaps, so the merchant's
+  // ten links fit a 1366×768 laptop window without the rail growing past the screen.
   return (
-    <ul className="grid justify-items-center gap-2">
+    <ul className="grid justify-items-center gap-2 [@media(max-height:46rem)]:gap-1">
       {items.map((item) => (
         <li key={item.href} className="relative">
           <Link
             href={item.href}
             aria-current={isActivePath(pathname, item.href, item.match) ? "page" : undefined}
             className={cn(
-              "group relative grid size-12 place-items-center rounded-control text-on-inverse-muted transition-colors duration-(--duration-fast)",
+              "group relative grid size-12 place-items-center rounded-control text-on-inverse-muted transition-colors duration-(--duration-fast) [@media(max-height:46rem)]:size-11",
               "hover:bg-inverse-raised hover:text-on-inverse aria-[current=page]:bg-inverse-raised aria-[current=page]:text-on-inverse",
               "[&_svg]:size-6",
             )}
