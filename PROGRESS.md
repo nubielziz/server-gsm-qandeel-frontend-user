@@ -145,6 +145,22 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
   after the review fixes the **full suite with the exclusive specs, nothing else running: 611 passed / 29 skipped /
   0 failed** (desktop + mobile).
 
+### Final acceptance (plan §7, 2026-11-15): all 16 features done
+1. **Full suite**, exclusive specs on, nothing else running, against `next start` on `:5176`: 611 passed / 29 skipped /
+   0 failed (desktop + mobile).
+2. **Docker image** `gsm-site:local` (built against `:3100`, 457 MB): healthy; `/robots.txt`, `/en`, `/ar`, `/sitemap.xml`,
+   a site image and a service picture through the optimizer answer 200; no `.env` in the image; runs as `node`. The full
+   suite against the container: 611 passed / 29 skipped / 0 failed.
+3. **Manual checks:** `mustChangePassword` passed (W2 review, en and ar). Turnstile on merchant auth: the isolated API
+   restarted with `TURNSTILE_MERCHANT_AUTH=true` refused a merchant forgot without a token (403) and `auth` +
+   `smart-sign-in` passed 84 / 84; restarted without the switch afterwards (the same request answers 204). The backend
+   lead may now switch it on in production once the site is deployed.
+4. **Left for the owner:** the walk of the §2.2 acceptance lists by hand in both languages (the reviewers took en/ar
+   screenshots at 1440, 390 and 360 px for every UI feature), and the owner decisions of plan §8 (wallet switch and card
+   top-ups, payment provider, JOD decimals, the word "Pre-order", production values, `logo-mark.png`).
+5. **Docs:** `CLAUDE.md` (Turnstile routes, the new helpers, wording, e2e notes) and `docs/BACKEND-NEEDS.md` (items 1 to 8
+   closed; the open backend limitations of plan §8 plus three top-up notes found in W3).
+
 ## Wiring (changed 2026-11-09, late evening, at the owner's request)
 - **Dev site (`npm run dev`, :5175) → the isolated demo API (:3100) since 2026-11-10**, at the owner's request (to
   see the home page with data). `.env.development.local`: `GSM_API_ORIGIN=http://localhost:3100`; start the API with

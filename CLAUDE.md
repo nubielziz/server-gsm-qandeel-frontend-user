@@ -3,7 +3,8 @@
 @AGENTS.md
 
 This is the public website (merchants + customers) of the GSM project. The plan and the backend facts are in
-`/home/saifi/gsm-project/STOREFRONT-HANDOFF.md` (cite its § numbers); status is in `PROGRESS.md`.
+`/home/saifi/gsm-project/STOREFRONT-HANDOFF.md` and `STOREFRONT-BACKEND-HANDOFF.md` (cite their § numbers); the
+build plan is `IMPLEMENTATION-PLAN.md`; status is in `PROGRESS.md`.
 Next.js 16.4 differs from your training data: read the matching guide in `node_modules/next/dist/docs/` before writing
 Next code (caching = `01-app/01-getting-started/08-caching.md`, `use cache`, `next/root-params`, `proxy.ts`).
 
@@ -50,7 +51,19 @@ Mailpit http://localhost:8025); the owner's API on :3000 and its data are never 
 - **Errors:** every failure is an `ApiError` (`lib/api/errors.ts`): translate with `useErrorText()` (client) by
   `code` and per-field `code`; show `reference()` (request id) on error screens. Sign out rules: handoff §3.4.
 - **Money:** 4-decimal strings. Display with `formatMoney()`; sum with `sumMoney()`; never floats.
-- **Turnstile:** `components/turnstile.tsx` for the 6 store routes; reset after every submit (tokens are single-use).
+- **Turnstile:** `components/turnstile.tsx` on the store routes, the one-form sign-in (`POST /client/auth/sign-in`) and
+  merchant register, forgot and login (sent always; the backend enforces it once `TURNSTILE_MERCHANT_AUTH` is on); reset
+  after every submit (tokens are single-use).
+- **Helpers added by the backend-handoff waves (2026-11-13/15):** `lib/api/store-query.ts` (store list filters, sorts,
+  safe paging), `lib/api/idempotency.ts` (one `Idempotency-Key` per request body; new after success or
+  `IDEMPOTENCY_KEY_REUSED`), `lib/quantity.ts` (one per order, exactly N, range, packs; texts keyed on
+  `invalid_quantity`; "From" prices), `lib/store/delivery.ts` (`etaText` else `deliveryMinutes` per language),
+  `lib/wallet/*` and `components/wallet/*` (customer and merchant wallets, top-ups), the notification bell and pages
+  (`components/notifications`). The customer wallet read is `no-store` inside `<Suspense>`. Wording: say "In stock" or
+  "On request" with the delivery line, never "Pre-order", "Out of stock" or a count (handoff §14).
+- **e2e:** only against the isolated API (`:3100`); `e2e/admin.ts` (staff helpers) and `e2e/helpers.ts`; exclusive
+  specs (for example `wallet-disabled`) run only with `E2E_EXCLUSIVE=1`. Next keeps the previous route hidden in the DOM
+  (`cacheComponents`): scope locators to the visible page.
 
 ## UI rules
 - Build pages from `components/ui` (primitives) and `components/layout` (shells); no one-off copies of a primitive.

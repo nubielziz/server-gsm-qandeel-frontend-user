@@ -1,5 +1,13 @@
 # Backend changes the storefront needs
 
+> **Status 2026-11-15: items 1 to 8 below are closed.** Backend feature 22 (`STOREFRONT-BACKEND-HANDOFF.md` §2) added
+> availability (`in_stock` / `on_request`, never a count), categories with counts, staff-editable listing content, a
+> delivery time per language (`deliveryMinutes`, `etaText`), best sellers (`_sort=popular`) and new arrivals
+> (`_sort=listedAt`), a picture per service (`imageUrl`) and the server filters (`type`, `categoryId`, `availability`,
+> `minPrice`/`maxPrice`). The customer wallet and the notification feed, once out of scope, were built too (features 21
+> and 23). The site uses all of them since waves 1 to 3 of `IMPLEMENTATION-PLAN.md`. What the backend still lacks is the
+> list under "Open (2026-11-15)" at the end; the items 1 to 8 stay below as the record of the requests.
+
 For the backend lead and the owner. Each item says what the store's design (the owner's mockups in `screenshots/`)
 wants, what the API offers today, a suggested change, and where the storefront would use it. The storefront never
 edits `backend/` (CLAUDE.md), so these are requests only. Already decided as out of scope in the handoff (§1.7): cart of
@@ -75,3 +83,36 @@ several services, favourites, customer wallet (phase 2W), notification feed, soc
   cards, cached; `lib/catalog.ts`). Fine at today's size.
 - **Suggested, for a larger catalog:** `minPrice` / `maxPrice` (in the requested currency) and `type` filters, plus
   facet counts, on `GET /store/v1/services`.
+
+## Open (2026-11-15): backend limitations the site meets (`IMPLEMENTATION-PLAN.md` §8; report, do not work around)
+
+1. No smart forgot-password route: the forgot page keeps a Customer or Merchant choice, each with its own Turnstile token.
+2. `POST /client/auth/register` takes no language: the first verification mail is English; the site saves the language
+   after the first sign-in in the same browser.
+3. An email that is both a merchant and a customer reaches the customer area only through the magic link.
+4. Cards carry no `quantity`: no "From" price on cards, no price sort or filter by the smallest purchase.
+5. No stock count and no change signal: availability can be up to 5 minutes behind; `in_stock` speaks for the smallest
+   order only.
+6. The checkout session and tracking carry only the English `service.deliveryTime` and the catalog name (no
+   `deliveryMinutes`, `etaText`, localized title, service id or slug); `/store/v1/me/orders` has no delivery time and no
+   unit price.
+7. The receipt PDF and the order emails show no quantity and no unit price; no order email carries the tracking link; the
+   default order emails speak of an "unlock" for every service.
+8. No signal while an on-request order waits; with `autoRefundFailed` off the timeline says "Refunded" while the refund is
+   only requested.
+9. Wallet events (credited, rejected, adjusted, on hold, refund to the balance) create no notification-center item.
+10. Customers have no notification preferences beyond `marketingOptIn`; there is no public announcements feed.
+11. Category `serviceCount` is not narrowed by other filters and the API has no facet counts: the site counts brands,
+    carriers, countries and types over at most 1000 cached cards.
+12. The merchant wallet statement has no date filter (the customer one has).
+13. No route changes an email (customer or merchant); no ticket list, ticket attachments, cart, favourites, social
+    sign-in, PayPal, Vodafone Cash or profile photo.
+14. Data-export delivery is undefined; model, network and MEP options cannot be ordered.
+15. `GET /store/v1/help/:slug` has no language parameter.
+16. A supplier's TIME text can give a misleading `deliveryMinutes`: staff should check it before the site says
+    "Delivered within …".
+17. OpenAPI marks `createdByStaff` (and other always-sent fields) optional.
+18. (Found in W3.) A receipt sent again on an `in_review` top-up answers `201` instead of `409`; cancelling a cancelled
+    top-up answers `200`; top-up list rows carry no instructions.
+
+Site limitation, kept: an unknown slug inside a streamed page answers 200 with `noindex`.
