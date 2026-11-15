@@ -12,15 +12,17 @@
 //   pill works in Arabic as is. The "All categories" menu button is a row item like the links; it is never selected.
 // - Not a React <ViewTransition>: a named view transition is drawn above the page and would hide the labels while
 //   it moves. Reduced motion: the global rule makes the transition instant and the colours switch at once.
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Container } from "./container";
 import { colourSwitch, firstBezier, firstTimeMs, type Span } from "./nav-pill-timing";
 
 const CURRENT = 'a.nav-item[aria-current="page"]';
 const DEFAULT = ".nav-item[data-nav-default]";
-/** The link the pill covers (white text). Set and removed here only. */
-const ON = "data-pill-on";
+/** The href of a nav link: the key of the "covered" state (a link is replaced when its <Suspense> resolves, its href stays). */
+const hrefOf = (el: HTMLElement) => el.getAttribute("href") ?? "";
+/** A CSS string literal for an attribute selector. */
+const cssString = (value: string) => `"${value.replace(/["\\]/g, "\\$&")}"`;
 
 type Box = { x: number; y: number; w: number; h: number };
 
@@ -42,6 +44,11 @@ export type NavRowProps = {
 export function NavRow({ children, className }: NavRowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   const pillRef = useRef<HTMLSpanElement>(null);
+  // Never write attributes on the links themselves: they sit in <Suspense> boundaries (NavLink) that may hydrate after
+  // this effect, and an attribute React did not render is a hydration mismatch. The row's own state says which links the
+  // pill covers (white text, rendered as a <style> rule below) and whether the pill has taken over (`data-pill`).
+  const [placed, setPlaced] = useState(false);
+  const [covered, setCovered] = useState<readonly string[]>([]);
 
   useLayoutEffect(() => {
     const row = rowRef.current;
@@ -50,16 +57,23 @@ export function NavRow({ children, className }: NavRowProps) {
     let timers: number[] = [];
     let last: { link: HTMLElement; box: Box } | null = null;
     let path = window.location.pathname;
+    const on = new Set<string>();
+    const commit = () => setCovered([...on]);
 
     const cancel = () => {
       for (const timer of timers) window.clearTimeout(timer);
       timers = [];
     };
     const target = () => row.querySelector<HTMLElement>(CURRENT) ?? row.querySelector<HTMLElement>(DEFAULT);
-    const lit = () => Array.from(row.querySelectorAll<HTMLElement>(`[${ON}]`));
+    const lit = () => Array.from(row.querySelectorAll<HTMLElement>("a.nav-item")).filter((el) => on.has(hrefOf(el)));
     const light = (link: HTMLElement) => {
-      for (const el of lit()) if (el !== link) el.removeAttribute(ON);
-      link.setAttribute(ON, "");
+      on.clear();
+      on.add(hrefOf(link));
+      commit();
+    };
+    const darken = (el: HTMLElement) => {
+      on.delete(hrefOf(el));
+      commit();
     };
     const draw = (box: Box) => {
       pill.style.width = `${box.w}px`;
@@ -99,9 +113,14 @@ export function NavRow({ children, className }: NavRowProps) {
           for (const el of lit()) {
             if (el === link) continue;
             const { leaveAt } = colourSwitch(from, to, { start: el.offsetLeft, width: el.offsetWidth }, duration, easing);
-            at(leaveAt, () => el.removeAttribute(ON));
+            at(leaveAt, () => darken(el));
           }
-          if (!link.hasAttribute(ON)) at(colourSwitch(from, to, null, duration, easing).arriveAt, () => link.setAttribute(ON, ""));
+          if (!on.has(hrefOf(link))) {
+            at(colourSwitch(from, to, null, duration, easing).arriveAt, () => {
+              on.add(hrefOf(link));
+              commit();
+            });
+          }
         }
       }
       last = { link, box };
@@ -123,19 +142,29 @@ export function NavRow({ children, className }: NavRowProps) {
     });
 
     place(false);
-    row.setAttribute("data-pill", "");
+    setPlaced(true);
     observeSizes();
     changes.observe(row, { subtree: true, childList: true, attributes: true, attributeFilter: ["aria-current"] });
     return () => {
       changes.disconnect();
       sizes.disconnect();
       cancel();
-      row.removeAttribute("data-pill");
+      setPlaced(false);
     };
   }, []);
 
   return (
-    <Container ref={rowRef} width="wide" className={cn("nav-row relative flex h-14 items-center gap-1", className)}>
+    <Container
+      ref={rowRef}
+      width="wide"
+      data-pill={placed ? "" : undefined}
+      className={cn("nav-row relative flex h-14 items-center gap-1", className)}
+    >
+      {covered.length > 0 ? (
+        // The links the pill covers get white text (the specificity beats the hover grey). Nothing is rendered on the
+        // server or before the pill is placed, so hydration sees the same markup.
+        <style>{`.nav-row[data-pill] a.nav-item.nav-item:is(${covered.map((href) => `[href=${cssString(href)}]`).join(",")}){color:var(--color-on-inverse);background-color:transparent;transition-property:color}`}</style>
+      ) : null}
       <span ref={pillRef} aria-hidden="true" className="nav-pill" />
       {children}
     </Container>

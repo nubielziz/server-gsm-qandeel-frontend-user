@@ -516,7 +516,7 @@ html:lang(ar) *::after {
      - Server HTML, before hydration and without JavaScript (`.nav-row` without `data-pill`): the selected link itself
        is the black box.
      - Once the pill is placed (`data-pill`): the pill draws the box and slides to the next selected link; the link it
-       covers is `data-pill-on` (white text), switched by the script when the pill covers half of it, so the text colour
+       covers gets white text (a rule nav-row.tsx renders), switched when the pill covers half of it, so the text colour
        follows the slide. A selected link never shows the hover grey (it would cover the arriving pill). */
   .nav-item {
     color: var(--color-ink-muted);
@@ -536,14 +536,12 @@ html:lang(ar) *::after {
     background-color: var(--color-inverse);
   }
   .nav-row[data-pill] a.nav-item[aria-current="page"],
-  .nav-row[data-pill]:not(:has(a.nav-item[aria-current="page"])) .nav-item[data-nav-default],
-  .nav-row[data-pill] .nav-item[data-pill-on] {
+  .nav-row[data-pill]:not(:has(a.nav-item[aria-current="page"])) .nav-item[data-nav-default] {
     background-color: transparent;
     transition-property: color;
   }
-  .nav-row[data-pill] .nav-item.nav-item[data-pill-on] {
-    color: var(--color-on-inverse);
-  }
+  /* The link the pill covers gets white text from a rule the nav row renders itself (nav-row.tsx): never an attribute
+     on the link, which hydrates in its own <Suspense> boundary and would report a mismatch. */
   /* Placed from the measured offsets of the link (physical px, the same in both writing directions), so `left`/`top`
      are physical on purpose. */
   .nav-pill {
