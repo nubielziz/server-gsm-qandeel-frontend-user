@@ -8,6 +8,7 @@ import { LOCALES, dirOf, isLocale } from "@/lib/i18n/config";
 import { errors } from "@/lib/i18n/messages/errors";
 import { ErrorTextProvider } from "@/lib/i18n/error-text";
 import { siteImage } from "@/lib/site-images";
+import { ViewTransitionGuard } from "@/components/layout/view-transition-guard";
 import "../globals.css";
 
 // Latin letters and digits on both languages. No `opsz` axis: the file stays a plain weight-only variable font
@@ -74,6 +75,7 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[la
     // <body> before React starts. It covers only these two elements' own attributes, never the page content.
     <html lang={lang} dir={dirOf(lang)} className={`${inter.variable} ${plexArabic.variable}`} suppressHydrationWarning>
       <body className="min-h-dvh bg-page font-sans text-ink antialiased" suppressHydrationWarning>
+        <ViewTransitionGuard />
         <ErrorTextProvider messages={errors[lang]}>{children}</ErrorTextProvider>
       </body>
     </html>
