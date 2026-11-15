@@ -7,7 +7,8 @@
 // Arrival animation (owner, 2026-11-15; rules in lib/notifications/bell-motion.ts): a live item swings the icon from its
 // top, pops the badge and rolls the number; a read rolls it down; reduced motion plays nothing. All of it is decoration:
 // the badge is aria-hidden and the live region above says the same as before. While the tab is hidden the title carries
-// "(n) " (lib/notifications/title-badge.ts).
+// "(n) " (lib/notifications/title-badge.ts). Each ring also plays a soft chime (lib/notifications/chime.ts), unless the
+// visitor turned it off on the notifications page; it is extra feedback only.
 import Link from "next/link";
 import { Bell as BellIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
@@ -17,6 +18,7 @@ import { fmt } from "@/lib/i18n/define";
 import { unreadText, unreadTextInline, type NotificationSurface } from "@/lib/notifications/link";
 import { unreadStore } from "@/lib/notifications/unread-store";
 import { playRing } from "@/lib/notifications/bell-ring";
+import { notificationChime } from "@/lib/notifications/chime";
 import { useBellMotion, useTitleBadge } from "./use-bell-motion";
 
 export type BellProps = {
@@ -51,6 +53,8 @@ export function Bell({ surface, locale, href, initialCount, labels }: BellProps)
     if (!view.ring || !iconRef.current) return;
     return playRing(iconRef.current, () => settle("bell-ring"));
   }, [view.ring, view.rings, settle]);
+  // Browsers play sound only after a gesture: the chime starts listening for the first one (once per page).
+  useEffect(() => notificationChime.arm(), []);
   // In an Arabic title "99+" must stay one left-to-right unit, or its "+" lands on the wrong side.
   useTitleBadge(count, locale === "ar" ? unreadTextInline(count, locale) : text);
   return (

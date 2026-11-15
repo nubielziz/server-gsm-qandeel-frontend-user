@@ -3,6 +3,7 @@
 // `title` and `body` come in the reader's language from the API and are shown as written.
 // "Unread" counts are written without number agreement ("Unread: 3") so Arabic needs no plural forms.
 // `live` is the live stream's own text (feature 27): the toast of a new notification and the "New notifications" pill.
+// `sound` is the switch of the bell's arrival chime on the notifications page header (owner, 2026-11-15).
 import { defineMessages } from "../define";
 
 export const notifications = defineMessages({
@@ -27,6 +28,7 @@ export const notifications = defineMessages({
     open: "Open",
     bell: "Notifications, {count} unread",
     bellNone: "Notifications",
+    sound: { label: "Notification sound", on: "On", off: "Off" },
     live: {
       view: "View",
       many: "{count} new notifications",
@@ -78,6 +80,7 @@ export const notifications = defineMessages({
     open: "فتح",
     bell: "الإشعارات، غير المقروءة: {count}",
     bellNone: "الإشعارات",
+    sound: { label: "صوت الإشعارات", on: "مفعّل", off: "متوقف" },
     live: {
       view: "عرض",
       many: "{count} إشعارات جديدة",

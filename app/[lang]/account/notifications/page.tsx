@@ -7,6 +7,7 @@ import { notifications } from "@/lib/i18n/messages/notifications";
 import type { SearchParams } from "@/lib/merchant/lists";
 import { PageHeader } from "@/components/layout/container";
 import { NotificationList, NotificationListSkeleton } from "@/components/notifications/notification-list";
+import { SoundToggle } from "@/components/notifications/sound-toggle";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(notifications);
@@ -17,7 +18,7 @@ export default async function CustomerNotificationsPage({ searchParams }: { sear
   const t = await getMessages(notifications);
   return (
     <div className="grid gap-4">
-      <PageHeader variant="card" title={t.title} description={t.subtitle} />
+      <PageHeader variant="card" title={t.title} description={t.subtitle} actions={<SoundToggle labels={t.sound} />} />
       <Suspense fallback={<NotificationListSkeleton />}>
         <NotificationList surface="customer" searchParams={searchParams} />
       </Suspense>
