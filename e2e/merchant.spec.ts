@@ -6,7 +6,7 @@
 import { expect, test } from "./fixtures";
 import { type Locator, type Page } from "@playwright/test";
 import fs from "node:fs/promises";
-import { ACCOUNTS, fixtures, signInMerchant } from "./helpers";
+import { ACCOUNTS, BASE_URL, fixtures, signInMerchant } from "./helpers";
 
 /** A valid 1x1 PNG: a stand-in for a bank receipt. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==", "base64");
@@ -565,5 +565,112 @@ test.describe("a merchant waiting for approval", () => {
   test("the notice is in Arabic too", async ({ page }) => {
     await go(page, "/ar/merchant/orders", ACCOUNTS.pendingMerchant);
     await expect(main(page).getByText("متاحة بعد الموافقة")).toBeVisible();
+  });
+});
+
+// ── Lists and frame (plan P1) ─────────────────────────────────────────────────────────────────────────────────────────
+// The long lists render ONE table for every screen (a `compact` table: the real table from md up, short rows with the
+// number as a link over the whole row on a phone), not a table plus a phone-only list. The frame is in the static shell
+// and the phone menu opens before React hydrates. Read-only: the demo merchant is only looked at.
+
+test.describe("lists: one table for every screen", () => {
+  const lists = [
+    { name: "orders", path: "/en/merchant/orders" },
+    { name: "services", path: "/en/merchant/services" },
+    { name: "invoices", path: "/en/merchant/invoices" },
+  ];
+
+  for (const list of lists) {
+    test(`${list.name}: no second list at 1280 or 390 px, rows are short on a phone and each row is one link`, async ({ page }) => {
+      for (const width of [1280, 390]) {
+        const at = `${list.name} at ${width}px`;
+        await page.setViewportSize({ width, height: 900 });
+        await go(page, list.path);
+        const rows = main(page).locator("tbody tr");
+        await expect(rows.first(), at).toBeVisible();
+        const count = await rows.count();
+        expect(count, at).toBeGreaterThan(0);
+
+        // Nothing is drawn twice: no phone-only list (the dashboard's latest orders still use one), every row is shown.
+        await expect(main(page).locator("ul.divide-y"), at).toHaveCount(0);
+        await expect(rows.filter({ visible: true }), at).toHaveCount(count);
+        // Table semantics survive the phone layout (display: block): one table, with its column headers.
+        await expect(main(page).getByRole("table"), at).toHaveCount(1);
+        expect(await main(page).getByRole("columnheader").count(), at).toBeGreaterThan(2);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        expect(overflow, `${at}: the page scrolls sideways`).toBeLessThanOrEqual(0);
+
+        if (width === 1280) {
+          await expect(main(page).getByRole("columnheader").first(), at).toBeVisible();
+          continue;
+        }
+        // A phone row is a few lines (a stacked card was about eight), and a tap anywhere on it opens the record.
+        const box = await rows.first().boundingBox();
+        expect(box, at).not.toBeNull();
+        expect(box!.height, `${at}: row height`).toBeGreaterThanOrEqual(56);
+        expect(box!.height, `${at}: row height`).toBeLessThan(170);
+        await rows.first().click({ position: { x: box!.width - 12, y: box!.height - 10 } });
+        await expect(page, at).toHaveURL(new RegExp(`${list.path}/\\d+$`));
+      }
+    });
+  }
+});
+
+test.describe("workspace frame", () => {
+  test("phone: the menu button opens the drawer before React hydrates, Esc and the close button close it, focus returns", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    // Every client script is aborted (the CSS still loads), so React never hydrates; inline scripts still run, so the
+    // streamed session parts show. A button that works now is the browser's own command, not an onClick.
+    let aborted = 0;
+    await page.route("**/_next/static/chunks/**", (route) => {
+      if (route.request().resourceType() !== "script") return route.continue();
+      aborted += 1;
+      return route.abort();
+    });
+    await page.goto("/en/merchant/orders");
+    expect(aborted, "no client script was blocked").toBeGreaterThan(0);
+
+    const button = page.getByRole("button", { name: "Open navigation", exact: true });
+    await expect(button).toHaveAttribute("aria-haspopup", "dialog");
+    await button.click();
+    const drawer = page.getByRole("dialog", { name: "Workspace navigation", exact: true });
+    await expect(drawer).toBeVisible();
+    expect(await drawer.evaluate((element) => element.matches(":modal"))).toBe(true);
+    // All ten links and Settings: the merchant's own list (the static one shows the same before it is read).
+    await expect(drawer.getByRole("link", { name: "Invoices", exact: true })).toBeVisible();
+    await expect(drawer.getByRole("link", { name: "Settings", exact: true })).toBeVisible();
+
+    await drawer.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(drawer).toBeHidden();
+    await expect(button).toBeFocused();
+    await button.click();
+    await expect(drawer).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(button).toBeFocused();
+  });
+
+  test("the static shell carries the frame and the section title and nothing personal", async ({ page }) => {
+    // `next dev` renders the shell and the session parts in one pass: the split below needs a production build.
+    test.skip(new URL(BASE_URL).port === "5175", "needs the production build (E2E_BASE_URL=http://localhost:5176)");
+    const me = (await (await page.request.get("/client/auth/me")).json()) as { name?: string; email: string; company?: string };
+    const html = await (await page.request.get("/en/merchant/orders")).text();
+    // The session parts stream after the shell as hidden segments that a script moves into place.
+    const streamed = html.search(/<div hidden id="S:\d+"/);
+    expect(streamed, "the personal parts stream after the shell").toBeGreaterThan(0);
+    const shell = html.slice(0, streamed);
+
+    expect(shell).toContain('aria-label="Workspace navigation"');
+    expect(shell).toContain("Merchant portal"); // the breadcrumb's area label
+    expect(shell).toMatch(/<p class="[^"]*text-heading[^"]*">Orders<\/p>/); // the section title
+    expect(shell).toContain('<main id="main"');
+    expect(shell).toContain("Merchant account"); // the role, where the name will be
+    expect(shell).toContain('aria-label="Open navigation"');
+
+    // The merchant is in the streamed parts only.
+    expect(html).toContain(me.name || me.email);
+    expect(shell).not.toContain(me.email);
+    if (me.name) expect(shell).not.toContain(me.name);
+    if (me.company) expect(shell).not.toContain(me.company);
   });
 });

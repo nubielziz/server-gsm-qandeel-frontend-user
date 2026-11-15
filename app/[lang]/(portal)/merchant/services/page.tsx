@@ -8,7 +8,6 @@ import { PageHeader } from "@/components/layout/container";
 import { FilterForm } from "@/components/merchant/filter-form";
 import { CsvDownloadButton } from "@/components/merchant/csv-download-button";
 import { PageError } from "@/components/merchant/page-error";
-import { MobileList, type MobileRow } from "@/components/merchant/mobile-list";
 import { ListSkeleton } from "@/components/merchant/skeletons";
 import { TypeBadge } from "@/components/merchant/type-badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -162,26 +161,13 @@ async function Catalog({ searchParams }: { searchParams: Promise<SearchParams> }
   );
 }
 
+// One markup for every screen (plan P1.1): a `compact` table is the real table from `md` up and short list rows on
+// phones (line 1: name and price; line 2: type; then category, delivery and quantity as small text). The name link covers
+// the whole row on phones, where the "Order" button column is dropped.
 function ServicesTable({ rows, locale, t, c }: { rows: MerchantService[]; locale: Locale; t: MerchantMessages; c: CommonMessages }) {
   const col = t.catalog.columns;
-  const mobile: MobileRow[] = rows.map((s) => ({
-    key: s.id,
-    href: localePath(locale, `/merchant/services/${s.id}`),
-    label: fmt(t.catalog.orderService, { name: s.name }),
-    title: s.name,
-    subtitle: <TypeBadge type={s.type} t={c} />,
-    details: [
-      s.category.name,
-      s.slaMinutes > 0 ? formatMinutes(s.slaMinutes, locale) : s.deliveryTime || null,
-      `${col.quantity}: ${quantityText(s, t.catalog, locale)}`,
-    ].filter(Boolean),
-    amount: <Money amount={s.price} currency={s.currency} locale={locale} />,
-  }));
   return (
-    <>
-      <MobileList rows={mobile} className="md:hidden" />
-      <div className="hidden md:block">
-        <Table caption={t.catalog.caption}>
+    <Table compact caption={t.catalog.caption}>
       <TableHead>
         <TableRow>
           <TableHeaderCell>{col.service}</TableHeaderCell>
@@ -200,39 +186,42 @@ function ServicesTable({ rows, locale, t, c }: { rows: MerchantService[]; locale
           <ServiceRow key={s.id} s={s} locale={locale} t={t} c={c} />
         ))}
       </TableBody>
-        </Table>
-      </div>
-    </>
+    </Table>
   );
 }
 
 function ServiceRow({ s, locale, t, c }: { s: MerchantService; locale: Locale; t: MerchantMessages; c: CommonMessages }) {
   const href = localePath(locale, `/merchant/services/${s.id}`);
   const col = t.catalog.columns;
+  const delivery = s.slaMinutes > 0 ? formatMinutes(s.slaMinutes, locale) : s.deliveryTime;
   return (
     <TableRow>
-      <TableCell>
+      <TableCell phone="title">
         <div className="min-w-0 text-start">
-          <Link href={href} className="font-semibold text-ink hover:underline">
+          <Link href={href} className="font-semibold text-ink hover:underline max-md:after:absolute max-md:after:inset-0">
             {s.name}
           </Link>
-          <p className="text-small text-ink-subtle">
+          <p className="text-small text-ink-subtle max-md:hidden">
             <bdi dir="ltr">{s.code}</bdi>
           </p>
         </div>
       </TableCell>
-      <TableCell label={col.category}>{s.category.name}</TableCell>
-      <TableCell label={col.type}>
+      <TableCell phone="meta" label={col.category}>
+        {s.category.name}
+      </TableCell>
+      <TableCell phone="subtitle" label={col.type}>
         <TypeBadge type={s.type} t={c} />
       </TableCell>
-      <TableCell numeric label={col.price} className="font-semibold">
+      <TableCell numeric phone="amount" label={col.price} className="font-semibold">
         <Money amount={s.price} currency={s.currency} locale={locale} />
       </TableCell>
-      <TableCell label={col.delivery}>{s.slaMinutes > 0 ? formatMinutes(s.slaMinutes, locale) : s.deliveryTime || t.shared.dash}</TableCell>
-      <TableCell label={col.quantity}>
+      <TableCell phone={delivery ? "meta" : "hide"} label={col.delivery}>
+        {delivery || t.shared.dash}
+      </TableCell>
+      <TableCell phone="meta-labeled" label={col.quantity}>
         <span className="num">{quantityText(s, t.catalog, locale)}</span>
       </TableCell>
-      <TableCell>
+      <TableCell phone="hide">
         <ButtonLink href={href} size="sm" variant="secondary" aria-label={fmt(t.catalog.orderService, { name: s.name })}>
           {t.catalog.order}
         </ButtonLink>

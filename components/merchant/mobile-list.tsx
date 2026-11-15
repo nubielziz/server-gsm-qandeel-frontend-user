@@ -1,5 +1,7 @@
 // A compact list for phones: one small row per record instead of a stacked table card (a stacked order is ~8 lines
-// tall, so 25 orders became a 12,000px page). Pages render the real <Table> from `md` up and this list below it.
+// tall, so 25 orders became a 12,000px page). The long lists (orders, services, invoices, wallet) no longer use it: they
+// render one `<Table compact>` for every screen (components/ui/table.tsx, plan P1.1), because a phone list next to the
+// table doubled their DOM. It stays for the dashboard's five latest orders, which render it beside their table.
 // A row with `href` is one big link (a 44px+ touch target); the amount sits on the end side.
 import Link from "next/link";
 import type { ReactNode } from "react";

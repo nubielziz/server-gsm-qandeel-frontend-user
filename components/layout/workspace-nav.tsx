@@ -1,11 +1,11 @@
 "use client";
-// Client parts of the workspace shell that need the current pathname: the active nav list, the header heading and the
-// mobile navigation drawer. The server wraps the first two in <Suspense> with a pure fallback (see workspace-shell.tsx).
+// Client parts of the workspace shell: the active nav list and the header heading (both need the current pathname; the
+// server wraps them in <Suspense> with a pure fallback, see workspace-shell.tsx) and the mobile navigation drawer.
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useId, type MouseEvent, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
-import { Drawer } from "@/components/ui/dialog";
+import { Drawer, openDialog } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { isActivePath } from "./active-path";
 import { WorkspaceNavView, type WorkspaceNavItem } from "./workspace-nav-view";
@@ -54,37 +54,50 @@ export function WorkspaceHeading({
 }
 
 export type WorkspaceMobileNavProps = {
-  items: WorkspaceNavItem[];
-  footerItems?: WorkspaceNavItem[];
   /** Server-rendered brand block shown at the top of the drawer. */
   brand: ReactNode;
+  /** The navigation lists, rendered by the server (they stream: the session decides which links the account has). */
+  children: ReactNode;
   labels: { open: string; title: string };
 };
 
-/** The menu button (below `lg`) and the start-side drawer with the labelled navigation. */
-export function WorkspaceMobileNav({ items, footerItems, brand, labels }: WorkspaceMobileNavProps) {
-  const [open, setOpen] = useState(false);
-  const pathname = usePathname();
+/**
+ * Closes the drawer when a link inside it is clicked (after hydration; before it, the link does a full page load). The
+ * drawer is uncontrolled, so the dialog element itself is closed.
+ */
+function closeOnLinkClick(event: MouseEvent<HTMLElement>) {
+  if (event.target instanceof Element && event.target.closest("a[href]")) event.currentTarget.closest("dialog")?.close();
+}
+
+/**
+ * The menu button (below `lg`) and the start-side drawer with the labelled navigation. The drawer is uncontrolled (`id`
+ * mode) and the button is a native `show-modal` command, so the menu opens from the server HTML at first paint instead of
+ * after hydration (plan P1.2 = P4.1). The button's `onClick` is the fallback for browsers without invoker commands; where
+ * both run, the click opens the dialog first and the command then finds it open and does nothing. It does not read the
+ * pathname, so nothing here suspends: the active link is marked inside the lists the server passes as `children`.
+ */
+export function WorkspaceMobileNav({ brand, labels, children }: WorkspaceMobileNavProps) {
+  // One id per shell: Next can keep a previous page (and its shell) hidden in the DOM, and a command finds the first
+  // element with its id.
+  const drawerId = `${useId()}-nav`;
   return (
     <>
-      <IconButton label={labels.open} aria-haspopup="dialog" variant="secondary" className="lg:hidden" onClick={() => setOpen(true)}>
+      <IconButton
+        label={labels.open}
+        aria-haspopup="dialog"
+        variant="secondary"
+        className="lg:hidden"
+        command="show-modal"
+        commandfor={drawerId}
+        onClick={() => openDialog(drawerId)}
+      >
         <Menu aria-hidden="true" />
       </IconButton>
-      <Drawer side="start" size="sm" open={open} onClose={() => setOpen(false)} title={labels.title}>
-        <div
-          className="grid gap-6"
-          onClick={(e) => {
-            if (e.target instanceof Element && e.target.closest("a[href]")) setOpen(false);
-          }}
-        >
+      <Drawer id={drawerId} side="start" size="sm" title={labels.title}>
+        <div className="grid gap-6" onClick={closeOnLinkClick}>
           <div>{brand}</div>
           <nav aria-label={labels.title} className="grid gap-4">
-            <WorkspaceNavView items={items} pathname={pathname} variant="drawer" />
-            {footerItems && footerItems.length > 0 ? (
-              <div className="border-t border-line pt-4">
-                <WorkspaceNavView items={footerItems} pathname={pathname} variant="drawer" />
-              </div>
-            ) : null}
+            {children}
           </nav>
         </div>
       </Drawer>

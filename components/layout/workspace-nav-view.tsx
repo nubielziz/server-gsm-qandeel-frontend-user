@@ -16,6 +16,13 @@ export type WorkspaceNavItem = {
   title?: string;
   /** `prefix` (default) is active for the page and everything below it; `exact` only for the page itself. */
   match?: "exact" | "prefix";
+  /**
+   * Holds the item's place without showing it: an empty slot of the same size, hidden from assistive technology. For an
+   * item that depends on the session (the customer's wallet): the static shell reserves the place, and the list read
+   * after the session either shows the item or drops the slot, so a likely item does not push the ones below it down.
+   * The item still names its page for the header title.
+   */
+  reserve?: boolean;
 };
 
 export type WorkspaceNavViewProps = {
@@ -31,22 +38,31 @@ export function WorkspaceNavView({ items, pathname, variant }: WorkspaceNavViewP
   if (variant === "drawer") {
     return (
       <ul className="grid gap-1">
-        {items.map((item) => (
-          <li key={item.href}>
-            <Link
-              href={item.href}
-              aria-current={isActivePath(pathname, item.href, item.match) ? "page" : undefined}
-              className={cn(
-                "flex min-h-12 items-center gap-3 rounded-control px-3 text-body font-semibold text-ink-muted transition-colors",
-                "hover:bg-surface-muted hover:text-ink aria-[current=page]:bg-inverse aria-[current=page]:text-on-inverse",
-                "[&_svg]:size-5 [&_svg]:shrink-0",
-              )}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          </li>
-        ))}
+        {items.map((item) => {
+          if (item.reserve) {
+            return (
+              <li key={item.href} aria-hidden="true">
+                <span className="block min-h-12" />
+              </li>
+            );
+          }
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                aria-current={isActivePath(pathname, item.href, item.match) ? "page" : undefined}
+                className={cn(
+                  "flex min-h-12 items-center gap-3 rounded-control px-3 text-body font-semibold text-ink-muted transition-colors",
+                  "hover:bg-surface-muted hover:text-ink aria-[current=page]:bg-inverse aria-[current=page]:text-on-inverse",
+                  "[&_svg]:size-5 [&_svg]:shrink-0",
+                )}
+              >
+                {item.icon}
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     );
   }
@@ -54,37 +70,46 @@ export function WorkspaceNavView({ items, pathname, variant }: WorkspaceNavViewP
   // ten links fit a 1366×768 laptop window without the rail growing past the screen.
   return (
     <ul className="grid justify-items-center gap-2 [@media(max-height:46rem)]:gap-1">
-      {items.map((item) => (
-        <li key={item.href} className="relative">
-          <Link
-            href={item.href}
-            aria-current={isActivePath(pathname, item.href, item.match) ? "page" : undefined}
-            className={cn(
-              "group relative grid size-12 place-items-center rounded-control text-on-inverse-muted transition-colors duration-(--duration-fast) [@media(max-height:46rem)]:size-11",
-              "hover:bg-inverse-raised hover:text-on-inverse aria-[current=page]:bg-inverse-raised aria-[current=page]:text-on-inverse",
-              "[&_svg]:size-6",
-            )}
-          >
-            {item.icon}
-            <span className="sr-only">{item.label}</span>
-            {/* Active mark on the rail's inner edge, as in the mockups. */}
-            <span
-              aria-hidden="true"
-              className="absolute -start-4 h-7 w-1 rounded-e-full bg-on-inverse opacity-0 group-aria-[current=page]:opacity-100"
-            />
-            {/* Tooltip: hover and keyboard focus. Decorative: the sr-only label above is the accessible name. */}
-            <span
-              aria-hidden="true"
+      {items.map((item) => {
+        if (item.reserve) {
+          return (
+            <li key={item.href} aria-hidden="true">
+              <span className="block size-12 [@media(max-height:46rem)]:size-11" />
+            </li>
+          );
+        }
+        return (
+          <li key={item.href} className="relative">
+            <Link
+              href={item.href}
+              aria-current={isActivePath(pathname, item.href, item.match) ? "page" : undefined}
               className={cn(
-                "pointer-events-none absolute start-full z-50 ms-4 whitespace-nowrap rounded-control bg-surface px-3 py-2 text-small font-semibold text-ink opacity-0 shadow-overlay",
-                "transition-opacity duration-(--duration-fast) group-hover:opacity-100 group-focus-visible:opacity-100",
+                "group relative grid size-12 place-items-center rounded-control text-on-inverse-muted transition-colors duration-(--duration-fast) [@media(max-height:46rem)]:size-11",
+                "hover:bg-inverse-raised hover:text-on-inverse aria-[current=page]:bg-inverse-raised aria-[current=page]:text-on-inverse",
+                "[&_svg]:size-6",
               )}
             >
-              {item.label}
-            </span>
-          </Link>
-        </li>
-      ))}
+              {item.icon}
+              <span className="sr-only">{item.label}</span>
+              {/* Active mark on the rail's inner edge, as in the mockups. */}
+              <span
+                aria-hidden="true"
+                className="absolute -start-4 h-7 w-1 rounded-e-full bg-on-inverse opacity-0 group-aria-[current=page]:opacity-100"
+              />
+              {/* Tooltip: hover and keyboard focus. Decorative: the sr-only label above is the accessible name. */}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "pointer-events-none absolute start-full z-50 ms-4 whitespace-nowrap rounded-control bg-surface px-3 py-2 text-small font-semibold text-ink opacity-0 shadow-overlay",
+                  "transition-opacity duration-(--duration-fast) group-hover:opacity-100 group-focus-visible:opacity-100",
+                )}
+              >
+                {item.label}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }

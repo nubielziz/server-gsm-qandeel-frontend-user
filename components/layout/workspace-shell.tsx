@@ -3,8 +3,14 @@
 // footer nav (settings) and the avatar; the main column starts with a white header card (breadcrumb + section title,
 // search, header slot such as the wallet pill, avatar menu). Below lg: a top bar with a menu button that opens a
 // start-side drawer with the labelled navigation.
-// A layout passes plain data; pages render their own <PageHeader> and content as children. It reads no session
-// itself: wrap the layout's session read in <Suspense fallback={<WorkspaceShellSkeleton />}>.
+//
+// The frame is part of the static shell (plan P1.4; Next guide "Optimizing the static shell", "Keep static UI in the
+// shell"): the rail, the header card with the section title, the menu button and drawer, the account menu and the main
+// area are prerendered, so the page has text on screen at first paint instead of a skeleton until the session is read.
+// Nothing personal is in it. The parts that depend on who is signed in are small holes with their own <Suspense> and a
+// same-size fallback, each read by an async function the layout passes (`resolveNav`, `resolveUser`): the nav lists
+// when the session decides which links exist, and the avatar with the name. A layout puts its session gate and its own
+// holes (wallet pill, bell) in `headerSlot` / `children`.
 import { Suspense, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { localePath } from "@/lib/i18n/config";
@@ -22,33 +28,137 @@ import { WorkspaceNavView, type WorkspaceNavItem } from "./workspace-nav-view";
 
 export type { WorkspaceNavItem };
 
-export type WorkspaceShellProps = {
+/** The nav lists once the session is known. */
+export type WorkspaceNavLists = {
   /** Main navigation (top of the rail / drawer). */
   nav: WorkspaceNavItem[];
   /** Secondary navigation pinned to the bottom of the rail (settings). */
   footerNav?: WorkspaceNavItem[];
+};
+
+/** The signed-in person. */
+export type WorkspaceUser = {
+  /** Avatar initials and the name beside the menu button. */
+  name: string;
+  /** Small line under the name (the role, a company). */
+  subtitle?: string;
+};
+
+export type WorkspaceShellProps = {
+  /**
+   * Main navigation as the static shell shows it, before the session is read (top of the rail / drawer): every link an
+   * account might have. An item the session may take away (the customer's wallet) is `reserve`d, which holds its place.
+   * Every item here also names its page for the header title, so the title is right in the static shell.
+   */
+  nav: WorkspaceNavItem[];
+  /** Secondary navigation pinned to the bottom of the rail (settings), as the static shell shows it. */
+  footerNav?: WorkspaceNavItem[];
+  /**
+   * Reads the session and returns the final lists (the wallet item for a customer who has one, the short list of a merchant
+   * waiting for approval). It runs inside <Suspense>; the static `nav` shows until it returns. Leave it out when every
+   * account has the same links.
+   */
+  resolveNav?: () => Promise<WorkspaceNavLists>;
   /** Name of the area for the breadcrumb ("Workspace", "My account"). */
   areaLabel: string;
   /** Where the area label and the rail logo go. Defaults to the shop home. */
   homeHref?: string;
-  /** The signed-in person: avatar initials and the name beside the menu button. */
-  user: { name: string; subtitle?: string };
-  /** The avatar menu content: `MenuItem`s / `SignOutButton`s from components/ui/menu and ./sign-out-button. */
+  /** The account's role in words ("Merchant account"): shown under the name's placeholder while the session is read. */
+  roleLabel: string;
+  /** Reads the signed-in person (and sends a signed-out visitor to sign-in). Runs inside <Suspense>. */
+  resolveUser: () => Promise<WorkspaceUser>;
+  /** The avatar menu content: `MenuItem`s / `SignOutButton`s from components/ui/menu and ./sign-out-button. Static. */
   userMenu: ReactNode;
-  /** Header slot on the end side, before the avatar (the wallet pill). */
+  /** Header slot on the end side, before the avatar (the bell, the wallet pill). Anything personal needs its own <Suspense>. */
   headerSlot?: ReactNode;
   /** A search form in the header (shown from `md`). Omit for none. */
   search?: { action: string; label: string; placeholder: string; submitLabel: string };
+  /** The page. Personal content needs its own <Suspense> (the layout adds the page-wide one and the session gate). */
   children: ReactNode;
 };
 
-/** The rail + header card + main column frame. Server component. */
+/** Short screens (under 46rem) drop the rail's avatar to make room for the links (the header menu shows it too). */
+const RAIL_AVATAR_HIDE = "[@media(max-height:46rem)]:hidden";
+
+/** The static nav list: the active link is marked where the pathname is known when the page is prerendered. */
+function StaticNav({ items, variant }: { items: WorkspaceNavItem[]; variant: "rail" | "drawer" }) {
+  return (
+    <Suspense fallback={<WorkspaceNavView items={items} pathname={null} variant={variant} />}>
+      <ActiveWorkspaceNav items={items} variant={variant} />
+    </Suspense>
+  );
+}
+
+type NavGroupProps = {
+  group: "main" | "footer";
+  variant: "rail" | "drawer";
+  nav: WorkspaceNavItem[];
+  footerNav?: WorkspaceNavItem[];
+  resolveNav?: () => Promise<WorkspaceNavLists>;
+};
+
+type ResolvedNavProps = Pick<NavGroupProps, "group" | "variant"> & { resolveNav: () => Promise<WorkspaceNavLists> };
+
+async function ResolvedNav({ group, variant, resolveNav }: ResolvedNavProps) {
+  const lists = await resolveNav();
+  return <StaticNav items={group === "main" ? lists.nav : (lists.footerNav ?? [])} variant={variant} />;
+}
+
+/** One nav list: the static one in the shell, replaced by the session's own once `resolveNav` returns. */
+function NavGroup({ group, variant, nav, footerNav, resolveNav }: NavGroupProps) {
+  const fixed = <StaticNav items={group === "main" ? nav : (footerNav ?? [])} variant={variant} />;
+  if (!resolveNav) return fixed;
+  return (
+    <Suspense fallback={fixed}>
+      <ResolvedNav group={group} variant={variant} resolveNav={resolveNav} />
+    </Suspense>
+  );
+}
+
+/** The rail's avatar: initials of the signed-in person. */
+async function RailAvatar({ resolveUser }: { resolveUser: () => Promise<WorkspaceUser> }) {
+  const user = await resolveUser();
+  return <Avatar name={user.name} size="md" tone="light" label={user.name} className={RAIL_AVATAR_HIDE} />;
+}
+
+/** The menu button's content: avatar and, from `xl`, the name with a small line under it. */
+async function UserTrigger({ resolveUser }: { resolveUser: () => Promise<WorkspaceUser> }) {
+  const user = await resolveUser();
+  return (
+    <>
+      <Avatar name={user.name} size="md" />
+      <span className="hidden min-w-0 text-start xl:block">
+        <span className="block max-w-40 truncate text-small font-bold text-ink">{user.name}</span>
+        {user.subtitle ? <span className="block max-w-40 truncate text-caption text-ink-subtle">{user.subtitle}</span> : null}
+      </span>
+    </>
+  );
+}
+
+/** The same boxes as `UserTrigger`, with the role in words where the name will be. Spans only: it sits inside a button. */
+function UserTriggerFallback({ roleLabel }: { roleLabel: string }) {
+  return (
+    <>
+      <span aria-hidden="true" className="skeleton size-10 rounded-full" />
+      <span className="hidden min-w-0 text-start xl:block">
+        <span aria-hidden="true" className="skeleton block h-auto w-24 text-small">
+          &nbsp;
+        </span>
+        <span className="block max-w-40 truncate text-caption text-ink-subtle">{roleLabel}</span>
+      </span>
+    </>
+  );
+}
+
+/** The rail, the header card, the main column and the phone drawer. Server component, static (no session read). */
 export async function WorkspaceShell({
   nav,
   footerNav,
+  resolveNav,
   areaLabel,
   homeHref,
-  user,
+  roleLabel,
+  resolveUser,
   userMenu,
   headerSlot,
   search,
@@ -58,6 +168,7 @@ export async function WorkspaceShell({
   const home = homeHref ?? localePath(locale);
   const all = [...nav, ...(footerNav ?? [])];
   const headingProps = { areaLabel, areaHref: home, breadcrumbLabel: t.workspace.breadcrumbLabel };
+  const lists = { nav, footerNav, resolveNav };
 
   return (
     <ChromeProviders>
@@ -72,35 +183,27 @@ export async function WorkspaceShell({
           <div className="surface-inverse sticky top-4 hidden min-h-[calc(100dvh-2rem)] w-20 shrink-0 flex-col items-center rounded-panel py-4 lg:flex">
             <Logo variant="stacked" tone="inverse" href={home} />
             <nav aria-label={t.workspace.navLabel} className="mt-5 flex min-h-0 w-full flex-1 flex-col justify-between px-4">
-              <Suspense fallback={<WorkspaceNavView items={nav} pathname={null} variant="rail" />}>
-                <ActiveWorkspaceNav items={nav} variant="rail" />
-              </Suspense>
+              <NavGroup group="main" variant="rail" {...lists} />
               <div className="grid justify-items-center gap-4">
-                {footerNav && footerNav.length > 0 ? (
-                  <Suspense fallback={<WorkspaceNavView items={footerNav} pathname={null} variant="rail" />}>
-                    <ActiveWorkspaceNav items={footerNav} variant="rail" />
-                  </Suspense>
-                ) : null}
+                {footerNav && footerNav.length > 0 ? <NavGroup group="footer" variant="rail" {...lists} /> : null}
                 {/* The header's account menu shows the same avatar: on short screens the rail drops it to fit. */}
-                <Avatar
-                  name={user.name}
-                  size="md"
-                  tone="light"
-                  label={user.name}
-                  className="[@media(max-height:46rem)]:hidden"
-                />
+                <Suspense fallback={<span aria-hidden="true" className={`size-10 rounded-full bg-inverse-raised ${RAIL_AVATAR_HIDE}`} />}>
+                  <RailAvatar resolveUser={resolveUser} />
+                </Suspense>
               </div>
             </nav>
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col gap-4">
             <header className="flex min-h-[4.5rem] items-center gap-3 rounded-card border border-line bg-surface px-3 py-2.5 shadow-card sm:px-5">
-              <WorkspaceMobileNav
-                items={nav}
-                footerItems={footerNav}
-                brand={<Logo href={home} />}
-                labels={{ open: t.workspace.openNav, title: t.workspace.navLabel }}
-              />
+              <WorkspaceMobileNav brand={<Logo href={home} />} labels={{ open: t.workspace.openNav, title: t.workspace.navLabel }}>
+                <NavGroup group="main" variant="drawer" {...lists} />
+                {footerNav && footerNav.length > 0 ? (
+                  <div className="border-t border-line pt-4">
+                    <NavGroup group="footer" variant="drawer" {...lists} />
+                  </div>
+                ) : null}
+              </WorkspaceMobileNav>
               <div className="min-w-0 flex-1 lg:flex-none lg:basis-72">
                 <Suspense fallback={<WorkspaceHeadingView {...headingProps} />}>
                   <WorkspaceHeading items={all} {...headingProps} />
@@ -117,19 +220,17 @@ export async function WorkspaceShell({
               )}
               <div className="ms-auto flex shrink-0 items-center gap-2 md:ms-0">
                 {headerSlot}
+                {/* The menu button and its panel are static (the popover opens before hydration too); only what the
+                    button shows, the avatar and the name, waits for the session. */}
                 <Menu
                   label={t.workspace.accountMenu}
                   align="end"
                   triggerClassName="relative inline-flex min-h-11 items-center gap-2 rounded-control px-1.5 text-ink transition-colors hover:bg-surface-sunken sm:pe-2"
                   trigger={
                     <>
-                      <Avatar name={user.name} size="md" />
-                      <span className="hidden min-w-0 text-start xl:block">
-                        <span className="block max-w-40 truncate text-small font-bold text-ink">{user.name}</span>
-                        {user.subtitle ? (
-                          <span className="block max-w-40 truncate text-caption text-ink-subtle">{user.subtitle}</span>
-                        ) : null}
-                      </span>
+                      <Suspense fallback={<UserTriggerFallback roleLabel={roleLabel} />}>
+                        <UserTrigger resolveUser={resolveUser} />
+                      </Suspense>
                       <ChevronDown aria-hidden="true" className="size-4 text-ink-subtle" />
                     </>
                   }
@@ -149,23 +250,12 @@ export async function WorkspaceShell({
   );
 }
 
-/** A same-size placeholder of the shell for `<Suspense fallback>` around a layout's session read (no layout shift). */
-export function WorkspaceShellSkeleton() {
+/** A same-size placeholder of the main area for a layout's page-wide <Suspense> (no layout shift). */
+export function WorkspaceMainSkeleton() {
   return (
-    <div className="min-h-dvh bg-page p-3 sm:p-4" aria-busy="true">
-      <div className="mx-auto flex w-full max-w-[110rem] items-start gap-4">
-        <div className="sticky top-4 hidden h-[calc(100dvh-2rem)] w-20 shrink-0 rounded-panel bg-inverse lg:block" />
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <div className="flex min-h-[4.5rem] items-center gap-4 rounded-card border border-line bg-surface px-5 py-2.5 shadow-card">
-            <Skeleton className="h-10 w-56" />
-            <Skeleton className="ms-auto size-11 rounded-full" />
-          </div>
-          <div className="grid gap-4">
-            <Skeleton className="h-20 rounded-card" />
-            <Skeleton className="h-64 rounded-card" />
-          </div>
-        </div>
-      </div>
+    <div className="grid gap-4" aria-busy="true">
+      <Skeleton className="h-20 rounded-card" />
+      <Skeleton className="h-64 rounded-card" />
     </div>
   );
 }

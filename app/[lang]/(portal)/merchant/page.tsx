@@ -35,7 +35,16 @@ export default function MerchantDashboardPage() {
 
 async function Dashboard() {
   const locale = await getLocale();
-  const [me, t, c, p] = await Promise.all([requireMerchant(locale, localePath(locale, "/merchant")), getMessages(merchant), getMessages(common), getMessages(portal)]);
+  // The dashboard read (`result`) starts with the session read (plan P1.3): one API round trip instead of two. A pending
+  // merchant never uses it (the API answers 403, settled here and ignored below) and a signed-out visitor is redirected
+  // before it matters. No-store and per request, as every personal read.
+  const [me, t, c, p, result] = await Promise.all([
+    requireMerchant(locale, localePath(locale, "/merchant")),
+    getMessages(merchant),
+    getMessages(common),
+    getMessages(portal),
+    settle(apiSessionGet<MerchantDashboard>("/client/dashboard")),
+  ]);
   const name = me.name || me.email;
   const pending = me.status === "pending";
 
@@ -91,7 +100,6 @@ async function Dashboard() {
     );
   }
 
-  const result = await settle(apiSessionGet<MerchantDashboard>("/client/dashboard"));
   if (!result.ok) {
     return (
       <div className="grid gap-6">

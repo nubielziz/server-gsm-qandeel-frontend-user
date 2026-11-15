@@ -3,7 +3,7 @@
 // so the shared demo accounts stay as every other test expects them.
 import { expect, test } from "./fixtures";
 import { type Page } from "@playwright/test";
-import { ACCOUNTS, signInCustomer } from "./helpers";
+import { ACCOUNTS, BASE_URL, signInCustomer } from "./helpers";
 
 const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 
@@ -280,5 +280,98 @@ test.describe("settings (throwaway customer)", () => {
     await page.getByRole("link", { name: "Privacy", exact: true }).click();
     await expect(page).toHaveURL(/#privacy$/);
     await expect(page.getByRole("heading", { name: "Privacy and data" })).toBeInViewport();
+  });
+});
+
+// ── The workspace frame (plan P1.2, P1.4) ─────────────────────────────────────────────────────────────────────────────
+// The customer area's frame is part of the static shell: the rail, the header with the section title, the menu button and
+// its drawer are in the HTML before anything personal is read, and the phone menu opens from that HTML (a native
+// `show-modal` command) before React hydrates. Read-only: the demo customer is only looked at.
+
+/** Whether React has attached its props to the element (it has hydrated). */
+const hydrated = (page: Page, selector: string) =>
+  page.locator(selector).first().evaluate((element) => Object.keys(element).some((key) => key.startsWith("__reactProps")));
+
+test.describe("workspace frame (demo customer, read only)", () => {
+  test.beforeEach(async ({ page }) => signInCustomer(page));
+
+  test("phone: the menu button opens the drawer before React hydrates, Esc and the close button close it, focus returns", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    // Every client script is aborted (the CSS still loads), so React never hydrates; inline scripts still run, so the
+    // streamed session parts show. A button that works now is the browser's own command, not an onClick.
+    let aborted = 0;
+    await page.route("**/_next/static/chunks/**", (route) => {
+      if (route.request().resourceType() !== "script") return route.continue();
+      aborted += 1;
+      return route.abort();
+    });
+    await page.goto("/en/account/orders");
+    expect(aborted, "no client script was blocked").toBeGreaterThan(0);
+
+    const button = page.getByRole("button", { name: "Open navigation", exact: true });
+    await expect(button).toHaveAttribute("aria-haspopup", "dialog");
+    expect(await hydrated(page, "header button[commandfor]"), "the page hydrated").toBe(false);
+
+    await button.click();
+    const drawer = page.getByRole("dialog", { name: "Workspace navigation", exact: true });
+    await expect(drawer).toBeVisible();
+    // A modal: the focus trap and the inert page come from showModal(), not from a plain `open` attribute.
+    expect(await drawer.evaluate((element) => element.matches(":modal"))).toBe(true);
+    await expect(drawer.getByRole("link", { name: "Orders", exact: true })).toBeVisible();
+    await expect(drawer.getByRole("link", { name: "Settings", exact: true })).toBeVisible();
+
+    await drawer.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(drawer).toBeHidden();
+    await expect(button).toBeFocused();
+
+    await button.click();
+    await expect(drawer).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(button).toBeFocused();
+  });
+
+  test("phone, hydrated: one modal per tap, and a link in the drawer closes it on the page it opens", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await go(page, "/en/account");
+    await expect.poll(() => hydrated(page, "header button[commandfor]")).toBe(true);
+
+    // The click handler opens it first and the native command then finds it open: one modal, no error.
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.getByRole("button", { name: "Open navigation", exact: true }).click();
+    const drawer = page.getByRole("dialog", { name: "Workspace navigation", exact: true });
+    await expect(drawer).toBeVisible();
+    expect(await drawer.evaluate((element) => element.matches(":modal"))).toBe(true);
+
+    // The frame stays mounted across account pages, so the drawer must be closed by the click, not by a new page.
+    await drawer.getByRole("link", { name: "Orders", exact: true }).click();
+    await expect(page).toHaveURL(/\/en\/account\/orders$/);
+    await expect(drawer).toBeHidden();
+    await expect(page.getByRole("heading", { level: 1, name: "My orders" })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test("the static shell carries the frame and the section title and nothing personal", async ({ page }) => {
+    // `next dev` renders the shell and the session parts in one pass: the split below needs a production build.
+    test.skip(new URL(BASE_URL).port === "5175", "needs the production build (E2E_BASE_URL=http://localhost:5176)");
+    const me = (await (await page.request.get("/store/v1/me")).json()) as { name?: string; email: string };
+    const html = await (await page.request.get("/en/account/orders")).text();
+    // The session parts stream after the shell as hidden segments that a script moves into place.
+    const streamed = html.search(/<div hidden id="S:\d+"/);
+    expect(streamed, "the personal parts stream after the shell").toBeGreaterThan(0);
+    const shell = html.slice(0, streamed);
+
+    expect(shell).toContain('aria-label="Workspace navigation"');
+    expect(shell).toContain("My account"); // the breadcrumb's area label
+    expect(shell).toMatch(/<p class="[^"]*text-heading[^"]*">Orders<\/p>/); // the section title
+    expect(shell).toContain('<main id="main"');
+    expect(shell).toContain("Customer account"); // the role, where the name will be
+    expect(shell).toContain('aria-label="Open navigation"');
+
+    // The person is in the streamed parts only.
+    expect(html).toContain(me.name || me.email);
+    expect(shell).not.toContain(me.email);
+    if (me.name) expect(shell).not.toContain(me.name);
   });
 });

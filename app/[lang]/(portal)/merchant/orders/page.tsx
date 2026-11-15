@@ -8,7 +8,6 @@ import { PageHeader } from "@/components/layout/container";
 import { CsvDownloadButton } from "@/components/merchant/csv-download-button";
 import { FilterForm } from "@/components/merchant/filter-form";
 import { PageError } from "@/components/merchant/page-error";
-import { MobileList, type MobileRow } from "@/components/merchant/mobile-list";
 import { ListSkeleton } from "@/components/merchant/skeletons";
 import { TypeBadge } from "@/components/merchant/type-badge";
 import { Badge } from "@/components/ui/badge";
@@ -173,33 +172,15 @@ async function Orders({ searchParams }: { searchParams: Promise<SearchParams> })
   );
 }
 
+// One markup for every screen (plan P1.1): a `compact` table is the real table from `md` up and short list rows on phones
+// (line 1: number, status, total; line 2: service; then date, input, quantity, check as small text). The number link
+// covers the whole row on phones. A value a phone row would show as an empty or default fact (a single unit, no check,
+// no input) is dropped there.
 function OrdersTable({ rows, locale, t, c }: { rows: MerchantOrder[]; locale: Locale; t: MerchantMessages; c: CommonMessages }) {
   const col = t.orders.columns;
   const verification = t.orders.verification as Record<string, string>;
-  const mobile: MobileRow[] = rows.map((o) => ({
-    key: o.id,
-    href: localePath(locale, `/merchant/orders/${o.id}`),
-    label: fmt(t.orders.open, { id: o.id }),
-    title: <span className="num">#{o.id}</span>,
-    badge: <StatusBadge kind="order" status={o.status} label={statusLabel(c, "order", o.status)} />,
-    subtitle: o.service.name,
-    details: [
-      formatDate(o.createdAt, locale),
-      o.imei ? (
-        <bdi key="i" dir="ltr" className="num break-all">
-          {o.imei}
-        </bdi>
-      ) : null,
-      o.quantity > 1 ? `× ${formatNumber(o.quantity, locale)}` : null,
-      o.verificationStatus ? verification[o.verificationStatus] : null,
-    ].filter(Boolean),
-    amount: <Money amount={o.totalPrice} currency={o.currency} locale={locale} />,
-  }));
   return (
-    <>
-      <MobileList rows={mobile} className="md:hidden" />
-      <div className="hidden md:block">
-        <Table caption={t.orders.caption}>
+    <Table compact caption={t.orders.caption}>
       <TableHead>
         <TableRow>
           <TableHeaderCell>{col.order}</TableHeaderCell>
@@ -217,27 +198,33 @@ function OrdersTable({ rows, locale, t, c }: { rows: MerchantOrder[]; locale: Lo
           const href = localePath(locale, `/merchant/orders/${o.id}`);
           return (
             <TableRow key={o.id}>
-              <TableCell>
-                <Link href={href} aria-label={fmt(t.orders.open, { id: o.id })} className="num font-semibold text-ink hover:underline">
+              <TableCell phone="title">
+                <Link
+                  href={href}
+                  aria-label={fmt(t.orders.open, { id: o.id })}
+                  className="num font-semibold text-ink hover:underline max-md:after:absolute max-md:after:inset-0"
+                >
                   #{o.id}
                 </Link>
               </TableCell>
-              <TableCell label={col.date}>
-                <span className="whitespace-nowrap text-ink-muted">{formatDate(o.createdAt, locale)}</span>
+              <TableCell phone="meta" label={col.date}>
+                <span className="whitespace-nowrap text-ink-muted max-md:text-ink-subtle">{formatDate(o.createdAt, locale)}</span>
               </TableCell>
-              <TableCell label={col.service}>
+              <TableCell phone="subtitle" label={col.service}>
                 <div className="grid min-w-0 justify-items-start gap-1 text-start">
                   <span className="font-medium text-ink">{o.service.name}</span>
-                  <TypeBadge type={o.service.type} t={c} />
+                  <span className="max-md:hidden">
+                    <TypeBadge type={o.service.type} t={c} />
+                  </span>
                 </div>
               </TableCell>
-              <TableCell label={col.input}>
+              <TableCell phone={o.imei || o.inputFileId ? "meta" : "hide"} label={col.input}>
                 {o.imei ? (
                   <bdi dir="ltr" title={o.imei} className="num block max-w-[13rem] truncate">
                     {o.imei}
                   </bdi>
                 ) : o.inputFileId ? (
-                  <span className="inline-flex items-center gap-1.5 text-ink-muted">
+                  <span className="inline-flex items-center gap-1.5 text-ink-muted max-md:text-ink-subtle">
                     <FileText aria-hidden="true" className="size-4" />
                     {t.orders.file}
                   </span>
@@ -245,24 +232,22 @@ function OrdersTable({ rows, locale, t, c }: { rows: MerchantOrder[]; locale: Lo
                   <span className="text-ink-subtle">{t.shared.dash}</span>
                 )}
               </TableCell>
-              <TableCell numeric label={col.quantity}>
+              <TableCell numeric phone={o.quantity > 1 ? "meta-labeled" : "hide"} label={col.quantity}>
                 {formatNumber(o.quantity, locale)}
               </TableCell>
-              <TableCell numeric label={col.total} className="font-semibold">
+              <TableCell numeric phone="amount" label={col.total} className="font-semibold">
                 <Money amount={o.totalPrice} currency={o.currency} locale={locale} />
               </TableCell>
-              <TableCell label={col.status}>
+              <TableCell phone="badge" label={col.status}>
                 <StatusBadge kind="order" status={o.status} label={statusLabel(c, "order", o.status)} />
               </TableCell>
-              <TableCell label={col.verification}>
+              <TableCell phone={o.verificationStatus ? "meta" : "hide"} label={col.verification}>
                 {o.verificationStatus ? <Badge tone={o.verificationStatus === "refunded" ? "danger" : o.verificationStatus === "accepted" ? "success" : "warning"}>{verification[o.verificationStatus]}</Badge> : <span className="text-ink-subtle">{t.shared.dash}</span>}
               </TableCell>
             </TableRow>
           );
         })}
       </TableBody>
-        </Table>
-      </div>
-    </>
+    </Table>
   );
 }

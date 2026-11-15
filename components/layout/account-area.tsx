@@ -7,7 +7,7 @@ import { cookies } from "next/headers";
 import { ClipboardList, LayoutDashboard, LogIn, UserRound, Wallet } from "lucide-react";
 import { ApiError } from "@/lib/api/errors";
 import { apiSessionGet } from "@/lib/api/server";
-import { getCustomer, getMerchant, STORE_CSRF_COOKIE } from "@/lib/api/session";
+import { getCustomer, getMerchant, MERCHANT_CSRF_COOKIE, STORE_CSRF_COOKIE } from "@/lib/api/session";
 import type { CustomerWallet, MerchantWallet } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
 import { localePath } from "@/lib/i18n/config";
@@ -23,8 +23,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { SignOutButton } from "./sign-out-button";
 
-/** The merchant's wallet (`GET /client/wallet`), or null when it cannot be shown (pending approval, signed out, error). Once per request. */
+/**
+ * The merchant's wallet (`GET /client/wallet`), or null when it cannot be shown (pending approval, signed out, error). Once
+ * per request. No merchant session can exist without the readable CSRF cookie: the call is skipped for everyone else, so a
+ * visitor who is signed out (or a customer) costs no API call, which lets the header start this read together with `me`.
+ */
 const getWallet = cache(async (): Promise<MerchantWallet | null> => {
+  if (!(await cookies()).has(MERCHANT_CSRF_COOKIE)) return null;
   try {
     return await apiSessionGet<MerchantWallet>("/client/wallet");
   } catch {
@@ -51,11 +56,17 @@ export function AccountAreaSkeleton({ compact }: { compact?: boolean }) {
 }
 
 async function AccountAreaContent({ compact }: { compact?: boolean }) {
-  const [locale, t, merchant, customer] = await Promise.all([
+  // The wallet reads start together with the session reads (plan P1.3): one API round trip instead of two. Each is skipped
+  // by itself when its surface has no session cookie, and dropped below when the session turns out signed out (401) or the
+  // merchant is pending. Personal reads stay no-store and per request. The compact shop header of a checkout (avatar only)
+  // never reads the customer's wallet.
+  const [locale, t, merchant, customer, merchantWallet, customerRead] = await Promise.all([
     getLocale(),
     getMessages(common),
     getMerchant().catch(() => null),
     getCustomer().catch(() => null),
+    getWallet(),
+    compact ? null : readCustomerWallet(),
   ]);
 
   if (!merchant && !customer) {
@@ -83,12 +94,8 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
     );
   }
 
-  // The shop header of a checkout is compact (avatar only): it never reads a wallet.
-  const [wallet, customerRead] = await Promise.all([
-    merchant && merchant.status !== "pending" ? getWallet() : null,
-    customer && !compact ? readCustomerWallet() : null,
-  ]);
-  const customerWallet = customerRead?.ok ? customerRead.data : null;
+  const wallet = merchant && merchant.status !== "pending" ? merchantWallet : null;
+  const customerWallet = customer && customerRead?.ok ? customerRead.data : null;
   const customerShows = customerWallet ? walletCapabilities(customerWallet).show : false;
   const name = merchant?.name || customer?.name || merchant?.email || customer?.email || "";
   const email = merchant?.email ?? customer?.email ?? "";

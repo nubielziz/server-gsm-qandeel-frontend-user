@@ -9,7 +9,6 @@ import { PageHeader } from "@/components/layout/container";
 import { FilterForm } from "@/components/merchant/filter-form";
 import { InvoiceFacts } from "@/components/merchant/invoice-facts";
 import { PageError } from "@/components/merchant/page-error";
-import { MobileList, type MobileRow } from "@/components/merchant/mobile-list";
 import { ListSkeleton, StatsSkeleton } from "@/components/merchant/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
@@ -228,6 +227,9 @@ async function Invoices({ searchParams }: { searchParams: Promise<SearchParams> 
   );
 }
 
+// One markup for every screen (plan P1.1): a `compact` table is the real table from `md` up and short list rows on phones
+// (line 1: number, status, total; then kind and date as small text). The number link covers the whole row on phones,
+// where the preview / PDF column is dropped (the preview panel shows from xl).
 function InvoicesTable({
   rows,
   selectedId,
@@ -259,20 +261,8 @@ function InvoicesTable({
     };
     return hrefWith(base, params);
   };
-  const mobile: MobileRow[] = rows.map((inv) => ({
-    key: inv.id,
-    href: localePath(locale, `/merchant/invoices/${inv.id}`),
-    label: fmt(t.invoices.view, { number: inv.number }),
-    title: <span className="num">{inv.number}</span>,
-    badge: <StatusBadge kind="invoice" status={inv.status} label={statusLabel(c, "invoice", inv.status)} />,
-    details: [labelOf(kinds, inv.kind), formatDate(inv.createdAt, locale)],
-    amount: <Money amount={inv.total} currency={inv.currency} locale={locale} />,
-  }));
   return (
-    <>
-      <MobileList rows={mobile} className="md:hidden" />
-      <div className="hidden md:block">
-      <Table caption={t.invoices.caption}>
+    <Table compact caption={t.invoices.caption}>
       <TableHead>
         <TableRow>
           <TableHeaderCell>{col.number}</TableHeaderCell>
@@ -290,26 +280,30 @@ function InvoicesTable({
           const detail = localePath(locale, `/merchant/invoices/${inv.id}`);
           return (
             <TableRow key={inv.id} selected={inv.id === selectedId}>
-              <TableCell>
-                <Link href={detail} className="num font-semibold text-ink hover:underline">
+              <TableCell phone="title">
+                <Link
+                  href={detail}
+                  aria-label={fmt(t.invoices.view, { number: inv.number })}
+                  className="num font-semibold text-ink hover:underline max-md:after:absolute max-md:after:inset-0"
+                >
                   {inv.number}
                 </Link>
               </TableCell>
-              <TableCell label={col.kind}>
+              <TableCell phone="meta" label={col.kind}>
                 <Badge tone="outline" shape="tag">
                   {labelOf(kinds, inv.kind)}
                 </Badge>
               </TableCell>
-              <TableCell label={col.issued}>
-                <span className="whitespace-nowrap text-ink-muted">{formatDate(inv.createdAt, locale)}</span>
+              <TableCell phone="meta" label={col.issued}>
+                <span className="whitespace-nowrap text-ink-muted max-md:text-ink-subtle">{formatDate(inv.createdAt, locale)}</span>
               </TableCell>
-              <TableCell numeric label={col.total} className="font-semibold">
+              <TableCell numeric phone="amount" label={col.total} className="font-semibold">
                 <Money amount={inv.total} currency={inv.currency} locale={locale} />
               </TableCell>
-              <TableCell label={col.status}>
+              <TableCell phone="badge" label={col.status}>
                 <StatusBadge kind="invoice" status={inv.status} label={statusLabel(c, "invoice", inv.status)} />
               </TableCell>
-              <TableCell>
+              <TableCell phone="hide">
                 <div className="flex items-center justify-end gap-1">
                   <Link
                     href={detail}
@@ -338,9 +332,7 @@ function InvoicesTable({
           );
         })}
       </TableBody>
-      </Table>
-      </div>
-    </>
+    </Table>
   );
 }
 
