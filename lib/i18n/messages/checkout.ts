@@ -41,7 +41,7 @@ export const checkout = defineMessages({
         edit: "Edit details",
         imei: "IMEI",
         quantity: "Quantity",
-        delivery: "Delivery: {time}",
+        quantityChanged: "The quantities this service sells have changed. We chose an allowed one.",
       },
       you: {
         title: "Your details",
@@ -67,6 +67,7 @@ export const checkout = defineMessages({
         imeiHint: "15 digits. Dial *#06# on the device to see it.",
         imeiPlaceholder: "Enter the 15-digit IMEI",
         quantity: "Quantity",
+        quantityHint: "{rule}. The total is shown in the order summary.",
         optional: "(optional)",
         select: "Select an option",
         warningTitle: "Please verify your details before continuing.",
@@ -76,7 +77,6 @@ export const checkout = defineMessages({
         errorLength: "An IMEI has 15 digits.",
         errorChecksum: "This IMEI is not valid: its last digit does not match the rest.",
         errorRequired: "This field is required.",
-        errorQuantity: "Enter a quantity between {min} and {max}.",
       },
       summary: {
         title: "Order summary",
@@ -160,7 +160,6 @@ export const checkout = defineMessages({
       },
       summary: {
         title: "Order summary",
-        net: "Price",
         tax: "Tax ({rate})",
         taxNone: "No tax",
         total: "Total to pay",
@@ -272,7 +271,7 @@ export const checkout = defineMessages({
         edit: "تعديل البيانات",
         imei: "IMEI",
         quantity: "الكمية",
-        delivery: "التسليم: {time}",
+        quantityChanged: "تغيّرت الكميات التي تُباع بها هذه الخدمة. اخترنا لك كمية مسموحًا بها.",
       },
       you: {
         title: "بياناتك",
@@ -298,6 +297,7 @@ export const checkout = defineMessages({
         imeiHint: "15 خانة. اطلب الرمز ‎*#06#‎ على الجهاز لإظهاره.",
         imeiPlaceholder: "أدخل رقم IMEI من 15 خانة",
         quantity: "الكمية",
+        quantityHint: "{rule}. يظهر الإجمالي في ملخص الطلب.",
         optional: "(اختياري)",
         select: "اختر خيارًا",
         warningTitle: "يرجى التحقق من بياناتك قبل المتابعة.",
@@ -307,7 +307,6 @@ export const checkout = defineMessages({
         errorLength: "رقم IMEI يتكوّن من 15 خانة.",
         errorChecksum: "رقم IMEI غير صالح: الخانة الأخيرة لا تطابق بقية الرقم.",
         errorRequired: "هذا الحقل مطلوب.",
-        errorQuantity: "أدخل كمية بين {min} و{max}.",
       },
       summary: {
         title: "ملخص الطلب",
@@ -391,7 +390,6 @@ export const checkout = defineMessages({
       },
       summary: {
         title: "ملخص الطلب",
-        net: "السعر",
         tax: "الضريبة ({rate})",
         taxNone: "بلا ضريبة",
         total: "الإجمالي المستحق",

@@ -70,18 +70,20 @@ async function me(page: Page) {
 test.describe("overview and orders (demo customer, read only)", () => {
   test.beforeEach(async ({ page }) => signInCustomer(page));
 
-  test("overview shows the profile read-only, recent orders with track links, quick links and no wallet", async ({ page }) => {
+  test("overview shows the profile with a link to edit it, recent orders with track links and quick links", async ({ page }) => {
     await go(page, "/en/account");
     await expect(page.getByRole("heading", { level: 1, name: /Welcome back/ })).toBeVisible();
     await expect(page.getByText(ACCOUNTS.customer.email).first()).toBeVisible();
     await expect(page.getByText("Verified").first()).toBeVisible();
-    await expect(page.getByText("To change your name, phone, country or email, contact support.")).toBeVisible();
+    // The profile is edited in the settings (customer-profile.spec.ts); only the email is left to support.
+    await expect(page.getByRole("link", { name: "Edit profile" })).toHaveAttribute("href", "/en/account/settings#profile");
+    await expect(page.getByText("To change your email address, contact support.")).toBeVisible();
+    await expect(page.getByText("To change your name, phone, country or email, contact support.")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Recent orders" })).toBeVisible();
     await expect(page.getByRole("cell", { name: /SF-\d+$/ }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /^Track order SF-\d+$/ }).first()).toHaveAttribute("href", /\/en\/track\/t_/);
     await expect(page.getByRole("link", { name: "Help center" })).toBeVisible();
-    await expect(page.getByText(/wallet|balance/i)).toHaveCount(0);
-    // No inputs to edit a name, phone or email.
+    // The overview itself has no inputs: editing happens on the settings page.
     await expect(page.locator('input[name="name"], input[name="phone"], input[name="email"]')).toHaveCount(0);
   });
 

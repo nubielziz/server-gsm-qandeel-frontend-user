@@ -74,9 +74,11 @@ async function Session({ params }: { params: Promise<{ token: string }> }) {
       session={session}
       locale={locale}
       labels={t.session}
+      quantityLabels={c.quantity}
       typeLabel={c.serviceType[session.service.type]}
       decimals={decimals}
-      restartHref={slug ? `${localePath(locale, "/checkout")}?service=${encodeURIComponent(slug)}` : null}
+      // A restart keeps the quantity: the form checks it against today's rule.
+      restartHref={slug ? `${localePath(locale, "/checkout")}?service=${encodeURIComponent(slug)}&quantity=${session.quantity}` : null}
       countryName={session.country ? countryName(session.country, locale) : ""}
     />
   );

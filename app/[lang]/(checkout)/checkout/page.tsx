@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CheckoutForm } from "@/components/checkout/checkout-form";
 import { resolveService } from "@/components/store/resolve-service";
-import { firstParam, type SearchParams } from "@/components/store/search-params";
+import { firstParam, intParam, type SearchParams } from "@/components/store/search-params";
 import { ServiceArt } from "@/components/store/service-art";
 import { getStoreConfig } from "@/lib/api/public";
 import { getCustomer } from "@/lib/api/session";
@@ -48,8 +48,12 @@ const UTM_KEYS = ["source", "medium", "campaign", "term", "content"] as const;
 async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const [params, locale, t, c] = await Promise.all([searchParams, getLocale(), getMessages(checkout), getMessages(common)]);
   const slug = firstParam(params.service, 200);
+  // A restarted or resumed checkout carries `&quantity=`; every link below keeps it, and the form checks it against
+  // today's rule (a quantity the rule no longer allows falls back to the default with a notice).
+  const wanted = intParam(params.quantity);
+  const quantityQuery = wanted === null ? "" : `&quantity=${wanted}`;
   const p = (path: string) => localePath(locale, path);
-  const nextPath = `${p("/checkout")}?service=${encodeURIComponent(slug)}`;
+  const nextPath = `${p("/checkout")}?service=${encodeURIComponent(slug)}${quantityQuery}`;
   const signInHref = `${p("/sign-in")}?as=customer&next=${encodeURIComponent(nextPath)}`;
 
   if (!slug) {
@@ -69,7 +73,7 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
   const resolved = await resolveService(slug, locale, currency.code);
 
   if (resolved.kind === "redirect") {
-    redirect(`${p("/checkout")}?service=${encodeURIComponent(resolved.slug)}`);
+    redirect(`${p("/checkout")}?service=${encodeURIComponent(resolved.slug)}${quantityQuery}`);
   }
   if (resolved.kind === "missing") {
     return (
@@ -92,7 +96,7 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
           title={t.start.otherLanguageTitle}
           description={fmt(t.start.otherLanguageText, { language })}
           action={
-            <ButtonLink href={`${localePath(resolved.locale, "/checkout")}?service=${encodeURIComponent(resolved.slug)}`}>
+            <ButtonLink href={`${localePath(resolved.locale, "/checkout")}?service=${encodeURIComponent(resolved.slug)}${quantityQuery}`}>
               {fmt(t.start.otherLanguageAction, { language })}
             </ButtonLink>
           }
@@ -141,16 +145,22 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
 
   return (
     <CheckoutForm
+      // A new service or a new quantity in the URL starts the form over (no rule, details or notice of the last one).
+      key={`${service.id}:${wanted ?? ""}`}
       locale={locale}
       labels={t.start}
+      quantityLabels={c.quantity}
+      deliveryLabels={c.delivery}
       typeLabel={c.serviceType[service.type]}
       service={{
         id: service.id,
         slug: service.slug,
         title: service.title,
-        deliveryTime: service.deliveryTime,
         isImei: service.type === "imei",
         quantity: service.quantity,
+        availability: service.availability,
+        etaText: service.etaText,
+        deliveryMinutes: service.deliveryMinutes,
         fields: service.fields,
         price: service.price,
       }}
@@ -163,6 +173,7 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
       signInHref={signInHref}
       supportHref={p("/support")}
       utm={utm}
+      initialQuantity={wanted}
     />
   );
 }

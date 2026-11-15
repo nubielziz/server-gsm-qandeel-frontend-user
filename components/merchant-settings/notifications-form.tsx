@@ -1,7 +1,10 @@
 "use client";
 // Notification preferences (PUT /client/notification-preferences): the low-balance threshold, per-event email and
 // Telegram switches, and the Telegram link (POST /client/telegram/link, no body). Only what changed is sent.
-// Telegram stays off until linked; in a setup with no bot the link answers 503 UNAVAILABLE ("not available yet").
+// Until Telegram is linked its switches are disabled and every row goes back with the Telegram value the GET showed (the
+// server accepts that value, and answers 422 `events.N.telegram` "Link Telegram first." only when a row switches Telegram
+// on; Announcements start with Telegram on, which takes effect once a chat is linked). In a setup with no bot the link
+// answers 503 UNAVAILABLE ("not available yet"). An event the site has no copy for keeps the API's label.
 import { useRef, useState, type FormEvent } from "react";
 import { Send } from "lucide-react";
 import { api } from "@/lib/api/browser";
@@ -22,8 +25,9 @@ import { toast } from "@/components/ui/toast";
 import { isMoneyInput, trimMoney } from "./format";
 import { ProblemAlert, useFocusFirstInvalid, useFormProblem } from "./form-problem";
 
-type Channels = { email: boolean; telegram: boolean };
-type EventMap = Record<string, Channels>;
+export type Channels = { email: boolean; telegram: boolean };
+export type EventMap = Record<string, Channels>;
+export type EventRow = { event: string } & Channels;
 
 /** The API's event names → keys of `t.eventList`. */
 const EVENT_KEYS: Record<string, keyof MerchantSettingsMessages["notifications"]["eventList"]> = {
@@ -33,10 +37,26 @@ const EVENT_KEYS: Record<string, keyof MerchantSettingsMessages["notifications"]
   "invoice.paid": "invoicePaid",
   "order.completed": "orderCompleted",
   "order.failed": "orderFailed",
+  "broadcast.announcement": "broadcastAnnouncement",
 };
 
 function toMap(events: NotificationPreferences["events"]): EventMap {
   return Object.fromEntries(events.map((e) => [e.event, { email: e.email, telegram: e.telegram }]));
+}
+
+/**
+ * The rows to PUT, in list order: the events whose switches differ from what the server last showed (`base`).
+ * While Telegram is not linked, a row carries the Telegram value of `base` whatever `working` says.
+ */
+export function changedEventRows(order: string[], working: EventMap, base: EventMap, linked: boolean): EventRow[] {
+  const rows: EventRow[] = [];
+  for (const event of order) {
+    const now = working[event] ?? { email: false, telegram: false };
+    const was = base[event] ?? { email: false, telegram: false };
+    const telegram = linked ? now.telegram : was.telegram;
+    if (now.email !== was.email || telegram !== was.telegram) rows.push({ event, email: now.email, telegram });
+  }
+  return rows;
 }
 
 type Props = {
@@ -65,9 +85,12 @@ export function NotificationsForm({ locale, initial, t, fieldTexts }: Props) {
   // What changed since the last save.
   const thresholdValue = threshold.trim();
   const thresholdChanged = thresholdValue !== base.threshold;
-  const changedEvents = order
-    .map((o) => ({ event: o.event, ...events[o.event] }))
-    .filter((e) => e.email !== base.events[e.event]?.email || e.telegram !== base.events[e.event]?.telegram);
+  const changedEvents = changedEventRows(
+    order.map((o) => o.event),
+    events,
+    base.events,
+    linked,
+  );
   const dirty = thresholdChanged || changedEvents.length > 0;
   const [emailBefore, emailAfter = ""] = t.emailText.split("{address}");
 
@@ -82,7 +105,7 @@ export function NotificationsForm({ locale, initial, t, fieldTexts }: Props) {
       failFields({ lowBalanceThreshold: t.thresholdInvalid });
       return;
     }
-    const body: { lowBalanceThreshold?: string | null; events?: { event: string; email: boolean; telegram: boolean }[] } = {};
+    const body: { lowBalanceThreshold?: string | null; events?: EventRow[] } = {};
     if (thresholdChanged) body.lowBalanceThreshold = thresholdValue === "" ? null : thresholdValue;
     if (changedEvents.length > 0) body.events = changedEvents;
     clear();
@@ -119,10 +142,7 @@ export function NotificationsForm({ locale, initial, t, fieldTexts }: Props) {
         locale={locale}
         linked={linked}
         t={t}
-        onLinkedChange={(value) => {
-          setLinked(value);
-          if (!value) setEvents((m) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { ...v, telegram: false }])));
-        }}
+        onLinkedChange={setLinked}
       />
       <Card as="section">
         <form ref={formRef} onSubmit={onSubmit} noValidate aria-busy={saving || undefined} className="flex min-w-0 flex-col">

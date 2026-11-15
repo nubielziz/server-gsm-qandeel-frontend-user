@@ -1,6 +1,6 @@
-// Account overview: welcome, a read-only profile (the API has no route to edit name, phone, country or email: support
-// does it), a summary of the preferences, the five latest orders and quick links. The session and the orders are read
-// at request time, so the content streams behind <Suspense> with a same-size skeleton.
+// Account overview: welcome, the profile (edited in the settings; only the email is changed by support), a summary of
+// the preferences, the five latest orders and quick links. The session and the orders are read at request time, so the
+// content streams behind <Suspense> with a same-size skeleton.
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -125,7 +125,10 @@ async function OverviewContent() {
               </DescriptionList>
             </CardBody>
             <CardFooter className="flex-col items-stretch sm:flex-col">
-              <p className="text-small text-ink-subtle">{o.profile.note}</p>
+              <ButtonLink href={`${p("/account/settings")}#profile`} variant="secondary" size="sm">
+                {o.profile.edit}
+              </ButtonLink>
+              <p className="text-small text-ink-subtle">{t.settings.profile.emailNote}</p>
               <ButtonLink href={p("/support")} variant="secondary" size="sm">
                 {o.profile.contact}
               </ButtonLink>

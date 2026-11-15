@@ -19,10 +19,11 @@ import { api, newIdempotencyKey } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { CheckoutSession, PayResult } from "@/lib/api/types";
 import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
-import { fmt } from "@/lib/i18n/define";
+import { fmt, plural } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { CheckoutMessages } from "@/lib/i18n/messages/checkout";
+import type { CommonMessages } from "@/lib/i18n/messages/common";
 import { slot } from "./rich";
 
 type Labels = CheckoutMessages["session"];
@@ -32,6 +33,8 @@ export type SessionViewProps = {
   session: CheckoutSession;
   locale: Locale;
   labels: Labels;
+  /** `common.quantity`: the plural "Subtotal (N units)" label. */
+  quantityLabels: CommonMessages["quantity"];
   typeLabel: string;
   /** Display decimals of the session's currency. */
   decimals: number;
@@ -75,7 +78,7 @@ function methodIcon(code: string) {
 
 type PayError = { message: string; reference?: string; support?: boolean };
 
-export function SessionView({ session, locale, labels, typeLabel, decimals, restartHref, countryName }: SessionViewProps) {
+export function SessionView({ session, locale, labels, quantityLabels, typeLabel, decimals, restartHref, countryName }: SessionViewProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const p = (path: string) => localePath(locale, path);
@@ -360,7 +363,10 @@ export function SessionView({ session, locale, labels, typeLabel, decimals, rest
             </span>
           </p>
           <DescriptionList>
-            <DescriptionItem label={labels.summary.net}>{money(display.net)}</DescriptionItem>
+            {/* The session's own totals: the net of all units, then the tax worked once on it. */}
+            <DescriptionItem label={plural(locale, session.quantity, quantityLabels.subtotal, formatNumber(session.quantity, locale))}>
+              {money(display.net)}
+            </DescriptionItem>
             <DescriptionItem
               label={taxApplies ? fmt(labels.summary.tax, { rate: formatPercent(session.taxRate, locale) }) : labels.summary.taxNone}
             >

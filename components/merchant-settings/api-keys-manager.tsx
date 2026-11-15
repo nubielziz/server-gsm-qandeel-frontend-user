@@ -1,10 +1,11 @@
 "use client";
 // API keys: the list (live first, revoked dimmed) and every action on it: create (secret shown once), edit name and
 // allowed IPs, revoke. All dates arrive already formatted from the server (UTC), so nothing here depends on the
-// browser's time zone. Mutations call the API from the browser, then refresh the route.
+// browser's time zone. Mutations call the API from the browser, then refresh the route. A key staff made for the
+// merchant (`createdByStaff`) carries a "Made by support" badge.
 import { useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, KeyRound, Pencil, Plus } from "lucide-react";
+import { Ban, Headset, KeyRound, Pencil, Plus } from "lucide-react";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import { pathOf } from "@/lib/api/query";
@@ -52,6 +53,8 @@ export type KeyRow = {
   created: string;
   revoked: boolean;
   expired: boolean;
+  /** Staff made the key for the merchant ("Made by support"). The API's field is optional in the type: missing = false. */
+  createdByStaff?: boolean;
 };
 
 type ModalState =
@@ -312,6 +315,7 @@ function KeyCard({ row, t, onEdit, onRevoke }: { row: KeyRow; t: Props["t"]; onE
               {row.prefix}…
             </code>
             <Badge tone="neutral">{t.revoked}</Badge>
+            {row.createdByStaff === true ? <MadeBySupport label={t.madeBySupport} /> : null}
           </div>
           <p className="text-small text-ink-subtle">
             {t.createdAt}: {row.created}
@@ -335,6 +339,7 @@ function KeyCard({ row, t, onEdit, onRevoke }: { row: KeyRow; t: Props["t"]; onE
               {row.prefix}…
             </code>
             <Badge tone={state.tone}>{state.label}</Badge>
+            {row.createdByStaff === true ? <MadeBySupport label={t.madeBySupport} /> : null}
           </p>
         </div>
         <div role="group" aria-label={fmt(t.actionsFor, { name: row.name })} className="flex flex-wrap items-center gap-2">
@@ -388,6 +393,15 @@ function KeyCard({ row, t, onEdit, onRevoke }: { row: KeyRow; t: Props["t"]; onE
         <Detail label={t.createdAt}>{row.created}</Detail>
       </dl>
     </Card>
+  );
+}
+
+/** The mark of a key staff made for the merchant (text and icon: never colour alone). */
+function MadeBySupport({ label }: { label: string }) {
+  return (
+    <Badge tone="outline" icon={<Headset aria-hidden="true" />}>
+      {label}
+    </Badge>
   );
 }
 

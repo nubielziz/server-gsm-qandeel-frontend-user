@@ -77,6 +77,8 @@ async function ApiKeysContent() {
     created: utcDate(k.createdAt, locale),
     revoked: k.revokedAt !== null,
     expired: k.revokedAt === null && k.expiresAt !== null && isPast(k.expiresAt),
+    // Optional in the OpenAPI type, always sent by the server (BH §5.4).
+    createdByStaff: k.createdByStaff === true,
   }));
   const base = (process.env.NEXT_PUBLIC_API_PUBLIC_URL ?? "").replace(/\/+$/, "");
   const h = t.apiKeys.help;

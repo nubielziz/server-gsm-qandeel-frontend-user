@@ -57,8 +57,12 @@ isolated demo API (:3100, Mailpit); the owner's API (:3000) is never written to.
 | F11 Notifications, unsubscribe | W1 | ✓ | fix, 1 major (bell count race) | ✓ | 3/3 | ✓ + rail avatar | W1 |
 | F12 Catalog list | W1 | ✓ | fix, 2 major (test bugs) | ✓ | 3/3 | ✓ | W1 |
 | F13 Card, page, quick view | W1 | ✓ | fix, 1 major (mini card badge row) | ✓ | 3/3 | ✓ | W1 |
+| F20 Checkout quantities | W2 | ✓ | accept, 2 minor | ✓ (both already in; 2 e2e guards) | 3/3 | ✓ | W2 |
+| F21 Customer wallet | W2 | ✓ | fix, 3 major (2 spec locators; date fields overflow at 360/390 px) | ✓ | 3/3 | ✓ | W2 |
+| F22 Merchant account | W2 | ✓ | accept, 1 minor (gate warning off screen); manual gate check PASS | ✓ | 3/3 | ✓ | W2 |
+| F23 Site API gaps | W2 | ✓ | fix, 2 major (settings nav overflow on phones; spec locator), 1 minor (skeleton height) | ✓ | 3/3 | ✓ | W2 |
 
-Agent calls so far: Fable 1 (plan) + 12 (W0) + 12 (W1).
+Agent calls so far: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2).
 
 ### Wave 1: sign-in, notifications, catalog, service display (2026-11-13)
 - **F10 smart sign-in:** one email + password form on `POST /client/auth/sign-in` (Turnstile); the answer's `kind` opens
@@ -86,6 +90,36 @@ Agent calls so far: Fable 1 (plan) + 12 (W0) + 12 (W1).
   notifications, unsubscribe, store, catalog-filters, service-display) 250 passed / 16 skipped / 0 failed; regression
   (routing, checkout, account, support, merchant, merchant-settings) 162 passed / 4 skipped / 0 failed; desktop + mobile.
   The first wave run had 11 failures in the new specs: 9 were test bugs, the rest real (bell count race), all fixed.
+
+### Wave 2: checkout quantities, customer wallet, merchant account, API gaps (2026-11-13, finished 2026-11-15)
+- **F20 checkout quantities:** one control per mode from `lib/quantity.ts` (a number box for a range, radios for packs, a
+  select above six, none for one per order or exactly N); the rule is state, read again after a server `invalid_quantity`
+  (text built from the rule, never the server's English; the control redrawn and focused, a named group for no-control
+  modes); a quantity the rule no longer allows falls back to the default with a notice; summary "Price per unit /
+  Subtotal (N units) / Estimated total"; the review page shows the session's own totals; restart, resume and the expired
+  link keep `&quantity=`.
+- **F21 customer wallet:** `/[lang]/account/wallet` (balance cards, statement with a date range, the on-hold state without
+  the staff reason, disabled and negative states); the balance pill in the account and shop headers and a Wallet menu
+  item; the wallet read is `no-store` inside `<Suspense>`; the merchant wallet page uses the same components.
+- **F22 merchant account:** the profile edits the address, the tax id and the email language; "Resend verification email"
+  while unverified (`429` shows the wait); "Made by support" on staff-made API keys; Announcements sent with the shown
+  Telegram value; `MustChangePasswordGate` keeps the merchant on settings/security until the password changes (warning in
+  view); the language switcher follows the page's same-origin hreflang link and saves the merchant's language.
+- **F23 API gaps:** the merchant order form sends one `Idempotency-Key` per body (new after a success or
+  `IDEMPOTENCY_KEY_REUSED`; `IDEMPOTENCY_IN_PROGRESS` waits and retries up to 3 times); quantities per `lib/quantity.ts`;
+  customers edit their name, phone and country in the settings (only changed keys; the currency cookie from the answer).
+- **Resumed on 2026-11-15:** the previous lead session stopped at its weekly usage limit during the W2 review (F20 and F23
+  were reviewed, F21 and F22 not). A new lead session (started from the backend project at the owner's request) restarted
+  the containers and the isolated API (`:3100`), rebuilt the hand-offs from the workflow journals, ran the F21 and F22
+  reviews and the F20 fixer, then the wave check below.
+- **Manual check (plan §7):** `mustChangePassword` on a throwaway merchant (`gsm_storefront` only): every portal page sent
+  the merchant to settings/security with the warning, in English and Arabic; the gate lifted after the change.
+- **Checks:** typecheck and ESLint clean; 381 unit tests; build OK; wave specs (checkout, quantity, wallet,
+  merchant-settings, merchant-account, account, customer-profile, merchant, merchant-order-idempotency) 236 passed /
+  9 skipped / 1 failed: a "socket hang up" on the sign-in through the site's proxy (`merchant.spec.ts:528`, mobile), which
+  passed on both projects when run again; `wallet-disabled` (exclusive) passed alone and switched the setting back on;
+  regression (auth, smart-sign-in, notifications, unsubscribe, store, catalog-filters, service-display, routing, support,
+  harness) 280 passed / 16 skipped / 0 failed; desktop + mobile.
 
 ## Wiring (changed 2026-11-09, late evening, at the owner's request)
 - **Dev site (`npm run dev`, :5175) → the isolated demo API (:3100) since 2026-11-10**, at the owner's request (to

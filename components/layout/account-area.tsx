@@ -1,14 +1,20 @@
 // AccountArea: the signed-in state in the header: "Sign in" button, or wallet pill + account menu.
 // It reads the session cookies, so it must be rendered inside <Suspense fallback={<AccountAreaSkeleton />}>.
-// A merchant and a customer can be signed in at once: the menu then lists both.
+// A merchant and a customer can be signed in at once: the menu then lists both, and the pill is the merchant's.
+// The customer's pill and "Wallet" menu item show when the customer wallet does (`walletCapabilities().show`, plan D7).
 import { cache, Suspense } from "react";
+import { cookies } from "next/headers";
 import { ClipboardList, LayoutDashboard, LogIn, UserRound, Wallet } from "lucide-react";
+import { ApiError } from "@/lib/api/errors";
 import { apiSessionGet } from "@/lib/api/server";
-import { getCustomer, getMerchant } from "@/lib/api/session";
-import type { MerchantWallet } from "@/lib/api/types";
+import { getCustomer, getMerchant, STORE_CSRF_COOKIE } from "@/lib/api/session";
+import type { CustomerWallet, MerchantWallet } from "@/lib/api/types";
+import { formatMoney } from "@/lib/format";
 import { localePath } from "@/lib/i18n/config";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
+import { settle, type Settled } from "@/lib/merchant/load";
+import { walletCapabilities } from "@/lib/wallet/view";
 import { Avatar } from "@/components/ui/avatar";
 import { ButtonLink } from "@/components/ui/button";
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/menu";
@@ -25,6 +31,18 @@ const getWallet = cache(async (): Promise<MerchantWallet | null> => {
     // 403 ACCOUNT_PENDING_APPROVAL and every other failure: no wallet pill; the header must never break the page.
     return null;
   }
+});
+
+/**
+ * The customer's wallet (`GET /store/v1/me/wallet`, always USD) as this request's one read, kept as a result so a caller
+ * can tell "no wallet to show" (a header: ignore a failure) from "could not load" (the wallet page: show the reference).
+ * No-store, reads cookies: render the caller inside <Suspense>. Deduplicated per request: the account layout's pill and
+ * nav item, the store header's pill and the wallet page ask once together.
+ */
+export const readCustomerWallet = cache(async (): Promise<Settled<CustomerWallet>> => {
+  // No customer session can exist without the readable CSRF cookie: skip the call for a visitor who is signed out.
+  if (!(await cookies()).has(STORE_CSRF_COOKIE)) return { ok: false, error: new ApiError({ status: 401, code: "UNAUTHORIZED" }) };
+  return settle(apiSessionGet<CustomerWallet>("/store/v1/me/wallet"));
 });
 
 /** A same-size placeholder for the account area while the session is read. */
@@ -65,7 +83,13 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
     );
   }
 
-  const wallet = merchant && merchant.status !== "pending" ? await getWallet() : null;
+  // The shop header of a checkout is compact (avatar only): it never reads a wallet.
+  const [wallet, customerRead] = await Promise.all([
+    merchant && merchant.status !== "pending" ? getWallet() : null,
+    customer && !compact ? readCustomerWallet() : null,
+  ]);
+  const customerWallet = customerRead?.ok ? customerRead.data : null;
+  const customerShows = customerWallet ? walletCapabilities(customerWallet).show : false;
   const name = merchant?.name || customer?.name || merchant?.email || customer?.email || "";
   const email = merchant?.email ?? customer?.email ?? "";
   const both = Boolean(merchant && customer);
@@ -80,6 +104,15 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
         >
           <Wallet aria-hidden="true" className="size-[18px]" />
           <Money amount={wallet.available} currency="USD" locale={locale} />
+        </Link>
+      ) : customerWallet && customerShows ? (
+        <Link
+          href={localePath(locale, "/account/wallet")}
+          aria-label={`${t.header.storeBalance}: ${formatMoney(customerWallet.available, "USD", locale)}`}
+          className="hidden h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold transition-colors hover:bg-surface-muted sm:inline-flex"
+        >
+          <Wallet aria-hidden="true" className="size-[18px]" />
+          <Money amount={customerWallet.available} currency="USD" locale={locale} />
         </Link>
       ) : null}
       <Menu
@@ -111,6 +144,11 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
             <MenuItem href={localePath(locale, "/account/orders")} icon={<ClipboardList aria-hidden="true" />}>
               {t.header.myOrders}
             </MenuItem>
+            {customerShows ? (
+              <MenuItem href={localePath(locale, "/account/wallet")} icon={<Wallet aria-hidden="true" />}>
+                {t.header.myWallet}
+              </MenuItem>
+            ) : null}
           </>
         ) : null}
         <MenuSeparator />

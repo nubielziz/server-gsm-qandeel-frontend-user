@@ -1,21 +1,29 @@
 "use client";
 // The order form of a service (handoff §4.5). One form for the four service types:
 //  - imei: one IMEI or a bulk list (≤ 100, one order per IMEI, all or none), checked with the Luhn digit as you type;
-//  - quantity: a select (qtyOptions) or a number (min–max); a fixed quantity is not asked;
+//  - quantity (lib/quantity.ts decides): a select for two or more packs, a number box for a range, nothing for one
+//    pack, an exact N or one per order; the rule and its refusals are worded by `quantityRuleText` and
+//    `invalidQuantityText`, for the local check and for a server `invalid_quantity` alike;
 //  - custom fields (text / number / select / textarea) with the catalog's regex; a field keyed `imei` on an IMEI
 //    service is the IMEI itself, so it is not shown twice;
 //  - file services: an upload → `fileId` (required when the service has no fields).
-// `POST /client/orders` has NO idempotency key: the button stays disabled from the first click until the answer, and
-// nothing here ever retries a request on its own (a retry would be a second order).
+// One submission = one `Idempotency-Key` (`POST /client/orders` replays the first answer for a repeated key and the
+// same body): the key is the same while the same body is sent again (a lost answer, a double click) and new as soon
+// as anything in the form changes; it is forgotten after a success and after 409 IDEMPOTENCY_KEY_REUSED, and kept
+// after every other failure. 409 IDEMPOTENCY_IN_PROGRESS (the first request still runs) waits `Retry-After` and sends
+// the same request again, at most 3 times. The button stays disabled from the first click until the answer, and a
+// synchronous guard keeps a second click from starting a second send while the first is still in flight.
 import { useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/browser";
 import { isApiError, type FieldError } from "@/lib/api/errors";
+import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { MerchantOrder, MerchantOrderInput, MerchantServiceDetail, UploadedFile } from "@/lib/api/types";
 import { compareMoney, formatMoney, formatNumber, isValidImei, normalizeImei, subtractMoney } from "@/lib/format";
 import type { Locale } from "@/lib/i18n/config";
 import { fmt, plural } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
+import type { CommonMessages } from "@/lib/i18n/messages/common";
 import type { MerchantMessages } from "@/lib/i18n/messages/merchant";
 import { ltr } from "@/lib/merchant/format";
 import { leaveIfSignedOut } from "@/lib/merchant/signed-out";
@@ -23,10 +31,14 @@ import { mulMoney } from "@/lib/merchant/money-math";
 import {
   MAX_BULK_IMEIS,
   MAX_FIELD_VALUE,
+  MAX_IN_PROGRESS_RETRIES,
   buildInputs,
   checkField,
+  defaultQuantityOf,
   hasFieldErrors,
+  inProgressWaitMs,
   mapOrderFieldErrors,
+  orderSignature,
   parseImeiLines,
   parseQuantity,
   quantityRule,
@@ -34,6 +46,7 @@ import {
   visibleFields,
   type OrderFieldErrors,
 } from "@/lib/merchant/order-input";
+import { fromMerchantRule, invalidQuantityText, quantityRuleText } from "@/lib/quantity";
 import { FileUpload } from "@/components/forms/file-upload";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -49,6 +62,8 @@ export type OrderFormLabels = {
   summary: MerchantMessages["summary"];
   errors: MerchantMessages["orderErrors"];
   placed: MerchantMessages["placed"];
+  /** `common.quantity`: the rule and refusal sentences of lib/quantity.ts. */
+  quantity: CommonMessages["quantity"];
 };
 
 export type OrderFormProps = {
@@ -68,9 +83,13 @@ type Banner =
   | { kind: "insufficient" }
   | { kind: "disabled" }
   | { kind: "fields" }
+  /** 409 IDEMPOTENCY_IN_PROGRESS: the first request still runs; the form waits and sends the same request again. */
+  | { kind: "processing" }
   | { kind: "generic"; message: string; reference?: string };
 
 const ID = { imei: "order-imei", bulk: "order-bulk", quantity: "order-quantity", file: "order-file", field: (key: string) => `order-field-${key}` };
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export function OrderForm({ service, available, locale, hrefs, labels, intro }: OrderFormProps) {
   const router = useRouter();
@@ -80,22 +99,42 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
   const needsImei = service.type === "imei";
   const fields = visibleFields(service);
   const rule = quantityRule(service);
+  const wording = fromMerchantRule(service);
   const fileRequired = service.type === "file" && service.fields.length === 0;
 
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [imei, setImei] = useState("");
   const [bulk, setBulk] = useState("");
-  const [qtyText, setQtyText] = useState(() => (rule.kind === "fixed" ? String(rule.value) : rule.kind === "options" ? String(rule.options[0]) : String(rule.min)));
+  const [qtyText, setQtyText] = useState(() => String(defaultQuantityOf(rule)));
   const [values, setValues] = useState<Record<string, string>>({});
   const [file, setFile] = useState<UploadedFile | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  // Synchronous guard as well as the state: a second order is real money (no Idempotency-Key on this route).
+  // Synchronous guard as well as the state: a second click must not start a second send before the state is applied.
   const inFlight = useRef(false);
+  // One key per submission (plan D13): the same body keeps the key, a changed form takes a new one.
+  const [keys] = useState(() => createIdempotencyKeys());
+  // False once the form is gone (the next page opened): a wait for IDEMPOTENCY_IN_PROGRESS then ends without a send.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const [serverErrors, setServerErrors] = useState<OrderFieldErrors | null>(null);
   const [banner, setBanner] = useState<Banner | null>(null);
   const bannerRef = useRef<HTMLDivElement>(null);
   const sentLines = useRef<ReturnType<typeof parseImeiLines>>([]);
+
+  // Staff can change the rule while the page is open (the page is re-read after a refused quantity): keep what was
+  // typed when the new rule still accepts it, else start again from the new default.
+  const ruleSignature = JSON.stringify(rule);
+  const [knownRule, setKnownRule] = useState(ruleSignature);
+  if (knownRule !== ruleSignature) {
+    setKnownRule(ruleSignature);
+    if (parseQuantity(qtyText, rule) === null) setQtyText(String(defaultQuantityOf(rule)));
+  }
 
   // "Reload price": re-reads the service on the server (which also records the new price as the listed one).
   const [reloading, startReload] = useTransition();
@@ -115,7 +154,8 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
   const readyCount = lines.filter((l) => l.valid && !l.duplicate).length;
   const quantity = parseQuantity(qtyText, rule);
   const imeiCount = needsImei ? (mode === "single" ? 1 : Math.max(1, list.count)) : 1;
-  const total = mulMoney(service.price, (quantity ?? (rule.kind === "fixed" ? rule.value : 1)) * imeiCount);
+  const shownQuantity = quantity ?? defaultQuantityOf(rule);
+  const total = mulMoney(service.price, shownQuantity * imeiCount);
   const afterOrder = available === null ? null : subtractMoney(available, total);
   const lowBalance = available !== null && compareMoney(total, available) > 0;
 
@@ -133,9 +173,9 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
     ) as Record<string, string>,
   };
 
+  /** What to say about a refused quantity: the pack list or the range, from the rule the page holds now. */
   function quantityProblem(): string {
-    if (rule.kind === "range") return fmt(f.quantityInvalid, { min: formatNumber(rule.min, locale), max: formatNumber(rule.max, locale) });
-    return f.problems.option;
+    return invalidQuantityText(wording, labels.quantity, locale);
   }
 
   const hasLocalErrors = Boolean(local.imei || local.bulk || local.quantity || local.file || Object.keys(local.inputs).length);
@@ -161,7 +201,8 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
   const shown = {
     imei: serverErrors?.imei ?? (submitted ? local.imei : undefined),
     bulk: serverErrors?.imeis ?? (submitted ? local.bulk : undefined),
-    quantity: serverErrors?.quantity ?? (submitted ? local.quantity : undefined),
+    // A server refusal is worded from the rule as it stands now (it may have been re-read since the answer came).
+    quantity: serverErrors?.quantity ? quantityProblem() : submitted ? local.quantity : undefined,
     file: serverErrors?.fileId ?? (submitted ? local.file : undefined),
     input: (key: string) => serverErrors?.inputs[key] ?? (submitted ? local.inputs[key] : undefined),
   };
@@ -207,7 +248,7 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting || inFlight.current) return; // one request at a time: there is no idempotency key to make a repeat safe
+    if (submitting || inFlight.current) return; // one send at a time; a repeat after it ends carries the same key
     setSubmitted(true);
     setBanner(null);
     setServerErrors(null);
@@ -225,7 +266,8 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
         body.imeis = lines.map((l) => l.imei);
       }
     }
-    if (rule.kind !== "fixed" && quantity !== null) body.quantity = quantity;
+    // Everything but "one per order" is sent: an exact N or a single pack is not asked, but the API orders `min` without it.
+    if (quantity !== null && !(rule.kind === "fixed" && rule.value === 1)) body.quantity = quantity;
     const inputs = buildInputs(fields, values);
     if (Object.keys(inputs).length > 0) body.inputs = inputs;
     if (file) body.fileId = file.id;
@@ -233,7 +275,9 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
     inFlight.current = true;
     setSubmitting(true);
     try {
-      const { orders } = await api.post<{ orders: MerchantOrder[] }>("/client/orders", body);
+      const orders = await sendOrder(body);
+      if (orders === null) return; // the form was left while it waited
+      keys.reset(); // a new submission starts with a new key
       // Stay disabled while the next page loads (submitting is not reset on success).
       if (orders.length === 1) {
         toast.success(fmt(labels.placed.one, { id: orders[0].id }));
@@ -246,7 +290,29 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
     } catch (error) {
       inFlight.current = false;
       setSubmitting(false);
+      setBanner((b) => (b?.kind === "processing" ? null : b));
       handleError(error);
+    }
+  }
+
+  /**
+   * `POST /client/orders` with the key of this body. A replay answers 201 with the first answer, so the caller goes to
+   * the order page, which reads the order's current status. `IDEMPOTENCY_IN_PROGRESS` waits `Retry-After` and sends the
+   * same request again (same key), at most `MAX_IN_PROGRESS_RETRIES` times; then the error reaches the person, who can
+   * press the button again (same body, same key). Returns null when the form was left during a wait.
+   */
+  async function sendOrder(body: MerchantOrderInput): Promise<MerchantOrder[] | null> {
+    const key = keys.keyFor(orderSignature(body));
+    for (let retry = 0; ; retry++) {
+      try {
+        const { orders } = await api.post<{ orders: MerchantOrder[] }>("/client/orders", body, { idempotencyKey: key });
+        return orders;
+      } catch (error) {
+        if (!isApiError(error) || error.code !== "IDEMPOTENCY_IN_PROGRESS" || retry >= MAX_IN_PROGRESS_RETRIES) throw error;
+        setBanner({ kind: "processing" }); // no focus move: it is a wait, not a failure
+        await sleep(inProgressWaitMs(error.retryAfter));
+        if (!alive.current) return null;
+      }
     }
   }
 
@@ -261,6 +327,8 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
       showBanner({ kind: "generic", message: errorText.message(error) });
       return;
     }
+    // The key was used for another body (never meant to happen): forget it, so the next press starts a new submission.
+    if (error.code === "IDEMPOTENCY_KEY_REUSED") keys.reset();
     switch (error.code) {
       case "PRICE_CHANGED":
         showBanner({
@@ -287,6 +355,7 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
       setServerErrors(mapped);
       if (hasFieldErrors(mapped)) {
         showBanner({ kind: "fields" });
+        if (mapped.quantity) router.refresh(); // the rule may have changed: read the service again
         const ids: string[] = [];
         if (mapped.imei) ids.push(ID.imei);
         if (mapped.imeis || Object.keys(mapped.lines).length) ids.push(ID.bulk);
@@ -428,10 +497,15 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
                 inputMode="numeric"
                 autoComplete="off"
                 dir="ltr"
-                hint={fmt(f.quantityRange, { min: formatNumber(rule.min, locale), max: formatNumber(rule.max, locale) })}
+                hint={<bdi>{quantityRuleText(wording, labels.quantity, locale)}</bdi>}
                 error={shown.quantity}
                 fieldClassName="sm:max-w-xs"
               />
+            ) : shown.quantity ? (
+              // One quantity only, so there is no control to hold the message: a refusal after the rule changed.
+              <p id={ID.quantity} tabIndex={-1} role="alert" className="text-small font-medium text-danger-ink focus:outline-none">
+                {shown.quantity}
+              </p>
             ) : null}
 
             {fields.map((field) => {
@@ -516,7 +590,7 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
                 <Money amount={service.price} currency={service.currency} locale={locale} />
               </DescriptionItem>
               <DescriptionItem label={s.quantity}>
-                <span className="num">{formatNumber(quantity ?? (rule.kind === "fixed" ? rule.value : 1), locale)}</span>
+                <span className="num">{formatNumber(shownQuantity, locale)}</span>
               </DescriptionItem>
               {needsImei && mode === "bulk" ? (
                 <DescriptionItem label={s.imeis}>
@@ -646,6 +720,8 @@ function BannerView({
           {generic.reviewFields}
         </Alert>
       );
+    case "processing":
+      return <Alert tone="info">{generic.stillProcessing}</Alert>;
     case "generic":
       return (
         <Alert tone="danger" title={generic.notPlacedTitle}>

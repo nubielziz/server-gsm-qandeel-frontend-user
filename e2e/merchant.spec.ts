@@ -6,7 +6,7 @@
 import { expect, test } from "./fixtures";
 import { type Locator, type Page } from "@playwright/test";
 import fs from "node:fs/promises";
-import { ACCOUNTS, signInMerchant } from "./helpers";
+import { ACCOUNTS, fixtures, signInMerchant } from "./helpers";
 
 /** A valid 1x1 PNG: a stand-in for a bank receipt. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==", "base64");
@@ -39,6 +39,31 @@ const main = (page: Page) => page.getByRole("main");
 
 /** Lists render a table from `md` up and a compact list below: only the visible copy counts. */
 const vis = (locator: Locator) => locator.filter({ visible: true });
+
+/** Waits until React has attached to the order form: a controlled input filled before that is reset when it does. */
+async function formReady(page: Page) {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const control = document.querySelector("main form input, main form select");
+        return Boolean(control) && Object.keys(control as object).some((key) => key.startsWith("__reactProps"));
+      }),
+    )
+    .toBe(true);
+}
+
+/** The merchant's price of a service as the API states it (prices differ per merchant). */
+async function priceOf(page: Page, serviceId: number): Promise<string> {
+  const res = await page.request.get(`/client/services/${serviceId}`);
+  expect(res.status(), await res.text()).toBe(200);
+  return ((await res.json()) as { price: string }).price;
+}
+
+/** `price x quantity` as the form shows it, worked out in whole cents so no float error creeps in. */
+function usdTotal(price: string, quantity: number): string {
+  const cents = Math.round(Number(price) * 100) * quantity;
+  return "$" + (cents / 100).toFixed(2);
+}
 
 test.beforeEach(async ({ page }) => {
   await signInMerchant(page);
@@ -204,6 +229,75 @@ test.describe("ordering", () => {
   });
 });
 
+test.describe("quantity rules (the three services the global setup configured, nothing is ordered)", () => {
+  const place = (page: Page) => main(page).getByRole("button", { name: /^Place order/ });
+
+  test("packs: the page says the packs, the form offers only them and totals the chosen pack", async ({ page }) => {
+    const { packs } = fixtures();
+    const price = await priceOf(page, packs.id);
+    await go(page, `/en/merchant/services/${packs.id}`);
+    await expect(main(page).getByText("Packs of 5, 10, 25")).toBeVisible();
+    await formReady(page);
+
+    const select = main(page).getByRole("combobox", { name: /^Quantity/ });
+    await expect(select.locator("option")).toHaveText(["5", "10", "25"]);
+    await expect(select).toHaveValue("5");
+    await expect(place(page)).toContainText(usdTotal(price, 5));
+    await select.selectOption("10");
+    await expect(place(page)).toContainText(usdTotal(price, 10));
+    // No free number box next to the packs.
+    await expect(main(page).getByRole("textbox", { name: /^Quantity/ })).toHaveCount(0);
+  });
+
+  test("a range: a number box with the rule as its hint, a quantity outside it is refused before anything is sent, Arabic digits are read", async ({ page }) => {
+    const { range } = fixtures();
+    const price = await priceOf(page, range.id);
+    const posts: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST" && new URL(request.url()).pathname === "/client/orders") posts.push(request.url());
+    });
+    await go(page, `/en/merchant/services/${range.id}`);
+    await expect(main(page).getByText("2 to 50 per order")).toHaveCount(2); // the details card and the hint under the box
+    await formReady(page);
+
+    const quantity = main(page).getByRole("textbox", { name: /^Quantity/ });
+    await expect(quantity).toHaveValue("2");
+    await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
+    await quantity.fill("1");
+    await place(page).click();
+    await expect(main(page).getByText("Enter a quantity from 2 to 50.")).toBeVisible();
+    await expect(quantity).toHaveAttribute("aria-invalid", "true");
+    await expect(quantity).toBeFocused();
+    expect(posts).toHaveLength(0);
+
+    await quantity.fill("٧");
+    await expect(place(page)).toContainText(usdTotal(price, 7));
+    await expect(main(page).getByText("Enter a quantity from 2 to 50.")).toHaveCount(0);
+  });
+
+  test("an exact N: nothing to choose, the total is N units", async ({ page }) => {
+    const { exact } = fixtures();
+    const price = await priceOf(page, exact.id);
+    await go(page, `/en/merchant/services/${exact.id}`);
+    await expect(main(page).getByText("5 per order")).toBeVisible();
+    await formReady(page);
+    await expect(main(page).getByRole("combobox", { name: /^Quantity/ })).toHaveCount(0);
+    await expect(main(page).getByRole("textbox", { name: /^Quantity/ })).toHaveCount(0);
+    await expect(place(page)).toContainText(usdTotal(price, 5));
+  });
+
+  test("the rule is worded in Arabic too", async ({ page }) => {
+    const { packs, range, exact } = fixtures();
+    await go(page, `/ar/merchant/services/${packs.id}`);
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    await expect(main(page).getByText("حزم من 5، 10، 25")).toBeVisible();
+    await go(page, `/ar/merchant/services/${range.id}`);
+    await expect(main(page).getByText("من 2 إلى 50 لكل طلب")).toHaveCount(2);
+    await go(page, `/ar/merchant/services/${exact.id}`);
+    await expect(main(page).getByText("5 لكل طلب")).toBeVisible();
+  });
+});
+
 test.describe("orders", () => {
   test("tabs, search and the CSV export use only what the API declares", async ({ page }) => {
     await go(page, "/en/merchant/orders");
@@ -365,6 +459,27 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
     await place(page).click();
     await expect(main(page).getByText("This value is not valid.")).toBeVisible();
     await expect(main(page).getByRole("textbox", { name: /^Z3X account/ })).toBeFocused();
+  });
+
+  test("a refused quantity (422 invalid_quantity) is worded from the pack list in the page's language, never with the API's English", async ({ page }) => {
+    const { packs } = fixtures();
+    await refuse(page, "**/client/orders", 422, {
+      code: "VALIDATION_FAILED",
+      errors: [{ field: "quantity", code: "invalid_quantity", message: "Choose one of the quantities this service sells: 5, 10, 25." }],
+    });
+    await go(page, `/en/merchant/services/${packs.id}`);
+    await formReady(page);
+    await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
+    await place(page).click();
+    await expect(main(page).getByText("Choose one of these quantities: 5, 10, 25.")).toBeVisible();
+    await expect(main(page).getByText("Choose one of the quantities this service sells")).toHaveCount(0);
+    const select = main(page).getByRole("combobox", { name: /^Quantity/ });
+    await expect(select).toHaveAttribute("aria-invalid", "true");
+    await expect(select).toBeFocused();
+
+    // Changing the quantity takes the message away.
+    await select.selectOption("10");
+    await expect(main(page).getByText("Choose one of these quantities: 5, 10, 25.")).toHaveCount(0);
   });
 
   test("top-up: a gateway error keeps the form and shows the reference; an automatic method goes to the payment page", async ({ page }) => {

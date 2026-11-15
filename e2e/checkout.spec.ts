@@ -54,6 +54,9 @@ test.describe("opening a checkout", () => {
     await page.goto("/en/checkout?service=icloud-clean-lost-check");
     await expect(page.getByRole("heading", { level: 1, name: "Secure checkout" })).toBeVisible();
     await expect(page.getByText("Additional information required")).toBeVisible();
+    // The delivery is the staff note as written (service 1: "2 min"), and a service sold one at a time shows no quantity rule.
+    await expect(page.getByText("2 min", { exact: true })).toBeVisible();
+    await expect(page.getByText("per order").filter({ visible: true })).toHaveCount(0);
     await expect(page.getByText("Tax is added once you choose your country.")).toBeVisible();
     await expect(page.getByText("$3.99").first()).toBeVisible();
 
@@ -73,6 +76,8 @@ test.describe("opening a checkout", () => {
     await expect(page).toHaveURL(/\/en\/checkout\/[A-Za-z0-9_-]{16,}$/);
     await expect(page.getByRole("heading", { level: 1, name: "Review and pay" })).toBeVisible();
     await expect(page.getByText(/Price locked for \d\d:\d\d/)).toBeVisible();
+    // The first row of the summary is the plural subtotal label, and its value is the session's net (one unit here).
+    await expect(page.getByText("Subtotal (1 unit)").filter({ visible: true })).toBeVisible();
     // Locked amounts (display currency = USD): net 3.99 + 19% tax 0.76 = 4.75; the IMEI and email stay masked.
     // (Next keeps the previous page hidden in the DOM, so look at what is visible.)
     await expect(page.getByText("Tax (19%)").filter({ visible: true })).toBeVisible();
@@ -314,9 +319,10 @@ test.describe("abandoned checkout link", () => {
     const token = await createSession(request);
     await page.goto(`/en/checkout/resume?token=${token}`);
     await expect(page.getByRole("heading", { name: "iCloud Clean / Lost Check" })).toBeVisible();
+    // The new checkout keeps the quantity of the unfinished one (the form checks it against today's rule).
     await expect(page.getByRole("link", { name: "Start a new checkout at today's price" })).toHaveAttribute(
       "href",
-      "/en/checkout?service=icloud-clean-lost-check",
+      "/en/checkout?service=icloud-clean-lost-check&quantity=1",
     );
   });
 

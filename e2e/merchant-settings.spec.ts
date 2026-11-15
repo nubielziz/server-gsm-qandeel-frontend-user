@@ -121,10 +121,16 @@ test.describe("settings (active merchant)", () => {
     await expect(page.getByRole("heading", { name: "Two-step verification" })).toBeVisible();
   });
 
-  test("notifications: Telegram says it is not available, the threshold is validated, switches stay off", async ({ page }) => {
+  test("notifications: Telegram says it is not available, the threshold is validated, the Telegram switches stay disabled (Announcements on)", async ({ page }) => {
     await page.goto("/en/merchant/settings/notifications");
     await expect(page.getByText("ops@zainmobilehub.example")).toBeVisible();
     await expect(page.getByRole("switch", { name: "Telegram" }).first()).toBeDisabled();
+
+    // Announcements (`broadcast.announcement`): its Telegram switch starts on and takes effect once a chat is linked, so
+    // it is checked and disabled (F22; the account is only read here, e2e/merchant-account.spec.ts saves on a throwaway one).
+    const announcements = page.getByRole("group", { name: "Announcements" });
+    await expect(announcements.getByRole("switch", { name: "Telegram" })).toBeDisabled();
+    await expect(announcements.getByRole("switch", { name: "Telegram" })).toBeChecked();
 
     await page.getByRole("button", { name: "Link Telegram" }).click();
     await expect(page.getByText("Telegram notifications are not available yet.")).toBeVisible();
@@ -136,6 +142,8 @@ test.describe("settings (active merchant)", () => {
     await expect(page.getByLabel(/Alert me when my available balance/)).toBeFocused();
     await page.getByRole("button", { name: "Discard changes" }).click();
     await expect(page.getByRole("switch", { name: "Email" }).nth(4)).not.toBeChecked();
+    // Discarding leaves Announcements as the API showed it.
+    await expect(announcements.getByRole("switch", { name: "Telegram" })).toBeChecked();
   });
 
   test("notifications: saving sends only what changed, and the change is restored", async ({ page }) => {

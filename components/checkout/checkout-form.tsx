@@ -3,10 +3,12 @@
 // details (email, country → tax, currency), the order summary with an indicative price, Turnstile and
 // "Continue to payment" → POST /store/v1/checkout-sessions → /<lang>/checkout/<token>. The amounts on this page are
 // indicative: the session locks price, tax and exchange rate for 30 minutes on the next page (handoff §5.8).
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+// The quantity rule of the service (a range, packs, exactly N) is state, not a constant: it starts from the server-rendered
+// service and is replaced by every re-read of the service (currency, country, region, a server refusal) (plan D17).
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Clock, Lock, Pencil } from "lucide-react";
+import { ArrowRight, Clock, Hash, Lock, Pencil } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -19,26 +21,46 @@ import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { CheckoutSession, CheckoutSessionInput, StoreConfig, StoreServiceDetail } from "@/lib/api/types";
 import { formatDateTime, formatNumber, formatPercent, isValidImei, normalizeImei } from "@/lib/format";
-import { fmt } from "@/lib/i18n/define";
+import { fmt, plural } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { CheckoutMessages } from "@/lib/i18n/messages/checkout";
+import type { CommonMessages } from "@/lib/i18n/messages/common";
+import {
+  coerceQuantity,
+  defaultQuantity,
+  invalidQuantityText,
+  isAllowedQuantity,
+  parseQuantityInput,
+  quantityMode,
+  quantityRuleText,
+  type QuantityRule,
+} from "@/lib/quantity";
+import { deliveryLine, stockHint } from "@/lib/store/delivery";
 import { multiplyMoney, isPositiveMoney } from "./money-math";
+import { focusQuantityControl, INVALID_SELECTOR, QuantityControl } from "./quantity-control";
 
 type Labels = CheckoutMessages["start"];
 
 export type CheckoutFormProps = {
   locale: Locale;
   labels: Labels;
+  /** `common.quantity`: the rule texts, the plural "Subtotal (N units)" and "per unit". */
+  quantityLabels: CommonMessages["quantity"];
+  /** `common.delivery`: the delivery line and the in-stock hint. */
+  deliveryLabels: CommonMessages["delivery"];
   /** Labels of the service type ("IMEI check"). */
   typeLabel: string;
   service: {
     id: number;
     slug: string;
     title: string;
-    deliveryTime: string;
     isImei: boolean;
+    /** The rule when the page was rendered; the form reads it again and keeps the newest. */
     quantity: StoreServiceDetail["quantity"];
+    availability: StoreServiceDetail["availability"];
+    etaText: StoreServiceDetail["etaText"];
+    deliveryMinutes: StoreServiceDetail["deliveryMinutes"];
     fields: StoreServiceDetail["fields"];
     /** The price in the visitor's currency, without tax (no country yet). */
     price: StoreServiceDetail["price"];
@@ -56,12 +78,31 @@ export type CheckoutFormProps = {
   supportHref: string;
   /** `utm_*` values of the landing URL (the abandoned-checkout report reads `source`). */
   utm?: NonNullable<CheckoutSessionInput["utm"]>;
+  /** The `?quantity=` of the URL (a restarted or resumed checkout keeps it): checked against today's rule. */
+  initialQuantity?: number | null;
 };
 
 type FormError = { message: string; reference?: string; signIn?: boolean; support?: boolean };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DRAWER_FIELD = /^(imei|quantity|inputs\..+)$/;
+
+/** The server refuses a quantity with these field codes (`invalid_quantity`, or the schema's own limits). */
+const QUANTITY_CODES = new Set(["invalid_quantity", "too_small", "too_big", "invalid_type"]);
+
+function refusesQuantity(error: unknown): boolean {
+  return isApiError(error) && error.status === 422 && error.fieldErrors.some((fe) => fe.field === "quantity" && QUANTITY_CODES.has(fe.code));
+}
+
+function sameRule(a: QuantityRule, b: QuantityRule): boolean {
+  return a.min === b.min && a.max === b.max && a.options.length === b.options.length && a.options.every((n, i) => n === b.options[i]);
+}
+
+/** True for the modes that ask the buyer to choose (a range, packs): they need the drawer. */
+function hasControl(rule: QuantityRule): boolean {
+  const kind = quantityMode(rule).kind;
+  return kind === "range" || kind === "packs";
+}
 
 function maskImei(imei: string): string {
   const digits = normalizeImei(imei);
@@ -71,6 +112,8 @@ function maskImei(imei: string): string {
 export function CheckoutForm({
   locale,
   labels,
+  quantityLabels,
+  deliveryLabels,
   typeLabel,
   service,
   art,
@@ -82,14 +125,23 @@ export function CheckoutForm({
   signInHref,
   supportHref,
   utm,
+  initialQuantity,
 }: CheckoutFormProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const drawerFormId = useId().replace(/:/g, "");
 
-  const { quantity: qtyRule, fields } = service;
-  const fixedQuantity = qtyRule.options.length === 0 && qtyRule.min === qtyRule.max;
-  const needsDetails = service.isImei || fields.length > 0 || !fixedQuantity;
+  const { fields } = service;
+  // The URL's quantity, checked once against the rule the page was rendered with (a rule that no longer allows it falls
+  // back to the default and says so).
+  const [initial] = useState(() => coerceQuantity(service.quantity, initialQuantity));
+  const [rule, setRule] = useState<QuantityRule>(service.quantity);
+  const [live, setLive] = useState({ availability: service.availability, etaText: service.etaText, deliveryMinutes: service.deliveryMinutes });
+  const ruleRef = useRef<QuantityRule>(service.quantity);
+  const quantityRef = useRef(String(initial.quantity));
+  const mode = quantityMode(rule);
+  const controlled = hasControl(rule);
+  const needsDetails = service.isImei || fields.length > 0 || controlled;
 
   const [email, setEmail] = useState(customer?.email ?? "");
   const [country, setCountry] = useState(customer?.country ?? "");
@@ -97,7 +149,8 @@ export function CheckoutForm({
   const [currency, setCurrency] = useState(defaultCurrency);
   const [imei, setImei] = useState("");
   const [inputs, setInputs] = useState<Record<string, string>>({});
-  const [quantity, setQuantity] = useState(String(qtyRule.options[0] ?? qtyRule.min));
+  const [quantity, setQuantity] = useState(String(initial.quantity));
+  const [quantityNotice, setQuantityNotice] = useState(initial.changed);
   const [detailsSaved, setDetailsSaved] = useState(!needsDetails);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -105,6 +158,49 @@ export function CheckoutForm({
   const [token, setToken] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
   const [busy, setBusy] = useState(false);
+
+  // ── The service as the API has it now (rule, availability, delivery, price): one read for the effect below and for
+  // a server refusal. Currency, country and region change the price; the rule and the delivery come along.
+  const readService = useCallback(
+    (signal?: AbortSignal) =>
+      api.get<StoreServiceDetail>(`/store/v1/services/${encodeURIComponent(service.slug)}`, {
+        query: { locale, currency, buyerCountry: country || undefined, region: region || undefined },
+        signal,
+      }),
+    [service.slug, locale, currency, country, region],
+  );
+
+  /**
+   * Takes the rule of a fresh read as the rule of the form. When it differs, the control is redrawn and a quantity the new
+   * rule does not allow is replaced: by the default with a notice (a silent change), or, after a server refusal, by
+   * nothing for packs (the buyer chooses again) and by the typed number for a range (the refusal text is shown).
+   */
+  const applyService = useCallback(
+    (detail: StoreServiceDetail, after: "silent" | "refusal"): QuantityRule => {
+      setLive({ availability: detail.availability, etaText: detail.etaText, deliveryMinutes: detail.deliveryMinutes });
+      const previous = ruleRef.current;
+      const next = detail.quantity;
+      if (sameRule(previous, next)) return previous;
+      ruleRef.current = next;
+      setRule(next);
+      const typed = parseQuantityInput(quantityRef.current);
+      const kept = typed !== null && isAllowedQuantity(next, typed);
+      if (!kept) {
+        const kind = quantityMode(next).kind;
+        const value =
+          after === "refusal" && kind === "packs" ? "" : after === "refusal" && kind === "range" ? quantityRef.current : String(defaultQuantity(next));
+        quantityRef.current = value;
+        setQuantity(value);
+        if (after === "silent" && typed !== null) setQuantityNotice(true);
+      }
+      const needs = service.isImei || fields.length > 0 || hasControl(next);
+      // Whatever the buyer saved before no longer matches the form: ask again. Nothing to enter: nothing to ask.
+      if (!needs) setDetailsSaved(true);
+      else if (!kept || (!hasControl(previous) && hasControl(next))) setDetailsSaved(false);
+      return next;
+    },
+    [service.isImei, fields.length],
+  );
 
   // ── Indicative price: the service card in the chosen currency and, once known, the buyer's country (tax included).
   const [price, setPrice] = useState(service.price);
@@ -117,12 +213,11 @@ export function CheckoutForm({
     const controller = new AbortController();
     const timer = setTimeout(() => {
       setPriceBusy(true);
-      api
-        .get<StoreServiceDetail>(`/store/v1/services/${encodeURIComponent(service.slug)}`, {
-          query: { locale, currency, buyerCountry: country || undefined, region: region || undefined },
-          signal: controller.signal,
+      readService(controller.signal)
+        .then((detail) => {
+          setPrice(detail.price);
+          applyService(detail, "silent");
         })
-        .then((detail) => setPrice(detail.price))
         .catch(() => undefined)
         .finally(() => {
           if (!controller.signal.aborted) setPriceBusy(false);
@@ -132,11 +227,13 @@ export function CheckoutForm({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [currency, country, region, service.slug, locale]);
+  }, [currency, country, region, readService, applyService]);
 
   const regionChoices = country ? taxRates.filter((rate) => rate.country === country && rate.region) : [];
-  const decimals = currencies.find((c) => c.code === price.currency)?.decimals;
-  const qtyNumber = Math.max(1, Number.parseInt(quantity, 10) || qtyRule.min);
+  const decimals = currencies.find((c) => c.code === price.currency)?.decimals ?? 2;
+  // The quantity the summary shows: the buyer's, when the rule allows it; else what a request without one would order.
+  const typedQuantity = parseQuantityInput(quantity);
+  const qtyNumber = typedQuantity !== null && isAllowedQuantity(rule, typedQuantity) ? typedQuantity : defaultQuantity(rule);
   const taxRate = country ? taxRates.find((rate) => rate.country === country && (!region || rate.region === region || !rate.region)) : undefined;
   const countryLabel = countries.find((c) => c.code === country)?.name ?? country;
 
@@ -153,15 +250,9 @@ export function CheckoutForm({
     for (const field of fields) {
       if (field.required && !(inputs[field.key] ?? "").trim()) found[`inputs.${field.key}`] = labels.drawer.errorRequired;
     }
-    if (!fixedQuantity) {
-      const n = Number(quantity);
-      const valid = Number.isInteger(n) && (qtyRule.options.length > 0 ? qtyRule.options.includes(n) : n >= qtyRule.min && n <= qtyRule.max);
-      if (!valid) {
-        found.quantity = fmt(labels.drawer.errorQuantity, {
-          min: formatNumber(qtyRule.min, locale),
-          max: formatNumber(qtyRule.max, locale),
-        });
-      }
+    // One per order and exactly N have no control: the rule decides the quantity.
+    if (controlled && (typedQuantity === null || !isAllowedQuantity(rule, typedQuantity))) {
+      found.quantity = invalidQuantityText(rule, quantityLabels, locale);
     }
     return found;
   }
@@ -170,9 +261,11 @@ export function CheckoutForm({
     if (Object.keys(found).some((key) => DRAWER_FIELD.test(key))) setDrawerOpen(true);
     setTimeout(() => {
       const target =
-        document.querySelector<HTMLElement>("dialog[open] [aria-invalid='true']") ??
-        document.querySelector<HTMLElement>("form [aria-invalid='true']");
-      target?.focus();
+        document.querySelector<HTMLElement>(`dialog[open] :is(${INVALID_SELECTOR})`) ??
+        document.querySelector<HTMLElement>(`form :is(${INVALID_SELECTOR})`);
+      // A group of packs is a fieldset: the focus goes to one of its radio buttons.
+      if (target instanceof HTMLFieldSetElement) focusQuantityControl();
+      else target?.focus();
     }, 80);
   }
 
@@ -218,6 +311,19 @@ export function CheckoutForm({
     return { fields: fieldsOut, form };
   }
 
+  /** The sentence for a quantity the server refused: read from the rule as the API has it now (the one we have if the read fails). */
+  async function quantityRefusalText(): Promise<string> {
+    let current = ruleRef.current;
+    try {
+      const detail = await readService();
+      setPrice(detail.price);
+      current = applyService(detail, "refusal");
+    } catch {
+      // keep the rule we have
+    }
+    return invalidQuantityText(current, quantityLabels, locale);
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
@@ -238,7 +344,7 @@ export function CheckoutForm({
       email: email.trim(),
       country,
       currency,
-      quantity: fixedQuantity ? qtyRule.min : Number(quantity),
+      quantity: qtyNumber,
       ...(region && regionChoices.some((r) => r.region === region) ? { region } : {}),
       ...(service.isImei ? { imei: normalizeImei(imei) } : {}),
       ...(Object.keys(filled).length > 0 ? { inputs: filled } : {}),
@@ -251,7 +357,18 @@ export function CheckoutForm({
       router.push(localePath(locale, `/checkout/${encodeURIComponent(session.token)}`));
       return; // stay busy while the next page opens
     } catch (error) {
-      const { fields: fieldsOut, form } = describe(error);
+      const { fields: fieldsOut, form: formOut } = describe(error);
+      let form = formOut;
+      if (refusesQuantity(error)) {
+        // The server's text is English and may describe a rule that has changed: read the service again, redraw the
+        // control for today's rule and say what that rule is.
+        const text = await quantityRefusalText();
+        if (service.isImei || fields.length > 0 || hasControl(ruleRef.current)) fieldsOut.quantity = text;
+        else {
+          delete fieldsOut.quantity;
+          form = { message: text, reference: errorText.reference(error) };
+        }
+      }
       setErrors(fieldsOut);
       setFormError(form);
       if (Object.keys(fieldsOut).length > 0) reveal(fieldsOut);
@@ -281,6 +398,13 @@ export function CheckoutForm({
       return next;
     });
 
+  function changeQuantity(value: string) {
+    quantityRef.current = value;
+    setQuantity(value);
+    setQuantityNotice(false);
+    clearError("quantity");
+  }
+
   const detailsStatus = !needsDetails ? (
     <span className="text-small text-ink-muted">{labels.info.none}</span>
   ) : detailsSaved ? (
@@ -297,6 +421,9 @@ export function CheckoutForm({
 
   const unitDecimals = decimals;
   const showTotals = qtyNumber > 1;
+  const deliveryText = deliveryLine(live, locale, deliveryLabels);
+  const ruleText = quantityRuleText(rule, quantityLabels, locale);
+  const stockNote = stockHint({ ...live, quantity: rule }, locale, deliveryLabels);
   const net = multiplyMoney(price.net, qtyNumber);
   const tax = multiplyMoney(price.tax, qtyNumber);
   const gross = multiplyMoney(price.gross, qtyNumber);
@@ -319,10 +446,18 @@ export function CheckoutForm({
                       <Badge tone="outline" shape="tag">
                         {typeLabel}
                       </Badge>
-                      <span className="flex items-center gap-1">
-                        <Clock aria-hidden="true" className="size-3.5" />
-                        <bdi>{fmt(labels.info.delivery, { time: service.deliveryTime })}</bdi>
-                      </span>
+                      {deliveryText ? (
+                        <span className="flex items-center gap-1">
+                          <Clock aria-hidden="true" className="size-3.5" />
+                          <bdi>{deliveryText}</bdi>
+                        </span>
+                      ) : null}
+                      {mode.kind !== "single" ? (
+                        <span className="flex items-center gap-1">
+                          <Hash aria-hidden="true" className="size-3.5" />
+                          <bdi>{ruleText}</bdi>
+                        </span>
+                      ) : null}
                     </p>
                     <p className="mt-2">{detailsStatus}</p>
                   </div>
@@ -340,6 +475,11 @@ export function CheckoutForm({
                   </Button>
                 ) : null}
               </div>
+              {quantityNotice ? (
+                <Alert tone="info" className="mt-4">
+                  {labels.info.quantityChanged}
+                </Alert>
+              ) : null}
               {needsDetails && detailsSaved ? (
                 <dl className="mt-4 grid gap-2 text-body">
                   {service.isImei ? (
@@ -350,7 +490,7 @@ export function CheckoutForm({
                       </dd>
                     </div>
                   ) : null}
-                  {!fixedQuantity ? (
+                  {controlled ? (
                     <div className="flex justify-between gap-4">
                       <dt className="text-ink-subtle">{labels.info.quantity}</dt>
                       <dd className="num font-semibold text-ink">{formatNumber(qtyNumber, locale)}</dd>
@@ -464,7 +604,7 @@ export function CheckoutForm({
               </div>
               {showTotals ? (
                 <div className="flex items-baseline justify-between gap-4">
-                  <dt className="text-body text-ink-muted">{labels.summary.price}</dt>
+                  <dt className="text-body text-ink-muted">{plural(locale, qtyNumber, quantityLabels.subtotal, formatNumber(qtyNumber, locale))}</dt>
                   <dd className="text-body font-medium text-ink">
                     <Money amount={net} currency={price.currency} locale={locale} decimals={unitDecimals} />
                   </dd>
@@ -560,7 +700,10 @@ export function CheckoutForm({
                 <p className="text-body font-semibold text-ink">{service.title}</p>
                 <p className="text-small text-ink-subtle">{typeLabel}</p>
               </div>
-              <Money amount={price.gross} currency={price.currency} locale={locale} decimals={unitDecimals} className="text-body font-bold text-ink" />
+              <div className="shrink-0 text-end">
+                <Money amount={price.net} currency={price.currency} locale={locale} decimals={unitDecimals} className="text-body font-bold text-ink" />
+                {mode.kind !== "single" ? <p className="text-small text-ink-subtle">{quantityLabels.perUnit}</p> : null}
+              </div>
             </div>
 
             {service.isImei ? (
@@ -628,37 +771,18 @@ export function CheckoutForm({
               );
             })}
 
-            {!fixedQuantity ? (
-              qtyRule.options.length > 0 ? (
-                <Select
-                  name="quantity"
-                  label={labels.drawer.quantity}
-                  error={errors.quantity}
-                  value={quantity}
-                  onChange={(event) => {
-                    setQuantity(event.target.value);
-                    clearError("quantity");
-                  }}
-                  options={qtyRule.options.map((n) => ({ value: String(n), label: formatNumber(n, locale) }))}
-                />
-              ) : (
-                <Input
-                  name="quantity"
-                  type="number"
-                  inputMode="numeric"
-                  min={qtyRule.min}
-                  max={qtyRule.max}
-                  label={labels.drawer.quantity}
-                  error={errors.quantity}
-                  value={quantity}
-                  onChange={(event) => {
-                    setQuantity(event.target.value);
-                    clearError("quantity");
-                  }}
-                  required
-                />
-              )
-            ) : null}
+            <QuantityControl
+              rule={rule}
+              locale={locale}
+              value={quantity}
+              onChange={changeQuantity}
+              error={errors.quantity}
+              label={labels.drawer.quantity}
+              hint={labels.drawer.quantityHint}
+              placeholder={labels.drawer.select}
+              quantityLabels={quantityLabels}
+              stockHint={stockNote}
+            />
 
             <Alert tone="info" title={labels.drawer.warningTitle}>
               {labels.drawer.warningText}

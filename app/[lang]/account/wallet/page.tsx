@@ -1,0 +1,257 @@
+// The customer wallet (plan F21, BH §3.1, §3.2): the balance cards, notices (on hold, below zero, switched off) and the
+// statement with a date range, 25 rows a page. The wallet is USD; in another shop currency an "about …" line follows.
+// The frame (heading) is static; the wallet and the statement are personal and never cached, so they are read at request
+// time (`apiSessionGet`, no-store) and stream behind <Suspense> with a skeleton. The wallet is the request's one shared
+// read (`readCustomerWallet`), also used by the layout's nav item and pill.
+// `?topUp=<id>` (the return of an online top-up) is accepted and ignored until the top-up poller (F33) reads it; a
+// failed read shows the request reference, and a signed-out answer goes to the sign-in page.
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { Plus, ReceiptText, Wallet } from "lucide-react";
+import { apiSessionList } from "@/lib/api/server";
+import { isApiError } from "@/lib/api/errors";
+import type { CustomerStatementLine } from "@/lib/api/types";
+import { getCurrency } from "@/lib/currency";
+import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import { localePath, type Locale } from "@/lib/i18n/config";
+import { fmt, plural } from "@/lib/i18n/define";
+import { errorText } from "@/lib/i18n/error-text-core";
+import { getLocale, getMessages } from "@/lib/i18n/server";
+import { common } from "@/lib/i18n/messages/common";
+import { errors } from "@/lib/i18n/messages/errors";
+import { wallet } from "@/lib/i18n/messages/wallet";
+import { ltr } from "@/lib/merchant/format";
+import { first, type SearchParams } from "@/lib/merchant/lists";
+import { settle } from "@/lib/merchant/load";
+import { parsePage } from "@/lib/api/query";
+import { approximateIn } from "@/lib/wallet/convert";
+import { CUSTOMER_STATEMENT_PER_PAGE, customerStatementRows, parseStatementRange, statementQuery, walletCapabilities } from "@/lib/wallet/view";
+import { readCustomerWallet } from "@/components/layout/account-area";
+import { PageHeader } from "@/components/layout/container";
+import { RetryButton } from "@/components/merchant/retry-button";
+import { WalletBalanceCards } from "@/components/wallet/balance-cards";
+import { StatementRangeForm } from "@/components/wallet/statement-range-form";
+import { StatementTable } from "@/components/wallet/statement-table";
+import { Alert } from "@/components/ui/alert";
+import { ButtonLink } from "@/components/ui/button";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { Pagination, pageHref } from "@/components/ui/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getMessages(wallet);
+  return { title: t.metaTitle, robots: { index: false, follow: false } };
+}
+
+const SIGNED_OUT_CODES = new Set(["UNAUTHORIZED", "ACCOUNT_SUSPENDED", "IP_NOT_ALLOWED"]);
+
+/** A signed-out answer (handoff §3.4) goes to the customer sign-in page, which comes back here; anything else returns. */
+function leaveIfSignedOut(error: unknown, locale: Locale, next: string): void {
+  if (isApiError(error) && (error.status === 401 || SIGNED_OUT_CODES.has(error.code))) {
+    redirect(`${localePath(locale, "/sign-in")}?${new URLSearchParams({ as: "customer", next }).toString()}`);
+  }
+}
+
+function WalletSkeleton() {
+  return (
+    <div aria-busy="true" className="grid gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Skeleton className="h-36 rounded-panel" />
+        <Skeleton className="h-36 rounded-card" />
+      </div>
+      <Skeleton className="h-[36rem] rounded-card" />
+    </div>
+  );
+}
+
+/** A failed read, inside the page (the frame stays): a plain sentence, the request reference and a retry. */
+function LoadError({ error, title, retry, locale }: { error: unknown; title: string; retry: string; locale: Locale }) {
+  const text = errorText(errors[locale]);
+  return (
+    <ErrorState
+      title={title}
+      message={text.message(error)}
+      reference={text.reference(error)}
+      action={<RetryButton label={retry} />}
+    />
+  );
+}
+
+async function WalletContent({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const [locale, t, c, sp] = await Promise.all([getLocale(), getMessages(wallet), getMessages(common), searchParams]);
+  const base = localePath(locale, "/account/wallet");
+  const range = parseStatementRange({ from: first(sp.from), to: first(sp.to) });
+  const page = parsePage(sp.page);
+  const filters = { from: range.from || undefined, to: range.to || undefined };
+
+  const [read, currency, statement] = await Promise.all([
+    readCustomerWallet(),
+    getCurrency().catch(() => null),
+    settle(apiSessionList<CustomerStatementLine>("/store/v1/me/wallet/statement", { query: statementQuery(range, page) })),
+  ]);
+
+  if (!read.ok) {
+    leaveIfSignedOut(read.error, locale, base);
+    return (
+      <Card>
+        <LoadError error={read.error} title={t.errors.loadTitle} retry={t.errors.retry} locale={locale} />
+      </Card>
+    );
+  }
+  const w = read.data;
+  const caps = walletCapabilities(w);
+
+  // Switched off and empty: nothing to show (no nav item, no pill either). Reached by a typed address or an old bookmark.
+  if (!caps.show) {
+    return (
+      <Card>
+        <EmptyState
+          icon={<Wallet aria-hidden="true" />}
+          title={t.notices.disabledTitle}
+          description={t.notices.disabledText}
+          action={
+            <ButtonLink href={localePath(locale, "/account")} variant="secondary">
+              {t.notices.backToAccount}
+            </ButtonLink>
+          }
+        />
+      </Card>
+    );
+  }
+
+  const approx = currency ? approximateIn(w.available, currency) : null;
+  const pendingCount = w.pendingTopUps?.count ?? 0;
+
+  let statementBody;
+  if (!statement.ok) {
+    leaveIfSignedOut(statement.error, locale, base);
+    statementBody = <LoadError error={statement.error} title={t.errors.statementTitle} retry={t.errors.retry} locale={locale} />;
+  } else {
+    const { data, total } = statement.data;
+    // A page number past the end (an old bookmark): back to the first page of the same range.
+    if (data.length === 0 && total > 0 && page > 1) redirect(pageHref(base, filters, 1));
+    const rows = customerStatementRows(data, (ref) => fmt(t.statement.order, { id: ltr(ref) }));
+    statementBody =
+      rows.length === 0 ? (
+        range.from || range.to ? (
+          <EmptyState
+            icon={<ReceiptText aria-hidden="true" />}
+            title={t.statement.emptyRangeTitle}
+            description={t.statement.emptyRangeText}
+            action={
+              <ButtonLink href={base} variant="secondary">
+                {t.statement.clear}
+              </ButtonLink>
+            }
+          />
+        ) : (
+          <EmptyState icon={<ReceiptText aria-hidden="true" />} title={t.statement.emptyTitle} description={t.statement.emptyText} />
+        )
+      ) : (
+        <>
+          <StatementTable
+            rows={rows}
+            locale={locale}
+            labels={{ caption: t.statement.caption, columns: t.statement.columns, kinds: t.statement.kinds, dash: t.statement.dash }}
+          />
+          <div className="border-t border-line px-5 py-4">
+            <Pagination total={total} pageSize={CUSTOMER_STATEMENT_PER_PAGE} page={page} basePath={base} searchParams={filters} />
+          </div>
+        </>
+      );
+  }
+
+  return (
+    <div className="grid gap-4">
+      {caps.frozen && w.frozen ? (
+        // The reason stays with staff: only the date is shown.
+        <Alert tone="warning" title={t.notices.frozenTitle}>
+          {fmt(t.notices.frozenText, { date: formatDate(w.frozen.at, locale) })}
+        </Alert>
+      ) : null}
+      {caps.negative ? (
+        <Alert tone="warning" title={t.notices.negativeTitle}>
+          {t.notices.negativeText}
+        </Alert>
+      ) : null}
+      {!w.enabled ? (
+        <Alert tone="info" title={t.notices.disabledTitle}>
+          {`${t.notices.disabledText} ${t.notices.disabledKept}`}
+        </Alert>
+      ) : null}
+
+      <WalletBalanceCards
+        locale={locale}
+        amounts={{ balance: w.balance, available: w.available }}
+        labels={{
+          available: t.cards.available,
+          availableHint: t.cards.availableHint,
+          balance: t.cards.balance,
+          balanceHint: t.cards.balanceHint,
+        }}
+        availableNote={
+          approx ? fmt(t.cards.approx, { amount: ltr(formatMoney(approx.amount, approx.currency, locale, approx.decimals)) }) : undefined
+        }
+        availableAction={
+          caps.canAddFunds ? (
+            <ButtonLink href={localePath(locale, "/account/wallet/add-funds")} variant="inverse" startIcon={<Plus aria-hidden="true" />}>
+              {t.page.addFunds}
+            </ButtonLink>
+          ) : undefined
+        }
+        pending={
+          pendingCount > 0
+            ? {
+                label: t.cards.pendingLabel,
+                amount: w.pendingTopUps.amount,
+                hint: plural(locale, pendingCount, t.cards.pending, formatNumber(pendingCount, locale)),
+              }
+            : undefined
+        }
+      />
+
+      <Card as="section" aria-labelledby="statement-title">
+        <CardHeader title={<span id="statement-title">{t.statement.title}</span>} description={t.statement.description} />
+        <CardBody>
+          <StatementRangeForm
+            action={base}
+            from={range.from}
+            to={range.to}
+            invalid={range.invalid}
+            clearHref={base}
+            labels={{
+              form: t.statement.rangeLabel,
+              from: t.statement.from,
+              to: t.statement.to,
+              apply: t.statement.apply,
+              clear: t.statement.clear,
+              invalid: t.statement.rangeInvalid,
+            }}
+          />
+          {/* Tells a screen reader how many lines the chosen dates left (the visible total is further down). */}
+          {statement.ok ? (
+            <p role="status" className="sr-only">
+              {plural(locale, statement.data.total, c.pagination.results, formatNumber(statement.data.total, locale))}
+            </p>
+          ) : null}
+        </CardBody>
+        <div className="border-t border-line">{statementBody}</div>
+      </Card>
+    </div>
+  );
+}
+
+export default async function WalletPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const t = await getMessages(wallet);
+  return (
+    <div className="grid gap-4">
+      <PageHeader variant="card" title={t.page.title} description={t.page.description} />
+      <Suspense fallback={<WalletSkeleton />}>
+        <WalletContent searchParams={searchParams} />
+      </Suspense>
+    </div>
+  );
+}

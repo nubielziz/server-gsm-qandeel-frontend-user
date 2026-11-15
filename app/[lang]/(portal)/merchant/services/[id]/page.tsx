@@ -21,7 +21,7 @@ import { common, type CommonMessages } from "@/lib/i18n/messages/common";
 import { merchant, type MerchantMessages } from "@/lib/i18n/messages/merchant";
 import { formatMinutes } from "@/lib/merchant/format";
 import { settle } from "@/lib/merchant/load";
-import { quantityRule } from "@/lib/merchant/order-input";
+import { fromMerchantRule, quantityRuleText } from "@/lib/quantity";
 
 const ID_PATTERN = /^[1-9]\d{0,15}$/;
 
@@ -102,19 +102,11 @@ async function Service({ params }: { params: Promise<{ id: string }> }) {
           topUp: localePath(locale, "/merchant/wallet/top-up"),
           services: localePath(locale, "/merchant/services"),
         }}
-        labels={{ form: t.form, summary: t.summary, errors: t.orderErrors, placed: t.placed }}
+        labels={{ form: t.form, summary: t.summary, errors: t.orderErrors, placed: t.placed, quantity: c.quantity }}
         intro={<AboutCard service={s} locale={locale} t={t} c={c} />}
       />
     </div>
   );
-}
-
-function quantityText(s: MerchantServiceDetail, locale: Locale, t: MerchantMessages["catalog"]): string {
-  const rule = quantityRule(s);
-  const n = (value: number) => formatNumber(value, locale);
-  if (rule.kind === "fixed") return fmt(t.qtyFixed, { n: n(rule.value) });
-  if (rule.kind === "range") return fmt(t.qtyRange, { min: n(rule.min), max: n(rule.max) });
-  return fmt(t.qtyOptions, { list: rule.options.map(n).join(", ") });
 }
 
 const OPTION_LISTS = ["model", "network", "mep"] as const;
@@ -146,7 +138,9 @@ function AboutCard({ service: s, locale, t, c }: { service: MerchantServiceDetai
           </div>
           <div>
             <dt className={term}>{t.service.quantity}</dt>
-            <dd className="num mt-0.5 text-body font-semibold text-ink">{quantityText(s, locale, t.catalog)}</dd>
+            <dd className="mt-0.5 text-body font-semibold text-ink">
+              <bdi>{quantityRuleText(fromMerchantRule(s), c.quantity, locale)}</bdi>
+            </dd>
           </div>
         </dl>
         {s.info.trim() ? (

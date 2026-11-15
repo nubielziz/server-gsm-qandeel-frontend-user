@@ -1,14 +1,15 @@
 // Account settings (mockup "Account Settings"): a section list on the start side, the forms in the middle and an
-// account summary + help on the end side. Sections: Preferences (language, currency, marketing), Password and Privacy
-// (data export / deletion requests). Name, phone, country and email are not editable: the API has no route for them.
+// account summary + help on the end side. Sections: Profile (name, phone, country; the email is read-only, no route
+// changes it), Preferences (language, currency, marketing), Password and Privacy (data export / deletion requests).
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { BadgeCheck } from "lucide-react";
 import { requireCustomer } from "@/lib/api/session";
 import { getStoreConfig } from "@/lib/api/public";
+import { countryName } from "@/lib/countries";
 import { getCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/format";
-import { localePath } from "@/lib/i18n/config";
+import { localePath, type Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { account } from "@/lib/i18n/messages/account";
@@ -17,6 +18,7 @@ import { portal } from "@/lib/i18n/messages/portal";
 import { PasswordForm } from "@/components/account/password-form";
 import { PreferencesForm } from "@/components/account/preferences-form";
 import { PrivacyRequests } from "@/components/account/privacy-requests";
+import { ProfileForm } from "@/components/account/profile-form";
 import { PageHeader } from "@/components/layout/container";
 import { Alert } from "@/components/ui/alert";
 import { Avatar } from "@/components/ui/avatar";
@@ -30,11 +32,20 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t.settings.metaTitle, robots: { index: false, follow: false } };
 }
 
+/** The countries the shop has a tax rate for (the API refuses any other), plus the saved one, named in the page language. */
+function countryChoices(taxRates: { country: string }[], saved: string, locale: Locale): { code: string; name: string }[] {
+  const codes = new Set(taxRates.map((rate) => rate.country));
+  if (saved) codes.add(saved);
+  const collator = new Intl.Collator(locale);
+  return [...codes].map((code) => ({ code, name: countryName(code, locale) })).sort((a, b) => collator.compare(a.name, b.name));
+}
+
 function SettingsSkeleton() {
   return (
-    <div aria-busy="true" className="grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]">
-      <Skeleton className="h-12 rounded-card lg:h-44" />
+    <div aria-busy="true" className="grid grid-cols-1 gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]">
+      <Skeleton className="h-12 rounded-card lg:h-56" />
       <div className="grid content-start gap-4">
+        <Skeleton className="h-[43rem] rounded-card sm:h-[28rem]" />
         <Skeleton className="h-96 rounded-card" />
         <Skeleton className="h-96 rounded-card" />
         <Skeleton className="h-72 rounded-card" />
@@ -59,6 +70,7 @@ async function SettingsContent() {
   ]);
   const s = t.settings;
   const sections = [
+    { id: "profile", label: s.sections.profile },
     { id: "preferences", label: s.sections.preferences },
     { id: "password", label: s.sections.password },
     { id: "privacy", label: s.sections.privacy },
@@ -69,7 +81,7 @@ async function SettingsContent() {
   const name = me.name || me.email;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]">
       <nav aria-label={s.navLabel} className="lg:sticky lg:top-4 lg:self-start">
         <ul className="flex gap-2 overflow-x-auto lg:flex-col lg:gap-0 lg:rounded-card lg:border lg:border-line lg:bg-surface lg:p-2 lg:shadow-card">
           {sections.map((section) => (
@@ -86,10 +98,24 @@ async function SettingsContent() {
       </nav>
 
       <div className="grid content-start gap-4">
+        <Card as="section" id="profile" aria-labelledby="profile-title">
+          <CardHeader title={<span id="profile-title">{s.profile.title}</span>} description={s.profile.description} />
+          <CardBody>
+            <ProfileForm
+              initial={{ name: me.name, phone: me.phone, country: me.country, currency: me.currency }}
+              email={me.email}
+              countries={countryChoices(config.taxRates, me.country, locale)}
+              t={s.profile}
+            />
+          </CardBody>
+        </Card>
+
         <Card as="section" id="preferences" aria-labelledby="preferences-title">
           <CardHeader title={<span id="preferences-title">{s.preferences.title}</span>} description={s.preferences.description} />
           <CardBody>
+            {/* Keyed by the shown currency: a country change in the profile resets it on the API, and the form must start again from it. */}
             <PreferencesForm
+              key={currency}
               initial={{ locale: me.locale === "ar" ? "ar" : "en", currency, marketingOptIn: me.marketingOptIn }}
               currencies={currencies}
               t={s.preferences}

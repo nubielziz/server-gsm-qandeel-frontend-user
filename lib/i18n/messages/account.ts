@@ -1,4 +1,5 @@
-// The customer area: overview, orders and settings. The workspace navigation labels live in `portal.customerNav`.
+// The customer area: overview, orders and settings (profile, preferences, password, privacy). The workspace navigation
+// labels live in `portal.customerNav`.
 import { defineMessages } from "../define";
 
 export const account = defineMessages({
@@ -20,7 +21,7 @@ export const account = defineMessages({
         verified: "Verified",
         notVerified: "Not verified",
         notProvided: "Not provided",
-        note: "To change your name, phone, country or email, contact support.",
+        edit: "Edit profile",
         contact: "Contact support",
       },
       preferences: {
@@ -83,9 +84,9 @@ export const account = defineMessages({
     settings: {
       metaTitle: "Settings",
       title: "Account settings",
-      subtitle: "Choose your language and currency, secure your account and manage your data.",
+      subtitle: "Update your details, choose your language and currency, secure your account and manage your data.",
       navLabel: "Settings sections",
-      sections: { preferences: "Preferences", password: "Password", privacy: "Privacy" },
+      sections: { profile: "Profile", preferences: "Preferences", password: "Password", privacy: "Privacy" },
       summary: {
         title: "Account summary",
         customer: "Customer account",
@@ -97,6 +98,25 @@ export const account = defineMessages({
         title: "Need help?",
         text: "Contact support for anything about your account or an order.",
         contact: "Contact support",
+      },
+
+      profile: {
+        title: "Profile",
+        description: "Your name, phone number and country. They are saved to your account.",
+        name: "Full name",
+        nameInvalid: "Enter your name, from 2 to 120 characters.",
+        phone: "Phone",
+        phoneHint: "Optional. Leave it empty to remove your number.",
+        country: "Country",
+        countryPlaceholder: "Choose your country",
+        countryHint: "Only countries we sell to are listed. Changing it can change the currency of the shop prices.",
+        countryUnsupported: "We do not sell to this country yet.",
+        email: "Email",
+        emailNote: "To change your email address, contact support.",
+        save: "Save profile",
+        saved: "Profile saved",
+        nothingChanged: "No changes to save",
+        currencyChanged: "Prices are now shown in {currency}.",
       },
 
       preferences: {
@@ -178,7 +198,7 @@ export const account = defineMessages({
         verified: "مؤكَّد",
         notVerified: "غير مؤكَّد",
         notProvided: "غير مذكور",
-        note: "لتغيير اسمك أو هاتفك أو دولتك أو بريدك الإلكتروني تواصل مع الدعم.",
+        edit: "تعديل الملف الشخصي",
         contact: "تواصل مع الدعم",
       },
       preferences: {
@@ -241,9 +261,9 @@ export const account = defineMessages({
     settings: {
       metaTitle: "الإعدادات",
       title: "إعدادات الحساب",
-      subtitle: "اختر لغتك وعملتك، وأمّن حسابك، وأدر بياناتك.",
+      subtitle: "حدّث بياناتك، واختر لغتك وعملتك، وأمّن حسابك، وأدر بياناتك.",
       navLabel: "أقسام الإعدادات",
-      sections: { preferences: "التفضيلات", password: "كلمة المرور", privacy: "الخصوصية" },
+      sections: { profile: "الملف الشخصي", preferences: "التفضيلات", password: "كلمة المرور", privacy: "الخصوصية" },
       summary: {
         title: "ملخص الحساب",
         customer: "حساب عميل",
@@ -255,6 +275,25 @@ export const account = defineMessages({
         title: "تحتاج إلى مساعدة؟",
         text: "تواصل مع الدعم لأي استفسار عن حسابك أو عن طلب.",
         contact: "تواصل مع الدعم",
+      },
+
+      profile: {
+        title: "الملف الشخصي",
+        description: "اسمك ورقم هاتفك ودولتك. تُحفظ في حسابك.",
+        name: "الاسم الكامل",
+        nameInvalid: "أدخل اسمك، من حرفين إلى 120 حرفًا.",
+        phone: "الهاتف",
+        phoneHint: "اختياري. اتركه فارغًا لإزالة رقمك.",
+        country: "الدولة",
+        countryPlaceholder: "اختر دولتك",
+        countryHint: "تظهر الدول التي نبيع إليها فقط. وقد يغيّر تغييرها عملة عرض الأسعار في المتجر.",
+        countryUnsupported: "لا نبيع إلى هذه الدولة بعد.",
+        email: "البريد الإلكتروني",
+        emailNote: "لتغيير بريدك الإلكتروني تواصل مع الدعم.",
+        save: "حفظ الملف الشخصي",
+        saved: "تم حفظ الملف الشخصي",
+        nothingChanged: "لا توجد تغييرات للحفظ",
+        currencyChanged: "تُعرض الأسعار الآن بعملة {currency}.",
       },
 
       preferences: {

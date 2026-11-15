@@ -170,8 +170,6 @@ export const merchant = defineMessages({
       lineDuplicate: "Line {line}: this IMEI is already in the list.",
       tooMany: "A bulk order takes at most {max} IMEIs.",
       quantity: "Quantity",
-      quantityRange: "Between {min} and {max}.",
-      quantityInvalid: "Enter a whole number between {min} and {max}.",
       selectPlaceholder: "Select…",
       file: "Input file",
       fileHint: "Attach the file this service needs, up to 25 MB.",
@@ -193,6 +191,7 @@ export const merchant = defineMessages({
       optional: "(optional)",
       reviewFields: "Check the highlighted fields and try again.",
       notPlacedTitle: "The order was not placed",
+      stillProcessing: "Your order is still being processed. Please wait, you do not need to place it again.",
     },
 
     summary: {
@@ -636,8 +635,6 @@ export const merchant = defineMessages({
       lineDuplicate: "السطر {line}: هذا الرقم موجود مسبقًا في القائمة.",
       tooMany: "يقبل الطلب الجماعي حتى {max} رقمًا.",
       quantity: "الكمية",
-      quantityRange: "بين {min} و{max}.",
-      quantityInvalid: "أدخل عددًا صحيحًا بين {min} و{max}.",
       selectPlaceholder: "اختر…",
       file: "ملف الإدخال",
       fileHint: "أرفق الملف الذي تحتاجه هذه الخدمة، حتى 25 ميغابايت.",
@@ -659,6 +656,7 @@ export const merchant = defineMessages({
       optional: "(اختياري)",
       reviewFields: "راجع الحقول المحددة وحاول مرة أخرى.",
       notPlacedTitle: "لم يُقدَّم الطلب",
+      stillProcessing: "ما زال طلبك قيد المعالجة. يرجى الانتظار، ولا حاجة إلى تقديمه مرة أخرى.",
     },
 
     summary: {

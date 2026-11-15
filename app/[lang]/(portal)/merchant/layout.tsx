@@ -3,6 +3,8 @@
 // behind <Suspense> (the static shell is the same-size skeleton). Signed out → sign-in (merchant tab).
 // A merchant waiting for approval (`status: pending`) gets 403 ACCOUNT_PENDING_APPROVAL on 32 routes (handoff §4.15):
 // the nav then shows only what works for them (overview, settings) and a banner explains the wait.
+// A merchant with `mustChangePassword` (a temporary password from staff) is sent to the security page by the gate
+// around the page content (plan D5) until the password is changed.
 import { Suspense, cache } from "react";
 import Link from "next/link";
 import {
@@ -25,10 +27,12 @@ import type { MerchantWallet } from "@/lib/api/types";
 import { localePath } from "@/lib/i18n/config";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
+import { merchantSettings } from "@/lib/i18n/messages/merchant-settings";
 import { portal } from "@/lib/i18n/messages/portal";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { BellSkeleton, BellSlot } from "@/components/notifications/bell-slot";
 import { WorkspaceShell, WorkspaceShellSkeleton, type WorkspaceNavItem } from "@/components/layout/workspace-shell";
+import { MustChangePasswordGate } from "@/components/merchant/must-change-password-gate";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
@@ -60,7 +64,12 @@ async function WalletPill() {
 
 async function MerchantFrame({ children }: { children: React.ReactNode }) {
   const locale = await getLocale();
-  const [me, t, c] = await Promise.all([requireMerchant(locale), getMessages(portal), getMessages(common)]);
+  const [me, t, c, settings] = await Promise.all([
+    requireMerchant(locale),
+    getMessages(portal),
+    getMessages(common),
+    getMessages(merchantSettings),
+  ]);
   const pending = me.status === "pending";
   const p = (path: string) => localePath(locale, path);
   const icon = "size-5";
@@ -137,7 +146,14 @@ async function MerchantFrame({ children }: { children: React.ReactNode }) {
           {t.pending.body}
         </Alert>
       ) : null}
-      {children}
+      <MustChangePasswordGate
+        mustChange={me.mustChangePassword === true}
+        securityPath={p("/merchant/settings/security")}
+        title={settings.security.mustChange.title}
+        text={settings.security.mustChange.text}
+      >
+        {children}
+      </MustChangePasswordGate>
     </WorkspaceShell>
   );
 }

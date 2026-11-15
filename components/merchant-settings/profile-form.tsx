@@ -1,21 +1,33 @@
 "use client";
-// Profile (PATCH /client/profile): name, company, phone and country are editable; the email is shown read-only with
-// its verification badge (no route changes it). Only the changed keys are sent, then the page refreshes.
+// Profile (PATCH /client/profile): name, company, phone, country, address (300), tax id (40) and the language of our
+// emails (`locale`) are editable; the email is shown read-only with its verification badge (no route changes it) and,
+// while it is not verified, a "Resend verification email" button. Only the changed keys are sent, then the page refreshes.
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/browser";
-import type { MerchantMe } from "@/lib/api/types";
+import type { MerchantMe, MerchantProfileInput } from "@/lib/api/types";
+import { isLocale, type Locale } from "@/lib/i18n/config";
 import type { MerchantSettingsMessages } from "@/lib/i18n/messages/merchant-settings";
 import { cn } from "@/lib/cn";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardFooter, CardHeader } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
-import { Input, Select, controlClasses } from "@/components/ui/input";
+import { Input, Select, Textarea, controlClasses } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { ProblemAlert, useFocusFirstInvalid, useFormProblem } from "./form-problem";
+import { VerifyEmailResend } from "./verify-email-resend";
 
-export type ProfileValues = { name: string; company: string; phone: string; country: string };
+export type ProfileValues = {
+  name: string;
+  company: string;
+  phone: string;
+  country: string;
+  address: string;
+  taxId: string;
+  /** The language of the merchant's emails and notifications. */
+  locale: Locale;
+};
 
 type Props = {
   /** Country names rendered by the server: Intl.DisplayNames differs between Node and browsers (hydration). */
@@ -23,14 +35,31 @@ type Props = {
   initial: ProfileValues;
   email: string;
   emailVerified: boolean;
+  /** Names of the languages in their own script (`{ en: "English", ar: "العربية" }`). */
+  languageNames: Record<Locale, string>;
   t: MerchantSettingsMessages["profile"];
   fieldTexts: MerchantSettingsMessages["fieldErrors"];
   optional: string;
 };
 
-const FIELDS = ["name", "company", "phone", "country"];
+const FIELDS = ["name", "company", "phone", "country", "address", "taxId", "locale"];
 
-export function ProfileForm({ countries, initial, email, emailVerified, t, fieldTexts, optional }: Props) {
+/** Free-text keys are compared and sent trimmed; the country and the language are codes. */
+const TEXT_KEYS = ["name", "company", "phone", "address", "taxId"] as const;
+
+/** The keys that differ from what the server shows (the body of the PATCH): nothing else is ever sent. */
+export function changedProfileFields(values: ProfileValues, initial: ProfileValues): MerchantProfileInput {
+  const changed: MerchantProfileInput = {};
+  for (const key of TEXT_KEYS) {
+    const now = values[key].trim();
+    if (now !== initial[key].trim()) changed[key] = now;
+  }
+  if (values.country !== initial.country) changed.country = values.country;
+  if (values.locale !== initial.locale) changed.locale = values.locale;
+  return changed;
+}
+
+export function ProfileForm({ countries, initial, email, emailVerified, languageNames, t, fieldTexts, optional }: Props) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [values, setValues] = useState<ProfileValues>(initial);
@@ -39,14 +68,10 @@ export function ProfileForm({ countries, initial, email, emailVerified, t, field
   const { problem, fail, failFields, clear } = useFormProblem(fieldTexts);
   useFocusFirstInvalid(formRef, problem);
 
-  const changed: Partial<ProfileValues> = {};
-  for (const key of ["name", "company", "phone", "country"] as const) {
-    const now = key === "country" ? values[key] : values[key].trim();
-    if (now !== initial[key]) changed[key] = now;
-  }
+  const changed = changedProfileFields(values, initial);
   const dirty = Object.keys(changed).length > 0;
   const busy = saving || refreshing;
-  const set = (key: keyof ProfileValues) => (value: string) => {
+  const set = <K extends keyof ProfileValues>(key: K) => (value: ProfileValues[K]) => {
     setValues((v) => ({ ...v, [key]: value }));
   };
 
@@ -86,23 +111,26 @@ export function ProfileForm({ countries, initial, email, emailVerified, t, field
             onChange={(e) => set("name")(e.target.value)}
             error={problem?.fields.name}
           />
-          <Field label={t.email} id="profile-email" hint={emailVerified ? t.emailHintVerified : t.emailHintUnverified}>
-            {(control) => (
-              <div dir="ltr" className="relative flex items-center">
-                <input
-                  {...control}
-                  type="email"
-                  dir="ltr"
-                  readOnly
-                  value={email}
-                  className={cn(controlClasses, "h-11 pe-32 text-start")}
-                />
-                <span className="absolute inset-y-0 end-2 flex items-center">
-                  {emailVerified ? <Badge tone="success">{t.verified}</Badge> : <Badge tone="warning">{t.notVerified}</Badge>}
-                </span>
-              </div>
-            )}
-          </Field>
+          <div className="grid gap-3">
+            <Field label={t.email} id="profile-email" hint={emailVerified ? t.emailHintVerified : t.emailHintUnverified}>
+              {(control) => (
+                <div dir="ltr" className="relative flex items-center">
+                  <input
+                    {...control}
+                    type="email"
+                    dir="ltr"
+                    readOnly
+                    value={email}
+                    className={cn(controlClasses, "h-11 pe-32 text-start")}
+                  />
+                  <span className="absolute inset-y-0 end-2 flex items-center">
+                    {emailVerified ? <Badge tone="success">{t.verified}</Badge> : <Badge tone="warning">{t.notVerified}</Badge>}
+                  </span>
+                </div>
+              )}
+            </Field>
+            <VerifyEmailResend verified={emailVerified} t={t} />
+          </div>
           <div className="grid gap-5 sm:grid-cols-2">
             <Input
               label={t.company}
@@ -126,16 +154,56 @@ export function ProfileForm({ countries, initial, email, emailVerified, t, field
               error={problem?.fields.phone}
             />
           </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Select
+              label={t.country}
+              required
+              name="country"
+              autoComplete="country"
+              placeholder={t.countryPlaceholder}
+              options={countries.map((c) => ({ value: c.code, label: c.name }))}
+              value={values.country}
+              onChange={(e) => set("country")(e.target.value)}
+              error={problem?.fields.country}
+            />
+            <Input
+              label={t.taxId}
+              optionalLabel={optional}
+              name="taxId"
+              dir="ltr"
+              autoComplete="off"
+              maxLength={40}
+              value={values.taxId}
+              onChange={(e) => set("taxId")(e.target.value)}
+              error={problem?.fields.taxId}
+            />
+          </div>
+          <Textarea
+            label={t.address}
+            optionalLabel={optional}
+            name="address"
+            dir="auto"
+            rows={3}
+            autoComplete="street-address"
+            maxLength={300}
+            value={values.address}
+            onChange={(e) => set("address")(e.target.value)}
+            error={problem?.fields.address}
+          />
           <Select
-            label={t.country}
-            required
-            name="country"
-            autoComplete="country"
-            placeholder={t.countryPlaceholder}
-            options={countries.map((c) => ({ value: c.code, label: c.name }))}
-            value={values.country}
-            onChange={(e) => set("country")(e.target.value)}
-            error={problem?.fields.country}
+            label={t.emailLanguage}
+            hint={t.emailLanguageHint}
+            name="locale"
+            options={[
+              { value: "en", label: languageNames.en },
+              { value: "ar", label: languageNames.ar },
+            ]}
+            value={values.locale}
+            onChange={(e) => {
+              if (isLocale(e.target.value)) set("locale")(e.target.value);
+            }}
+            error={problem?.fields.locale}
+            fieldClassName="sm:max-w-xs"
           />
         </CardBody>
         <CardFooter>

@@ -1,8 +1,9 @@
 // Pure helpers for the order form (handoff §4.5): reading bulk IMEI lists, checking custom fields, building the
 // request body and mapping the API's field errors back onto the form. No React, no I/O: unit-tested.
 import { isValidImei, normalizeImei } from "@/lib/format";
-import type { MerchantServiceDetail } from "@/lib/api/types";
+import type { MerchantOrderInput, MerchantServiceDetail } from "@/lib/api/types";
 import type { FieldError } from "@/lib/api/errors";
+import { fromMerchantRule, isAllowedQuantity, parseQuantityInput, quantityMode } from "@/lib/quantity";
 
 /** At most this many IMEIs in one bulk order (`imeis` has 1–100 items). */
 export const MAX_BULK_IMEIS = 100;
@@ -106,22 +107,69 @@ export function buildInputs(fields: ServiceField[], values: Record<string, strin
 
 export type QuantityRule = { kind: "fixed"; value: number } | { kind: "options"; options: number[] } | { kind: "range"; min: number; max: number };
 
-/** How the quantity is chosen: a fixed one, one of `qtyOptions`, or a number from min to max. */
-export function quantityRule(service: { minQty: number; maxQty: number; qtyOptions: number[] }): QuantityRule {
-  if (service.qtyOptions.length > 0) return { kind: "options", options: service.qtyOptions };
-  if (service.minQty >= service.maxQty) return { kind: "fixed", value: service.minQty };
-  return { kind: "range", min: service.minQty, max: service.maxQty };
+/**
+ * How the quantity is chosen, decided by `quantityMode` of lib/quantity.ts (plan D17, BH §14.2): two or more packs are
+ * `options`; one pack, an exact N and "one per order" are `fixed` (nothing to choose); else a `range` from min to max.
+ */
+export function quantityRule(service: { minQty: number; maxQty: number; qtyOptions: readonly number[] }): QuantityRule {
+  const mode = quantityMode(fromMerchantRule(service));
+  switch (mode.kind) {
+    case "single":
+      return { kind: "fixed", value: 1 };
+    case "exact":
+      return { kind: "fixed", value: mode.value };
+    case "packs":
+      return { kind: "options", options: mode.options };
+    case "range":
+      return { kind: "range", min: mode.min, max: mode.max };
+  }
 }
 
-/** Reads a typed quantity: a whole number within the rule, else null. */
+/** The quantity a form shows first: the fixed one, the smallest pack, or the range's minimum (what the API orders without `quantity`). */
+export function defaultQuantityOf(rule: QuantityRule): number {
+  return rule.kind === "fixed" ? rule.value : rule.kind === "options" ? rule.options[0] : rule.min;
+}
+
+/** Reads a typed quantity (Arabic-Indic digits too): a whole number the rule accepts, else null. A fixed rule is always its value. */
 export function parseQuantity(text: string, rule: QuantityRule): number | null {
   if (rule.kind === "fixed") return rule.value;
-  const t = text.trim();
-  if (!/^\d+$/.test(t)) return null;
-  const n = Number(t);
-  if (!Number.isSafeInteger(n)) return null;
+  const n = parseQuantityInput(text);
+  if (n === null) return null;
   if (rule.kind === "options") return rule.options.includes(n) ? n : null;
-  return n >= rule.min && n <= rule.max ? n : null;
+  return isAllowedQuantity({ min: rule.min, max: rule.max, options: [] }, n) ? n : null;
+}
+
+// ── One submission, one key ────────────────────────────────────────────────────────────────────────────────
+
+/** A JSON text of `value` with object keys sorted at every level (arrays keep their order). */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item === undefined ? null : item)).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+/**
+ * The signature of an order request for `createIdempotencyKeys().keyFor()`: equal bodies give the same text whatever
+ * the order of their keys, and any change (an IMEI, the quantity, one input, the file, the IMEI order of a bulk list)
+ * gives another. The same signature keeps the same `Idempotency-Key`, so a retry or a double click replays the first
+ * answer; a changed form takes a new key (a reused key with another body is 409 IDEMPOTENCY_KEY_REUSED).
+ */
+export function orderSignature(body: MerchantOrderInput): string {
+  return canonicalJson(body);
+}
+
+/** The most `409 IDEMPOTENCY_IN_PROGRESS` waits before the form gives up and lets the person try again (same key). */
+export const MAX_IN_PROGRESS_RETRIES = 3;
+
+/** How long to wait after `409 IDEMPOTENCY_IN_PROGRESS`: the `Retry-After` seconds, at least 1 s and at most 10 s. */
+export function inProgressWaitMs(retryAfterSeconds: number | undefined): number {
+  const seconds = typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : 1;
+  return Math.min(Math.max(Math.ceil(seconds), 1), 10) * 1000;
 }
 
 // ── API field errors → form state ──────────────────────────────────────────────────────────────────────────

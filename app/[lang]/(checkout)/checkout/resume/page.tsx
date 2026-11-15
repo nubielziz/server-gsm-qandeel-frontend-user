@@ -96,10 +96,12 @@ async function Resume({ searchParams }: { searchParams: Promise<SearchParams> })
   // The service may be listed in this language, the other one, or no longer at all.
   const [config, own] = await Promise.all([getStoreConfig(), slugForService(session.service.id, locale)]);
   const other = own ? null : await slugForService(session.service.id, otherLocale(locale));
+  // The new checkout keeps the quantity of the unfinished one: the form checks it against today's rule.
+  const quantityQuery = `&quantity=${session.quantity}`;
   const href = own
-    ? `${p("/checkout")}?service=${encodeURIComponent(own)}`
+    ? `${p("/checkout")}?service=${encodeURIComponent(own)}${quantityQuery}`
     : other
-      ? `${localePath(otherLocale(locale), "/checkout")}?service=${encodeURIComponent(other)}`
+      ? `${localePath(otherLocale(locale), "/checkout")}?service=${encodeURIComponent(other)}${quantityQuery}`
       : null;
   const decimals = config.currencies.find((currency) => currency.code === session.currency)?.decimals ?? 2;
 
