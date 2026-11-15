@@ -10,12 +10,13 @@
 // "(n) " (lib/notifications/title-badge.ts).
 import Link from "next/link";
 import { Bell as BellIcon } from "lucide-react";
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
 import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { unreadText, unreadTextInline, type NotificationSurface } from "@/lib/notifications/link";
 import { unreadStore } from "@/lib/notifications/unread-store";
+import { playRing } from "@/lib/notifications/bell-ring";
 import { useBellMotion, useTitleBadge } from "./use-bell-motion";
 
 export type BellProps = {
@@ -43,7 +44,13 @@ export function Bell({ surface, locale, href, initialCount, labels }: BellProps)
 
   const count = polled ?? initialCount ?? 0;
   const text = unreadText(count, locale);
-  const { view, onAnimationEnd } = useBellMotion(surface, count, text);
+  const { view, onAnimationEnd, settle } = useBellMotion(surface, count, text);
+  const iconRef = useRef<SVGSVGElement>(null);
+  // The swing is played on the same icon element each time (lib/notifications/bell-ring.ts): never a remount.
+  useEffect(() => {
+    if (!view.ring || !iconRef.current) return;
+    return playRing(iconRef.current, () => settle("bell-ring"));
+  }, [view.ring, view.rings, settle]);
   // In an Arabic title "99+" must stay one left-to-right unit, or its "+" lands on the wrong side.
   useTitleBadge(count, locale === "ar" ? unreadTextInline(count, locale) : text);
   return (
@@ -55,12 +62,9 @@ export function Bell({ surface, locale, href, initialCount, labels }: BellProps)
         "transition-colors hover:bg-surface-muted",
       )}
     >
-      {/* A new ring gets a new key, so the swing starts again from rest. It pivots on the top centre: symmetric, so RTL needs nothing. */}
-      <BellIcon
-        key={view.rings}
-        aria-hidden="true"
-        className={cn("size-5", view.ring && "origin-top motion-safe:animate-bell-ring")}
-      />
+      {/* One icon element for good: the swing is played on it (playRing), never by a remount. It pivots on the top centre:
+          symmetric, so RTL needs nothing. */}
+      <BellIcon ref={iconRef} aria-hidden="true" className="size-5 origin-top" />
       {count > 0 ? (
         <span
           key={view.popKey}

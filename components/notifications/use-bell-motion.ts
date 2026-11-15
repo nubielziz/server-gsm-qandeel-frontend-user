@@ -22,7 +22,12 @@ export function useBellMotion(
   surface: NotificationSurface,
   count: number,
   text: string,
-): { view: BellView; onAnimationEnd: (event: AnimationEvent<HTMLElement>) => void } {
+): {
+  view: BellView;
+  onAnimationEnd: (event: AnimationEvent<HTMLElement>) => void;
+  /** Sets one motion at rest by its name (the swing is played with the Web Animations API, which fires no animationend). */
+  settle: (name: string) => void;
+} {
   const subscribe = useCallback((listener: () => void) => bellMotion.subscribe(surface, listener), [surface]);
   const motion = useSyncExternalStore(subscribe, () => bellMotion.getSnapshot(surface), () => IDLE_MOTION);
   const [view, setView] = useState(() => initialBellView(count, text, motion));
@@ -34,7 +39,8 @@ export function useBellMotion(
     const name = event.animationName;
     setView((current) => settleBellView(current, name));
   }, []);
-  return { view: next, onAnimationEnd };
+  const settle = useCallback((name: string) => setView((current) => settleBellView(current, name)), []);
+  return { view: next, onAnimationEnd, settle };
 }
 
 /** Registers this bell's count for the hidden tab's title prefix; the registration ends with the bell. */
