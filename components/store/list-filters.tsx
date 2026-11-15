@@ -4,9 +4,10 @@
 // checkbox with how many services it would show; several options of one list add up. A GET form, so it works without
 // JavaScript (its Apply button shows only then). With
 // JavaScript a change applies at once (a checkbox when ticked, the slider when released) without moving the page, so
-// the list updates beside it. Rendered twice: in the sidebar and in the phone drawer, which stays open while options are
-// picked. The ticks follow the URL: a filter removed elsewhere (a chip) clears its box here too.
-import { useId, useRef, useState, type FormEvent } from "react";
+// the list updates beside it. The sidebar's copy is server-rendered; the phone drawer's (`LazyListFilters`) mounts when the
+// drawer first opens and stays while options are picked (one form in the HTML, plan P3.4). The ticks follow the URL: a
+// filter removed elsewhere (a chip) clears its box here too.
+import { useCallback, useId, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -188,4 +189,31 @@ export function ListFilters({ action, keep, top, price, groups, locale, labels, 
       ) : null}
     </form>
   );
+}
+
+/** Calls `onChange` whenever the dialog with this id opens or closes (its `open` attribute). */
+function watchOpen(dialogId: string, onChange: () => void): () => void {
+  const dialog = document.getElementById(dialogId);
+  if (!dialog) return () => {};
+  const observer = new MutationObserver(onChange);
+  observer.observe(dialog, { attributes: true, attributeFilter: ["open"] });
+  return () => observer.disconnect();
+}
+
+const isOpen = (dialogId: string) => document.getElementById(dialogId)?.hasAttribute("open") ?? false;
+const closedOnServer = () => false;
+
+/**
+ * The filter form inside the phone drawer: nothing until the dialog `dialogId` first opens, then the form, kept mounted
+ * (closed and opened again, it shows the same state at once). Mounting on open keeps a second copy of the form out of
+ * the page's HTML (plan P3.4). The open attribute is watched, so it does not matter what opened the dialog; React renders
+ * the form in the same task, before the opened dialog is painted. Open the drawer with a click handler only
+ * (`DialogTrigger native={false}`): before hydration it would be empty.
+ */
+export function LazyListFilters({ dialogId, ...props }: ListFiltersProps & { dialogId: string }) {
+  const subscribe = useCallback((onChange: () => void) => watchOpen(dialogId, onChange), [dialogId]);
+  const open = useSyncExternalStore(subscribe, () => isOpen(dialogId), closedOnServer);
+  const [mounted, setMounted] = useState(false);
+  if (open && !mounted) setMounted(true);
+  return mounted ? <ListFilters {...props} /> : null;
 }

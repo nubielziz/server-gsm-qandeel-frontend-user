@@ -1,7 +1,11 @@
 // The browsable service list shared by the home page ("All services", mockup "All Products") and the catalog page
-// (`/services`): a filter sidebar (Categories with how many services each has, "In stock only", a price range, service
-// type, brand, carrier and country, each option with how many services it would leave; a drawer on phones), a search
-// box, a sort control, chips, the cards and page links. The rows and their total come from the API, which filters,
+// (`/services`): on the catalog a filter sidebar (Categories with how many services each has, "In stock only", a price
+// range, service type, brand, carrier and country, each option with how many services it would leave; a drawer on
+// phones), a search box, a sort control, chips, the cards and page links. The home list has no filter panel: its
+// "Filters" button is a link to the catalog with the same filters (owner decision, plan P3.4).
+// One filter form in the HTML (plan P3.4): the sidebar's (`lg` up). The phone drawer mounts its own copy when it first
+// opens (`LazyListFilters`), so its trigger is a plain click handler (`native={false}`: before hydration the drawer is
+// empty). Without JavaScript the drawer cannot open: a <noscript> style shows the sidebar on phones too, above the list. The rows and their total come from the API, which filters,
 // sorts and pages (lib/catalog.ts `catalogList`); the numbers beside the options are counted over the cached catalog.
 // Its state is the page URL (`?category=4-carrier-unlock&stock=1&type=imei&brand=Apple&brand=Samsung&max=20&sort=popular&page=2`):
 // it works without JavaScript and can be shared. It reads `searchParams` and the currency cookie, so render it inside
@@ -27,7 +31,7 @@ import { store } from "@/lib/i18n/messages/store";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { ActiveFilters, type FilterChip } from "./active-filters";
 import { serviceCardLabels } from "./card-labels";
-import { ListFilters, type FilterGroup } from "./list-filters";
+import { LazyListFilters, ListFilters, type FilterGroup, type ListFiltersProps } from "./list-filters";
 import { ListToolbar } from "./list-toolbar";
 import { allParams, firstParam, intParam, type SearchParams } from "./search-params";
 import { ServiceCard, ServiceCardMini, ServiceCardMiniSkeleton, ServiceCardSkeleton } from "./service-card";
@@ -40,14 +44,25 @@ export type ServiceListConfig = {
   hash: string;
   /** `mini`: dense cards, 4 a row (home). `full`: ServiceCard, 3 a row (catalog). */
   cards: "mini" | "full";
-  /** Id of the phone filter drawer (unique on the page). */
-  drawerId: string;
+  /**
+   * Id of the phone filter drawer (unique on the page): the list has the filter panel (sidebar from `lg` up, drawer
+   * below). Left out (the home page): no panel, and "Filters" links to the catalog page with the same filters.
+   */
+  drawerId?: string;
 };
 
 /** The list's query parameters, as its links keep them (empty ones are left out). */
 export type ListState = Record<"q" | "min" | "max" | "sort" | "stock", string | undefined> & Record<FacetKey | "category", string[]>;
 
-const LAYOUT = "grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start";
+/** The list beside its filter sidebar (`lg` up); without a panel the list alone. */
+const LAYOUT = { panel: "grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start", none: "grid gap-6" } as const;
+
+/**
+ * Without JavaScript the drawer cannot open and holds no form: show the sidebar (`data-list-filters-aside`) at every
+ * width and hide the drawer's trigger (`data-list-filters-trigger`). Not in a cascade layer, so it wins over the
+ * `hidden` / `lg:block` utilities (Tailwind's `@layer utilities`).
+ */
+const NO_SCRIPT_CSS = "[data-list-filters-aside]{display:block}[data-list-filters-trigger]{display:none}";
 const GRIDS = {
   mini: "grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4",
   full: "grid gap-4 sm:grid-cols-2 xl:grid-cols-3",
@@ -192,7 +207,10 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
 
 export type ServiceListData = Awaited<ReturnType<typeof loadServiceList>>;
 
-/** Sidebar (drawer on phones), toolbar, chips, count, cards or the empty state, page links. */
+/**
+ * Sidebar (drawer on phones; with a `drawerId` only), toolbar (with "Filters": the drawer's button, or a link to the
+ * catalog), chips, count, cards or the empty state, page links.
+ */
 export function ServiceList({ data, config }: { data: ServiceListData; config: ServiceListConfig }) {
   const { locale, t, c, currency, sort, sorts, list, state, base, chips, top, groups, price, keep } = data;
   const count = (n: number) => plural(locale, n, t.catalog.results, formatNumber(n, locale));
@@ -200,37 +218,68 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
   const clear = { label: t.catalog.clear, href: base + config.hash };
   const cardLabels = serviceCardLabels(t, c);
   const start = (list.page - 1) * config.perPage;
+  const { drawerId } = config;
 
-  const filters = (
-    <ListFilters
-      action={base}
-      keep={[
-        ["q", state.q ?? ""],
-        ["sort", state.sort ?? ""],
-      ].filter((pair): pair is [string, string] => Boolean(pair[1]))}
-      top={top}
-      price={price}
-      groups={groups}
-      locale={locale}
-      labels={{
-        priceRange: t.home.products.priceRange,
-        minPrice: t.home.products.minPrice,
-        maxPrice: t.home.products.maxPrice,
-        showMore: t.home.products.showMore,
-        showLess: t.home.products.showLess,
-        apply: t.catalog.apply,
-        clear: t.catalog.clear,
-      }}
-      clearHref={filtered ? base : null}
-    />
+  const filters: ListFiltersProps = {
+    action: base,
+    keep: [
+      ["q", state.q ?? ""],
+      ["sort", state.sort ?? ""],
+    ].filter((pair): pair is [string, string] => Boolean(pair[1])),
+    top,
+    price,
+    groups,
+    locale,
+    labels: {
+      priceRange: t.home.products.priceRange,
+      minPrice: t.home.products.minPrice,
+      maxPrice: t.home.products.maxPrice,
+      showMore: t.home.products.showMore,
+      showLess: t.home.products.showLess,
+      apply: t.catalog.apply,
+      clear: t.catalog.clear,
+    },
+    clearHref: filtered ? base : null,
+  };
+
+  // "Filters" and how many are active: opens the drawer (catalog, phones) or links to the catalog (home).
+  const filtersLabel = (
+    <>
+      {t.catalog.filters}
+      {filtered ? (
+        <Badge tone="inverse" className="num px-1.5 py-0.5">
+          {formatNumber(chips.length, locale)}
+        </Badge>
+      ) : null}
+    </>
+  );
+  const filtersControl = drawerId ? (
+    <DialogTrigger
+      for={drawerId}
+      native={false}
+      variant="secondary"
+      className="lg:hidden"
+      startIcon={<SlidersHorizontal aria-hidden="true" />}
+      data-list-filters-trigger=""
+    >
+      {filtersLabel}
+    </DialogTrigger>
+  ) : (
+    <ButtonLink href={pageHref(localePath(locale, "/services"), state, 1)} variant="secondary" startIcon={<SlidersHorizontal aria-hidden="true" />}>
+      {filtersLabel}
+    </ButtonLink>
   );
 
   return (
     <>
-      <div className={LAYOUT}>
-        <aside aria-label={t.catalog.filters} className="hidden lg:block">
-          <Card className="p-4">{filters}</Card>
-        </aside>
+      <div className={drawerId ? LAYOUT.panel : LAYOUT.none}>
+        {drawerId ? (
+          <aside aria-label={t.catalog.filters} className="hidden lg:block" data-list-filters-aside="">
+            <Card className="p-4">
+              <ListFilters {...filters} />
+            </Card>
+          </aside>
+        ) : null}
 
         <div className="grid min-w-0 gap-4">
           <ListToolbar
@@ -247,16 +296,7 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
               sort: t.catalog.sort,
               sorts,
             }}
-            extra={
-              <DialogTrigger for={config.drawerId} variant="secondary" className="lg:hidden" startIcon={<SlidersHorizontal aria-hidden="true" />}>
-                {t.catalog.filters}
-                {filtered ? (
-                  <Badge tone="inverse" className="num px-1.5 py-0.5">
-                    {formatNumber(chips.length, locale)}
-                  </Badge>
-                ) : null}
-              </DialogTrigger>
-            }
+            extra={filtersControl}
           />
 
           <ActiveFilters label={t.catalog.active} chips={chips} clear={clear} />
@@ -286,9 +326,10 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
                     decimals={currency.decimals}
                     labels={cardLabels}
                     priority={i === 0 && list.page === 1}
+                    index={i}
                   />
                 ) : (
-                  <ServiceCardMini key={service.id} service={service} locale={locale} decimals={currency.decimals} labels={cardLabels} />
+                  <ServiceCardMini key={service.id} service={service} locale={locale} decimals={currency.decimals} labels={cardLabels} index={i} />
                 ),
               )}
             </div>
@@ -311,31 +352,40 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
         </div>
       </div>
 
-      <Drawer
-        id={config.drawerId}
-        title={t.catalog.filters}
-        description={t.catalog.filtersDescription}
-        footer={<DialogClose variant="primary">{t.catalog.apply}</DialogClose>}
-      >
-        {filters}
-      </Drawer>
+      {drawerId ? (
+        <>
+          <Drawer
+            id={drawerId}
+            title={t.catalog.filters}
+            description={t.catalog.filtersDescription}
+            footer={<DialogClose variant="primary">{t.catalog.apply}</DialogClose>}
+          >
+            <LazyListFilters dialogId={drawerId} {...filters} />
+          </Drawer>
+          <noscript>
+            <style>{NO_SCRIPT_CSS}</style>
+          </noscript>
+        </>
+      ) : null}
     </>
   );
 }
 
-/** The same layout while the list streams in: filter card, toolbar, count, a page of card skeletons. */
+/** The same layout while the list streams in: filter card (with a panel), toolbar, count, a page of card skeletons. */
 export function ServiceListSkeleton({ config, rows }: { config: ServiceListConfig; rows?: number }) {
   const Skel = config.cards === "full" ? ServiceCardSkeleton : ServiceCardMiniSkeleton;
   return (
-    <div className={LAYOUT} aria-busy="true">
-      <div aria-hidden="true" className="hidden gap-5 rounded-card border border-line bg-surface p-4 shadow-card lg:grid">
-        {[4, 1, 0, 4, 5].map((n, i) => (
-          <div key={i} className="grid gap-2">
-            <Skeleton className="h-4 w-24" />
-            {n === 0 ? <Skeleton className="h-12" /> : Array.from({ length: n }, (_, j) => <Skeleton key={j} className="h-6" />)}
-          </div>
-        ))}
-      </div>
+    <div className={config.drawerId ? LAYOUT.panel : LAYOUT.none} aria-busy="true">
+      {config.drawerId ? (
+        <div aria-hidden="true" className="hidden gap-5 rounded-card border border-line bg-surface p-4 shadow-card lg:grid">
+          {[4, 1, 0, 4, 5].map((n, i) => (
+            <div key={i} className="grid gap-2">
+              <Skeleton className="h-4 w-24" />
+              {n === 0 ? <Skeleton className="h-12" /> : Array.from({ length: n }, (_, j) => <Skeleton key={j} className="h-6" />)}
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div aria-hidden="true" className="grid min-w-0 gap-4">
         <div className="flex flex-wrap gap-x-4 gap-y-3">
           <Skeleton className="h-11 min-w-0 flex-[1_1_16rem]" />

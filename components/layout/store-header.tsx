@@ -5,6 +5,9 @@
 // categories in a `<details>` block, and the pickers.
 // Static shell: only the account area and the currency picker read request data, each inside its own <Suspense>. The
 // categories are a cached catalog read (components/layout/category-menu.tsx): a change shows when the cache turns over.
+// The two "All services" links use `prefetch={true}`: their prefetch carries the catalog's first page (cached, URL data),
+// so the list shows at once on the click (plan P3.1, Next docs "Optimizing prefetching"). The pill is hidden below `lg`
+// and the drawer link is not in the viewport while the drawer is closed, so each costs a server render only when seen.
 import { Headset, LayoutGrid, ScanSearch, Store, PackageSearch, LifeBuoy } from "lucide-react";
 import { localePath } from "@/lib/i18n/config";
 import { getLocale, getMessages } from "@/lib/i18n/server";
@@ -44,7 +47,8 @@ export async function StoreHeader() {
 
   const nav = (
     <>
-      <ButtonLink href={p("/services")} size="sm" pill startIcon={<LayoutGrid aria-hidden="true" />}>
+      {/* prefetch: the catalog's first page comes with the prefetch, not after the click (plan P3.1). */}
+      <ButtonLink href={p("/services")} prefetch size="sm" pill startIcon={<LayoutGrid aria-hidden="true" />}>
         {t.nav.allServices}
       </ButtonLink>
       <CategoryMenu
@@ -78,7 +82,7 @@ export async function StoreHeader() {
   const drawerContent = (
     <div className="grid gap-6">
       <nav aria-label={t.nav.label} className="grid gap-1">
-        <NavLink href={p("/services")} className={drawerLinkClasses}>
+        <NavLink href={p("/services")} prefetch className={drawerLinkClasses}>
           <LayoutGrid aria-hidden="true" />
           {t.nav.allServices}
         </NavLink>

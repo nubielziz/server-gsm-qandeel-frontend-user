@@ -1,7 +1,11 @@
 // Pieces of the service page and the quick view: FAQ accordion, the price block (unit price, "per unit", "From", the
 // packs), the facts rows (availability, delivery, quantity) and the merchant price hint.
+// The price (currency cookie) and the merchant hint (session) await `navigation()` first: they render on the click, never
+// in a prefetch, so every cookie read of the service page sits below it and a prefetch of a prerendered slug is served
+// from the static output (plan P3.2; Next docs "Optimizing prefetching", "Keep the prefetch static"). Each sits in its
+// own <Suspense>, whose fallback is what the prefetch shows.
 import type { ReactNode } from "react";
-import { cookies } from "next/headers";
+import { navigation } from "next/cache";
 import Link from "next/link";
 import { ChevronDown, CircleCheck, Clock, Hash, PackageCheck, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -12,8 +16,8 @@ import { demoteHeadings } from "./markdown-source";
 import { priceNotes } from "./card-labels";
 import { getStoreService } from "@/lib/api/public";
 import { apiSessionGet } from "@/lib/api/server";
-import { MERCHANT_CSRF_COOKIE } from "@/lib/api/session";
-import type { MerchantMe, MerchantServiceDetail, StoreServiceDetail } from "@/lib/api/types";
+import { getMerchant } from "@/lib/api/session";
+import type { MerchantServiceDetail, StoreServiceDetail } from "@/lib/api/types";
 import { getCurrency } from "@/lib/currency";
 import { formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
@@ -185,8 +189,12 @@ export function PriceBlock(props: PriceBlockProps) {
   );
 }
 
-/** The service price in the visitor's currency (cookie) with its notes: streams in behind `PriceBlock pending`. */
+/**
+ * The service price in the visitor's currency (cookie) with its notes: streams in behind `PriceBlock pending`, on the
+ * navigation (never in a prefetch; a direct load is unaffected).
+ */
 export async function ServicePrice({ slug }: { slug: string }) {
+  await navigation();
   const [locale, currency, t, c] = await Promise.all([getLocale(), getCurrency(), getMessages(store), getMessages(common)]);
   const service = await getStoreService(slug, { locale, currency: currency.code });
   if (!service) return null;
@@ -196,16 +204,17 @@ export async function ServicePrice({ slug }: { slug: string }) {
 /**
  * For a signed-in ACTIVE merchant only: what the merchant pays for this service (`GET /client/services/:id`), with a link
  * to the portal. Nothing for visitors, pending merchants or services the merchant cannot see (403/404). Reading it records
- * the merchant's listed price, which is intended (handoff §4.4).
+ * the merchant's listed price, which is intended (handoff §4.4). Personal: rendered on the navigation, per request, never
+ * cached or prefetched. The merchant comes from `getMerchant()` (no API call without the merchant's CSRF cookie, one per
+ * request however many parts ask).
  */
 export async function MerchantPriceHint({ serviceId }: { serviceId: number }) {
+  await navigation();
   const [locale, t] = await Promise.all([getLocale(), getMessages(store)]);
-  const jar = await cookies();
-  if (!jar.has(MERCHANT_CSRF_COOKIE)) return null;
   let service: MerchantServiceDetail | null = null;
   try {
-    const me = await apiSessionGet<MerchantMe>("/client/auth/me");
-    if (me.status === "active") service = await apiSessionGet<MerchantServiceDetail>(`/client/services/${serviceId}`);
+    const me = await getMerchant();
+    if (me?.status === "active") service = await apiSessionGet<MerchantServiceDetail>(`/client/services/${serviceId}`);
   } catch {
     // 401/403 (signed out, pending, not allowed) and 404 (service not on this merchant's list): no hint. Never break the page.
     service = null;

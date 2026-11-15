@@ -70,6 +70,11 @@ export type RequestOptions = {
   idempotencyKey?: string;
   signal?: AbortSignal;
   accept?: string;
+  /**
+   * `fetch(…, { keepalive: true })`: the request completes even if the page is closed or left meanwhile (a save the
+   * caller does not wait for, such as the language switch). Small bodies only (the browser caps them at 64 KiB).
+   */
+  keepalive?: boolean;
 };
 
 async function send(method: Method, path: string, options: RequestOptions = {}): Promise<Response> {
@@ -102,6 +107,7 @@ async function send(method: Method, path: string, options: RequestOptions = {}):
       body: payload,
       credentials: "include",
       signal: options.signal,
+      keepalive: options.keepalive,
       cache: "no-store",
     });
   } catch (error) {

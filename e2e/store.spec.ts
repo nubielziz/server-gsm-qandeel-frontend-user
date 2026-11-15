@@ -66,7 +66,7 @@ test.describe("home", () => {
     await expect(collections.getByText("8 services")).toBeVisible();
   });
 
-  test("all services: 8 per page, sidebar checkboxes with counts, search; the state is in the home URL", async ({ page, request, isMobile }) => {
+  test("all services: 8 per page, chips and search; the state is in the home URL; Filters opens the catalog", async ({ page, request, isMobile }) => {
     await page.goto("/en");
     const list = page.getByRole("region", { name: /^All services/ });
     await expect(list.getByRole("article")).toHaveCount(8);
@@ -76,25 +76,17 @@ test.describe("home", () => {
     await expect(page).toHaveURL(/\/en\?page=2#all-services$/);
     await expect(list.getByRole("article")).toHaveCount(3);
 
-    // Sidebar on a desktop, drawer on a phone. A ticked box applies at once and starts again at page 1; several
-    // options of one list add up.
-    if (isMobile) await list.getByRole("button", { name: /^Filters/ }).click();
-    const filters = isMobile ? page.getByRole("dialog", { name: "Filters" }) : list.getByRole("complementary", { name: "Filters" });
-    // "Categories" holds the API's real categories with their service count; the four service types sit under "Service type".
-    const category = (await apiCategories(request)).find((c) => c.serviceCount > 0);
-    expect(category, "the demo catalog has a category with services").toBeDefined();
-    await expect(filters.getByRole("group", { name: "Categories" }).getByRole("checkbox", { name: categoryCheckbox(category!) })).toBeVisible();
-    await expect(filters.getByRole("group", { name: "Service type" }).getByRole("checkbox", { name: /^IMEI check/ })).toBeVisible();
-    const brands = filters.getByRole("group", { name: "Brand" });
-    await expect(brands.getByText("(8)")).toBeVisible();
-    await brands.getByRole("checkbox", { name: /^Samsung/ }).check();
-    await expect(page).toHaveURL(/\/en\?brand=Samsung$/);
-    await expect(brands.getByRole("checkbox", { name: /^Samsung/ })).toBeChecked();
-    await brands.getByRole("checkbox", { name: /^Apple/ }).check();
-    await expect(page).toHaveURL(/\/en\?brand=Apple&brand=Samsung$/);
-    if (isMobile) await filters.getByRole("button", { name: "Show results" }).click();
+    // No filter panel on the home page (owner decision, plan P3.4): no sidebar, no drawer; "Filters" is a link to the
+    // catalog with the same filters.
+    await expect(list.getByRole("complementary", { name: "Filters" })).toHaveCount(0);
+    await expect(list.getByRole("button", { name: /^Filters/ })).toHaveCount(0);
+    await expect(list.getByRole("link", { name: /^Filters/ })).toHaveAttribute("href", "/en/services");
+
+    // Filters in the home URL still apply (several values of one list add up) and show as chips.
+    await page.goto("/en?brand=Apple&brand=Samsung");
     await expect(list.getByText("10 services")).toBeVisible();
     await expect(list.getByRole("link", { name: "Remove filter: Samsung" })).toBeVisible();
+    await expect(list.getByRole("link", { name: /^Filters/ })).toHaveAttribute("href", /^\/en\/services\?(?=.*\bbrand=Apple\b)(?=.*\bbrand=Samsung\b)/);
 
     // A chip removes one value; the search keeps the rest.
     await list.getByRole("link", { name: "Remove filter: Apple" }).click();
@@ -106,21 +98,39 @@ test.describe("home", () => {
     await expect(page).toHaveURL(/\/en\?brand=Samsung&q=kg\+lock#all-services$/);
     await expect(list.getByRole("article")).toHaveCount(1);
     await expect(list.getByText("Samsung KG Lock Fix")).toBeVisible();
+
+    // "Filters" opens the catalog with the same state, where the filter form is (sidebar on a desktop, drawer on a phone).
+    await list.getByRole("link", { name: /^Filters/ }).click();
+    await expect(page).toHaveURL(/\/en\/services\?(?=.*\bbrand=Samsung\b)(?=.*\bq=kg\+lock\b)/);
+    await expect(page.getByRole("heading", { level: 1, name: "All services" })).toBeVisible();
+    if (isMobile) await page.getByRole("button", { name: /^Filters/ }).click();
+    const filters = isMobile ? page.getByRole("dialog", { name: "Filters" }) : page.getByRole("complementary", { name: "Filters" });
+    // "Categories" holds the API's real categories with their service count; the four service types sit under "Service type".
+    const category = (await apiCategories(request)).find((c) => c.serviceCount > 0);
+    expect(category, "the demo catalog has a category with services").toBeDefined();
+    await expect(filters.getByRole("group", { name: "Categories" }).getByRole("checkbox", { name: categoryCheckbox(category!) })).toBeVisible();
+    await expect(filters.getByRole("group", { name: "Service type" }).getByRole("checkbox", { name: /^IMEI check/ })).toBeVisible();
+    await expect(filters.getByRole("group", { name: "Brand" }).getByRole("checkbox", { name: /^Samsung/ })).toBeChecked();
   });
 
-  test("all services: the price range filters by the shown price; the slider works with the keyboard", async ({ page, isMobile }) => {
+  test("all services: a price range in the home URL filters by the shown price", async ({ page }) => {
     await page.goto("/en?max=14");
     const list = page.getByRole("region", { name: /^All services/ });
     await expect(list.getByRole("article")).toHaveCount(6);
     await expect(list.getByRole("link", { name: "Remove filter: Price: $3 to $14" })).toBeVisible();
+  });
+
+  test("catalog: the price slider works with the keyboard", async ({ page, isMobile }) => {
     test.skip(isMobile, "the slider is the same component in the drawer");
-    const highest = list.getByRole("complementary", { name: "Filters" }).getByRole("slider", { name: "Maximum price" });
+    await page.goto("/en/services?max=14");
+    await expect(page.getByRole("article")).toHaveCount(6);
+    const highest = page.getByRole("complementary", { name: "Filters" }).getByRole("slider", { name: "Maximum price" });
     await expect(highest).toHaveValue("14");
     await highest.focus();
     await page.keyboard.press("ArrowRight");
     await page.keyboard.press("ArrowRight");
-    await expect(page).toHaveURL(/\/en\?max=16$/);
-    await expect(list.getByText("8 services")).toBeVisible();
+    await expect(page).toHaveURL(/\/en\/services\?max=16$/);
+    await expect(page.getByText("8 services", { exact: true }).first()).toBeVisible();
     await expect(highest).toBeFocused();
   });
 

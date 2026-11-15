@@ -1,6 +1,7 @@
 // A service page: art (the service's own picture, else brand logo, else type picture), title, chips, price (visitor
 // currency, with "per unit", "From" and the packs), availability, delivery and quantity rules, "Buy now", description,
-// requirements and FAQ. `params` is read behind <Suspense>; the price and the merchant hint stream in behind their own.
+// requirements and FAQ. `params` is read behind <Suspense>; the price and the merchant hint stream in behind their own
+// and wait for the navigation (`navigation()`), so a prefetch of a prerendered slug is served from the static output.
 // A slug of the other language redirects to this language's slug of the same service (through its `alternates`), else
 // 404; the language alternates of the metadata come from the same field.
 import { Suspense } from "react";
@@ -15,9 +16,8 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Markdown } from "@/components/ui/markdown";
 import { Skeleton } from "@/components/ui/skeleton";
-import { staticSlugParams } from "@/components/store/static-params";
 import { demoteHeadings } from "@/components/store/markdown-source";
-import { prerenderSlugs, resolveService } from "@/components/store/resolve-service";
+import { resolveService } from "@/components/store/resolve-service";
 import { ServiceArt } from "@/components/store/service-art";
 import {
   Accordion,
@@ -27,8 +27,8 @@ import {
   serviceFacts,
   serviceStockHint,
 } from "@/components/store/service-parts";
+import { serviceStaticParams } from "@/components/store/service-static-params";
 import { countryName } from "@/lib/countries";
-import { allListedServices } from "@/lib/catalog";
 import { localePath } from "@/lib/i18n/config";
 import { common } from "@/lib/i18n/messages/common";
 import { store } from "@/lib/i18n/messages/store";
@@ -58,20 +58,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-const MAX_STATIC_SLUGS = 50;
-
 /**
  * At most 50 services per language are prerendered (their content joins the static shell): the featured ones first, then
  * the API's order (plan D20). The rest render on demand, so a build through the shop host stays under its request limit.
+ * The quick view dialog prerenders the same slugs.
  */
 export async function generateStaticParams() {
-  try {
-    const rows = await allListedServices(await getLocale());
-    return staticSlugParams(prerenderSlugs(rows, MAX_STATIC_SLUGS));
-  } catch {
-    // The API is unreachable at build time: every service page renders on demand instead.
-    return staticSlugParams([]);
-  }
+  return serviceStaticParams();
 }
 
 export default function ServicePage(props: PageProps<"/[lang]/services/[slug]">) {
@@ -169,7 +162,14 @@ async function ServiceContent({ params }: { params: Promise<{ slug: string }> })
               </div>
               {buyable ? (
                 <div className="grid gap-3">
-                  <ButtonLink href={checkoutHref} size="lg" block endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}>
+                  {/* prefetch: the checkout's service summary and form come with the prefetch (plan P3.1). */}
+                  <ButtonLink
+                    href={checkoutHref}
+                    prefetch
+                    size="lg"
+                    block
+                    endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}
+                  >
                     {t.service.buyNow}
                   </ButtonLink>
                   <p className="text-small text-ink-subtle">{t.service.afterPay}</p>

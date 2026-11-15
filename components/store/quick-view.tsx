@@ -1,18 +1,18 @@
 // The quick view of a service, shown in a dialog over the page (app/[lang]/(store)/@modal/(.)quick-view/[slug]): its
 // title, a body (art, type and chips, summary, price in the visitor's currency with "per unit", "From" and the packs,
 // availability, delivery and quantity rules, description and requirements) and the actions (Buy now, full details).
-// Each part reads the route params and the currency cookie, so each streams in behind its own <Suspense>; the service
-// read is cached, so the parts share it. The mockup's stock number, favourites and cart do not exist in the API
-// (handoff §1.7).
+// Each part reads the route params, so each streams in behind its own <Suspense>; the service read is cached and shared
+// (no cookie), so for a prerendered slug the title, body and actions are in the static output and a prefetch carries
+// them. Only the price reads the currency cookie: it is `ServicePrice`, in its own <Suspense>, rendered on the click
+// (plan P3.3). The mockup's stock number, favourites and cart do not exist in the API (handoff §1.7).
+import { Suspense } from "react";
 import { ArrowRight, MapPin, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Markdown } from "@/components/ui/markdown";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getStoreService } from "@/lib/api/public";
 import type { StoreServiceDetail } from "@/lib/api/types";
 import { countryName } from "@/lib/countries";
-import { getCurrency } from "@/lib/currency";
 import { localePath } from "@/lib/i18n/config";
 import { common } from "@/lib/i18n/messages/common";
 import { store } from "@/lib/i18n/messages/store";
@@ -20,18 +20,24 @@ import { getLocale, getMessages } from "@/lib/i18n/server";
 import { demoteHeadings } from "./markdown-source";
 import { resolveService } from "./resolve-service";
 import { ServiceArt } from "./service-art";
-import { PriceBlock, serviceFacts, serviceStockHint } from "./service-parts";
+import { PriceBlock, ServicePrice, serviceFacts, serviceStockHint } from "./service-parts";
 
 type Params = Promise<{ slug: string }>;
 
-/** The service of the URL in this language and the visitor's currency; null when it is not listed in this language. */
+/**
+ * The service of the URL in this language; null when it is not listed in this language. A shared cached read (the base
+ * currency, no cookie): the title, texts and links do not depend on the visitor. The price comes from `ServicePrice`.
+ */
 async function load(params: Params) {
-  const [{ slug }, locale, currency] = await Promise.all([params, getLocale(), getCurrency()]);
-  const resolved = await resolveService(slug, locale, currency.code);
+  const [{ slug }, locale] = await Promise.all([params, getLocale()]);
+  const resolved = await resolveService(slug, locale);
   let service: StoreServiceDetail | null = resolved.kind === "found" ? resolved.service : null;
   // A slug of the other language: the same service in this language.
-  if (resolved.kind === "redirect") service = await getStoreService(resolved.slug, { locale, currency: currency.code });
-  return { locale, currency, service };
+  if (resolved.kind === "redirect") {
+    const own = await resolveService(resolved.slug, locale);
+    service = own.kind === "found" ? own.service : null;
+  }
+  return { locale, service };
 }
 
 /** The dialog's title: the service name. */
@@ -41,7 +47,7 @@ export async function QuickViewTitle({ params }: { params: Params }) {
 }
 
 export async function QuickViewBody({ params }: { params: Params }) {
-  const [{ locale, currency, service }, t, c] = await Promise.all([load(params), getMessages(store), getMessages(common)]);
+  const [{ locale, service }, t, c] = await Promise.all([load(params), getMessages(store), getMessages(common)]);
   if (!service) return <p className="text-body text-ink-muted">{t.quickView.missingText}</p>;
 
   const chips = [service.brand, service.network, service.country ? countryName(service.country, locale) : ""].filter(Boolean);
@@ -79,7 +85,9 @@ export async function QuickViewBody({ params }: { params: Params }) {
           <div>
             <p className="text-small font-semibold text-ink-muted">{t.service.priceLabel}</p>
             <div className="mt-1">
-              <PriceBlock price={service.price} decimals={currency.decimals} rule={service.quantity} locale={locale} q={c.quantity} t={t.service} />
+              <Suspense fallback={<PriceBlock pending rule={service.quantity} locale={locale} q={c.quantity} t={t.service} />}>
+                <ServicePrice slug={service.slug} />
+              </Suspense>
             </div>
             <p className="mt-1.5 text-caption text-ink-subtle">{t.service.taxNote}</p>
           </div>
@@ -137,7 +145,8 @@ export async function QuickViewActions({ params }: { params: Params }) {
       {service.type === "file" ? (
         <ButtonLink href={localePath(locale, "/support")}>{t.service.fileCta}</ButtonLink>
       ) : (
-        <ButtonLink href={`${localePath(locale, "/checkout")}?service=${slug}`} startIcon={<ShoppingCart aria-hidden="true" />}>
+        // prefetch: the checkout's service summary and form come with the prefetch (plan P3.1).
+        <ButtonLink href={`${localePath(locale, "/checkout")}?service=${slug}`} prefetch startIcon={<ShoppingCart aria-hidden="true" />}>
           {t.service.buyNow}
         </ButtonLink>
       )}

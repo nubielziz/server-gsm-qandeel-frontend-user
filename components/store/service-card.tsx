@@ -6,6 +6,11 @@
 // row (ServiceCardMini, reserved for every card) and never changes their height. The delivery time is the staff note
 // or the minutes in the page's language (lib/store/delivery.ts).
 // ServiceCardMini is the dense variant for side lists and the home list (mockup "New Arrivals", "All Products").
+// In a browsable list (`index` given) the first PREFETCH_CARDS title links and quick view links use `prefetch={true}`:
+// their prefetch carries the service page's or the quick view's content (static output for a prerendered slug; the price
+// waits for the navigation), so the page or the dialog's title shows at once on a tap. The others keep the default
+// prefetch of the route's shell, which leaves out the slug's content: a per-link prefetch for every card of a long grid
+// would cost one request each (plan P3.2, P3.3, Next docs "Optimizing prefetching", "Trade-offs").
 import Link from "next/link";
 import { CircleCheck, Clock, Eye, MapPin, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +51,17 @@ export type ServiceCardProps = {
   labels: ServiceCardLabels;
   /** Marks the card art as the page's main image (preload). At most one per page. */
   priority?: boolean;
+  /** The card's place in its list (0 first): the first PREFETCH_CARDS prefetch their page's and quick view's content. Left out: default prefetch. */
+  index?: number;
 };
+
+/** How many cards of a list prefetch their service page's and quick view's content (`prefetch={true}` on both links). */
+export const PREFETCH_CARDS = 4;
+
+/** The title and quick view links' prefetch: the route's content for the first cards of a list, else Next's default (`"auto"`). */
+export function cardPrefetch(index: number | undefined): true | "auto" {
+  return index !== undefined && index < PREFETCH_CARDS ? true : "auto";
+}
 
 /** The box of both card sizes: lifts on hover and shows the focus ring of its stretched title link. */
 const frame =
@@ -69,15 +84,23 @@ const links = (service: StoreServiceCard, locale: Locale) => ({
 
 /**
  * The quick view link: opens the service in a dialog over the current page (an intercepted route, see
- * app/[lang]/(store)/@modal); opened directly it is the service page. Keeps the scroll position.
+ * app/[lang]/(store)/@modal); opened directly it is the service page. Keeps the scroll position. The first cards of a
+ * list prefetch the dialog's title, body and actions like their title link (`cardPrefetch`, plan P3.3).
  */
-function QuickViewLink({ service, locale, labels, className }: Pick<ServiceCardProps, "service" | "locale" | "labels"> & { className?: string }) {
+function QuickViewLink({
+  service,
+  locale,
+  labels,
+  index,
+  className,
+}: Pick<ServiceCardProps, "service" | "locale" | "labels" | "index"> & { className?: string }) {
   return (
     <IconButtonLink
       href={localePath(locale, `/quick-view/${encodeURIComponent(service.slug)}`)}
       label={fmt(labels.quickView, { title: service.title })}
       size="sm"
       scroll={false}
+      prefetch={cardPrefetch(index)}
       className={cn("z-10", className)}
     >
       <Eye aria-hidden="true" />
@@ -114,7 +137,7 @@ function InStock({ service, labels }: Pick<ServiceCardProps, "service" | "labels
   );
 }
 
-export function ServiceCard({ service, locale, decimals, labels, priority }: ServiceCardProps) {
+export function ServiceCard({ service, locale, decimals, labels, priority, index }: ServiceCardProps) {
   const { href, orderHref } = links(service, locale);
   const place = [service.network, service.country ? countryName(service.country, locale) : ""].filter(Boolean).join(" · ");
   const time = deliveryTime(service, locale).text;
@@ -122,7 +145,7 @@ export function ServiceCard({ service, locale, decimals, labels, priority }: Ser
     <article className={cn(frame, "p-4")}>
       <div className="flex h-12 items-center gap-3">
         <ServiceMark type={service.type} imageUrl={service.imageUrl} brand={service.brand} priority={priority} />
-        <QuickViewLink service={service} locale={locale} labels={labels} className="-me-2 self-start" />
+        <QuickViewLink service={service} locale={locale} labels={labels} index={index} className="-me-2 self-start" />
       </div>
       <div className="mt-3.5 flex h-[1.375rem] items-center gap-2 overflow-hidden">
         <Badge shape="tag" caps>
@@ -132,7 +155,11 @@ export function ServiceCard({ service, locale, decimals, labels, priority }: Ser
       </div>
       <div className={cn("mt-2", BODY_BLOCK)}>
         <h3 className="text-subheading font-bold text-ink">
-          <Link href={href} className="card-link line-clamp-2 rounded-badge after:absolute after:inset-0 focus-visible:outline-none">
+          <Link
+            href={href}
+            prefetch={cardPrefetch(index)}
+            className="card-link line-clamp-2 rounded-badge after:absolute after:inset-0 focus-visible:outline-none"
+          >
             {service.title}
           </Link>
         </h3>
@@ -218,17 +245,21 @@ export function ServiceGridSkeleton({ count = 8, className }: { count?: number; 
  * The dense card: art, brand, a 2-line title, a 2-line summary, the delivery time (and the "In stock" mark), the price
  * and a square order link.
  */
-export function ServiceCardMini({ service, locale, decimals, labels }: Omit<ServiceCardProps, "priority">) {
+export function ServiceCardMini({ service, locale, decimals, labels, index }: Omit<ServiceCardProps, "priority">) {
   const { href, orderHref } = links(service, locale);
   const time = deliveryTime(service, locale).text;
   return (
     <article className={cn(frame, "p-3.5")}>
       <div className="flex h-10 items-center gap-2.5">
         <ServiceMark type={service.type} imageUrl={service.imageUrl} brand={service.brand} size="sm" />
-        <QuickViewLink service={service} locale={locale} labels={labels} className="-me-2 -mt-1 self-start" />
+        <QuickViewLink service={service} locale={locale} labels={labels} index={index} className="-me-2 -mt-1 self-start" />
       </div>
       <h3 className="mt-3 text-small font-bold text-ink">
-        <Link href={href} className="card-link line-clamp-2 rounded-badge after:absolute after:inset-0 focus-visible:outline-none">
+        <Link
+          href={href}
+          prefetch={cardPrefetch(index)}
+          className="card-link line-clamp-2 rounded-badge after:absolute after:inset-0 focus-visible:outline-none"
+        >
           {service.title}
         </Link>
       </h3>

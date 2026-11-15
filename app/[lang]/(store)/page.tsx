@@ -135,7 +135,15 @@ async function ViewAll({ locale, sort }: { locale: Locale; sort?: Exclude<ListSo
   const c = await getMessages(common);
   const services = localePath(locale, "/services");
   return (
-    <ButtonLink href={sort ? `${services}?sort=${sort}` : services} variant="ghost" size="sm" className="-me-3.5 -mb-1.5" endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}>
+    // prefetch: the catalog's first page in this sort comes with the prefetch, so it shows at once on the click (plan P3.1).
+    <ButtonLink
+      href={sort ? `${services}?sort=${sort}` : services}
+      prefetch
+      variant="ghost"
+      size="sm"
+      className="-me-3.5 -mb-1.5"
+      endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}
+    >
       {c.actions.viewAll}
     </ButtonLink>
   );
