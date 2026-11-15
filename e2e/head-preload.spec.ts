@@ -1,5 +1,5 @@
 // The font preload is a <link> in the HTML <head>, also on a page the server has regenerated (perf plan P2.2).
-// `reactMaxHeadersLength: 0` (next.config.ts) makes React write every preload into the prerendered head instead of the
+// `reactMaxHeadersLength: 1` (next.config.ts) makes React write every preload into the prerendered head instead of the
 // `Link` response header. A regenerated entry drops that header, so Inter used to start about 600 ms late on catalog pages,
 // which revalidate every 30 s. HTTP-level checks plus one browser navigation; run it against a production build
 // (`E2E_BASE_URL=http://localhost:5176`): the dev server does not prerender.
