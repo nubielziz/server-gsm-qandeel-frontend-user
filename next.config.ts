@@ -49,9 +49,10 @@ const nextConfig: NextConfig = {
   // the wire (measured on /en: 157 KB against 48-73 KB). The value is fixed into the build: the Dockerfile build stage sets
   // `NEXT_COMPRESS=0`; every other build and a bare `next start` (lab, e2e) keep Next's gzip. docs/DEPLOY.md, section 7.
   compress: process.env.NEXT_COMPRESS !== "0",
-  // 0: React writes every preload (fonts) as a <link> in the prerendered <head> instead of a `Link` response header.
-  // A regenerated shell (catalog pages revalidate every 30 s) loses that header, which started Inter about 600 ms late.
-  reactMaxHeadersLength: 0,
+  // 1: no preload fits the header budget, so React writes every preload (fonts) as a <link> in the prerendered <head>
+  // instead of a `Link` response header. A regenerated shell (catalog pages revalidate every 30 s) loses that header,
+  // which started Inter about 600 ms late. Not 0: React logs an error on every request for a zero or negative value.
+  reactMaxHeadersLength: 1,
   turbopack: {
     // This app is its own root (an empty package-lock.json sits in the parent workspace folder).
     root: path.join(__dirname),
