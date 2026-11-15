@@ -81,6 +81,17 @@ export const account = defineMessages({
       browse: "Browse services",
     },
 
+    // My tickets (feature 28): the signed-in customer's own ticket list and the new-ticket page. The conversation itself is
+    // the token page (`/support/tickets/<token>`, texts in `messages/support.ts`).
+    tickets: {
+      metaTitle: "My tickets",
+      title: "My tickets",
+      subtitle: "Your conversations with our support team. Replies appear here as they are written.",
+      newMetaTitle: "New ticket",
+      newTitle: "New ticket",
+      newSubtitle: "Tell us what happened. Our team answers in the conversation, and we email you if you miss a reply.",
+    },
+
     settings: {
       metaTitle: "Settings",
       title: "Account settings",
@@ -256,6 +267,15 @@ export const account = defineMessages({
       emptyFilteredText: "لا يوجد حاليًا أي طلب من طلباتك بهذه الحالة.",
       showAll: "عرض كل الطلبات",
       browse: "تصفّح الخدمات",
+    },
+
+    tickets: {
+      metaTitle: "تذاكري",
+      title: "تذاكري",
+      subtitle: "محادثاتك مع فريق الدعم. تظهر الردود هنا فور كتابتها.",
+      newMetaTitle: "تذكرة جديدة",
+      newTitle: "تذكرة جديدة",
+      newSubtitle: "أخبرنا بما حدث. يجيبك فريقنا في المحادثة، ونرسل إليك بريدًا إلكترونيًا إن فاتك رد.",
     },
 
     settings: {

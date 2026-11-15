@@ -6,7 +6,8 @@
 // The wallet (plan F21, D7) shows as a nav item and a header pill when `walletCapabilities().show`: the shop switch is
 // on, or the customer still has a balance. The static nav reserves the wallet item's place and the read of the wallet
 // shows or drops it. The pill steps aside on phones (below `sm`), like the merchant's, so the bell and the account menu
-// fit at 360 px; the wallet is one tap away in the navigation. Support lives in the shop chrome (`/support`).
+// fit at 360 px; the wallet is one tap away in the navigation. "My tickets" (`/account/tickets`, feature 28) is the way into
+// support for a signed-in customer; the public form stays in the shop chrome (`/support`).
 import { Suspense } from "react";
 import Link from "next/link";
 import { Bell, ClipboardList, Headset, LayoutDashboard, Settings, Store, UserRound, Wallet } from "lucide-react";
@@ -67,7 +68,7 @@ export default async function AccountLayout({ children }: LayoutProps<"/[lang]/a
     label: t.customerNav.notifications,
     icon: <Bell aria-hidden="true" className={icon} />,
   };
-  const support: WorkspaceNavItem = { href: p("/support"), label: t.customerNav.support, icon: <Headset aria-hidden="true" className={icon} /> };
+  const tickets: WorkspaceNavItem = { href: p("/account/tickets"), label: t.customerNav.myTickets, icon: <Headset aria-hidden="true" className={icon} /> };
   const footerNav: WorkspaceNavItem[] = [
     { href: p("/account/settings"), label: t.customerNav.settings, icon: <Settings aria-hidden="true" className={icon} /> },
   ];
@@ -76,7 +77,7 @@ export default async function AccountLayout({ children }: LayoutProps<"/[lang]/a
   async function resolveNav() {
     const walletRead = await readCustomerWallet();
     const shows = walletRead.ok && walletCapabilities(walletRead.data).show;
-    return { nav: shows ? [overview, orders, wallet, notifications, support] : [overview, orders, notifications, support], footerNav };
+    return { nav: shows ? [overview, orders, wallet, notifications, tickets] : [overview, orders, notifications, tickets], footerNav };
   }
 
   async function resolveUser() {
@@ -87,7 +88,7 @@ export default async function AccountLayout({ children }: LayoutProps<"/[lang]/a
   return (
     <WorkspaceShell
       // The static shell assumes the wallet shows: its place is held, and `resolveNav` drops the slot when it does not.
-      nav={[overview, orders, { ...wallet, reserve: true }, notifications, support]}
+      nav={[overview, orders, { ...wallet, reserve: true }, notifications, tickets]}
       footerNav={footerNav}
       resolveNav={resolveNav}
       areaLabel={t.customerArea}

@@ -171,7 +171,7 @@ test.describe("customer", () => {
     // The leader closes: the lock passes to the other tab, which opens a stream with the cursor of the last item.
     await page.close();
     await expect.poll(() => streams.length, { timeout: 15_000 }).toBe(2);
-    expect(streams[1]).toMatch(/^\?locale=en&cursor=i\d+$/);
+    expect(streams[1]).toMatch(/^\?locale=en&cursor=i\d+(-t\d+)?$/);
     await second.waitForTimeout(500);
 
     const next = `Shared two ${tag()}`;

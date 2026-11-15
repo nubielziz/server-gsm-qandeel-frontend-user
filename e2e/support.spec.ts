@@ -105,14 +105,14 @@ async function fillTicket(page: Page, values: { email?: string; subject: string;
 test.describe("new ticket form", () => {
   test.beforeEach(async ({ page }) => stubTurnstile(page));
 
-  test("shows the form, the side cards and says there is no ticket list", async ({ page }) => {
+  test("shows the form, the side cards and points signed-in customers to My tickets", async ({ page }) => {
     await go(page, "/en/support");
     await expect(page.getByRole("heading", { level: 1, name: "Contact support" })).toBeVisible();
     await expect(page.locator('input[name="email"]')).toBeVisible();
     await expect(page.locator('select[name="category"] option')).toHaveCount(8);
     await expect(page.getByRole("link", { name: /Open the help center/ })).toHaveAttribute("href", "/en/help");
     await expect(page.getByRole("link", { name: /Track an order/ }).first()).toBeVisible();
-    await expect(page.getByText(/no ticket list on this site/)).toBeVisible();
+    await expect(page.getByText(/Your tickets are also under My tickets in your account/)).toBeVisible();
     // Attachments are not supported by the API: no file inputs or attach buttons.
     await expect(page.locator('input[type="file"]')).toHaveCount(0);
   });

@@ -1,7 +1,7 @@
 // Contact support (public, in the shop frame): a new-ticket form with Turnstile and three side cards. The page frame
 // and the side cards are static; the form needs the signed-in customer's email and `?order=` (cookies and
-// searchParams), so it streams behind <Suspense> with a same-size skeleton. There is NO ticket list in the API: the
-// way back to a ticket is the link in its email, and the page says so.
+// searchParams), so it streams behind <Suspense> with a same-size skeleton. A guest has no ticket list: the way back to a
+// ticket is the link in its email; a signed-in customer also finds theirs under "My tickets". The page says both.
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";

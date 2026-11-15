@@ -1204,6 +1204,217 @@ export type PostClientTelegramLinkResponse = {
   expiresAt: IsoDateTime;
 };
 
+// ── GET /client/tickets — My support tickets
+export type GetClientTicketsQuery = {
+  /** First row to return (0-based, inclusive). Default 0. */
+  _start?: number;
+  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 50 rows. */
+  _end?: number;
+  /** Comma-separated sort fields. Allowed: updatedAt, createdAt. Default: updatedAt desc. */
+  _sort?: string;
+  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
+  _order?: string;
+  /** Keep rows where status equals (repeat the key for IN) the value. */
+  status?: Array<"new" | "open" | "pending" | "resolved">;
+};
+/** 200 */
+export type GetClientTicketsResponse = Array<{
+  /** The ticket number to quote, 'T-1042' style. */
+  number: string;
+  subject: string;
+  category: "refund" | "delay" | "failed_unlock" | "billing" | "wrong_imei" | "howto" | "presale" | "other";
+  /** `pending` means the team waits for the customer. */
+  status: "new" | "open" | "pending" | "resolved";
+  /** The order the ticket is about, when it has one. */
+  orderId: Id | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  /** ISO 8601 UTC time with milliseconds. */
+  updatedAt: IsoDateTime;
+  /** When the newest message of the conversation was written, or null. */
+  lastMessageAt: IsoDateTime | null;
+  /** Who wrote it: `you` or `support`; null for a ticket without a message. Notes never count. */
+  lastMessageFrom: "you" | "support" | null;
+  /** True while support wrote a message the page has not marked as seen yet. */
+  hasUnread: boolean;
+  /** What the ticket routes of the portal take. */
+  id: Id;
+}>;
+
+// ── POST /client/tickets — Open a support ticket
+export type PostClientTicketsBody = {
+  subject: string;
+  /** The first message. May be `''` when `fileIds` has an entry. */
+  message: string;
+  /** Default `other`; the category sets the reply target. */
+  category?: "refund" | "delay" | "failed_unlock" | "billing" | "wrong_imei" | "howto" | "presale" | "other";
+  /** One of the caller's own orders, when the ticket is about one. */
+  orderId?: Id;
+  /** Files to attach, uploaded by the sender: each must be the sender's own PDF, JPEG or PNG of at most 5 MiB (`422` on `fileIds` with `unknown_file`, `not_yours`, `type` or `too_large`). */
+  fileIds?: Id[];
+};
+/** 201 */
+export type PostClientTicketsResponse = {
+  /** The ticket number to quote, 'T-1042' style. */
+  number: string;
+  subject: string;
+  category: "refund" | "delay" | "failed_unlock" | "billing" | "wrong_imei" | "howto" | "presale" | "other";
+  /** `pending` means the team waits for the customer. */
+  status: "new" | "open" | "pending" | "resolved";
+  /** The order the ticket is about, when it has one. */
+  orderId: Id | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  /** ISO 8601 UTC time with milliseconds. */
+  updatedAt: IsoDateTime;
+  resolvedAt: IsoDateTime | null;
+  /** Oldest first, without internal notes. */
+  messages: Array<{
+    /** Numeric record id. */
+    id: Id;
+    /** `you` is the requester, `support` is the team. */
+    from: "you" | "support";
+    /** May be `''` when the message is files only. */
+    body: string;
+    /** ISO 8601 UTC time with milliseconds. */
+    createdAt: IsoDateTime;
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    attachments?: Array<{
+      /** Numeric record id. */
+      id: Id;
+      /** The stored base name: the download is saved under it. Never shown inline. */
+      filename: string;
+      /** `application/pdf`, `image/jpeg` or `image/png`. */
+      mime: string;
+      /** Bytes, at most 5 MiB. */
+      size: number;
+    }>;
+  }>;
+  /** What the ticket routes of the portal take. */
+  id: Id;
+  /** The newest support message the merchant has seen (its own mark), or null. */
+  seenByYou: Id | null;
+  /** The newest message of the merchant that support has seen, or null: show `Seen` under it and the older ones. */
+  seenBySupport: Id | null;
+  /** When support saw it, or null. */
+  seenBySupportAt: IsoDateTime | null;
+};
+
+// ── GET /client/tickets/:id — A support ticket with its conversation
+export type GetClientTicketsByIdParams = {
+  /** The ticket. */
+  id: Id;
+};
+/** 200 */
+export type GetClientTicketsByIdResponse = {
+  /** The ticket number to quote, 'T-1042' style. */
+  number: string;
+  subject: string;
+  category: "refund" | "delay" | "failed_unlock" | "billing" | "wrong_imei" | "howto" | "presale" | "other";
+  /** `pending` means the team waits for the customer. */
+  status: "new" | "open" | "pending" | "resolved";
+  /** The order the ticket is about, when it has one. */
+  orderId: Id | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  /** ISO 8601 UTC time with milliseconds. */
+  updatedAt: IsoDateTime;
+  resolvedAt: IsoDateTime | null;
+  /** Oldest first, without internal notes. */
+  messages: Array<{
+    /** Numeric record id. */
+    id: Id;
+    /** `you` is the requester, `support` is the team. */
+    from: "you" | "support";
+    /** May be `''` when the message is files only. */
+    body: string;
+    /** ISO 8601 UTC time with milliseconds. */
+    createdAt: IsoDateTime;
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    attachments?: Array<{
+      /** Numeric record id. */
+      id: Id;
+      /** The stored base name: the download is saved under it. Never shown inline. */
+      filename: string;
+      /** `application/pdf`, `image/jpeg` or `image/png`. */
+      mime: string;
+      /** Bytes, at most 5 MiB. */
+      size: number;
+    }>;
+  }>;
+  /** What the ticket routes of the portal take. */
+  id: Id;
+  /** The newest support message the merchant has seen (its own mark), or null. */
+  seenByYou: Id | null;
+  /** The newest message of the merchant that support has seen, or null: show `Seen` under it and the older ones. */
+  seenBySupport: Id | null;
+  /** When support saw it, or null. */
+  seenBySupportAt: IsoDateTime | null;
+};
+
+// ── GET /client/tickets/:id/files/:fileId — Download an attachment of a support ticket
+export type GetClientTicketsByIdFilesByFileIdParams = {
+  /** The ticket. */
+  id: Id;
+  /** The attachment. */
+  fileId: Id;
+};
+/** 302 */
+export type GetClientTicketsByIdFilesByFileIdResponse = void;
+
+// ── POST /client/tickets/:id/messages — Write on a support ticket
+export type PostClientTicketsByIdMessagesParams = {
+  /** The ticket. */
+  id: Id;
+};
+export type PostClientTicketsByIdMessagesBody = {
+  body: string;
+  /** Files to attach, uploaded by the sender: each must be the sender's own PDF, JPEG or PNG of at most 5 MiB (`422` on `fileIds` with `unknown_file`, `not_yours`, `type` or `too_large`). */
+  fileIds?: Id[];
+};
+/** 201 */
+export type PostClientTicketsByIdMessagesResponse = {
+  /** Numeric record id. */
+  id: Id;
+  /** `you` is the requester, `support` is the team. */
+  from: "you" | "support";
+  /** May be `''` when the message is files only. */
+  body: string;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+  attachments?: Array<{
+    /** Numeric record id. */
+    id: Id;
+    /** The stored base name: the download is saved under it. Never shown inline. */
+    filename: string;
+    /** `application/pdf`, `image/jpeg` or `image/png`. */
+    mime: string;
+    /** Bytes, at most 5 MiB. */
+    size: number;
+  }>;
+};
+
+// ── POST /client/tickets/:id/read — Mark support’s messages as seen
+export type PostClientTicketsByIdReadParams = {
+  /** The ticket. */
+  id: Id;
+};
+export type PostClientTicketsByIdReadBody = {
+  /** The newest support message the thread shows. */
+  upToMessageId: Id;
+};
+/** 204 */
+export type PostClientTicketsByIdReadResponse = void;
+
+// ── POST /client/tickets/:id/typing — Tell support the merchant is typing
+export type PostClientTicketsByIdTypingParams = {
+  /** The ticket. */
+  id: Id;
+};
+/** 204 */
+export type PostClientTicketsByIdTypingResponse = void;
+
 // ── GET /client/wallet — My wallet
 /** 200 */
 export type GetClientWalletResponse = {
@@ -2082,6 +2293,106 @@ export type GetStoreV1MeStreamQuery = {
 /** 200 text/event-stream */
 export type GetStoreV1MeStreamResponse = Blob;
 
+// ── GET /store/v1/me/tickets — My support tickets
+export type GetStoreV1MeTicketsQuery = {
+  /** First row to return (0-based, inclusive). Default 0. */
+  _start?: number;
+  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 50 rows. */
+  _end?: number;
+  /** Comma-separated sort fields. Allowed: updatedAt, createdAt. Default: updatedAt desc. */
+  _sort?: string;
+  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
+  _order?: string;
+  /** Keep rows where status equals (repeat the key for IN) the value. */
+  status?: Array<"new" | "open" | "pending" | "resolved">;
+};
+/** 200 */
+export type GetStoreV1MeTicketsResponse = Array<{
+  /** The ticket number to quote, 'T-1042' style. */
+  number: string;
+  subject: string;
+  category: "refund" | "delay" | "failed_unlock" | "billing" | "wrong_imei" | "howto" | "presale" | "other";
+  /** `pending` means the team waits for the customer. */
+  status: "new" | "open" | "pending" | "resolved";
+  /** The order the ticket is about, when it has one. */
+  orderId: Id | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  /** ISO 8601 UTC time with milliseconds. */
+  updatedAt: IsoDateTime;
+  /** When the newest message of the conversation was written, or null. */
+  lastMessageAt: IsoDateTime | null;
+  /** Who wrote it: `you` or `support`; null for a ticket without a message. Notes never count. */
+  lastMessageFrom: "you" | "support" | null;
+  /** True while support wrote a message the page has not marked as seen yet. */
+  hasUnread: boolean;
+  /** The ticket link token: the page is `/support/tickets/<token>` and every `/store/v1/tickets/:token…` route takes it. A credential: never log or cache it. */
+  token: string;
+}>;
+
+// ── POST /store/v1/me/tickets — Open a support ticket when signed in
+export type PostStoreV1MeTicketsBody = {
+  subject: string;
+  /** The first message. May be `''` when `fileIds` has an entry. */
+  message: string;
+  /** Default `other`; the category sets the reply target. */
+  category?: "refund" | "delay" | "failed_unlock" | "billing" | "wrong_imei" | "howto" | "presale" | "other";
+  /** One of the caller's own orders, when the ticket is about one. */
+  orderId?: Id;
+  /** Files to attach, uploaded by the sender: each must be the sender's own PDF, JPEG or PNG of at most 5 MiB (`422` on `fileIds` with `unknown_file`, `not_yours`, `type` or `too_large`). */
+  fileIds?: Id[];
+};
+/** 201 */
+export type PostStoreV1MeTicketsResponse = {
+  /** The ticket number to quote, 'T-1042' style. */
+  number: string;
+  subject: string;
+  category: "refund" | "delay" | "failed_unlock" | "billing" | "wrong_imei" | "howto" | "presale" | "other";
+  /** `pending` means the team waits for the customer. */
+  status: "new" | "open" | "pending" | "resolved";
+  /** The order the ticket is about, when it has one. */
+  orderId: Id | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+  /** ISO 8601 UTC time with milliseconds. */
+  updatedAt: IsoDateTime;
+  resolvedAt: IsoDateTime | null;
+  /** The rating the customer gave, once. */
+  csatScore: number | null;
+  /** True while the ticket is resolved and not yet rated. */
+  canRate: boolean;
+  /** Oldest first, without internal notes. */
+  messages: Array<{
+    /** Numeric record id. */
+    id: Id;
+    /** `you` is the requester, `support` is the team. */
+    from: "you" | "support";
+    /** May be `''` when the message is files only. */
+    body: string;
+    /** ISO 8601 UTC time with milliseconds. */
+    createdAt: IsoDateTime;
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    attachments?: Array<{
+      /** Numeric record id. */
+      id: Id;
+      /** The stored base name: the download is saved under it. Never shown inline. */
+      filename: string;
+      /** `application/pdf`, `image/jpeg` or `image/png`. */
+      mime: string;
+      /** Bytes, at most 5 MiB. */
+      size: number;
+    }>;
+  }>;
+  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the console merge. */
+  seenByYou?: Id | null;
+  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the console merge. */
+  seenBySupport?: Id | null;
+  /** When support saw it, or null. Always sent; optional in the schema until the console merge. */
+  seenBySupportAt?: IsoDateTime | null;
+  /** The ticket link token: the page is `/support/tickets/<token>` and every `/store/v1/tickets/:token…` route takes it. A credential: never log or cache it. */
+  token: string;
+};
+
 // ── GET /store/v1/me/wallet — My store balance
 /** 200 */
 export type GetStoreV1MeWalletResponse = {
@@ -2759,10 +3070,28 @@ export type PostStoreV1TicketsResponse = {
     id: Id;
     /** `you` is the requester, `support` is the team. */
     from: "you" | "support";
+    /** May be `''` when the message is files only. */
     body: string;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    attachments?: Array<{
+      /** Numeric record id. */
+      id: Id;
+      /** The stored base name: the download is saved under it. Never shown inline. */
+      filename: string;
+      /** `application/pdf`, `image/jpeg` or `image/png`. */
+      mime: string;
+      /** Bytes, at most 5 MiB. */
+      size: number;
+    }>;
   }>;
+  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the console merge. */
+  seenByYou?: Id | null;
+  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the console merge. */
+  seenBySupport?: Id | null;
+  /** When support saw it, or null. Always sent; optional in the schema until the console merge. */
+  seenBySupportAt?: IsoDateTime | null;
   /** The ticket token. Present only when `orderToken` was given; with `email` alone it is left out. */
   token?: string;
 };
@@ -2797,10 +3126,28 @@ export type GetStoreV1TicketsByTokenResponse = {
     id: Id;
     /** `you` is the requester, `support` is the team. */
     from: "you" | "support";
+    /** May be `''` when the message is files only. */
     body: string;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    attachments?: Array<{
+      /** Numeric record id. */
+      id: Id;
+      /** The stored base name: the download is saved under it. Never shown inline. */
+      filename: string;
+      /** `application/pdf`, `image/jpeg` or `image/png`. */
+      mime: string;
+      /** Bytes, at most 5 MiB. */
+      size: number;
+    }>;
   }>;
+  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the console merge. */
+  seenByYou?: Id | null;
+  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the console merge. */
+  seenBySupport?: Id | null;
+  /** When support saw it, or null. Always sent; optional in the schema until the console merge. */
+  seenBySupportAt?: IsoDateTime | null;
 };
 
 // ── POST /store/v1/tickets/:token/csat — Rate a resolved support ticket
@@ -2836,11 +3183,62 @@ export type PostStoreV1TicketsByTokenCsatResponse = {
     id: Id;
     /** `you` is the requester, `support` is the team. */
     from: "you" | "support";
+    /** May be `''` when the message is files only. */
     body: string;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    attachments?: Array<{
+      /** Numeric record id. */
+      id: Id;
+      /** The stored base name: the download is saved under it. Never shown inline. */
+      filename: string;
+      /** `application/pdf`, `image/jpeg` or `image/png`. */
+      mime: string;
+      /** Bytes, at most 5 MiB. */
+      size: number;
+    }>;
   }>;
+  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the console merge. */
+  seenByYou?: Id | null;
+  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the console merge. */
+  seenBySupport?: Id | null;
+  /** When support saw it, or null. Always sent; optional in the schema until the console merge. */
+  seenBySupportAt?: IsoDateTime | null;
 };
+
+// ── POST /store/v1/tickets/:token/files — Upload an attachment for a support ticket
+export type PostStoreV1TicketsByTokenFilesParams = {
+  /** The ticket token. */
+  token: string;
+};
+/** multipart/form-data with one part named `file`. */
+export type PostStoreV1TicketsByTokenFilesBody = FormData;
+/** 201 */
+export type PostStoreV1TicketsByTokenFilesResponse = {
+  /** What `fileIds` of the next message takes. */
+  id: Id;
+  /** The base name of the file, without control characters, at most 200 characters. */
+  filename: string;
+  /** Bytes, at most 5 MiB. */
+  size: number;
+  /** `application/pdf`, `image/jpeg` or `image/png`. */
+  mime: string;
+  /** Hex SHA-256 of the content. */
+  sha256: string;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+};
+
+// ── GET /store/v1/tickets/:token/files/:fileId — Download an attachment of a support ticket
+export type GetStoreV1TicketsByTokenFilesByFileIdParams = {
+  /** The ticket token. */
+  token: string;
+  /** The attachment. */
+  fileId: Id;
+};
+/** 302 */
+export type GetStoreV1TicketsByTokenFilesByFileIdResponse = void;
 
 // ── POST /store/v1/tickets/:token/messages — Write on a support ticket
 export type PostStoreV1TicketsByTokenMessagesParams = {
@@ -2849,6 +3247,8 @@ export type PostStoreV1TicketsByTokenMessagesParams = {
 };
 export type PostStoreV1TicketsByTokenMessagesBody = {
   body: string;
+  /** Files to attach, uploaded by the sender: each must be the sender's own PDF, JPEG or PNG of at most 5 MiB (`422` on `fileIds` with `unknown_file`, `not_yours`, `type` or `too_large`). */
+  fileIds?: Id[];
 };
 /** 201 */
 export type PostStoreV1TicketsByTokenMessagesResponse = {
@@ -2856,10 +3256,56 @@ export type PostStoreV1TicketsByTokenMessagesResponse = {
   id: Id;
   /** `you` is the requester, `support` is the team. */
   from: "you" | "support";
+  /** May be `''` when the message is files only. */
   body: string;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
+  /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+  attachments?: Array<{
+    /** Numeric record id. */
+    id: Id;
+    /** The stored base name: the download is saved under it. Never shown inline. */
+    filename: string;
+    /** `application/pdf`, `image/jpeg` or `image/png`. */
+    mime: string;
+    /** Bytes, at most 5 MiB. */
+    size: number;
+  }>;
 };
+
+// ── POST /store/v1/tickets/:token/read — Mark support’s messages as seen
+export type PostStoreV1TicketsByTokenReadParams = {
+  /** The ticket token. */
+  token: string;
+};
+export type PostStoreV1TicketsByTokenReadBody = {
+  /** The newest message of the other side the page shows. */
+  upToMessageId: Id;
+};
+/** 204 */
+export type PostStoreV1TicketsByTokenReadResponse = void;
+
+// ── GET /store/v1/tickets/:token/stream — Live events of a support ticket
+export type GetStoreV1TicketsByTokenStreamQuery = {
+  /** The page language (the events carry no text of their own). */
+  locale?: "en" | "ar";
+  /** The last event id the page saw (`t5521`), for a new stream that should replay what it missed. */
+  cursor?: string;
+};
+export type GetStoreV1TicketsByTokenStreamParams = {
+  /** The ticket token. */
+  token: string;
+};
+/** 200 text/event-stream */
+export type GetStoreV1TicketsByTokenStreamResponse = Blob;
+
+// ── POST /store/v1/tickets/:token/typing — Tell support the customer is typing
+export type PostStoreV1TicketsByTokenTypingParams = {
+  /** The ticket token. */
+  token: string;
+};
+/** 204 */
+export type PostStoreV1TicketsByTokenTypingResponse = void;
 
 /** Every /client and /store/v1 route: `ApiRoutes['GET /store/v1/services']['response']`. */
 export interface ApiRoutes {
@@ -2914,6 +3360,13 @@ export interface ApiRoutes {
   "DELETE /client/sessions/:id": { query: never; params: DeleteClientSessionsByIdParams; body: never; response: DeleteClientSessionsByIdResponse; status: 204 };
   "GET /client/stream": { query: GetClientStreamQuery; params: never; body: never; response: GetClientStreamResponse; status: 200 };
   "POST /client/telegram/link": { query: never; params: never; body: never; response: PostClientTelegramLinkResponse; status: 201 };
+  "GET /client/tickets": { query: GetClientTicketsQuery; params: never; body: never; response: GetClientTicketsResponse; status: 200 };
+  "POST /client/tickets": { query: never; params: never; body: PostClientTicketsBody; response: PostClientTicketsResponse; status: 201 };
+  "GET /client/tickets/:id": { query: never; params: GetClientTicketsByIdParams; body: never; response: GetClientTicketsByIdResponse; status: 200 };
+  "GET /client/tickets/:id/files/:fileId": { query: never; params: GetClientTicketsByIdFilesByFileIdParams; body: never; response: GetClientTicketsByIdFilesByFileIdResponse; status: 302 };
+  "POST /client/tickets/:id/messages": { query: never; params: PostClientTicketsByIdMessagesParams; body: PostClientTicketsByIdMessagesBody; response: PostClientTicketsByIdMessagesResponse; status: 201 };
+  "POST /client/tickets/:id/read": { query: never; params: PostClientTicketsByIdReadParams; body: PostClientTicketsByIdReadBody; response: PostClientTicketsByIdReadResponse; status: 204 };
+  "POST /client/tickets/:id/typing": { query: never; params: PostClientTicketsByIdTypingParams; body: never; response: PostClientTicketsByIdTypingResponse; status: 204 };
   "GET /client/wallet": { query: never; params: never; body: never; response: GetClientWalletResponse; status: 200 };
   "GET /client/wallet/statement": { query: GetClientWalletStatementQuery; params: never; body: never; response: GetClientWalletStatementResponse; status: 200 };
   "GET /client/webhooks": { query: GetClientWebhooksQuery; params: never; body: never; response: GetClientWebhooksResponse; status: 200 };
@@ -2952,6 +3405,8 @@ export interface ApiRoutes {
   "GET /store/v1/me/orders": { query: GetStoreV1MeOrdersQuery; params: never; body: never; response: GetStoreV1MeOrdersResponse; status: 200 };
   "POST /store/v1/me/password": { query: never; params: never; body: PostStoreV1MePasswordBody; response: PostStoreV1MePasswordResponse; status: 204 };
   "GET /store/v1/me/stream": { query: GetStoreV1MeStreamQuery; params: never; body: never; response: GetStoreV1MeStreamResponse; status: 200 };
+  "GET /store/v1/me/tickets": { query: GetStoreV1MeTicketsQuery; params: never; body: never; response: GetStoreV1MeTicketsResponse; status: 200 };
+  "POST /store/v1/me/tickets": { query: never; params: never; body: PostStoreV1MeTicketsBody; response: PostStoreV1MeTicketsResponse; status: 201 };
   "GET /store/v1/me/wallet": { query: never; params: never; body: never; response: GetStoreV1MeWalletResponse; status: 200 };
   "GET /store/v1/me/wallet/statement": { query: GetStoreV1MeWalletStatementQuery; params: never; body: never; response: GetStoreV1MeWalletStatementResponse; status: 200 };
   "GET /store/v1/me/wallet/top-up-methods": { query: GetStoreV1MeWalletTopUpMethodsQuery; params: never; body: never; response: GetStoreV1MeWalletTopUpMethodsResponse; status: 200 };
@@ -2970,5 +3425,10 @@ export interface ApiRoutes {
   "POST /store/v1/tickets": { query: never; params: never; body: PostStoreV1TicketsBody; response: PostStoreV1TicketsResponse; status: 201 };
   "GET /store/v1/tickets/:token": { query: never; params: GetStoreV1TicketsByTokenParams; body: never; response: GetStoreV1TicketsByTokenResponse; status: 200 };
   "POST /store/v1/tickets/:token/csat": { query: never; params: PostStoreV1TicketsByTokenCsatParams; body: PostStoreV1TicketsByTokenCsatBody; response: PostStoreV1TicketsByTokenCsatResponse; status: 200 };
+  "POST /store/v1/tickets/:token/files": { query: never; params: PostStoreV1TicketsByTokenFilesParams; body: PostStoreV1TicketsByTokenFilesBody; response: PostStoreV1TicketsByTokenFilesResponse; status: 201 };
+  "GET /store/v1/tickets/:token/files/:fileId": { query: never; params: GetStoreV1TicketsByTokenFilesByFileIdParams; body: never; response: GetStoreV1TicketsByTokenFilesByFileIdResponse; status: 302 };
   "POST /store/v1/tickets/:token/messages": { query: never; params: PostStoreV1TicketsByTokenMessagesParams; body: PostStoreV1TicketsByTokenMessagesBody; response: PostStoreV1TicketsByTokenMessagesResponse; status: 201 };
+  "POST /store/v1/tickets/:token/read": { query: never; params: PostStoreV1TicketsByTokenReadParams; body: PostStoreV1TicketsByTokenReadBody; response: PostStoreV1TicketsByTokenReadResponse; status: 204 };
+  "GET /store/v1/tickets/:token/stream": { query: GetStoreV1TicketsByTokenStreamQuery; params: GetStoreV1TicketsByTokenStreamParams; body: never; response: GetStoreV1TicketsByTokenStreamResponse; status: 200 };
+  "POST /store/v1/tickets/:token/typing": { query: never; params: PostStoreV1TicketsByTokenTypingParams; body: never; response: PostStoreV1TicketsByTokenTypingResponse; status: 204 };
 }

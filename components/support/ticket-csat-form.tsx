@@ -1,7 +1,7 @@
 "use client";
 // TicketCsatForm: a 1-5 rating once the ticket is resolved (`POST /store/v1/tickets/:token/csat`, one rating per
-// ticket). Native radios, so the arrow keys and the group label work without extra code.
-import { useRouter } from "next/navigation";
+// ticket). Native radios, so the arrow keys and the group label work without extra code. The conversation owns the ticket's
+// state (feature 28): after the rating is saved it is told through `onSaved`, so there is no `router.refresh()`.
 import { useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api/browser";
 import { useErrorText } from "@/lib/i18n/error-text";
@@ -12,8 +12,16 @@ import { useFocusOnFeedback } from "@/components/auth/use-focus-on-feedback";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 
-export function TicketCsatForm({ token, t }: { token: string; t: SupportMessages["ticket"]["csat"] }) {
-  const router = useRouter();
+export function TicketCsatForm({
+  token,
+  t,
+  onSaved,
+}: {
+  token: string;
+  t: SupportMessages["ticket"]["csat"];
+  /** Called with the score after the API saved it. */
+  onSaved(score: number): void;
+}) {
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
   const [score, setScore] = useState<number | null>(null);
@@ -29,7 +37,7 @@ export function TicketCsatForm({ token, t }: { token: string; t: SupportMessages
     try {
       await api.post(`/store/v1/tickets/${encodeURIComponent(token)}/csat`, { score });
       toast.success(t.saved);
-      router.refresh();
+      onSaved(score);
     } catch (error) {
       setFeedback(feedbackFrom(error, errorText, ["score"]));
     } finally {

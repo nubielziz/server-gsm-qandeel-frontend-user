@@ -1,5 +1,7 @@
-// Support tickets: the public "contact support" form and the ticket conversation page (opened from the email link).
-// The API has no ticket list: a ticket is reached through its own link, so the texts say so instead of faking an inbox.
+// Support tickets: the public "contact support" form and the ticket conversation page (opened from the email link, or
+// from "My tickets" for a signed-in customer). A guest has no ticket list: the link in the ticket email is the way back, and
+// a signed-in customer also finds their tickets under "My tickets"; the public texts say both. The conversation is live (feature 28): `ticket.chat` is its own text, `list` and `newForm` serve
+// the ticket lists of a signed-in customer (`/account/tickets`) and merchant (`/merchant/support`).
 import { defineMessages } from "../define";
 
 export const support = defineMessages({
@@ -50,7 +52,7 @@ export const support = defineMessages({
       track: { title: "Track an order", text: "See where an order is without signing in. You only need its tracking link.", action: "Track an order" },
       comeBack: {
         title: "Coming back later?",
-        text: "Use the link in your ticket email to read replies and answer. There is no ticket list on this site, so keep that email.",
+        text: "Use the link in your ticket email to read replies and answer. Signed in? Your tickets are also under My tickets in your account.",
       },
     },
 
@@ -73,6 +75,29 @@ export const support = defineMessages({
         sent: "Reply sent",
         reopens: "This ticket is resolved. Your reply reopens it.",
         pendingHint: "We are waiting for your reply.",
+        enterHint: "Press Enter to send, Shift and Enter for a new line.",
+        attach: "Attach a file",
+        attachHint: "PDF, JPG or PNG, up to 5 MB, 5 files",
+        attached: "Attached files",
+        removeFile: "Remove {name}",
+        uploading: "Uploading…",
+        tooMany: "You can attach up to 5 files to one message.",
+        waitUpload: "Wait for the files to finish uploading.",
+        fileErrors: {
+          type: "Attach a PDF, JPG or PNG file.",
+          empty: "This file is empty.",
+          too_large: "This file is larger than 5 MB.",
+        },
+      },
+      chat: {
+        typing: "Support is typing…",
+        sent: "Sent",
+        seen: "Seen",
+        newMessage: "New message",
+        live: "Connected",
+        offline: "Reconnecting…",
+        attachments: "Attachments",
+        opensNewTab: "(opens in a new tab)",
       },
       csat: {
         title: "How was our support?",
@@ -102,6 +127,29 @@ export const support = defineMessages({
         presale: "A question before I buy",
         other: "Something else",
       },
+    },
+
+    // The ticket lists of a signed-in customer (`/account/tickets`) and merchant (`/merchant/support`).
+    list: {
+      caption: "Your support tickets",
+      columns: { ticket: "Ticket", subject: "Subject", topic: "Topic", status: "Status", activity: "Last activity" },
+      open: "Open ticket {number}",
+      unread: "New reply",
+      youLast: "You wrote",
+      supportLast: "Support replied",
+      noMessages: "No messages yet",
+      newTicket: "New ticket",
+      emptyTitle: "You have no tickets yet",
+      emptyText: "Open a ticket and our team will answer here.",
+      emptyAction: "Open a ticket",
+    },
+    // The new-ticket form of a signed-in customer or merchant (the public form's fields, no email and no security check).
+    newForm: {
+      orderLabel: "Related order",
+      orderNone: "No related order",
+      orderHint: "Pick the order this ticket is about. It is optional.",
+      orderOption: "{order} · {service} · {date}",
+      submit: "Open ticket",
     },
   },
 
@@ -152,7 +200,7 @@ export const support = defineMessages({
       track: { title: "تتبّع طلب", text: "اعرف أين وصل طلبك دون تسجيل الدخول. تحتاج فقط إلى رابط التتبّع.", action: "تتبّع طلب" },
       comeBack: {
         title: "ستعود لاحقًا؟",
-        text: "استخدم الرابط في رسالة تذكرتك لقراءة الردود والرد علينا. لا توجد قائمة تذاكر في هذا الموقع، لذا احتفظ بتلك الرسالة.",
+        text: "استخدم الرابط في رسالة تذكرتك لقراءة الردود والرد علينا. إن كان لديك حساب، فستجد تذاكرك أيضًا في «تذاكري».",
       },
     },
 
@@ -175,6 +223,29 @@ export const support = defineMessages({
         sent: "تم إرسال الرد",
         reopens: "هذه التذكرة محلولة. سيعيد ردّك فتحها.",
         pendingHint: "ننتظر ردّك.",
+        enterHint: "اضغط Enter للإرسال، وShift مع Enter لسطر جديد.",
+        attach: "إرفاق ملف",
+        attachHint: "PDF أو JPG أو PNG، حتى 5 ميغابايت، 5 ملفات",
+        attached: "الملفات المرفقة",
+        removeFile: "إزالة {name}",
+        uploading: "جارٍ الرفع…",
+        tooMany: "يمكنك إرفاق 5 ملفات كحد أقصى في الرسالة الواحدة.",
+        waitUpload: "انتظر حتى ينتهي رفع الملفات.",
+        fileErrors: {
+          type: "أرفق ملف PDF أو JPG أو PNG.",
+          empty: "هذا الملف فارغ.",
+          too_large: "حجم هذا الملف أكبر من 5 ميغابايت.",
+        },
+      },
+      chat: {
+        typing: "فريق الدعم يكتب…",
+        sent: "أُرسلت",
+        seen: "شوهدت",
+        newMessage: "رسالة جديدة",
+        live: "متصل",
+        offline: "جارٍ إعادة الاتصال…",
+        attachments: "المرفقات",
+        opensNewTab: "(يفتح في تبويب جديد)",
       },
       csat: {
         title: "كيف وجدت دعمنا؟",
@@ -204,6 +275,27 @@ export const support = defineMessages({
         presale: "سؤال قبل الشراء",
         other: "أمر آخر",
       },
+    },
+
+    list: {
+      caption: "تذاكر الدعم الخاصة بك",
+      columns: { ticket: "التذكرة", subject: "الموضوع", topic: "نوع الطلب", status: "الحالة", activity: "آخر نشاط" },
+      open: "فتح التذكرة {number}",
+      unread: "رد جديد",
+      youLast: "كتبتَ",
+      supportLast: "ردّ الدعم",
+      noMessages: "لا توجد رسائل بعد",
+      newTicket: "تذكرة جديدة",
+      emptyTitle: "لا توجد تذاكر بعد",
+      emptyText: "افتح تذكرة وسيجيبك فريقنا هنا.",
+      emptyAction: "افتح تذكرة",
+    },
+    newForm: {
+      orderLabel: "الطلب المرتبط",
+      orderNone: "بلا طلب مرتبط",
+      orderHint: "اختر الطلب الذي تخصّه هذه التذكرة. هذا اختياري.",
+      orderOption: "{order} · {service} · {date}",
+      submit: "فتح التذكرة",
     },
   },
 });

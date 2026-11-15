@@ -5,7 +5,7 @@
 // nav lists, the wallet pill and the bell. The page itself sits behind the session read (the main hole below), because
 // the password gate wraps it. Signed out → sign-in (merchant tab).
 // A merchant waiting for approval (`status: pending`) gets 403 ACCOUNT_PENDING_APPROVAL on 32 routes (handoff §4.15):
-// the nav then shows only what works for them (overview, settings), a badge replaces the wallet pill and a banner
+// the nav then shows only what works for them (overview, notifications, support, settings), a badge replaces the wallet pill and a banner
 // explains the wait. The static shell shows the full nav and the search, as for an approved merchant (almost every
 // merchant is one); for a pending one the nav shrinks and the badge replaces the pill once the session is read.
 // A merchant with `mustChangePassword` (a temporary password from staff) is sent to the security page by the gate
@@ -17,6 +17,7 @@ import {
   ClipboardList,
   Clock,
   Gift,
+  Headset,
   KeyRound,
   LayoutDashboard,
   PlusCircle,
@@ -117,6 +118,8 @@ export default async function MerchantLayout({ children }: LayoutProps<"/[lang]/
     label: t.merchantNav.notifications,
     icon: <Bell aria-hidden="true" className={icon} />,
   };
+  // Support is open to a merchant waiting for approval too (feature 28, plan B217): it is in both lists.
+  const support: WorkspaceNavItem = { href: p("/merchant/support"), label: t.merchantNav.support, icon: <Headset aria-hidden="true" className={icon} /> };
   const approvedNav: WorkspaceNavItem[] = [
     overview,
     { href: p("/merchant/services"), label: t.merchantNav.services, title: t.servicesTitle, icon: <PlusCircle aria-hidden="true" className={icon} /> },
@@ -127,8 +130,9 @@ export default async function MerchantLayout({ children }: LayoutProps<"/[lang]/
     { href: p("/merchant/webhooks"), label: t.merchantNav.webhooks, icon: <Webhook aria-hidden="true" className={icon} /> },
     { href: p("/merchant/referrals"), label: t.merchantNav.referrals, icon: <Gift aria-hidden="true" className={icon} /> },
     notifications,
+    support,
   ];
-  const pendingNav: WorkspaceNavItem[] = [overview, notifications];
+  const pendingNav: WorkspaceNavItem[] = [overview, notifications, support];
   const footerNav: WorkspaceNavItem[] = [
     { href: p("/merchant/settings"), label: t.merchantNav.settings, icon: <Settings aria-hidden="true" className={icon} /> },
   ];

@@ -34,12 +34,58 @@ export type StoreMe = S.GetStoreV1MeResponse;
 export type StoreLoginResult = S.PostStoreV1AuthLoginResponse;
 export type CustomerOrder = S.GetStoreV1MeOrdersResponse[number];
 export type DataRequest = S.PostStoreV1MeDataExportResponse;
-export type Ticket = S.GetStoreV1TicketsByTokenResponse;
 export type TicketInput = S.PostStoreV1TicketsBody;
 export type TicketCreated = S.PostStoreV1TicketsResponse;
-export type TicketMessage = Ticket["messages"][number];
 export type StoreMeInput = S.PatchStoreV1MeBody;
 export type StoreUploadedFile = S.PostStoreV1FilesResponse;
+
+// ── Support live chat (feature 28). HAND-TYPED from the backend plan `docs/briefs/28-support-live-chat.md` §3.2: the
+// generated `schema.gen.ts` does not carry these routes and keys until the backend is merged and `npm run gen:api` runs.
+// The new keys of the existing answers are optional here, as in the plan ("always sent; optional in the schema until the
+// console merge"): the code reads them with a default, so it works against both. After `gen:api`, the generated types
+// carry the same keys and the intersections below become redundant; replace them by plain aliases then.
+/** A file on a message: PDF, JPEG or PNG, at most 5 MiB. Download only through the ticket's file route, never inline. */
+export type Attachment = { id: S.Id; filename: string; mime: string; size: number };
+type StoreTicketBase = S.GetStoreV1TicketsByTokenResponse;
+/** A public message of a ticket: `from` is `you` (the requester) or `support`; never an internal note. */
+export type TicketMessage = StoreTicketBase["messages"][number] & { attachments?: Attachment[] };
+/** `GET /store/v1/tickets/:token`. `seenByYou` / `seenBySupport` are the highest message id each side has seen. */
+export type Ticket = Omit<StoreTicketBase, "messages"> & {
+  messages: TicketMessage[];
+  seenByYou?: S.Id | null;
+  seenBySupport?: S.Id | null;
+  seenBySupportAt?: S.IsoDateTime | null;
+};
+/** One row of `GET /store/v1/me/tickets`: the token opens the existing ticket page. */
+export type MyTicketRow = {
+  number: string;
+  subject: string;
+  category: Ticket["category"];
+  status: Ticket["status"];
+  orderId: S.Id | null;
+  createdAt: S.IsoDateTime;
+  updatedAt: S.IsoDateTime;
+  lastMessageAt: S.IsoDateTime | null;
+  lastMessageFrom: "you" | "support" | null;
+  hasUnread: boolean;
+  token: string;
+};
+/** `POST /store/v1/me/tickets`: the opened ticket with its token. */
+export type MyTicketCreated = Ticket & { token: string };
+/** One row of `GET /client/tickets` (a merchant's ticket has no token: the id is the address). */
+export type ClientTicketRow = Omit<MyTicketRow, "token"> & { id: S.Id };
+/** `GET /client/tickets/:id`, `POST /client/tickets`: no rating (customers only). */
+export type ClientTicket = Omit<Ticket, "canRate" | "csatScore"> & { id: S.Id };
+/** The answer of a ticket file upload (`POST /store/v1/tickets/:token/files`, `POST /client/files`). */
+export type TicketFile = { id: S.Id; filename: string; size: number; mime: string };
+/** `POST /store/v1/me/tickets` and `POST /client/tickets`. */
+export type SignedInTicketInput = {
+  subject: string;
+  message: string;
+  category?: Ticket["category"];
+  orderId?: S.Id;
+  fileIds?: S.Id[];
+};
 
 // ── Store: customer wallet (`/store/v1/me/wallet*`, always USD)
 export type CustomerWallet = S.GetStoreV1MeWalletResponse;
