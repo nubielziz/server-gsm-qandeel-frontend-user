@@ -87,6 +87,28 @@ export type SignedInTicketInput = {
   fileIds?: S.Id[];
 };
 
+// ── Store search (feature 29, decision 038): `/store/v1/search/suggest` and `/store/v1/search`. English only; no price is ever
+// read from the search engine (the API joins the card price itself). `engine: 'fallback'` = the database answered (degraded: no
+// facets, no completions).
+/** `GET /store/v1/search/suggest?q=&currency=`: completions, the nearest services, ready filters. Empty `q`: only `popular`. */
+export type SuggestBody = S.GetStoreV1SearchSuggestResponse;
+/** Which side answered a search: the search engine, or the database fallback. */
+export type SearchEngineName = SuggestBody["engine"];
+/** A phrase that completes or corrects the typed text (normalised: lower case, single spaces). */
+export type SuggestCompletion = SuggestBody["completions"][number];
+/** Where a completion phrase comes from. */
+export type SuggestCompletionKind = SuggestCompletion["kind"];
+/** A service of the suggestion list: its card's display part and the card price without tax, in the asked currency. */
+export type SuggestService = SuggestBody["services"][number];
+/** A ready filter: `value` is what the list filters by (brand or carrier name, ISO country code, category id). */
+export type SuggestFilter = SuggestBody["filters"][number];
+/** `GET /store/v1/search`: the results page. `hits` are the exact cards of `GET /store/v1/services`. */
+export type SearchBody = S.GetStoreV1SearchResponse;
+/** Facet counts of a results page (each group ignores its own selection); null on fallback. */
+export type SearchFacets = NonNullable<SearchBody["facets"]>;
+/** One facet value with how many matches it would leave. Brand and carrier values are display labels. */
+export type SearchFacetCount = SearchFacets["brand"][number];
+
 // ── Store: customer wallet (`/store/v1/me/wallet*`, always USD)
 export type CustomerWallet = S.GetStoreV1MeWalletResponse;
 export type CustomerStatementLine = S.GetStoreV1MeWalletStatementResponse[number];

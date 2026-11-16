@@ -1278,7 +1278,7 @@ export type PostClientTicketsResponse = {
     body: string;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
-    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the storefront merge. */
     attachments?: Array<{
       /** Numeric record id. */
       id: Id;
@@ -1330,7 +1330,7 @@ export type GetClientTicketsByIdResponse = {
     body: string;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
-    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the storefront merge. */
     attachments?: Array<{
       /** Numeric record id. */
       id: Id;
@@ -1382,7 +1382,7 @@ export type PostClientTicketsByIdMessagesResponse = {
   body: string;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
-  /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+  /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the storefront merge. */
   attachments?: Array<{
     /** Numeric record id. */
     id: Id;
@@ -2371,7 +2371,7 @@ export type PostStoreV1MeTicketsResponse = {
     body: string;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
-    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the storefront merge. */
     attachments?: Array<{
       /** Numeric record id. */
       id: Id;
@@ -2383,11 +2383,11 @@ export type PostStoreV1MeTicketsResponse = {
       size: number;
     }>;
   }>;
-  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the console merge. */
+  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the storefront merge. */
   seenByYou?: Id | null;
-  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the console merge. */
+  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the storefront merge. */
   seenBySupport?: Id | null;
-  /** When support saw it, or null. Always sent; optional in the schema until the console merge. */
+  /** When support saw it, or null. Always sent; optional in the schema until the storefront merge. */
   seenBySupportAt?: IsoDateTime | null;
   /** The ticket link token: the page is `/support/tickets/<token>` and every `/store/v1/tickets/:token…` route takes it. A credential: never log or cache it. */
   token: string;
@@ -2842,13 +2842,203 @@ export type GetStoreV1PagesBySlugResponse = {
   } | null;
 };
 
+// ── GET /store/v1/search — Search the services (results page)
+export type GetStoreV1SearchQuery = {
+  q: string;
+  page?: number;
+  perPage?: number;
+  brand?: string | string[];
+  network?: string | string[];
+  country?: string | string[];
+  categoryId?: number | number[];
+  type?: "imei" | "server" | "remote" | "file" | Array<"imei" | "server" | "remote" | "file">;
+  availability?: "in_stock" | "on_request";
+  featured?: "true" | "false";
+  sort?: "relevance" | "popular" | "title" | "listedAt" | "price";
+  order?: "asc" | "desc";
+  /** The buyer's country: the tax of its window is added. Without it no tax is added. */
+  buyerCountry?: string;
+  /** The buyer's region, for the countries that tax by region. */
+  region?: string;
+  /** The currency to show prices in (one `GET /store/v1/config` lists). Default: USD. */
+  currency?: string;
+  /** Lowest `price.gross` to show (inclusive), in `currency`. */
+  minPrice?: string;
+  /** Highest `price.gross` to show (inclusive), in `currency`. Not below `minPrice`. */
+  maxPrice?: string;
+};
+/** 200 */
+export type GetStoreV1SearchResponse = {
+  q: string;
+  engine: "typesense" | "fallback";
+  /** How many services matched (the best 1000 when `truncated`). */
+  total: number;
+  /** More than 1000 matched and the answer is a price sort or price bounds over the best 1000. */
+  truncated: boolean;
+  page: number;
+  perPage: number;
+  /** The exact card of `GET /store/v1/services`. */
+  hits: Array<{
+    /** The service id: what `POST /store/v1/checkout-sessions` takes as `serviceId`. */
+    id: Id;
+    slug: string;
+    locale: "en" | "ar";
+    title: string;
+    summary: string;
+    brand: string;
+    /** The carrier or network the service unlocks (empty when none). */
+    network: string;
+    /** The country the service is for (empty when none). */
+    country: string;
+    isFeatured: boolean;
+    type: "imei" | "server" | "remote" | "file";
+    /** How long it takes, as text (English, or the supplier's own words). */
+    deliveryTime: string;
+    /** The catalog category of the service (what `GET /store/v1/categories` lists). */
+    category: {
+      /** Numeric record id. */
+      id: Id;
+      /** `<id>-<words>`: only the number before the first hyphen counts. */
+      slug: string;
+      /** The category name in the requested language (the English name when there is no Arabic one). */
+      name: string;
+    };
+    /** `in_stock`: the available inventory codes cover the smallest order, so it is delivered at once; `on_request`: processed after the order. Both can be bought. Never a count. */
+    availability: "in_stock" | "on_request";
+    /** The expected delivery time in minutes (the service SLA); the site formats it per language. */
+    deliveryMinutes: number;
+    /** A delivery note in this page's language that replaces `deliveryMinutes` on screen; `''` when none. */
+    etaText: string;
+    /** When the page first went on the site; never resets. `null` for pages from before it was recorded. */
+    listedAt: IsoDateTime | null;
+    /** The picture of the service: a root-relative path `/store/v1/media/<sha256>.<jpg|png|webp>` (immutable, cached for a year); `null` when it has none (show the picture of the service type). */
+    imageUrl: string | null;
+    price: {
+      /** The currency of net, tax and gross. */
+      currency: string;
+      /** Units of the currency per 1 USD, the exchange markup included (8 decimals). */
+      fxRate: Decimal;
+      /** The price before tax. */
+      net: Money;
+      /** Decimal string with exactly 4 fraction digits. */
+      tax: Money;
+      /** What the buyer pays: net plus tax. */
+      gross: Money;
+      /** The tax rate in percent (0 when the buyer gave no country or it has no tax). */
+      taxRate: Decimal;
+      /** The country the tax was worked out for. */
+      taxCountry: string | null;
+    };
+  }>;
+  /** The counts per filter, each ignoring its own group's selection (page 1); `null` on fallback. */
+  facets: {
+    /** `value` is the display name; spellings that differ in case are one entry. */
+    brand: Array<{
+      value: string;
+      count: number;
+    }>;
+    network: Array<{
+      value: string;
+      count: number;
+    }>;
+    /** `value` is the ISO-2 code. */
+    country: Array<{
+      value: string;
+      count: number;
+    }>;
+    category: Array<{
+      /** Numeric record id. */
+      id: Id;
+      name: string;
+      count: number;
+    }>;
+    type: Array<{
+      value: string;
+      count: number;
+    }>;
+    availability: {
+      in_stock: number;
+      on_request: number;
+    };
+  } | null;
+  /** The lowest and highest `price.gross` of the matches, page 1 only and only when at most 1000 matched. */
+  priceRange: {
+    /** Decimal string with exactly 4 fraction digits. */
+    min: Money;
+    /** Decimal string with exactly 4 fraction digits. */
+    max: Money;
+  } | null;
+  didYouMean: string | null;
+  intent: "imei" | null;
+};
+
+// ── GET /store/v1/search/suggest — Search as you type
+export type GetStoreV1SearchSuggestQuery = {
+  q?: string;
+  /** The currency to show prices in (one `GET /store/v1/config` lists). Default: USD. */
+  currency?: string;
+};
+/** 200 */
+export type GetStoreV1SearchSuggestResponse = {
+  /** The typed text as the engine read it (normalised, at most 100 characters). */
+  q: string;
+  /** `fallback`: the simple database search answered (the engine is off or down). */
+  engine: "typesense" | "fallback";
+  /** The rest of the word being typed (`icl` gives `oud`), to draw after the input; `null` when nothing continues the text and on fallback. */
+  ghost: string | null;
+  /** Phrases that complete what was typed, best first. */
+  completions: Array<{
+    text: string;
+    kind: "brand" | "carrier" | "category" | "country" | "title" | "synonym" | "query";
+  }>;
+  /** The best matches, then nearby services (similar words, drop a word, a typo), priced like the cards without tax. */
+  services: Array<{
+    /** Numeric record id. */
+    id: Id;
+    slug: string;
+    title: string;
+    /** The title as HTML with `<mark>` around matched words; every other character is escaped. */
+    titleHighlight: string;
+    brand: string;
+    network: string;
+    type: "imei" | "server" | "remote" | "file";
+    category: {
+      /** Numeric record id. */
+      id: Id;
+      name: string;
+    };
+    imageUrl: string | null;
+    availability: "in_stock" | "on_request";
+    price: {
+      currency: string;
+      /** Decimal string with exactly 4 fraction digits. */
+      net: Money;
+      /** Decimal string with exactly 4 fraction digits. */
+      gross: Money;
+    };
+  }>;
+  filters: Array<{
+    kind: "brand" | "network" | "country" | "category";
+    /** What the list filter takes: the name (brand, network), the country code, the category id. */
+    value: string;
+    /** `Brand: Samsung`, `Network: Vodafone`, `Country: United Kingdom`. */
+    label: string;
+    count: number;
+  }>;
+  didYouMean: string | null;
+  /** Popular searches, only while the text is empty. */
+  popular: string[];
+  /** `imei`: the text is an IMEI: offer the IMEI check, no search ran. */
+  intent: "imei" | null;
+};
+
 // ── GET /store/v1/services — List the services on sale
 export type GetStoreV1ServicesQuery = {
   /** First row to return (0-based, inclusive). Default 0. */
   _start?: number;
   /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 100 rows. */
   _end?: number;
-  /** Comma-separated sort fields. Allowed: featured, sort, title, popular, listedAt, price. Default: featured desc, sort asc, title asc. */
+  /** Comma-separated sort fields. Allowed: relevance, featured, sort, title, popular, listedAt, price. Default: relevance desc, featured desc, sort asc, title asc. */
   _sort?: string;
   /** Comma-separated directions (asc or desc), one per sort field in the same order. */
   _order?: string;
@@ -3074,7 +3264,7 @@ export type PostStoreV1TicketsResponse = {
     body: string;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
-    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the storefront merge. */
     attachments?: Array<{
       /** Numeric record id. */
       id: Id;
@@ -3086,11 +3276,11 @@ export type PostStoreV1TicketsResponse = {
       size: number;
     }>;
   }>;
-  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the console merge. */
+  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the storefront merge. */
   seenByYou?: Id | null;
-  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the console merge. */
+  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the storefront merge. */
   seenBySupport?: Id | null;
-  /** When support saw it, or null. Always sent; optional in the schema until the console merge. */
+  /** When support saw it, or null. Always sent; optional in the schema until the storefront merge. */
   seenBySupportAt?: IsoDateTime | null;
   /** The ticket token. Present only when `orderToken` was given; with `email` alone it is left out. */
   token?: string;
@@ -3130,7 +3320,7 @@ export type GetStoreV1TicketsByTokenResponse = {
     body: string;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
-    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the storefront merge. */
     attachments?: Array<{
       /** Numeric record id. */
       id: Id;
@@ -3142,11 +3332,11 @@ export type GetStoreV1TicketsByTokenResponse = {
       size: number;
     }>;
   }>;
-  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the console merge. */
+  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the storefront merge. */
   seenByYou?: Id | null;
-  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the console merge. */
+  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the storefront merge. */
   seenBySupport?: Id | null;
-  /** When support saw it, or null. Always sent; optional in the schema until the console merge. */
+  /** When support saw it, or null. Always sent; optional in the schema until the storefront merge. */
   seenBySupportAt?: IsoDateTime | null;
 };
 
@@ -3187,7 +3377,7 @@ export type PostStoreV1TicketsByTokenCsatResponse = {
     body: string;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
-    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the storefront merge. */
     attachments?: Array<{
       /** Numeric record id. */
       id: Id;
@@ -3199,11 +3389,11 @@ export type PostStoreV1TicketsByTokenCsatResponse = {
       size: number;
     }>;
   }>;
-  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the console merge. */
+  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the storefront merge. */
   seenByYou?: Id | null;
-  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the console merge. */
+  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the storefront merge. */
   seenBySupport?: Id | null;
-  /** When support saw it, or null. Always sent; optional in the schema until the console merge. */
+  /** When support saw it, or null. Always sent; optional in the schema until the storefront merge. */
   seenBySupportAt?: IsoDateTime | null;
 };
 
@@ -3260,7 +3450,7 @@ export type PostStoreV1TicketsByTokenMessagesResponse = {
   body: string;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
-  /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the console merge. */
+  /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the storefront merge. */
   attachments?: Array<{
     /** Numeric record id. */
     id: Id;
@@ -3420,6 +3610,8 @@ export interface ApiRoutes {
   "GET /store/v1/orders/:token/receipt": { query: never; params: GetStoreV1OrdersByTokenReceiptParams; body: never; response: GetStoreV1OrdersByTokenReceiptResponse; status: 200 };
   "GET /store/v1/pages": { query: GetStoreV1PagesQuery; params: never; body: never; response: GetStoreV1PagesResponse; status: 200 };
   "GET /store/v1/pages/:slug": { query: GetStoreV1PagesBySlugQuery; params: GetStoreV1PagesBySlugParams; body: never; response: GetStoreV1PagesBySlugResponse; status: 200 };
+  "GET /store/v1/search": { query: GetStoreV1SearchQuery; params: never; body: never; response: GetStoreV1SearchResponse; status: 200 };
+  "GET /store/v1/search/suggest": { query: GetStoreV1SearchSuggestQuery; params: never; body: never; response: GetStoreV1SearchSuggestResponse; status: 200 };
   "GET /store/v1/services": { query: GetStoreV1ServicesQuery; params: never; body: never; response: GetStoreV1ServicesResponse; status: 200 };
   "GET /store/v1/services/:slug": { query: GetStoreV1ServicesBySlugQuery; params: GetStoreV1ServicesBySlugParams; body: never; response: GetStoreV1ServicesBySlugResponse; status: 200 };
   "POST /store/v1/tickets": { query: never; params: never; body: PostStoreV1TicketsBody; response: PostStoreV1TicketsResponse; status: 201 };

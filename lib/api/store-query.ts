@@ -104,3 +104,75 @@ export function storeServicesQuery(args: ServiceListArgs): QueryInput {
   // `listQuery` keeps keys whose value is undefined: drop them, so the record holds only what is sent.
   return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined));
 }
+
+// ── `GET /store/v1/search` (backend plan 29 §5.3): the English results page. Its own query dialect: `page` and
+// `perPage` (not `_start`/`_end`), `sort` and `order` (not `_sort`/`_order`), and no `locale` (English only). The same
+// 422 rule: nothing empty is sent.
+
+/** Sorts of the results page: `relevance` (the default, sent as nothing), best sellers, name, new arrivals, price. */
+export type SearchSort = "relevance" | "popular" | "title" | "listedAt" | "price";
+
+/** The highest page and the largest page the route accepts. */
+export const SEARCH_MAX_PAGE = 50;
+export const SEARCH_MAX_PER_PAGE = 48;
+/** The longest query the route accepts (characters, after its own normalising). */
+export const SEARCH_MAX_QUERY = 100;
+
+export type StoreSearchArgs = {
+  /** The visitor's text (1-100 characters; longer text is cut). */
+  q: string;
+  /** ISO code of the currency to price the cards in. */
+  currency: string;
+  /** 1-based, at most 50. */
+  page?: number;
+  /** 1-48, default 24. */
+  perPage?: number;
+  brand?: string | string[];
+  network?: string | string[];
+  country?: string | string[];
+  categoryId?: number[];
+  type?: ServiceType[];
+  availability?: ServiceAvailability;
+  featured?: boolean;
+  /** Left out (or `relevance`): best match first. */
+  sort?: SearchSort;
+  /** Only for `title`, `listedAt` and `price` (the route ignores it for the others, so it is not sent). */
+  order?: "asc" | "desc";
+  minPrice?: string;
+  maxPrice?: string;
+  buyerCountry?: string;
+};
+
+const ORDERED: ReadonlySet<SearchSort> = new Set(["title", "listedAt", "price"]);
+
+/** A whole number held inside [min, max]; anything else is `fallback`. */
+function within(value: number | undefined, min: number, max: number, fallback: number): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback;
+  return Math.min(Math.max(Math.floor(value), min), max);
+}
+
+/** The query record of one results page. Hand it to `apiVisitorGet('/store/v1/search', { query })`. */
+export function storeSearchQuery(args: StoreSearchArgs): QueryInput {
+  const query: QueryInput = { q: args.q.trim().slice(0, SEARCH_MAX_QUERY), currency: args.currency };
+  const add = (key: string, value: string | string[] | undefined) => {
+    if (value !== undefined) query[key] = value;
+  };
+  const page = within(args.page, 1, SEARCH_MAX_PAGE, 1);
+  if (page > 1) query.page = page;
+  query.perPage = within(args.perPage, 1, SEARCH_MAX_PER_PAGE, 24);
+  add("brand", strings(args.brand));
+  add("network", strings(args.network));
+  add("country", strings(args.country));
+  add("categoryId", ids(args.categoryId));
+  add("type", strings(args.type));
+  add("availability", strings(args.availability)?.[0]);
+  if (args.featured !== undefined) query.featured = args.featured;
+  if (args.sort && args.sort !== "relevance") {
+    query.sort = args.sort;
+    if (ORDERED.has(args.sort)) query.order = args.order ?? (args.sort === "listedAt" ? "desc" : "asc");
+  }
+  add("minPrice", strings(args.minPrice)?.[0]);
+  add("maxPrice", strings(args.maxPrice)?.[0]);
+  add("buyerCountry", strings(args.buyerCountry)?.[0]);
+  return query;
+}

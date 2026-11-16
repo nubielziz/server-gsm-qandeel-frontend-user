@@ -105,12 +105,18 @@ test.describe("home", () => {
     await expect(page.getByRole("heading", { level: 1, name: "All services" })).toBeVisible();
     if (isMobile) await page.getByRole("button", { name: /^Filters/ }).click();
     const filters = isMobile ? page.getByRole("dialog", { name: "Filters" }) : page.getByRole("complementary", { name: "Filters" });
-    // "Categories" holds the API's real categories with their service count; the four service types sit under "Service type".
+    // A q page counts with the search's facets (feature 29: over the matches, each group without its own selection).
+    await expect(filters.getByRole("group", { name: "Categories" }).getByRole("checkbox").first()).toBeVisible();
+    await expect(filters.getByRole("group", { name: "Brand" }).getByRole("checkbox", { name: /^Samsung/ })).toBeChecked();
+
+    // Without q, "Categories" holds the API's real categories with their service count; the four service types sit under
+    // "Service type".
+    await page.goto("/en/services");
+    if (isMobile) await page.getByRole("button", { name: /^Filters/ }).click();
     const category = (await apiCategories(request)).find((c) => c.serviceCount > 0);
     expect(category, "the demo catalog has a category with services").toBeDefined();
     await expect(filters.getByRole("group", { name: "Categories" }).getByRole("checkbox", { name: categoryCheckbox(category!) })).toBeVisible();
     await expect(filters.getByRole("group", { name: "Service type" }).getByRole("checkbox", { name: /^IMEI check/ })).toBeVisible();
-    await expect(filters.getByRole("group", { name: "Brand" }).getByRole("checkbox", { name: /^Samsung/ })).toBeChecked();
   });
 
   test("all services: a price range in the home URL filters by the shown price", async ({ page }) => {
@@ -174,17 +180,26 @@ test.describe("catalog", () => {
 
   test("search narrows the list and an empty result offers to clear the filters", async ({ page }) => {
     await page.goto("/en/services");
+    // The list's own search box (a plain search field); the header's is the search combobox (e2e/search.spec.ts).
     const search = page.getByRole("searchbox", { name: "Search", exact: true });
     await search.fill("verizon");
     await search.press("Enter");
     await expect(page).toHaveURL(/\/en\/services\?q=verizon$/);
     await expect(page.getByRole("article")).toHaveCount(1);
     await expect(page.getByText("Verizon iPhone Unlock").first()).toBeVisible();
+    // An English search is answered by the search engine: "Best match" is its sort.
+    await expect(page.getByLabel("Sort by")).toHaveValue("relevance");
 
+    // Nothing found: the search's own empty state names the text and still offers to clear the filters.
     await page.goto("/en/services?q=zzzzzzzz");
-    await expect(page.getByText("No services match your filters")).toBeVisible();
+    await expect(page.getByText("No services match “zzzzzzzz”")).toBeVisible();
     await page.getByRole("link", { name: "Clear filters" }).click();
     await expect(page.getByRole("article")).toHaveCount(11);
+
+    // A filter page without text is not a search: its own empty state, and Featured is its sort.
+    await page.goto("/en/services?brand=NoSuchBrand");
+    await expect(page.getByText("No services match your filters")).toBeVisible();
+    await expect(page.getByLabel("Sort by")).toHaveValue("featured");
   });
 
   test("has the same filter sidebar as the home page: categories, service type, price range, brand checkboxes", async ({ page, request, isMobile }) => {

@@ -1,5 +1,8 @@
 // SearchInput: a search form (GET) with a magnifier, one text field and a submit button.
-// Uses next/form so a search is a soft navigation (with prefetching), and still works without JavaScript.
+// Uses next/form so a search is a soft navigation (with prefetching), and still works without JavaScript. It stays an
+// honest server search field: no `id`, `role` or ARIA wiring of its own. With `enhance` its field wrapper carries
+// `data-search-enhance`, where components/search/search-enhancer.tsx finds the field and turns it into the search
+// combobox after hydration (English shop header only, backend plan 29 §7).
 import Form from "next/form";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -22,6 +25,13 @@ export type SearchInputProps = {
   className?: string;
   /** Class of the text field itself. */
   inputClassName?: string;
+  /** Marks the field for the search combobox (`data-search-enhance` on its wrapper); render it inside a SearchEnhancer. */
+  enhance?: boolean;
+  /**
+   * The `autofocus` attribute: the field takes focus when a popover holding it opens (the phone search row), inside
+   * the tap, so a phone opens its keyboard. Never on a field that is visible at page load.
+   */
+  autoFocus?: boolean;
 };
 
 /** A GET search form: `<SearchInput action={localePath(locale, "/services")} label="Search services" submitLabel="Search" />`. */
@@ -36,13 +46,15 @@ export function SearchInput({
   large,
   className,
   inputClassName,
+  enhance,
+  autoFocus,
 }: SearchInputProps) {
   return (
     <Form action={action} role="search" className={cn("flex w-full items-stretch", className)}>
       {hidden
         ? Object.entries(hidden).map(([key, value]) => <input key={key} type="hidden" name={key} value={value} />)
         : null}
-      <div className="relative min-w-0 flex-1">
+      <div className="relative min-w-0 flex-1" data-search-enhance={enhance ? "" : undefined}>
         <Search
           aria-hidden="true"
           className="pointer-events-none absolute inset-y-0 start-3.5 my-auto size-[18px] text-ink-subtle"
@@ -55,6 +67,7 @@ export function SearchInput({
           placeholder={placeholder}
           enterKeyHint="search"
           autoComplete="off"
+          autoFocus={autoFocus}
           className={cn(
             "w-full rounded-s-control border border-control bg-surface ps-10 pe-3 text-base text-ink md:text-body",
             "placeholder:text-ink-subtle hover:border-ink-muted focus-visible:border-ink",

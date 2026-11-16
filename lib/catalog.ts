@@ -3,23 +3,33 @@
 // like the catalog) and index it. The browsable service list (home and /services) takes its rows and total from the
 // API, which filters, sorts and pages (`GET /store/v1/services`, plan D12); the numbers beside the options (how many
 // services each would show, "In stock only") and the price slider's span are counted here over the cached catalog, with
-// the API's own rules (lib/catalog-facets.ts), because the API has no facet counts. Shared data only: safe inside
-// 'use cache'.
+// the API's own rules (lib/catalog-facets.ts), because that route has no facet counts. Shared data only.
+// A text search (feature 29, backend plan §7) is read for the visitor, never from the cache (lib/api/visitor.ts): on
+// English pages from the search engine (`GET /store/v1/search`: rows, facet counts, price span, "Did you mean"); on
+// Arabic pages from `GET /store/v1/services?q=`. When the engine is down the search route answers from the database
+// without facets (`engine: 'fallback'`): the options then come from the cached catalog again, without their numbers.
 import { cacheLife, cacheTag } from "next/cache";
 import { listStoreCategories, listStoreServices } from "@/lib/api/public";
-import { MAX_PAGE_SIZE } from "@/lib/api/store-query";
-import type { StoreCategory, StoreServiceCard } from "@/lib/api/types";
+import { MAX_PAGE_SIZE, SEARCH_MAX_PAGE, SEARCH_MAX_PER_PAGE, type ServiceListArgs } from "@/lib/api/store-query";
+import type { SearchBody, SearchEngineName, StoreCategory, StoreServiceCard } from "@/lib/api/types";
+import { searchStore, searchStoreServices } from "@/lib/api/visitor";
 import {
   FACET_KEYS,
   clampPage,
+  cleanText,
   facetOptions,
+  facetOptionsFromCounts,
   fitPriceRange,
   inStockCount,
   listFilterArgs,
+  pageCount,
   pickCollections,
   priceBounds,
   requestedPage,
   resolveCategories,
+  searchFilterArgs,
+  searchSortQuery,
+  searchesEngine,
   sortQuery,
   type CategoryEntry,
   type Collection,
@@ -31,6 +41,7 @@ import {
 } from "@/lib/catalog-facets";
 import { compareMoney } from "@/lib/format";
 import type { Locale } from "@/lib/i18n/config";
+import { imeiFromQuery, searchText } from "@/lib/search/terms";
 
 const PAGE = 100;
 const MAX_ROWS = 1000;
@@ -95,6 +106,21 @@ export type CatalogList = {
   bounds: { min: number; max: number } | null;
   /** The filter as applied: listed categories only, the price range fitted to `bounds` (an end of the span is "no limit"). */
   filter: ListFilter;
+  /** Whether the numbers beside the options are real (false on a search the database answered: they are hidden then). */
+  counts: boolean;
+  /** What only an English text search has; null on every other list. */
+  search: SearchInfo | null;
+};
+
+/** The extras of a search-engine page (`GET /store/v1/search`). */
+export type SearchInfo = {
+  engine: SearchEngineName;
+  /** The corrected query ("Did you mean …?"), or null. */
+  didYouMean: string | null;
+  /** The IMEI the text holds (the page offers "Check IMEI …"), or null. */
+  imei: string | null;
+  /** A price sort or price bounds ran over the best 1000 matches and more matched. */
+  truncated: boolean;
 };
 
 /**
@@ -115,10 +141,16 @@ export async function catalogList(
   const bounds = priceBounds(catalog);
   const { entries, ids } = resolveCategories(input.category, categories);
   const applied: ListFilter = { ...input, category: ids, ...fitPriceRange(input.min, input.max, bounds) };
+  // An English text the API normalises to nothing (`&`, `()`, an emoji) is no search: both routes would answer 422
+  // (backend plan 29 §5.3: `q` is 1-100 characters after normalising), so the page shows the plain list instead.
+  if (locale === "en" && searchText(applied.q) === "") applied.q = "";
+
+  if (searchesEngine(locale, applied.q)) return searchList({ catalog, categories, entries, applied, bounds, currency, sort, page, perPage });
 
   const size = Math.min(Math.max(1, Math.floor(perPage)), MAX_PAGE_SIZE);
-  const read = (n: number) =>
-    listStoreServices({ locale, currency, ...listFilterArgs(applied), ...sortQuery(sort), start: (n - 1) * size, end: n * size });
+  // A text search is the visitor's own read (counted and limited per visitor); every other list is the cached one.
+  const list = (args: ServiceListArgs) => (cleanText(applied.q) ? searchStoreServices(args) : listStoreServices(args));
+  const read = (n: number) => list({ locale, currency, ...listFilterArgs(applied), ...sortQuery(sort), start: (n - 1) * size, end: n * size });
   const wanted = requestedPage(page);
   let result = await read(wanted);
   const current = clampPage(wanted, result.total, size);
@@ -137,6 +169,75 @@ export async function catalogList(
     inStock: inStockCount(catalog, applied),
     bounds,
     filter: applied,
+    counts: true,
+    search: null,
+  };
+}
+
+type SearchListInput = {
+  catalog: StoreServiceCard[];
+  categories: StoreCategory[];
+  entries: CategoryEntry[];
+  applied: ListFilter;
+  /** The cached catalog's price span (the URL's range is fitted to it before the request). */
+  bounds: { min: number; max: number } | null;
+  currency: string;
+  sort: ListSort;
+  page: number;
+  perPage: number;
+};
+
+/** The whole units a price span covers: the lowest price rounded down to the highest rounded up; null when unreadable. */
+function spanOf(range: SearchBody["priceRange"]): { min: number; max: number } | null {
+  if (!range) return null;
+  const min = Math.floor(Number(range.min));
+  const max = Math.ceil(Number(range.max));
+  return Number.isFinite(min) && Number.isFinite(max) && min <= max ? { min, max } : null;
+}
+
+/**
+ * One English search page from the search engine: its rows and total, the options with the engine's facet counts (each
+ * group ignores its own selection), the price slider over the matches (page 1 without a price bound; later pages, a
+ * bounded page and the fallback use the catalog's span), "Did you mean", the IMEI intent. Pages stop at 50 (the route's limit). When the database answered
+ * (`engine: 'fallback'`, no facets), the options come from the cached catalog with their numbers hidden.
+ */
+async function searchList({ catalog, categories, entries, applied, bounds, currency, sort, page, perPage }: SearchListInput): Promise<CatalogList> {
+  const size = Math.min(Math.max(1, Math.floor(perPage)), SEARCH_MAX_PER_PAGE);
+  const read = (n: number) =>
+    searchStore({ q: cleanText(applied.q), currency, page: n, perPage: size, ...searchFilterArgs(applied), ...searchSortQuery(sort) });
+  const wanted = Math.min(requestedPage(page), SEARCH_MAX_PAGE);
+  let result = await read(wanted);
+  const current = Math.min(wanted, pageCount(result.total, size), SEARCH_MAX_PAGE);
+  // Past the end the route answers no rows with the true total; an empty result stays on page 1 without another read.
+  if (current !== wanted && result.total > 0) result = await read(current);
+
+  const facets = result.engine === "typesense" ? result.facets : null;
+  const options = Object.fromEntries(
+    FACET_KEYS.map((key) => [key, facets ? facetOptionsFromCounts(facets[key], applied[key]) : facetOptions(catalog, applied, key)]),
+  ) as Record<FacetKey, FacetOption[]>;
+  // The categories keep the API's order and slugs; on a search their number is how many matches each holds.
+  const matches = facets ? new Map(facets.category.map((category) => [category.id, category.count])) : null;
+  const counted = matches ? categories.map((category) => ({ ...category, serviceCount: matches.get(category.id) ?? 0 })) : categories;
+  return {
+    catalogSize: catalog.length,
+    total: result.total,
+    page: current,
+    rows: Array.isArray(result.hits) ? result.hits : [],
+    options,
+    categories: counted,
+    categoryEntries: entries,
+    inStock: facets ? facets.availability.in_stock : inStockCount(catalog, applied),
+    // The span over the matches only while no price bound is applied: §5.3 does not say whether `priceRange` ignores
+    // minPrice/maxPrice, and a span cut to the bound would make its end "no limit" (list-filters), dropping the bound.
+    bounds: (current === 1 && applied.min === null && applied.max === null ? spanOf(result.priceRange) : null) ?? bounds,
+    filter: applied,
+    counts: facets !== null,
+    search: {
+      engine: result.engine,
+      didYouMean: result.didYouMean?.trim() || null,
+      imei: result.intent === "imei" ? imeiFromQuery(applied.q) : null,
+      truncated: Boolean(result.truncated),
+    },
   };
 }
 

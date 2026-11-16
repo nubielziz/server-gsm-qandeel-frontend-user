@@ -9,11 +9,18 @@
 // The two "All services" links use `prefetch={true}`: their prefetch carries the catalog's first page (cached, URL data),
 // so the list shows at once on the click (plan P3.1, Next docs "Optimizing prefetching"). The nav row is hidden below `lg`
 // and the drawer link is not in the viewport while the drawer is closed, so each costs a server render only when seen.
+// Search (feature 29, backend plan §7): on English pages each copy of the search form (desktop bar, phone row) is wrapped
+// in a SearchEnhancer, which turns it into the search combobox on the first interaction; Arabic pages keep the plain GET
+// form (the search engine is English only). The phone copy carries `autofocus`, so the row's popover focuses it inside
+// the tap (a phone then opens its keyboard).
 import { Headset, LayoutGrid, ScanSearch, Store, PackageSearch, LifeBuoy } from "lucide-react";
 import { localePath } from "@/lib/i18n/config";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
+import { search as searchMessages } from "@/lib/i18n/messages/search";
 import { SearchInput } from "@/components/ui/search-input";
+import { SearchEnhancer } from "@/components/search/search-enhancer";
+import type { SearchComboboxLabels } from "@/components/search/search-combobox";
 import { AccountArea } from "./account-area";
 import { CategoryDrawerList, CategoryMenu, loadMenuCategories } from "./category-menu";
 import { CurrencySwitcherSlot } from "./currency-switcher-slot";
@@ -35,18 +42,51 @@ const drawerLinkClasses =
 
 /** The shop header. Render it in the (store) layout; it needs no props. */
 export async function StoreHeader() {
-  const [locale, t] = await Promise.all([getLocale(), getMessages(common)]);
+  const [locale, t, s] = await Promise.all([getLocale(), getMessages(common), getMessages(searchMessages)]);
   const categories = await loadMenuCategories(locale);
   const p = (path: string) => localePath(locale, path);
 
-  const search = (
-    <SearchInput
-      action={p("/services")}
-      label={t.header.searchLabel}
-      placeholder={t.header.searchPlaceholder}
-      submitLabel={t.actions.search}
-    />
-  );
+  // The combobox's texts (it is a Client Component: it gets only the strings it shows).
+  const enhance = locale === "en";
+  const labels: SearchComboboxLabels = {
+    label: s.label,
+    suggestions: s.suggestions,
+    services: s.services,
+    filters: s.filters,
+    recent: s.recent,
+    clearRecent: s.clearRecent,
+    popular: s.popular,
+    fill: s.fill,
+    imei: s.imei,
+    didYouMean: s.didYouMean,
+    taxNote: s.taxNote,
+    status: s.status,
+    country: s.country,
+    brand: s.brand,
+    network: s.network,
+    category: s.category,
+    inStock: t.availability.inStock,
+    onRequest: t.availability.onRequest,
+  };
+  const searchCopy = (phone: boolean) => {
+    const field = (
+      <SearchInput
+        action={p("/services")}
+        label={t.header.searchLabel}
+        placeholder={t.header.searchPlaceholder}
+        submitLabel={t.actions.search}
+        enhance={enhance}
+        autoFocus={phone}
+      />
+    );
+    return enhance ? (
+      <SearchEnhancer labels={labels} paths={{ results: p("/services"), imei: p("/imei-check") }}>
+        {field}
+      </SearchEnhancer>
+    ) : (
+      field
+    );
+  };
 
   const nav = (
     <>
@@ -123,7 +163,8 @@ export async function StoreHeader() {
   return (
     <StoreHeaderFrame
       logo={<Logo tagline />}
-      search={search}
+      search={searchCopy(false)}
+      searchPhone={searchCopy(true)}
       switchers={
         <>
           <CurrencySwitcherSlot />

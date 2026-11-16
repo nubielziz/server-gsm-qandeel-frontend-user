@@ -7,10 +7,14 @@
 //   are worked out in memory over the cards that lib/catalog.ts reads (cached): the API has no facet counts (handoff
 //   §1.7). `passes` follows the API's own rules (brand, carrier, country: exact, case-insensitive; `q` over title,
 //   summary, brand and carrier; the price range inclusive, no tax), so a count equals the total the API would answer.
+// An English text search (feature 29) asks the search route instead (`searchFilterArgs`, `searchSortQuery`; options from
+// its facet counts, `facetOptionsFromCounts`) and has its own sorts ("Best match" first, no "Featured").
 // Also the "Featured collections" of the home page. Pure functions: unit-tested, safe anywhere.
-import type { ServiceListArgs } from "@/lib/api/store-query";
-import type { ServiceType, StoreCategory, StoreServiceCard } from "@/lib/api/types";
+import type { ServiceListArgs, StoreSearchArgs } from "@/lib/api/store-query";
+import type { SearchFacetCount, ServiceType, StoreCategory, StoreServiceCard } from "@/lib/api/types";
 import { compareMoney } from "@/lib/format";
+import type { Locale } from "@/lib/i18n/config";
+import { searchText } from "@/lib/search/terms";
 
 /** The card fields the list can be filtered by; each is a query parameter that may repeat (`brand=A&brand=B`). */
 export const FACET_KEYS = ["type", "brand", "network", "country"] as const;
@@ -212,11 +216,35 @@ export function resolveCategories(raw: readonly string[], categories: readonly C
 
 /** The sorts of the toolbar. `featured` is the default and sends no `_sort` (the API's own order). */
 export const LIST_SORTS = ["featured", "popular", "newest", "price_asc", "price_desc", "title"] as const;
-export type ListSort = (typeof LIST_SORTS)[number];
+/**
+ * The sorts of an English page with a text search (backend plan 29 §7): "Best match" (`relevance`) first and the
+ * default, so it never shows in the URL; "Featured" is not offered there.
+ */
+export const SEARCH_SORTS = ["relevance", "popular", "newest", "price_asc", "price_desc", "title"] as const;
+export type ListSort = (typeof LIST_SORTS)[number] | (typeof SEARCH_SORTS)[number];
 
-/** The `sort` value of the URL; anything unknown is `featured`. */
-export function parseSort(value: string): ListSort {
-  return (LIST_SORTS as readonly string[]).includes(value) ? (value as ListSort) : "featured";
+/**
+ * Whether a list page is answered by the search engine (`GET /store/v1/search`): English, with a text search the API
+ * accepts (`searchText`: not empty after its normalising, so `&`, `()` or an emoji alone is no search and the route never
+ * answers 422). Arabic pages keep the database search of `GET /store/v1/services` (the engine is English only).
+ */
+export function searchesEngine(locale: Locale, q: string): boolean {
+  return locale === "en" && searchText(q) !== "";
+}
+
+/** The sorts a page offers, in display order. */
+export function sortsFor(search: boolean): readonly ListSort[] {
+  return search ? SEARCH_SORTS : LIST_SORTS;
+}
+
+/** The sort a page uses when the URL names none (and leaves out of its links). */
+export function defaultSort(search: boolean): ListSort {
+  return search ? "relevance" : "featured";
+}
+
+/** The `sort` value of the URL; anything the page does not offer is its default. */
+export function parseSort(value: string, search = false): ListSort {
+  return (sortsFor(search) as readonly string[]).includes(value) ? (value as ListSort) : defaultSort(search);
 }
 
 /** What a sort asks the API for (`_sort` and `_order`): best sellers = `popular` desc, new arrivals = `listedAt` desc. */
@@ -233,6 +261,26 @@ export function sortQuery(sort: ListSort): Pick<ServiceListArgs, "sort" | "order
     case "title":
       return { sort: "title", order: "asc" };
     case "featured":
+    case "relevance":
+      return {};
+  }
+}
+
+/** The same for the search route (`sort`/`order`): best match sends nothing. */
+export function searchSortQuery(sort: ListSort): Pick<StoreSearchArgs, "sort" | "order"> {
+  switch (sort) {
+    case "popular":
+      return { sort: "popular" };
+    case "newest":
+      return { sort: "listedAt", order: "desc" };
+    case "price_asc":
+      return { sort: "price", order: "asc" };
+    case "price_desc":
+      return { sort: "price", order: "desc" };
+    case "title":
+      return { sort: "title", order: "asc" };
+    case "featured":
+    case "relevance":
       return {};
   }
 }
@@ -263,6 +311,31 @@ export function listFilterArgs(filter: ListFilter): FilterArgs {
   if (min !== undefined) args.minPrice = min;
   if (max !== undefined) args.maxPrice = max;
   return args;
+}
+
+/** The search route's filters of an applied list filter (the same values as `listFilterArgs`, without `q`). */
+export function searchFilterArgs(filter: ListFilter): Omit<StoreSearchArgs, "q" | "currency" | "page" | "perPage" | "sort" | "order"> {
+  const { type, categoryId, brand, network, country, minPrice, maxPrice } = listFilterArgs(filter);
+  return { type, categoryId, brand, network, country, minPrice, maxPrice, availability: filter.inStock ? "in_stock" : undefined };
+}
+
+/**
+ * The options of one field from the search route's facet counts (`value` = what the catalog spells: a brand or carrier
+ * label, an ISO country code, a service type), most first, then by name. Selected values the facets lack stay, with 0.
+ */
+export function facetOptionsFromCounts(counts: readonly SearchFacetCount[], selected: readonly string[]): FacetOption[] {
+  const merged = new Map<string, { value: string; count: number }>();
+  for (const { value, count } of counts) {
+    if (!value || !Number.isFinite(count) || count <= 0) continue;
+    const entry = merged.get(value.toLowerCase());
+    if (entry) entry.count += count;
+    else merged.set(value.toLowerCase(), { value, count });
+  }
+  const options = [...merged.values()].map(({ value, count }) => ({ value, count, selected: selected.some((s) => same(value, s)) }));
+  for (const value of selected) {
+    if (!options.some((option) => same(option.value, value))) options.push({ value, count: 0, selected: true });
+  }
+  return options.sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 }
 
 // ── Paging

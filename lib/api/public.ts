@@ -16,6 +16,7 @@ import type {
   StorePageListItem,
   StoreServiceCard,
   StoreServiceDetail,
+  SuggestBody,
 } from "./types";
 import type { Locale } from "@/lib/i18n/config";
 
@@ -121,4 +122,19 @@ export async function getHelpArticle(slug: string): Promise<HelpArticleDetail | 
   cacheLife("content");
   cacheTag("store-help");
   return orNull(apiPublicGet<HelpArticleDetail>(`/store/v1/help/${encodeURIComponent(slug)}`));
+}
+
+/**
+ * The popular searches of the English shop (`GET /store/v1/search/suggest` with an empty `q`): at most 8 phrases, the
+ * same for every visitor (the API computes them from distinct visitors and hides what staff hid). `q=` is written into
+ * the path because the query builder leaves empty values out. Throws like every read here: callers that must not break
+ * use `popularSearches()` (lib/search/popular.ts).
+ */
+export async function listPopularSearches(): Promise<string[]> {
+  "use cache";
+  cacheLife("catalog");
+  cacheTag("store-search-popular");
+  const body = await apiPublicGet<SuggestBody>("/store/v1/search/suggest?q=");
+  const popular = Array.isArray(body?.popular) ? body.popular : [];
+  return popular.filter((term): term is string => typeof term === "string" && term.trim() !== "").slice(0, 8);
 }

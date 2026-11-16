@@ -3,7 +3,9 @@
 // from first paint, not only after hydration (13 of 15 early taps were lost before). The specs block every client
 // script (`/_next/static/chunks/**`; the CSS still loads), so React never hydrates, then tap. Inline scripts still run,
 // so streamed Suspense content still shows. A last spec checks the hydrated page: the click handler and the command
-// do not fight, and a link in the drawer closes it. Nothing here changes data.
+// do not fight, and a link in the drawer closes it. The phone search row is a popover opened by its button's
+// `popovertarget`: a tap before hydration opens it and its field (`autofocus`) has the focus, so a phone opens its
+// keyboard (feature 29). Nothing here changes data.
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { go } from "./helpers";
@@ -12,8 +14,8 @@ import { go } from "./helpers";
 const DESKTOP_NAV = 1024;
 
 const TEXT = {
-  en: { openMenu: "Open menu", menu: "Menu", close: "Close", trackOrder: "Track an order" },
-  ar: { openMenu: "فتح القائمة", menu: "القائمة", close: "إغلاق", trackOrder: "تتبّع طلب" },
+  en: { openMenu: "Open menu", menu: "Menu", close: "Close", trackOrder: "Track an order", openSearch: "Open search", search: "Search services" },
+  ar: { openMenu: "فتح القائمة", menu: "القائمة", close: "إغلاق", trackOrder: "تتبّع طلب", openSearch: "فتح البحث", search: "ابحث في الخدمات" },
 } as const;
 
 const SERVICE = "/en/checkout?service=icloud-clean-lost-check";
@@ -72,6 +74,29 @@ test.describe("before hydration", () => {
     });
   }
 
+  for (const locale of ["en", "ar"] as const) {
+    test(`${locale}: the search button opens the phone search row and its field has the focus`, async ({ page }) => {
+      test.skip(!narrow(page), "the search button shows only under lg");
+      const aborted = await withoutClientJs(page);
+      await page.goto(`/${locale}`);
+      expect(aborted(), "no client script was blocked").toBeGreaterThan(0);
+
+      const button = page.getByRole("banner").getByRole("button", { name: TEXT[locale].openSearch, exact: true });
+      expect(await hydrated(page, "header button[popovertarget]"), "the page hydrated").toBe(false);
+      const mainTop = async () => (await page.locator("main").boundingBox())?.y;
+      const before = await mainTop();
+      await button.click();
+      // Before hydration the field is the plain search box (the combobox comes with the first interaction after it).
+      const field = page.getByRole("banner").getByRole("searchbox", { name: TEXT[locale].search, exact: true });
+      await expect(field).toBeVisible();
+      await expect(field).toBeFocused();
+      // The row lies over the page: opening it moved nothing below the header.
+      expect(await mainTop()).toBe(before);
+      await page.keyboard.press("Escape");
+      await expect(field).toBeHidden();
+    });
+  }
+
   test("checkout: Enter details opens the requirements drawer; Cancel closes it; Save does not leave the page", async ({ page }) => {
     const aborted = await withoutClientJs(page);
     await page.goto(SERVICE);
@@ -101,6 +126,19 @@ test.describe("before hydration", () => {
 });
 
 test.describe("after hydration", () => {
+  test("the search button toggles the phone search row once per tap, the field focused", async ({ page }) => {
+    test.skip(!narrow(page), "the search button shows only under lg");
+    await go(page, "/en");
+    const banner = page.getByRole("banner");
+    await expect.poll(() => hydrated(page, "header button[popovertarget]")).toBe(true);
+    await banner.getByRole("button", { name: TEXT.en.openSearch, exact: true }).click();
+    const field = banner.getByRole("combobox", { name: TEXT.en.search });
+    await expect(field).toBeVisible();
+    await expect(field).toBeFocused();
+    await banner.getByRole("button", { name: "Close search", exact: true }).click();
+    await expect(field).toBeHidden();
+  });
+
   test("the menu opens once per tap and a link inside it closes it", async ({ page }) => {
     test.skip(!narrow(page), "the menu button shows only under lg");
     await go(page, "/en");

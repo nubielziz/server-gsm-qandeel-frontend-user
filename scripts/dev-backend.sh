@@ -24,6 +24,10 @@ export PORTAL_BASE_URL=http://localhost:5175/merchant
 export TRUST_PROXY=loopback
 # Every mail goes to Mailpit (http://localhost:8025), never to Resend.
 export MAIL_SMTP_URL=smtp://localhost:1025
+# Product search (feature 29): the dev Typesense node (compose service `typesense`, :8108, dev keys) under this copy's own
+# collection prefix, so the isolated API never reads or writes the owner's search collections.
+export SEARCH_ENABLED=true
+export TYPESENSE_PREFIX=gsm_storefront_
 
 # Public MinIO dev credentials (backend/src/config/env.ts DEV_DEFAULTS).
 S3_USER="${S3_ACCESS_KEY_ID:-gsm-minio}"

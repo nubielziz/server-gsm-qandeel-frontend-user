@@ -111,6 +111,17 @@ test.describe("categories", () => {
     await expect(chip).toHaveCount(0);
   });
 
+  test("the header search is a combobox on English pages only; the list keeps its own plain search box", async ({ page, isMobile }) => {
+    await page.goto("/en/services");
+    if (isMobile) await page.getByRole("banner").getByRole("button", { name: "Open search" }).click();
+    // In the header only: the list's sort control is a <select> (a combobox too), and its search box is a plain field.
+    await expect(page.getByRole("banner").getByRole("combobox", { name: "Search services" })).toBeVisible();
+    await expect(page.locator("main").getByRole("combobox", { name: "Search services" })).toHaveCount(0);
+    await expect(page.locator("main").getByRole("searchbox", { name: "Search", exact: true })).toBeVisible();
+    await page.goto("/ar/services");
+    await expect(page.getByRole("banner").getByRole("combobox", { name: "ابحث في الخدمات" })).toHaveCount(0);
+  });
+
   test("search, sort and filters keep each other in the URL", async ({ page, request }) => {
     const [category] = await pickCategories(request, 1);
     await page.goto(`/en/services?category=${category.slug}&sort=price_desc`);

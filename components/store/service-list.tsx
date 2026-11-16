@@ -10,7 +10,12 @@
 // Its state is the page URL (`?category=4-carrier-unlock&stock=1&type=imei&brand=Apple&brand=Samsung&max=20&sort=popular&page=2`):
 // it works without JavaScript and can be shared. It reads `searchParams` and the currency cookie, so render it inside
 // <Suspense>. Availability is only ever "in stock" or not: no stock level exists anywhere.
-import { PackageSearch, SlidersHorizontal } from "lucide-react";
+// An English list with a text search is a search-engine page (feature 29, lib/catalog.ts `searchList`): rows and
+// option counts from `GET /store/v1/search`, "Best match" as the default sort (no "Featured"), "Did you mean …?", a
+// "Check IMEI" link for an IMEI, an empty state with popular searches, a quiet note while the database answers instead
+// of the engine (counts hidden then), and a note when a price sort covers only the best 1000 matches.
+import Link from "next/link";
+import { Info, PackageSearch, ScanSearch, SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,17 +23,32 @@ import { DialogClose, DialogTrigger, Drawer } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination, pageHref } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SEARCH_MAX_PAGE } from "@/lib/api/store-query";
 import type { ServiceType } from "@/lib/api/types";
 import { catalogList } from "@/lib/catalog";
-import { FACET_KEYS, LIST_SORTS, SERVICE_TYPES, cleanText, parseSort, type FacetKey, type ListInput, type ListSort } from "@/lib/catalog-facets";
+import {
+  FACET_KEYS,
+  SERVICE_TYPES,
+  cleanText,
+  defaultSort,
+  parseSort,
+  searchesEngine,
+  sortsFor,
+  type FacetKey,
+  type ListInput,
+  type ListSort,
+} from "@/lib/catalog-facets";
 import { countryName } from "@/lib/countries";
 import { getCurrency } from "@/lib/currency";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { localePath } from "@/lib/i18n/config";
 import { fmt, plural } from "@/lib/i18n/define";
 import { common } from "@/lib/i18n/messages/common";
+import { search as searchMessages } from "@/lib/i18n/messages/search";
 import { store } from "@/lib/i18n/messages/store";
 import { getLocale, getMessages } from "@/lib/i18n/server";
+import { resultsHref } from "@/lib/search/options";
+import { popularSearches } from "@/lib/search/popular";
 import { ActiveFilters, type FilterChip } from "./active-filters";
 import { serviceCardLabels } from "./card-labels";
 import { LazyListFilters, ListFilters, type FilterGroup, type ListFiltersProps } from "./list-filters";
@@ -85,13 +105,29 @@ function readInput(params: SearchParams): ListInput {
   };
 }
 
+/** A price held inside the slider's span. */
+function clamp(n: number, bounds: { min: number; max: number }): number {
+  return Math.min(Math.max(n, bounds.min), bounds.max);
+}
+
 /** Reads the URL, the API and the catalog and prepares everything the list shows (and `catalogSize`, 0 for an empty catalog). */
 export async function loadServiceList(searchParams: Promise<SearchParams>, config: ServiceListConfig) {
   const params = await searchParams;
-  const [locale, t, c, currency] = await Promise.all([getLocale(), getMessages(store), getMessages(common), getCurrency()]);
-  const sort: ListSort = parseSort(firstParam(params.sort));
-  const list = await catalogList(locale, currency.code, readInput(params), sort, Number(firstParam(params.page, 12)) || 1, config.perPage);
+  const [locale, t, c, s, currency] = await Promise.all([
+    getLocale(),
+    getMessages(store),
+    getMessages(common),
+    getMessages(searchMessages),
+    getCurrency(),
+  ]);
+  const input = readInput(params);
+  // An English text search is answered by the search engine: "Best match" is its default sort and "Featured" goes.
+  const searching = searchesEngine(locale, input.q);
+  const sort: ListSort = parseSort(firstParam(params.sort), searching);
+  const list = await catalogList(locale, currency.code, input, sort, Number(firstParam(params.page, 12)) || 1, config.perPage);
   const { filter, bounds } = list;
+  // Nothing matched a search: offer the popular searches (a cached shared read; [] when it cannot be read).
+  const popular = list.search && list.total === 0 ? await popularSearches() : [];
 
   const state: ListState = {
     q: filter.q || undefined,
@@ -103,7 +139,7 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
     country: filter.country,
     min: filter.min === null ? undefined : String(filter.min),
     max: filter.max === null ? undefined : String(filter.max),
-    sort: sort === "featured" ? undefined : sort,
+    sort: sort === defaultSort(searching) ? undefined : sort,
   };
   const base = localePath(locale, config.path || undefined);
   const href = (change: Partial<ListState>) => pageHref(base, { ...state, ...change }, 1) + config.hash;
@@ -112,13 +148,15 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
   const label = (key: FacetKey, value: string) =>
     key === "type" ? (c.serviceType[value as ServiceType] ?? value) : key === "country" ? countryName(value, locale) : value;
 
+  // The numbers beside the options; hidden while the database answers a search instead of the engine (no facets).
+  const counted = (n: number) => (list.counts ? `(${formatNumber(n, locale)})` : "");
   const group = (key: FacetKey, title: string): FilterGroup => ({
     name: key,
     label: title,
     options: list.options[key].map((option) => ({
       value: option.value,
       label: label(key, option.value),
-      count: `(${formatNumber(option.count, locale)})`,
+      count: counted(option.count),
       selected: option.selected,
     })),
   });
@@ -132,7 +170,7 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
       .map(({ category, selected }) => ({
         value: category.slug,
         label: category.name,
-        count: `(${formatNumber(category.serviceCount, locale)})`,
+        count: counted(category.serviceCount),
         selected,
       })),
   };
@@ -142,7 +180,7 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
     label: t.catalog.availability,
     options:
       list.inStock > 0 || filter.inStock
-        ? [{ value: "1", label: t.catalog.inStockOnly, count: `(${formatNumber(list.inStock, locale)})`, selected: filter.inStock }]
+        ? [{ value: "1", label: t.catalog.inStockOnly, count: counted(list.inStock), selected: filter.inStock }]
         : [],
   };
 
@@ -168,6 +206,7 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
   }
 
   const sortNames: Record<ListSort, string> = {
+    relevance: s.bestMatch,
     featured: t.catalog.sortFeatured,
     popular: t.catalog.sortPopular,
     newest: t.catalog.sortNewest,
@@ -182,7 +221,7 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
     c,
     currency,
     sort,
-    sorts: LIST_SORTS.map((value) => ({ value, label: sortNames[value] })),
+    sorts: sortsFor(searching).map((value) => ({ value, label: sortNames[value] })),
     list,
     state,
     base,
@@ -193,8 +232,16 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
     groups: [group("type", t.catalog.type), group("brand", t.catalog.brand), group("network", t.catalog.network), group("country", t.catalog.country)],
     price:
       bounds && bounds.min < bounds.max
-        ? { min: bounds.min, max: bounds.max, value: [filter.min ?? bounds.min, filter.max ?? bounds.max] as [number, number], currency: currency.code }
+        ? {
+            min: bounds.min,
+            max: bounds.max,
+            // A search's span covers its matches only, so a range from the URL may reach past it: hold it inside.
+            value: [clamp(filter.min ?? bounds.min, bounds), clamp(filter.max ?? bounds.max, bounds)] as [number, number],
+            currency: currency.code,
+          }
         : null,
+    s,
+    popular,
     /** The sidebar's filters, carried by the search form as hidden fields (a category the API does not list is not carried). */
     keep: [
       ...list.categoryEntries.filter((entry) => entry.known).map((entry): [string, string] => ["category", entry.value]),
@@ -213,7 +260,10 @@ export type ServiceListData = Awaited<ReturnType<typeof loadServiceList>>;
  * catalog), chips, count, cards or the empty state, page links.
  */
 export function ServiceList({ data, config }: { data: ServiceListData; config: ServiceListConfig }) {
-  const { locale, t, c, currency, sort, sorts, list, state, base, chips, top, groups, price, keep } = data;
+  const { locale, t, c, s, currency, sort, sorts, list, state, base, chips, top, groups, price, keep, popular } = data;
+  const { search } = list;
+  // The search route serves 50 pages at most: the page links stop there (the count still says the whole total).
+  const pagingTotal = search ? Math.min(list.total, SEARCH_MAX_PAGE * config.perPage) : list.total;
   const count = (n: number) => plural(locale, n, t.catalog.results, formatNumber(n, locale));
   const filtered = chips.length > 0;
   const clear = { label: t.catalog.clear, href: base + config.hash };
@@ -316,6 +366,8 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
             ) : null}
           </p>
 
+          {search ? <SearchNotes data={data} config={config} /> : null}
+
           {list.rows.length > 0 ? (
             <div className={GRIDS[config.cards]}>
               {list.rows.map((service, i) =>
@@ -334,6 +386,39 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
                 ),
               )}
             </div>
+          ) : search ? (
+            <Card>
+              <EmptyState
+                icon={<PackageSearch aria-hidden="true" />}
+                title={fmt(s.noResults, { q: state.q ?? "" })}
+                description={s.noResultsText}
+                action={
+                  <div className="grid justify-items-center gap-4">
+                    {popular.length > 0 ? (
+                      <nav aria-label={s.popular} className="grid justify-items-center gap-2">
+                        <p className="text-small font-semibold text-ink">{s.popular}</p>
+                        <ul className="flex flex-wrap justify-center gap-2">
+                          {popular.map((term) => (
+                            <li key={term}>
+                              <Link
+                                href={resultsHref(localePath(locale, "/services"), term)}
+                                prefetch={false}
+                                className="inline-flex min-h-11 items-center rounded-full border border-line-strong px-4 text-small font-medium text-ink transition-colors hover:border-ink"
+                              >
+                                {term}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </nav>
+                    ) : null}
+                    <ButtonLink href={clear.href} variant="secondary">
+                      {t.catalog.emptyAction}
+                    </ButtonLink>
+                  </div>
+                }
+              />
+            </Card>
           ) : (
             <Card>
               <EmptyState
@@ -349,7 +434,7 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
             </Card>
           )}
 
-          <Pagination total={list.total} pageSize={config.perPage} page={list.page} basePath={base} searchParams={state} hash={config.hash} />
+          <Pagination total={pagingTotal} pageSize={config.perPage} page={list.page} basePath={base} searchParams={state} hash={config.hash} />
         </div>
       </div>
 
@@ -370,6 +455,53 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
       ) : null}
     </>
   );
+}
+
+/**
+ * What a search-engine page says above its cards: "Did you mean …?" (a link to the corrected search, the filters kept),
+ * "Check IMEI …" when the text is an IMEI, a quiet note while the database answers instead of the engine, and the note
+ * that a price sort covers only the best 1000 matches.
+ */
+function SearchNotes({ data, config }: { data: ServiceListData; config: ServiceListConfig }) {
+  const { s, locale, list, state, base, sort } = data;
+  const { search } = list;
+  if (!search) return null;
+  const [before, after = ""] = s.didYouMean.split("{q}");
+  const priceSorted = sort === "price_asc" || sort === "price_desc";
+  const notes = [
+    search.didYouMean ? (
+      <p key="dym" className="text-body text-ink">
+        {before}
+        <Link href={pageHref(base, { ...state, q: search.didYouMean }, 1) + config.hash} className="font-bold underline underline-offset-4">
+          {search.didYouMean}
+        </Link>
+        {after}
+      </p>
+    ) : null,
+    search.imei ? (
+      <p key="imei">
+        <Link
+          href={`${localePath(locale, "/imei-check")}?${new URLSearchParams({ imei: search.imei }).toString()}`}
+          className="inline-flex min-h-11 items-center gap-2 text-body font-semibold text-ink underline underline-offset-4"
+        >
+          <ScanSearch aria-hidden="true" className="size-4" />
+          {fmt(s.imei, { imei: search.imei })}
+        </Link>
+      </p>
+    ) : null,
+    search.engine === "fallback" ? (
+      <p key="fallback" className="flex items-center gap-1.5 text-small text-ink-subtle">
+        <Info aria-hidden="true" className="size-4 shrink-0" />
+        {s.fallback}
+      </p>
+    ) : null,
+    search.truncated && priceSorted ? (
+      <p key="truncated" className="text-small text-ink-subtle">
+        {s.priceTruncated}
+      </p>
+    ) : null,
+  ].filter(Boolean);
+  return notes.length > 0 ? <div className="grid gap-1.5">{notes}</div> : null;
 }
 
 /** The same layout while the list streams in: filter card (with a panel), toolbar, count, a page of card skeletons. */

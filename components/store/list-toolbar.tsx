@@ -1,9 +1,9 @@
 "use client";
 // The search box and the sort control above the service list (home and catalog): one GET form, so it works without
 // JavaScript (the search button submits it). The sort has six choices (featured, best sellers, new arrivals, price both
-// ways, name); the server names them, so this component knows only their values. With JavaScript a new sort applies at
-// once, empty and default values stay out of the URL, the page number starts again at 1 and the list's anchor keeps it
-// in view. The other filters ride along as hidden fields. Give it a `key` made of the current values: a new URL then
+// ways, name; an English text search has "Best match" instead of "Featured"); the server names them, so this component
+// knows only their values. With JavaScript a new sort applies at once, empty and default values stay out of the URL,
+// the page number starts again at 1 and the list's anchor keeps it in view. The other filters ride along as hidden fields. Give it a `key` made of the current values: a new URL then
 // shows them (the fields are uncontrolled).
 import { useId, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -26,7 +26,7 @@ export type ListToolbarProps = {
   /** The list's anchor (`#all-services`). */
   hash: string;
   q: string;
-  /** The current sort (`featured`, `popular`, `newest`, `price_asc`, `price_desc` or `title`). */
+  /** The current sort (`featured` or `relevance`, `popular`, `newest`, `price_asc`, `price_desc`, `title`). */
   sort: string;
   /** Active filters to keep (category, stock, type, brand, carrier, country, price), as name/value pairs (names may repeat). */
   keep: [string, string][];
@@ -48,7 +48,9 @@ export function ListToolbar({ action, hash, q, sort, keep, labels, extra }: List
     const params = new URLSearchParams();
     for (const [key, value] of new FormData(event.currentTarget)) {
       const text = typeof value === "string" ? value.trim() : "";
-      if (!text || (key === "sort" && text === "featured")) continue;
+      // Neither default sort goes into the URL (`featured`; `relevance` with a text search): a new or cleared search then
+      // gets the default of its own kind of page.
+      if (!text || (key === "sort" && (text === "featured" || text === "relevance"))) continue;
       params.append(key, text);
     }
     const query = params.toString();
