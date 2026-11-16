@@ -14,6 +14,8 @@ ARG NEXT_PUBLIC_SITE_URL
 ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
 ARG NEXT_PUBLIC_TIME_ZONE=UTC
 ARG NEXT_PUBLIC_API_PUBLIC_URL=
+# The team's WhatsApp number for merchant applications (owner, 2026-11-16); a build arg overrides it.
+ARG NEXT_PUBLIC_MERCHANT_WHATSAPP="+20 12 10230575"
 # NEXT_COMPRESS=0 turns Next's own gzip off (next.config.ts `compress`, fixed into the standalone server at build time):
 # Caddy compresses in production (backend/deploy/Caddyfile, `encode zstd gzip`). Never expose this image without Caddy.
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_OUTPUT=standalone NEXT_COMPRESS=0 \
@@ -21,7 +23,8 @@ ENV NEXT_TELEMETRY_DISABLED=1 NEXT_OUTPUT=standalone NEXT_COMPRESS=0 \
     NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL} \
     NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY} \
     NEXT_PUBLIC_TIME_ZONE=${NEXT_PUBLIC_TIME_ZONE} \
-    NEXT_PUBLIC_API_PUBLIC_URL=${NEXT_PUBLIC_API_PUBLIC_URL}
+    NEXT_PUBLIC_API_PUBLIC_URL=${NEXT_PUBLIC_API_PUBLIC_URL} \
+    NEXT_PUBLIC_MERCHANT_WHATSAPP=${NEXT_PUBLIC_MERCHANT_WHATSAPP}
 RUN test -n "$GSM_API_ORIGIN" && test -n "$NEXT_PUBLIC_SITE_URL" && test -n "$NEXT_PUBLIC_TURNSTILE_SITE_KEY"
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

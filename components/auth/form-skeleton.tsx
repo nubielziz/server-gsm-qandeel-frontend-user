@@ -5,12 +5,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function FormSkeleton({
   fields = 2,
   hint = false,
-  turnstile = false,
 }: {
   fields?: number;
   hint?: boolean;
-  /** Reserves the 65 px row of the Turnstile widget above the submit button. */
-  turnstile?: boolean;
 }) {
   return (
     <div aria-busy="true" className="grid gap-5">
@@ -21,7 +18,6 @@ export function FormSkeleton({
           {hint && i === 0 ? <Skeleton className="h-4 w-3/4" /> : null}
         </div>
       ))}
-      {turnstile ? <Skeleton className="h-[65px] rounded-control" /> : null}
       <Skeleton className="h-12 rounded-control" />
     </div>
   );

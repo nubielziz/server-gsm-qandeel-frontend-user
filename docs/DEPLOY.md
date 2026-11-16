@@ -22,7 +22,7 @@ site:3000 ── server-side reads (Server Components) ──► GSM_API_ORIGIN 
 - Server-side calls (`lib/api/server.ts`) forward the visitor's `Cookie` and the incoming `X-Forwarded-For` (Caddy sets it from
   the real visitor address and drops a client-sent value). The API trusts exactly the compose subnet
   (`TRUST_PROXY=172.30.0.0/24`), so it takes the visitor's address from that header and not from the site container.
-- `lib/api/server.ts` sends no `Origin`, so every mutation (sign-in, register, orders, uploads) runs in the browser.
+- `lib/api/server.ts` sends no `Origin`, so every mutation (sign-in, orders, uploads) runs in the browser.
 
 ## 2. Variables
 
@@ -34,6 +34,7 @@ site:3000 ── server-side reads (Server Components) ──► GSM_API_ORIGIN 
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | at build | Cloudflare Turnstile site key of the widget for `<SHOP_HOST>`. Required (production has no test key). |
 | `NEXT_PUBLIC_TIME_ZONE` | at build | IANA time zone for dates on the site. Default `UTC`, the API's own zone. |
 | `NEXT_PUBLIC_API_PUBLIC_URL` | at build | Optional: `https://<API_HOST>`, the machine API host shown as "Base URL" on the merchant API keys page. Empty hides those two lines. |
+| `NEXT_PUBLIC_MERCHANT_WHATSAPP` | at build | The team's WhatsApp number for merchant applications. "Apply as a merchant" sends the visitor to it. Default in the `Dockerfile`: `+20 12 10230575` (the owner's number, 2026-11-16); pass the build arg only to change it. International format: `+`, the country code, then the number **without** the national leading 0 (never `+44 (0)20 …`); spaces are allowed and kept on the page. Empty or malformed: the page shows no WhatsApp button and points to the support page. |
 | `PORT`, `HOSTNAME` | at run time | The image sets `3000` and `0.0.0.0`. |
 
 - `NEXT_PUBLIC_*` values are written into the JavaScript at build time. Changing one needs a new image.
@@ -90,7 +91,7 @@ In `backend/.env.production` (`.env.production.example` has the template):
 |---|---|---|
 | `STORE_BASE_URL` | `https://<SHOP_HOST>` | customer links in mail (`/sign-in?token=`, `/unsubscribe?token=`) |
 | `PORTAL_BASE_URL` | `https://<SHOP_HOST>/merchant` | merchant links in mail (`/set-password?token=`) |
-| `CORS_ORIGINS` | includes `https://<SHOP_HOST>` | the Origin check of public `POST` routes (sign-in, register, forgot password) |
+| `CORS_ORIGINS` | includes `https://<SHOP_HOST>` | the Origin check of public `POST` routes (sign-in, forgot password) |
 | `TURNSTILE_HOSTNAMES` | `<SHOP_HOST>` | host names a Turnstile token may be issued for |
 | `TURNSTILE_SECRET_KEY` | secret of the widget whose site key is `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | token check |
 | `TRUST_PROXY` | `172.30.0.0/24` | the API trusts `X-Forwarded-For` from Caddy and from the site |

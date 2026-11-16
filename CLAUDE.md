@@ -52,8 +52,11 @@ Mailpit http://localhost:8025); the owner's API on :3000 and its data are never 
   `code` and per-field `code`; show `reference()` (request id) on error screens. Sign out rules: handoff §3.4.
 - **Money:** 4-decimal strings. Display with `formatMoney()`; sum with `sumMoney()`; never floats.
 - **Turnstile:** `components/turnstile.tsx` on the store routes, the one-form sign-in (`POST /client/auth/sign-in`) and
-  merchant register, forgot and login (sent always; the backend enforces it once `TURNSTILE_MERCHANT_AUTH` is on); reset
-  after every submit (tokens are single-use).
+  merchant forgot and login (sent always; the backend enforces it once `TURNSTILE_MERCHANT_AUTH` is on); reset after
+  every submit (tokens are single-use).
+- **Merchant application:** `/[lang]/merchant/register` is not a form (since 2026-11-16): it sends the visitor to the
+  team's WhatsApp number (`NEXT_PUBLIC_MERCHANT_WHATSAPP`, `lib/contact/whatsapp.ts`); staff create the merchant in the
+  admin console. The site never calls `POST /client/auth/register`.
 - **Helpers added by the backend-handoff waves (2026-11-13/15):** `lib/api/store-query.ts` (store list filters, sorts,
   safe paging), `lib/api/idempotency.ts` (one `Idempotency-Key` per request body; new after success or
   `IDEMPOTENCY_KEY_REUSED`), `lib/quantity.ts` (one per order, exactly N, range, packs; texts keyed on

@@ -75,7 +75,8 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
   `POST /store/v1/me/password`). "Email me a sign-in link (customers)" always visible. One sentence for every 401.
   `targetAfterSignIn` keeps a customer out of the portal and a merchant out of the account (`?next=` safe).
   `X-Turnstile-Token` on merchant register and forgot. An Arabic merchant sign-up saves `locale: 'ar'` at the first
-  sign-in (`lib/merchant/signup-locale.ts`).
+  sign-in (`lib/merchant/signup-locale.ts`). *(The register form and the saved language were removed on 2026-11-16: see
+  "Merchant application on WhatsApp".)*
 - **F11 notifications:** bell with the unread count (99+) in both areas' headers, polled at most once a minute while the
   tab is visible; `/[lang]/account/notifications` and `/[lang]/merchant/notifications` (All / Unread, mark one, mark all
   with `upToId`, links prefixed with the language and checked by `notificationHref`, text rendered as text, `lang`/`dir`
@@ -160,6 +161,30 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
    top-ups, payment provider, JOD decimals, the word "Pre-order", production values, `logo-mark.png`).
 5. **Docs:** `CLAUDE.md` (Turnstile routes, the new helpers, wording, e2e notes) and `docs/BACKEND-NEEDS.md` (items 1 to 8
    closed; the open backend limitations of plan §8 plus three top-up notes found in W3).
+
+## Merchant application on WhatsApp (2026-11-16, owner's request)
+- **What changed:** `/[lang]/merchant/register` (same URL, still static and `noindex`) is no longer a form and sends
+  nothing. It says that merchant accounts are opened by the team, lists three steps and offers "Chat on WhatsApp"
+  (a `wa.me` link in a new tab with a prefilled message in the page's language) and the number as selectable text. Staff
+  then create the merchant in the admin console, which sends the set-password link; the backend and the console did not
+  change. `?ref=CODE` (a merchant's referral link) is read in the browser, checked (`[A-Z0-9]{1,32}`) and added to the
+  message as "Referral code: CODE." with a note under the button; the note's slot reserves two lines with or without a
+  code, so nothing moves when it fills at hydration (the auth layout centres the page vertically).
+- **Configuration:** `NEXT_PUBLIC_MERCHANT_WHATSAPP` (build-time; `.env.example`, `docs/DEPLOY.md`). The owner's number
+  `+20 12 10230575` is the `Dockerfile` default and is set in the local env files; the page shows it as the owner grouped
+  it and links to `wa.me/201210230575`. Unset or malformed: no WhatsApp button, a "Contact support" button to `/support`
+  instead (no steps, a neutral subtitle).
+- **Open (the lead raised it with the owner):** staff create merchants with `POST /admin/clients`, which takes no referral
+  code, and no staff route sets the referrer. The code a referred visitor sends on WhatsApp can therefore not be
+  recorded yet: until the backend takes it, a merchant who applies through a referral link is not linked to the referrer
+  (`docs/BACKEND-NEEDS.md` open item 19). The portal's Referrals text ("Merchants who sign up through it are linked to
+  you") stays as it is until the owner decides.
+- **Code:** `lib/contact/whatsapp.ts` (+ test), `components/auth/merchant-whatsapp.tsx` (client, `useSearchParams` behind
+  `<Suspense>`) and `merchant-whatsapp-actions.tsx` (also the Suspense fallback: same button and number without the
+  referral sentence). Removed: `merchant-register-form.tsx`, `lib/merchant/signup-locale.ts` (+ test) and its call in
+  `sign-in-flow.tsx`, the form's `auth.register` strings. The site no longer calls `POST /client/auth/register`
+  (`docs/BACKEND-NEEDS.md` open item 2 is closed); the e2e helper `freshMerchant` still calls it
+  directly.
 
 ## Wiring (changed 2026-11-09, late evening, at the owner's request)
 - **Dev site (`npm run dev`, :5175) → the isolated demo API (:3100) since 2026-11-10**, at the owner's request (to

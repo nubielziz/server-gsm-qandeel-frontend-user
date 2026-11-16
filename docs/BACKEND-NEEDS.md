@@ -87,8 +87,10 @@ several services, favourites, customer wallet (phase 2W), notification feed, soc
 ## Open (2026-11-15): backend limitations the site meets (`IMPLEMENTATION-PLAN.md` §8; report, do not work around)
 
 1. No smart forgot-password route: the forgot page keeps a Customer or Merchant choice, each with its own Turnstile token.
-2. `POST /client/auth/register` takes no language: the first verification mail is English; the site saves the language
-   after the first sign-in in the same browser.
+2. ~~`POST /client/auth/register` takes no language: the first verification mail is English; the site saves the language
+   after the first sign-in in the same browser.~~ **Closed 2026-11-16:** the site no longer calls the route. Merchants
+   apply on WhatsApp (`NEXT_PUBLIC_MERCHANT_WHATSAPP`) and staff create the account in the admin console, which sends the
+   set-password link; nothing is saved in the browser any more.
 3. An email that is both a merchant and a customer reaches the customer area only through the magic link.
 4. Cards carry no `quantity`: no "From" price on cards, no price sort or filter by the smallest purchase.
 5. No stock count and no change signal: availability can be up to 5 minutes behind; `in_stock` speaks for the smallest
@@ -116,3 +118,9 @@ several services, favourites, customer wallet (phase 2W), notification feed, soc
     top-up answers `200`; top-up list rows carry no instructions.
 
 Site limitation, kept: an unknown slug inside a streamed page answers 200 with `noindex`.
+19. **Referral code on staff-created merchants (2026-11-16).** Merchants now apply on WhatsApp and staff create the
+   account with `POST /admin/clients`, whose body has no referral code; no staff route sets `referredById` (only the
+   self-registration route did). The site still reads `?ref=CODE` and puts "Referral code: CODE." in the WhatsApp message,
+   but staff cannot record it, so a referred merchant is not linked to the referrer and earns them no commission. Needs an
+   optional `referralCode` on `POST /admin/clients` (422 `unknown_code` like the register route) and the field in the
+   console's New merchant dialog.

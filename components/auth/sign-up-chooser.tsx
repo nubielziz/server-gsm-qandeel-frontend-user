@@ -1,7 +1,8 @@
 "use client";
 // SignUpChooser: "Customer or Merchant?" with the difference spelled out. Customer: an email and an emailed link that
-// creates the account on first use (MagicLinkForm). Merchant: resellers apply on their own form, are approved by staff
-// and then get group prices, a wallet and API access. The choice starts from `?as=`.
+// creates the account on first use (MagicLinkForm). Merchant: resellers message the team on WhatsApp from the
+// application page, staff open the account and then they get group prices, a wallet and API access. The choice starts
+// from `?as=`.
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";

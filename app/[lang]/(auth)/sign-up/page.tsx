@@ -1,4 +1,4 @@
-// Create an account: choose Customer (email link, no password) or Merchant (reseller application). Static page; the
+// Create an account: choose Customer (email link, no password) or Merchant (reseller applies on WhatsApp). Static page; the
 // chooser reads `?as=` in the browser behind <Suspense>. Never indexed.
 import type { Metadata } from "next";
 import { Suspense } from "react";

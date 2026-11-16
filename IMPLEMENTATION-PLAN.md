@@ -1,5 +1,11 @@
 # GSM storefront: implementation plan for the backend handoff of 2026-11-11/12
 
+> **Superseded in part, 2026-11-16 (owner's request):** the merchant application is no longer a form. `/[lang]/merchant/register`
+> sends the visitor to the team's WhatsApp number and staff create the account (see `PROGRESS.md`, "Merchant application on
+> WhatsApp"). Everything below about `merchant-register-form.tsx`, Turnstile on merchant register, the sign-up language
+> marker (`lib/merchant/signup-locale.ts`, D4) and the e2e check "after `/ar/merchant/register` … `locale: \"ar\"`" is history:
+> do not rebuild it.
+
 > **Owner decisions (2026-11-13), applied on top of this plan:** commit once per finished and verified wave (after a baseline commit of the earlier uncommitted work), local only, never pushed; every feature is tested against the isolated demo backend `http://localhost:3100` only (nothing is submitted through `:3000`/`:5175`, which sends real email). At most 4 agents at once; Fable 5.2 was called once, for this plan, and is not called again.
 
 Master plan for `/home/saifi/gsm-project/storefront` (Next.js 16.4 App Router). It was written once, from the two handoff files, the regenerated API contract, the backend contracts and the working tree as it stood on 2026-11-13. Nothing was run while writing it: every "verify" below is a step for an agent or the lead.

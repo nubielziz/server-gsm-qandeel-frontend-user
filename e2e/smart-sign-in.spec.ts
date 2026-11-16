@@ -1,17 +1,17 @@
 // The smart sign-in (plan F10, BH §5.1 and §6): ONE form on `POST /client/auth/sign-in` for customers and merchants, the
-// password step of a temporary password for both kinds, Turnstile on merchant register and forgot password, and the
-// sign-up language of a merchant. Runs against the isolated demo backend (:3100) and Mailpit (:8025) only.
+// password step of a temporary password for both kinds, and Turnstile on the forgot-password forms. (The merchant register
+// form and the language marker it left are gone since 2026-11-16: merchants apply on WhatsApp, see e2e/auth.spec.ts.)
+// Runs against the isolated demo backend (:3100) and Mailpit (:8025) only.
 // Rules (F03): the sign-in limit is 5 attempts per email and IP in 15 minutes and the smart route charges BOTH old counters,
 // so every failure test uses a throwaway email (never a shared demo account); accounts that change data are throwaway;
 // staff calls (temporary passwords) go straight to the API through e2e/admin.ts.
 import type { Page } from "@playwright/test";
 import { customerIdByEmail, merchantIdByEmail, temporaryCustomerPassword, temporaryMerchantPassword, totp } from "./admin";
 import { expect, test } from "./fixtures";
-import { ACCOUNTS, DEV_TURNSTILE_TOKEN, FRESH_MERCHANT_PASSWORD, freshCustomer, freshMerchant, go, signInMerchant, stubTurnstile, uniqueEmail } from "./helpers";
+import { ACCOUNTS, DEV_TURNSTILE_TOKEN, freshCustomer, freshMerchant, go, signInMerchant, stubTurnstile, uniqueEmail } from "./helpers";
 
 const SIGN_IN_PATH = "/client/auth/sign-in";
 const WRONG = "The email or password is incorrect.";
-const SIGNUP_MARKER_KEY = "gsm.merchant.signup-locale";
 /** Strong enough for the API's password rules, and not a part of any name or email used here. */
 const CHOSEN = "Willow-Anchor-7304";
 
@@ -324,25 +324,15 @@ test.describe("temporary password", () => {
   });
 });
 
-test.describe("Turnstile on the other merchant routes", () => {
-  test("merchant register, merchant forgot password and customer forgot password carry x-turnstile-token", async ({ page }) => {
-    const registerEmail = uniqueEmail("merchant");
-    await go(page, "/en/merchant/register");
-    await page.locator('input[name="name"]').fill("Test Merchant");
-    await page.locator('input[name="email"]').fill(registerEmail);
-    await page.locator('input[name="password"]').fill(FRESH_MERCHANT_PASSWORD);
-    await page.locator('select[name="country"]').selectOption("JO");
-    const register = page.waitForRequest(isPost("/client/auth/register"));
-    await page.getByRole("button", { name: "Submit application" }).click();
-    expect((await register).headers()["x-turnstile-token"]).toBe(DEV_TURNSTILE_TOKEN);
-    await expect(page.getByText("Check your email")).toBeVisible();
-
+test.describe("Turnstile on the forgot-password forms", () => {
+  test("merchant forgot password and customer forgot password carry x-turnstile-token", async ({ page }) => {
+    const merchantEmail = uniqueEmail("merchant");
     await go(page, "/en/forgot-password?as=merchant");
-    await page.locator('input[name="email"]').fill(registerEmail);
+    await page.locator('input[name="email"]').fill(merchantEmail);
     const merchantForgot = page.waitForRequest(isPost("/client/auth/password/forgot"));
     await page.getByRole("button", { name: "Email me a reset link" }).click();
     expect((await merchantForgot).headers()["x-turnstile-token"]).toBe(DEV_TURNSTILE_TOKEN);
-    await expect(page.getByText(`If an account exists for ${registerEmail}`)).toBeVisible();
+    await expect(page.getByText(`If an account exists for ${merchantEmail}`)).toBeVisible();
 
     await go(page, "/en/forgot-password");
     await page.locator('input[name="email"]').fill(uniqueEmail("nobody"));
@@ -351,7 +341,7 @@ test.describe("Turnstile on the other merchant routes", () => {
     expect((await customerForgot).headers()["x-turnstile-token"]).toBe(DEV_TURNSTILE_TOKEN);
   });
 
-  test("the register and forgot forms ask the widget for a new token after every submit", async ({ page }) => {
+  test("the forgot form asks the widget for a new token after every submit", async ({ page }) => {
     await countingTurnstile(page);
     const turnstileFailed = { status: 403, contentType: "application/problem+json", body: JSON.stringify({ type: "about:blank", title: "Turnstile failed", status: 403, code: "TURNSTILE_FAILED", requestId: "req-turnstile" }) };
 
@@ -372,52 +362,11 @@ test.describe("Turnstile on the other merchant routes", () => {
     // ...and the form that comes back renders a new one.
     await page.getByRole("button", { name: "Use a different email" }).click();
     await expect.poll(async () => (await widgetCounts(page)).renders).toBe(2);
-
-    // Register: the same after a refused submit.
-    await page.route("**/client/auth/register", (route) => route.fulfill(turnstileFailed), { times: 1 });
-    await go(page, "/en/merchant/register");
-    await page.locator('input[name="name"]').fill("Test Merchant");
-    await page.locator('input[name="email"]').fill(uniqueEmail("merchant"));
-    await page.locator('input[name="password"]').fill(FRESH_MERCHANT_PASSWORD);
-    await page.locator('select[name="country"]').selectOption("JO");
-    await page.getByRole("button", { name: "Submit application" }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "The anti-bot check failed." })).toBeVisible();
-    await expect.poll(async () => (await widgetCounts(page)).resets).toBe(1);
-    const registered = page.waitForRequest(isPost("/client/auth/register"));
-    await page.getByRole("button", { name: "Submit application" }).click();
-    expect((await registered).headers()["x-turnstile-token"]).toBe(DEV_TURNSTILE_TOKEN);
-    await expect(page.getByText("Check your email")).toBeVisible();
   });
 });
 
-test.describe("sign-up language of a merchant", () => {
-  test("an Arabic sign-up leaves a marker without the email; the first sign-in saves the language and uses the marker up", async ({ page }) => {
-    const email = uniqueEmail("merchant-ar");
-    await go(page, "/ar/merchant/register");
-    await page.locator('input[name="name"]').fill("تاجر تجريبي");
-    await page.locator('input[name="email"]').fill(email);
-    await page.locator('input[name="password"]').fill(FRESH_MERCHANT_PASSWORD);
-    await page.locator('select[name="country"]').selectOption("JO");
-    await page.getByRole("button", { name: "أرسل الطلب" }).click();
-    await expect(page.getByText("تحقّق من بريدك الإلكتروني").first()).toBeVisible();
-
-    const marker = await page.evaluate((key) => localStorage.getItem(key), SIGNUP_MARKER_KEY);
-    expect(marker).not.toBeNull();
-    expect(marker).not.toContain(email);
-    expect(JSON.parse(marker!)).toEqual({ locale: "ar", at: expect.any(Number) });
-
-    await go(page, "/ar/sign-in");
-    await page.locator('input[name="email"]').fill(email);
-    await page.locator('input[name="password"]').fill(FRESH_MERCHANT_PASSWORD);
-    await page.getByRole("button", { name: "تسجيل الدخول", exact: true }).click();
-    await expect(page).toHaveURL(/\/ar\/merchant$/);
-
-    const me = await page.request.get("/client/auth/me");
-    expect(((await me.json()) as { locale: string }).locale).toBe("ar");
-    expect(await page.evaluate((key) => localStorage.getItem(key), SIGNUP_MARKER_KEY)).toBeNull();
-  });
-
-  test("signing in on the Arabic page never changes the language of an account that has no marker", async ({ page }) => {
+test.describe("language of a merchant account", () => {
+  test("signing in on the Arabic page never changes the language of the account (nothing saves one any more)", async ({ page }) => {
     const { email, password } = await freshMerchant(page);
     await go(page, "/ar/sign-in");
     await page.locator('input[name="email"]').fill(email);
@@ -426,17 +375,5 @@ test.describe("sign-up language of a merchant", () => {
     await expect(page).toHaveURL(/\/ar\/merchant$/);
     const me = await page.request.get("/client/auth/me");
     expect(((await me.json()) as { locale: string }).locale).toBe("en");
-  });
-
-  test("an English sign-up clears an older Arabic marker", async ({ page }) => {
-    await go(page, "/en/merchant/register");
-    await page.evaluate((key) => localStorage.setItem(key, JSON.stringify({ locale: "ar", at: Date.now() })), SIGNUP_MARKER_KEY);
-    await page.locator('input[name="name"]').fill("Test Merchant");
-    await page.locator('input[name="email"]').fill(uniqueEmail("merchant-en"));
-    await page.locator('input[name="password"]').fill(FRESH_MERCHANT_PASSWORD);
-    await page.locator('select[name="country"]').selectOption("JO");
-    await page.getByRole("button", { name: "Submit application" }).click();
-    await expect(page.getByText("Check your email")).toBeVisible();
-    expect(await page.evaluate((key) => localStorage.getItem(key), SIGNUP_MARKER_KEY)).toBeNull();
   });
 });

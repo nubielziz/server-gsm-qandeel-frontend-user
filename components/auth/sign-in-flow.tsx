@@ -9,21 +9,19 @@
 //   merchant-new-password  `next: password` for a merchant (temporary password) → POST /client/auth/password/change
 //              → `totp` (continue with the code) | `done`
 //   link       `/sign-in?token=` from the magic-link mail: a button, never auto-submitted (mail scanners)
-// A 401 is always "wrong email or password" and never reveals whether the email exists. After success a merchant's saved
-// sign-up language is applied (lib/merchant/signup-locale.ts), then router.replace(target) and router.refresh() so the
-// header shows the signed-in state. `?as=` is not a choice any more: an old link's value only decides which tab the forgot
-// page and the sign-up page open on.
+// A 401 is always "wrong email or password" and never reveals whether the email exists. After success
+// router.replace(target) and router.refresh() so the header shows the signed-in state. `?as=` is not a choice any more:
+// an old link's value only decides which tab the forgot page and the sign-up page open on.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { Mail, Store } from "lucide-react";
 import { api } from "@/lib/api/browser";
 import { ApiError, isApiError } from "@/lib/api/errors";
-import type { MerchantMe, MerchantPasswordChangeResult, SmartSignInResult } from "@/lib/api/types";
+import type { MerchantPasswordChangeResult, SmartSignInResult } from "@/lib/api/types";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
-import { applySignupLocale } from "@/lib/merchant/signup-locale";
 import { Turnstile } from "@/components/turnstile";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Divider } from "@/components/ui/divider";
@@ -67,14 +65,8 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
   // An old `?as=merchant` link only picks the default tab of the pages the links below open.
   const asQuery = params.get("as") === "merchant" ? "?as=merchant" : "";
 
-  /** Signs in: apply a merchant's sign-up language, go to the target, then refresh so the server parts see the session. */
-  async function finish(area: SignInKind) {
-    if (area === "merchant") {
-      await applySignupLocale({
-        getMe: () => api.get<MerchantMe>("/client/auth/me"),
-        setLocale: (value) => api.patch("/client/profile", { locale: value }),
-      });
-    }
+  /** Signs in: go to the target, then refresh so the server parts see the session. */
+  function finish(area: SignInKind) {
     router.replace(targetAfterSignIn(area, params.get("next"), locale));
     router.refresh();
   }

@@ -2,10 +2,13 @@
 // Rules this file keeps (rate limits are real, handoff §3.9): wrong passwords only with throwaway emails, the shared demo
 // accounts are never changed (passwords, settings): lifecycle tests create their own customer / merchant.
 // The sign-in page is ONE form for customers and merchants (plan F10): the radios are gone. The smart-sign-in specifics
-// (request shape, tokens, temporary passwords, language marker) live in e2e/smart-sign-in.spec.ts.
+// (request shape, tokens, temporary passwords) live in e2e/smart-sign-in.spec.ts.
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { customerIdByEmail, temporaryCustomerPassword, totp } from "./admin";
-import { ACCOUNTS, DEV_TURNSTILE_TOKEN, go, stubTurnstile, uniqueEmail, waitForLink } from "./helpers";
+import { ACCOUNTS, DEV_TURNSTILE_TOKEN, freshMerchant, go, stubTurnstile, uniqueEmail, waitForLink } from "./helpers";
+import { siteEnv } from "./site-env";
+import { displayWhatsAppNumber, normaliseWhatsAppNumber } from "../lib/contact/whatsapp";
 
 test.describe("sign-in page", () => {
   test.beforeEach(async ({ page }) => stubTurnstile(page));
@@ -149,10 +152,10 @@ test.describe("email-link pages", () => {
     await waitForLink(page, email, /\/sign-in\?token=/);
   });
 
-  test("sign-up: the merchant choice explains the difference and links to the application", async ({ page }) => {
+  test("sign-up: the merchant choice explains the difference and links to the application page", async ({ page }) => {
     await go(page, "/en/sign-up?as=merchant");
     await expect(page.getByRole("radio", { name: /^Merchant/ })).toBeChecked();
-    await expect(page.getByText("Every application is reviewed by our team")).toBeVisible();
+    await expect(page.getByText("Our team opens every merchant account with you on WhatsApp.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Apply as a merchant" })).toHaveAttribute("href", "/en/merchant/register");
   });
 
@@ -216,15 +219,10 @@ test.describe("email-link pages", () => {
     await expect(page.getByText("This sign-in link has expired").or(page.getByText("This link has expired"))).toBeVisible();
   });
 
-  test("merchant lifecycle: apply, verify the email, reset the password, sign in as pending", async ({ page }) => {
-    const email = uniqueEmail("merchant");
-    await go(page, "/en/merchant/register?ref=");
-    await page.locator('input[name="name"]').fill("Test Merchant");
-    await page.locator('input[name="email"]').fill(email);
-    await page.locator('input[name="password"]').fill("Orchard-Lantern-8841");
-    await page.locator('select[name="country"]').selectOption("JO");
-    await page.getByRole("button", { name: "Submit application" }).click();
-    await expect(page.getByText("Check your email")).toBeVisible();
+  test("merchant lifecycle: an account made without the site, verify the email, reset the password, sign in as pending", async ({ page }) => {
+    // The site has no application form any more (merchants apply on WhatsApp and staff create the account), so the account
+    // comes straight from the API (`POST /client/auth/register`, which still exists): pending, verification mail sent.
+    const { email } = await freshMerchant(page);
 
     const verify = await waitForLink(page, email, /\/merchant\/verify-email\?token=/);
     await go(page, verify);
@@ -281,18 +279,106 @@ test.describe("email-link pages", () => {
     await page.getByRole("button", { name: "Verify and sign in" }).click();
     await expect(page).toHaveURL(/\/en\/merchant$/);
   });
+});
 
-  test("merchant register: a referral code that matches nobody is refused on its field", async ({ page }) => {
-    await go(page, "/en/merchant/register?ref=NOSUCHCODE");
-    await expect(page.locator('input[name="referralCode"]')).toHaveValue("NOSUCHCODE");
-    await page.locator('input[name="name"]').fill("Test Merchant");
-    await page.locator('input[name="email"]').fill(uniqueEmail("refcode"));
-    await page.locator('input[name="password"]').fill("Orchard-Lantern-8841");
-    await page.locator('select[name="country"]').selectOption("JO");
-    await page.getByRole("button", { name: "Submit application" }).click();
-    await expect(page.locator('input[name="referralCode"]')).toHaveAttribute("aria-invalid", "true");
-    await expect(page.getByText("This referral code is not valid.")).toBeVisible();
-    await expect(page.locator('input[name="referralCode"]')).toBeFocused();
+// "Apply as a merchant" is not a form (2026-11-16): the page sends the visitor to the team's WhatsApp number. The number is
+// a build-time value (NEXT_PUBLIC_MERCHANT_WHATSAPP, see .env.example): the tests read it from the env files of the site
+// under test and are skipped when it is not set (the page then shows "Contact support" instead of a WhatsApp link).
+const WHATSAPP_RAW = siteEnv("NEXT_PUBLIC_MERCHANT_WHATSAPP");
+const WHATSAPP_NUMBER = normaliseWhatsAppNumber(WHATSAPP_RAW);
+/** The number as the page shows it (the owner's own grouping when written with a plus, digits and spaces). */
+const WHATSAPP_DISPLAY = WHATSAPP_NUMBER ? displayWhatsAppNumber(WHATSAPP_RAW, WHATSAPP_NUMBER) : "";
+const WHATSAPP_MESSAGE_EN = "Hello, I would like to open a merchant account.";
+const WHATSAPP_MESSAGE_AR = "مرحبًا، أرغب في فتح حساب تاجر.";
+const waLink = (text: string) => `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+
+/** Waits until the page's own script runs the WhatsApp link: the static fallback is replaced by the hydrated component. */
+async function whenWhatsAppLinkHydrated(page: Page) {
+  await page.waitForFunction(() => {
+    const link = document.querySelector('a[href^="https://wa.me/"]');
+    return !!link && Object.keys(link).some((key) => key.startsWith("__reactProps"));
+  });
+}
+
+test.describe("merchant application page", () => {
+  test.skip(!WHATSAPP_NUMBER, "NEXT_PUBLIC_MERCHANT_WHATSAPP is not set in the env files of the site under test");
+
+  test("English: the heading, three steps, no form, and a WhatsApp link with the prefilled message and the number as text", async ({ page }) => {
+    await go(page, "/en/merchant/register");
+    await expect(page.getByRole("heading", { level: 1, name: "Apply as a merchant" })).toBeVisible();
+    const main = page.locator("main");
+    await expect(main.getByText("Merchant accounts are opened by our team.")).toBeVisible();
+
+    const steps = main.getByRole("list", { name: "How to apply" }).getByRole("listitem");
+    await expect(steps).toHaveCount(3);
+    await expect(steps).toHaveText([
+      /Message us on WhatsApp\.$/,
+      /Tell us your name, company, country and email\.$/,
+      /Our team reviews the request and sends you a link to set your password\.$/,
+    ]);
+
+    // Nothing to fill in or submit.
+    await expect(main.locator("form, input, select, textarea")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Submit application" })).toHaveCount(0);
+
+    const chat = main.getByRole("link", { name: "Chat on WhatsApp" });
+    await expect(chat).toBeVisible();
+    await expect(chat).toHaveAttribute("href", waLink(WHATSAPP_MESSAGE_EN));
+    await expect(chat).toHaveAttribute("target", "_blank");
+    await expect(chat).toHaveAttribute("rel", /noopener/);
+    await expect(chat).toHaveAccessibleName(/opens WhatsApp in a new tab/);
+
+    await expect(main.getByText("Or message this number on WhatsApp:")).toBeVisible();
+    await expect(main.locator('span[dir="ltr"]', { hasText: WHATSAPP_DISPLAY })).toBeVisible();
+    await expect(main.getByText("will be included in your message.")).toHaveCount(0);
+
+    await expect(page.locator("p", { hasText: "Already a merchant?" }).getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/en/sign-in");
+  });
+
+  test("a valid ?ref= code (any case) goes into the message and a note names it", async ({ page }) => {
+    await go(page, "/en/merchant/register?ref=gsm0001");
+    const chat = page.getByRole("link", { name: "Chat on WhatsApp" });
+    await expect(chat).toHaveAttribute("href", waLink(`${WHATSAPP_MESSAGE_EN} Referral code: GSM0001.`));
+    const note = page.getByText("will be included in your message.");
+    await expect(note).toBeVisible();
+    await expect(note).toContainText("The referral code GSM0001");
+    await expect(note.locator('span[dir="ltr"]')).toHaveText("GSM0001");
+    await expect(page.locator('span[dir="ltr"]', { hasText: WHATSAPP_DISPLAY })).toBeVisible();
+  });
+
+  test("an invalid ?ref= value is ignored: the plain message and no note", async ({ page }) => {
+    await go(page, "/en/merchant/register?ref=%3Cscript%3E");
+    await whenWhatsAppLinkHydrated(page); // so the page has read the query, not only shown its static version
+    await expect(page.getByRole("link", { name: "Chat on WhatsApp" })).toHaveAttribute("href", waLink(WHATSAPP_MESSAGE_EN));
+    await expect(page.getByText("will be included in your message.")).toHaveCount(0);
+    await expect(page.locator("main")).not.toContainText("script");
+  });
+
+  test("Arabic: right-to-left, the Arabic message in the link, and the number and the code still left-to-right", async ({ page }) => {
+    await go(page, "/ar/merchant/register");
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    await expect(page.getByRole("heading", { level: 1, name: "قدّم طلبًا كتاجر" })).toBeVisible();
+    const chat = page.getByRole("link", { name: "تواصل معنا عبر واتساب" });
+    await expect(chat).toHaveAttribute("href", waLink(WHATSAPP_MESSAGE_AR));
+    await expect(chat).toHaveAttribute("target", "_blank");
+    await expect(chat).toHaveAccessibleName(/يفتح واتساب في تبويب جديد/);
+    await expect(page.locator('span[dir="ltr"]', { hasText: WHATSAPP_DISPLAY })).toBeVisible();
+    await expect(page.locator("p", { hasText: "أنت تاجر بالفعل؟" }).getByRole("link", { name: "تسجيل الدخول" })).toHaveAttribute("href", "/ar/sign-in");
+
+    await go(page, "/ar/merchant/register?ref=GSM0001");
+    await expect(chat).toHaveAttribute("href", waLink(`${WHATSAPP_MESSAGE_AR} رمز الإحالة: GSM0001.`));
+    await expect(page.locator('span[dir="ltr"]', { hasText: "GSM0001" })).toBeVisible();
+  });
+
+  test("the page sends no request to the register route", async ({ page }) => {
+    const registerRequests: string[] = [];
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/client/auth/register") registerRequests.push(`${request.method()} ${request.url()}`);
+    });
+    await go(page, "/en/merchant/register?ref=GSM0001");
+    await whenWhatsAppLinkHydrated(page);
+    await expect(page.getByText("will be included in your message.")).toBeVisible();
+    expect(registerRequests).toEqual([]);
   });
 });
 
