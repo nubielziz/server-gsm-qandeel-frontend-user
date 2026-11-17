@@ -10,7 +10,6 @@
 // a sign-out.
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
-import { Banknote, CreditCard, Landmark, Wallet } from "lucide-react";
 import { api, forgetCsrf } from "@/lib/api/browser";
 import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { TopUpDetail, TopUpMethod } from "@/lib/api/types";
@@ -38,14 +37,13 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { DescriptionItem, DescriptionList } from "@/components/ui/description-list";
 import { Input } from "@/components/ui/input";
 import { Money } from "@/components/ui/money";
+import { PaymentMethodLogo } from "@/components/ui/payment-method-logo";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-card";
 import { toast } from "@/components/ui/toast";
 
 const CREATE_PATH = "/store/v1/me/wallet/top-ups";
 const METHODS_ID = "topup-methods";
 const AMOUNT_ID = "topup-amount";
-
-const ICONS = { bank: Landmark, card: CreditCard, usdt: Wallet, wise: Banknote } as const;
 
 export type TopUpFormProps = {
   methods: TopUpMethod[];
@@ -212,7 +210,6 @@ export function TopUpForm({ methods, limits, frozen, detailBase, labels: t, erro
             <div id={METHODS_ID} tabIndex={-1} className="focus:outline-none">
               <RadioGroup legend={t.methodLegend} required columns={2} error={methodError}>
                 {methods.map((m) => {
-                  const Icon = ICONS[m.methodType] ?? Banknote;
                   const unavailable = !offered(m);
                   const own = effectiveLimits(m, limits);
                   return (
@@ -226,7 +223,7 @@ export function TopUpForm({ methods, limits, frozen, detailBase, labels: t, erro
                         setMethodId(m.id);
                         setFieldErrors((prev) => ({ ...prev, gatewayId: undefined }));
                       }}
-                      icon={<Icon aria-hidden="true" />}
+                      icon={<PaymentMethodLogo name={m.name} alt="" logoUrl={m.logoUrl} preset={m.preset} methodType={m.methodType} />}
                       title={<span dir="auto">{m.name}</span>}
                       trailing={<Badge tone={m.kind === "manual" ? "neutral" : "success"}>{m.kind === "manual" ? t.manual : t.automatic}</Badge>}
                     >

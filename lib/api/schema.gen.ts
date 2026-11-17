@@ -954,6 +954,10 @@ export type GetClientPaymentMethodsResponse = Array<{
   holdHours: number;
   /** The transfer details of a manual method; empty for an automatic one. */
   instructions: string;
+  /** The key of the ready-made method it was made from (feature 32); null for a custom method. Always sent. */
+  preset: string | null;
+  /** The public path of the logo staff uploaded (`/store/v1/media/<name>`); null when none, then show the bundled logo of `preset`. Always sent. */
+  logoUrl: string | null;
 }>;
 
 // ── GET /client/prices/export — Export my price list
@@ -1732,6 +1736,10 @@ export type PostStoreV1CheckoutSessionsResponse = {
     code: string;
     name: string;
     supports3ds: boolean;
+    /** The key of the ready-made method it was made from; null for a custom method (feature 32). */
+    preset: string | null;
+    /** The public path of the logo staff uploaded; null when none, then show the bundled logo of `preset` (feature 32). */
+    logoUrl: string | null;
   }>;
   /** Feature 21: true when the store balance is switched on and this checkout was opened by a signed-in customer, so `POST /store/v1/checkout-sessions/:token/balance-payment` may pay it (with that customer signed in). Never the balance itself: read it from `GET /store/v1/me/wallet`. */
   balancePayable: boolean;
@@ -1805,6 +1813,10 @@ export type GetStoreV1CheckoutSessionsByTokenResponse = {
     code: string;
     name: string;
     supports3ds: boolean;
+    /** The key of the ready-made method it was made from; null for a custom method (feature 32). */
+    preset: string | null;
+    /** The public path of the logo staff uploaded; null when none, then show the bundled logo of `preset` (feature 32). */
+    logoUrl: string | null;
   }>;
   /** Feature 21: true when the store balance is switched on and this checkout was opened by a signed-in customer, so `POST /store/v1/checkout-sessions/:token/balance-payment` may pay it (with that customer signed in). Never the balance itself: read it from `GET /store/v1/me/wallet`. */
   balancePayable: boolean;
@@ -1939,6 +1951,10 @@ export type GetStoreV1ConfigResponse = {
     code: string;
     name: string;
     supports3ds: boolean;
+    /** The key of the ready-made method it was made from; null for a custom method (feature 32). */
+    preset: string | null;
+    /** The public path of the logo staff uploaded; null when none, then show the bundled logo of `preset` (feature 32). */
+    logoUrl: string | null;
   }>;
   policies: {
     guestCheckout: boolean;
@@ -2482,6 +2498,10 @@ export type GetStoreV1MeWalletTopUpMethodsResponse = Array<{
   holdHours: number;
   /** The transfer details of a manual method; empty for an automatic one. */
   instructions: string;
+  /** The key of the ready-made method it was made from (feature 32); null for a custom method. Always sent. */
+  preset: string | null;
+  /** The public path of the logo staff uploaded (`/store/v1/media/<name>`); null when none, then show the bundled logo of `preset`. Always sent. */
+  logoUrl: string | null;
 }>;
 
 // ── GET /store/v1/me/wallet/top-ups — My top-ups

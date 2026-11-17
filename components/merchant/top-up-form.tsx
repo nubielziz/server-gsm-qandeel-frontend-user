@@ -4,7 +4,6 @@
 // payment provider (`paymentUrl`). `POST /client/invoices` has no idempotency key: one request at a time, no retries.
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, CreditCard, Landmark, Wallet } from "lucide-react";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { InvoiceCreated, PaymentMethod } from "@/lib/api/types";
@@ -22,10 +21,9 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { DescriptionItem, DescriptionList } from "@/components/ui/description-list";
 import { Input } from "@/components/ui/input";
 import { Money } from "@/components/ui/money";
+import { PaymentMethodLogo } from "@/components/ui/payment-method-logo";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-card";
 import { toast } from "@/components/ui/toast";
-
-const ICONS = { bank: Landmark, card: CreditCard, usdt: Wallet, wise: Banknote } as const;
 
 function isZero(money: string): boolean {
   return /^0+(\.0+)?$/.test(money.trim());
@@ -159,7 +157,6 @@ export function TopUpForm({
             <div id="topup-methods" tabIndex={-1} className="focus:outline-none">
               <RadioGroup legend={t.methodLegend} required columns={2} error={methodError}>
                 {methods.map((m) => {
-                  const Icon = ICONS[m.methodType] ?? Banknote;
                   return (
                     <RadioCard
                       key={m.id}
@@ -170,7 +167,7 @@ export function TopUpForm({
                         setMethodId(m.id);
                         setFieldErrors((prev) => ({ ...prev, gatewayId: undefined }));
                       }}
-                      icon={<Icon aria-hidden="true" />}
+                      icon={<PaymentMethodLogo name={m.name} alt="" logoUrl={m.logoUrl} preset={m.preset} methodType={m.methodType} />}
                       title={m.name}
                       trailing={<Badge tone={m.kind === "manual" ? "neutral" : "success"}>{m.kind === "manual" ? t.manual : t.automatic}</Badge>}
                     >

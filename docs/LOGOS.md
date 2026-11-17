@@ -129,3 +129,18 @@ from official sites were taken from the owners' own pages.
   Pandora, Cheetah, TSM, MRST, Miracle, Medusa …). Resellers usually get these from the vendor's reseller kit.
 - **Left out on purpose:** Microsoft, Windows, Xbox, Adobe, Amazon and Nintendo (their owners had them removed from
   Simple Icons, a sign they object to such use).
+
+## Payment method logos (5)
+
+The bundled logos of the ready-made payment methods (feature 32, backend B232) are in `public/images/payments/`, named after the
+method's preset key; `npm run logos` writes their sizes to `lib/payment-logo-sizes.json`, and `components/ui/payment-method-logo.tsx`
+shows them (a logo that staff uploaded for a method wins; a method with no file shows an icon). Each is 128 x 128 pixels. Bank
+transfer and Crypto transfer have no file: they show the bank and the coin icon.
+
+| File | Source | Terms |
+|---|---|---|
+| `payments/binance_pay.png` | Simple Icons `binance` (the Binance mark, `#F0B90B`), fetched 2026-11-17 | CC0-1.0 icon data; trademark of its owner |
+| `payments/fawry_transfer.png` | Simple Icons `fawry` (the Fawry mark, `#FFD300`), fetched 2026-11-17 | CC0-1.0 icon data; trademark of its owner |
+| `payments/instapay.png` | the InstaPay Egypt app icon from its Google Play listing (`com.egyptianbanks.instapay`), fetched 2026-11-17 | trademark of its owner |
+| `payments/nowpayments.png` | the NOWPayments GitHub organisation picture (`https://github.com/NowPaymentsIO.png`), fetched 2026-11-17 | trademark of its owner |
+| `payments/vodafone_cash.png` | Simple Icons `vodafone` (the Vodafone speech mark, `#E60000`), fetched 2026-11-17 | CC0-1.0 icon data; trademark of its owner |

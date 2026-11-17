@@ -10,7 +10,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Banknote, Bitcoin, CircleCheck, Clock, CreditCard, Lock, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowRight, CircleCheck, Clock, Lock, ShieldCheck, Wallet } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DescriptionItem, DescriptionList } from "@/components/ui/description-list";
 import { Money } from "@/components/ui/money";
+import { PaymentMethodLogo } from "@/components/ui/payment-method-logo";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-card";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
@@ -54,12 +55,6 @@ export type SessionViewProps = {
    */
   balance: { signedIn: boolean; wallet: BalanceWallet | null };
 };
-
-function methodIcon(code: string) {
-  if (/crypto|usdt|btc/i.test(code)) return <Bitcoin aria-hidden="true" />;
-  if (/card|stripe|visa/i.test(code)) return <CreditCard aria-hidden="true" />;
-  return <Banknote aria-hidden="true" />;
-}
 
 /** Answers after which the wallet may look different: the page reads it again. */
 const BALANCE_REFRESH_CODES = new Set(["INSUFFICIENT_FUNDS", "WALLET_FROZEN", "WALLET_DISABLED"]);
@@ -506,7 +501,7 @@ export function SessionView({ session, labels, quantityLabels, typeLabel, decima
                       setGateway(method.code);
                       setGatewayError(undefined);
                     }}
-                    icon={methodIcon(method.code)}
+                    icon={<PaymentMethodLogo name={method.name} alt="" logoUrl={method.logoUrl} preset={method.preset} code={method.code} />}
                     title={method.name}
                     description={methodDescription(method.code, method.supports3ds)}
                   />
