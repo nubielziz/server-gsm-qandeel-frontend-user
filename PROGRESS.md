@@ -228,6 +228,37 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
   copy that could be found (the text of 2026-11-09), under a banner; `../STOREFRONT-BACKEND-HANDOFF.md` section 18 is the
   English-only handoff and wins wherever they differ.
 
+## Payment method logos (feature 32) and the IMEI-HUB brand (2026-11-17, owner's requests)
+- **Payment method logos, `2c4a064`** (backend decision 041, B232; handoff section 19). Every payment method the API lists
+  carries `preset` and `logoUrl` (the `paymentMethods` of `GET /store/v1/config` and of a checkout session,
+  `GET /store/v1/me/wallet/top-up-methods`, `GET /client/payment-methods`). `components/ui/payment-method-logo.tsx` (a Client
+  Component) draws, in this order: the logo staff uploaded, the bundled logo of the ready-made method
+  (`public/images/payments/<preset>.png`, listed in `lib/payment-logo-sizes.json` by `npm run logos`), an icon (bank, coin,
+  card, banknotes for Wise, as before); a picture that fails to load falls back to the next. Used in the customer's Add funds
+  form, the merchant's top-up form and the checkout. No URL, text or behaviour changed. Sources of the five logo files:
+  `docs/LOGOS.md`. Built by Sonnet, reviewed by Opus (one fix round), walked by hand by the lead on the isolated API.
+- **The brand, `d1ad6d5`.** The shop is **IMEI-HUB** (was "GSM Store"): the owner's logo in every header, footer and the
+  workspace rail (`components/layout/logo.tsx`: mark and wordmark pictures in whole-pixel boxes, white-ink copies on dark
+  surfaces, a size smaller below 640 px, the name hidden under 360 px), the tab and touch icons (the mark on a white tile),
+  and the name in every title and message; tagline "GSM Services & IMEI Solutions". Never write the old name again. The kit
+  (the owner's picture, the cutting script, every file) is outside the repository: `/home/saifi/gsm-project/.brand/`.
+- **E2E on a production build.** The owner's dev server held :5175 and calls the owner's API (real mail), and Playwright
+  would have reused it: the suite ran against `npm run build && npm start` (:5176) with
+  `E2E_BASE_URL=http://localhost:5176 GSM_API_ORIGIN=http://localhost:3100`, the isolated API running the backend branch.
+  First run: 660 passed, 47 skipped, 3 failed. Two were the new logo, wider than the old one: the header was 4 px too wide
+  in a 345 px window and the page scrolled 1 px sideways on a phone when signed in (fixed: the smaller boxes below 640 px).
+  Second run, after that fix: 661 passed, 47 skipped, 2 failed, both tests, not the site (`6587843`): `routing.spec.ts`
+  expected a streamed 200 for an old service address, where a production build that already resolved it answers 308 (with a
+  `Location`, sometimes written twice with the same value, or without one and with the same `noindex` page); and the
+  merchant notification settings test, which did not wait for the answer to its last save, so a run under load left the
+  alert set and every later run found the Save button disabled. Both were fixed and rerun green in both projects; the app
+  code did not change after the second run.
+- **Left in the demo database by the hand walk:** one switched-off Vodafone Cash method (it has a credited top-up of a
+  throwaway customer, so it cannot be deleted).
+- **Checks on `main` after the merge:** `npm run check` green (generated types up to date with the merged backend, 125
+  operations; typecheck; lint; 984 tests in 90 files; build). The whole e2e was the second run above, on the branch whose
+  tree `main` now has.
+
 ## Wiring (changed 2026-11-09, late evening, at the owner's request)
 - **Dev site (`npm run dev`, :5175) → the isolated demo API (:3100) since 2026-11-10**, at the owner's request (to
   see the home page with data). `.env.development.local`: `GSM_API_ORIGIN=http://localhost:3100`; start the API with
