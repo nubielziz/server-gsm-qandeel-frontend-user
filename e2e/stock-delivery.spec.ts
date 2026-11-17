@@ -1,6 +1,6 @@
 // Stocked delivery and tracking (plan F32, BH §14.4, §14.5, §14.9): a service with stock completes at once and answers with
 // its codes one per line; the tracking page lists them, each with a Copy button, plus "Copy all"; an order the stock could not
-// cover stays pending and the page promises no time; a staff reply with words stays one block. English and Arabic.
+// cover stays pending and the page promises no time; a staff reply with words stays one block.
 // Real browser → Next → the isolated demo backend (:3100). The service is the packs fixture of the global setup (packs of
 // 5, 10 and 25; e2e/global-setup.ts → e2e/.auth/fixtures.json): codes are taken only when the order is created and only when
 // they cover the whole quantity, never reserved. The customer, the codes it buys and the orders are this test's own.
@@ -15,10 +15,7 @@ const PASSWORD = "Orchard-Lantern-8841";
 const IMEI = "490154203237518";
 
 /** Words and digits that would promise a time (the plain "as soon as it is ready" does not). */
-const PROMISES_A_TIME = {
-  en: /\d|second|minute|hour|\bdays?\b|week|instant|immediate|quick|fast|shortly|within/i,
-  ar: /\d|ثاني|ثوان|دقيق|ساع|يوم|أيام|أسبوع|فورًا|فوري|سريع|قريب|خلال/,
-} as const;
+const PROMISES_A_TIME = /\d|second|minute|hour|\bdays?\b|week|instant|immediate|quick|fast|shortly|within/i;
 
 /** Waits until React has attached to an element: before that a click does nothing. */
 async function hydrated(locator: Locator) {
@@ -48,7 +45,7 @@ async function buyFromBalance(page: Page, email: string, serviceId: number, quan
 
   const consents = await page.request.post(`/store/v1/checkout-sessions/${session.token}/consents`, {
     headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { consents: session.consent.required.map((purpose) => ({ purpose, granted: true })), locale: "en" },
+    data: { consents: session.consent.required.map((purpose) => ({ purpose, granted: true })) },
   });
   expect(consents.status(), await consents.text()).toBe(201);
 
@@ -72,7 +69,7 @@ test("a stocked order completes at once, its codes are listed with a Copy button
   // 4. Five units from stock: the order is completed when it is created.
   const stocked = await buyFromBalance(page, email, packs.id, 5);
 
-  // 5. English tracking page.
+  // 5. Tracking page.
   await page.goto(`/en/track/${stocked.trackingToken}`);
   const main = page.getByRole("main");
   await expect(main.getByRole("heading", { level: 2, name: "Result", exact: true })).toBeVisible();
@@ -81,6 +78,7 @@ test("a stocked order completes at once, its codes are listed with a Copy button
   await expect(region).toBeVisible(); // wait for the content before reading it
   const items = region.getByRole("listitem");
   await expect(items).toHaveCount(5);
+  await expect(region.locator('bdi[dir="ltr"]')).toHaveCount(5); // a code is isolated left-to-right
   await expect(main.locator("pre")).toHaveCount(0);
   const codes = await items.locator("bdi").allTextContents();
   expect(codes).toHaveLength(5);
@@ -105,37 +103,15 @@ test("a stocked order completes at once, its codes are listed with a Copy button
   expect(await availableCodes(packs.id), "the packs service holds fewer than 10 codes, so a 10-unit order cannot be filled").toBeLessThan(10);
   const waiting = await buyFromBalance(page, email, packs.id, 10);
   await page.goto(`/en/track/${waiting.trackingToken}`);
-  const pendingEn = main.getByText(store.en.track.pendingText, { exact: true });
-  await expect(pendingEn).toBeVisible();
-  expect(await pendingEn.textContent()).not.toMatch(PROMISES_A_TIME.en);
+  const pending = main.getByText(store.en.track.pendingText, { exact: true });
+  await expect(pending).toBeVisible();
+  expect(await pending.textContent()).not.toMatch(PROMISES_A_TIME);
   await expect(main.getByText("Pending", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/processed shortly/i)).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Your codes" })).toHaveCount(0);
   await expect(main.getByRole("heading", { name: "Result", exact: true })).toHaveCount(0);
 
-  // 7. Arabic: labels, right-to-left, codes isolated left-to-right.
-  await page.goto(`/ar/track/${stocked.trackingToken}`);
-  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  const regionAr = page.getByRole("region", { name: "رموزك" });
-  await expect(regionAr).toBeVisible();
-  await expect(regionAr.getByRole("listitem")).toHaveCount(5);
-  await expect(regionAr.locator('bdi[dir="ltr"]')).toHaveCount(5);
-  for (let n = 1; n <= 5; n += 1) await expect(regionAr.getByRole("button", { name: `نسخ الرمز ${n}`, exact: true })).toBeVisible();
-  await expect(main.getByText("مكتمل", { exact: true }).first()).toBeVisible();
-  await expectNoHorizontalOverflow(page);
-  const copyAllAr = regionAr.getByRole("button", { name: "نسخ الكل", exact: true });
-  await hydrated(copyAllAr);
-  await copyAllAr.click();
-  await expect.poll(() => clipboard(page)).toBe(codes.join("\n"));
-
-  await page.goto(`/ar/track/${waiting.trackingToken}`);
-  const pendingAr = main.getByText(store.ar.track.pendingText, { exact: true });
-  await expect(pendingAr).toBeVisible();
-  expect(await pendingAr.textContent()).not.toMatch(PROMISES_A_TIME.ar);
-  await expect(main.getByText("قيد الانتظار", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("region", { name: "رموزك" })).toHaveCount(0);
-
-  // 8. Staff finish the waiting order with a reply in words: it is not a list of codes, so it stays one block with one Copy button.
+  // 7. Staff finish the waiting order with a reply in words: it is not a list of codes, so it stays one block with one Copy button.
   // The last line is one 130-character token with no space (a link): the block must wrap it, not stretch the page sideways
   // (the mobile project catches it: 130 characters are about 1000 px wide).
   const replyText = ["Done: restart the phone and insert a new SIM.", "Then wait one minute.", `https://example.com/${"x".repeat(110)}`].join("\n");

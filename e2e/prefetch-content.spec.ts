@@ -1,4 +1,4 @@
-// What a click shows before the server answers (performance plan P3.1, P3.2, P3.3, P3.4, P3.5). Each navigation test lets the
+// What a click shows before the server answers (performance plan P3.1, P3.2, P3.3, P3.4). Each navigation test lets the
 // page's prefetches finish, then HOLDS every later RSC request (the navigation's own) until its assertions are done:
 // what is visible came from the prefetch. Held rather than aborted: a failed RSC request makes the router fall back to
 // a document load, which would show the content and hide a missing prefetch. A document request is a failure too.
@@ -7,7 +7,7 @@
 // dependency (not approved).
 import type { Page, Request, Route } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { BASE_URL, signInCustomer, signInMerchant, stubTurnstile } from "./helpers";
+import { BASE_URL, signInCustomer, stubTurnstile } from "./helpers";
 
 test.skip(new URL(BASE_URL).port === "5175", "prefetching is only enabled in production: run against the production build");
 
@@ -214,82 +214,5 @@ test.describe("one filter form (P3.4)", () => {
     await expect(drawer.getByRole("group", { name: "Availability" })).toBeVisible();
     await drawer.getByRole("button", { name: "Show results" }).click();
     await expect(drawer).toBeHidden();
-  });
-});
-
-test.describe("soft language switch (P3.5)", () => {
-  test("no document load; html lang and dir, the page and its hreflang alternates follow", async ({ page, isMobile }) => {
-    test.skip(isMobile, "the header switcher sits in the menu drawer on a phone: the same component");
-    await page.goto("/en/services/icloud-clean-lost-check");
-    const switcher = page.locator('a[hreflang="ar"]:visible').first();
-    // Until the page is hydrated the link is a plain fallback to /ar: wait for the real one before clicking.
-    await expect(switcher).toHaveAttribute("href", /^\/ar\/services\//);
-
-    const documents = documentLoads(page);
-    await switcher.click();
-    // The alternate's own slug, or the swapped one that redirects to it (metadataBase of another origin).
-    await expect(page).toHaveURL(/\/ar\/services\/fahs-icloud$/);
-    await expect(page.locator("html")).toHaveAttribute("lang", "ar");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("فحص حالة iCloud");
-    const alternates = (hreflang: string) =>
-      page.locator(`link[rel="alternate"][hreflang="${hreflang}"]`).evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""));
-    await expect.poll(() => alternates("en")).toEqual(expect.arrayContaining([expect.stringMatching(/\/en\/services\/icloud-clean-lost-check$/)]));
-    expect((await alternates("en")).every((href) => /\/en\/services\/icloud-clean-lost-check$/.test(href))).toBe(true);
-    expect((await alternates("ar")).every((href) => /\/ar\/services\/fahs-icloud$/.test(href))).toBe(true);
-    await expect(page.locator('a[hreflang="en"]:visible').first()).toHaveAttribute("href", /^\/en\/services\//);
-    expect(documents).toEqual([]);
-    expect((await page.context().cookies()).find((cookie) => cookie.name === "gsm_locale")?.value).toBe("ar");
-  });
-
-  test("a signed-in customer and merchant: both saves are sent without holding the switch", async ({ page, isMobile }) => {
-    test.skip(isMobile, "the header switcher sits in the menu drawer on a phone: the same component");
-    const storeCsrf = await signInCustomer(page);
-    const clientCsrf = await signInMerchant(page);
-    await page.goto("/en/services");
-    const switcher = page.locator('a[hreflang="ar"]:visible').first();
-    await expect(switcher).toHaveAttribute("href", "/ar/services");
-
-    // Held saves must not hold the switch (they are not awaited).
-    const saves: Route[] = [];
-    await page.route(/\/(store\/v1\/me|client\/profile)$/, async (route) => {
-      if (route.request().method() === "PATCH") saves.push(route);
-      else await route.fallback();
-    });
-    const documents = documentLoads(page);
-    const customerSave = page.waitForRequest((r) => r.url().endsWith("/store/v1/me") && r.method() === "PATCH");
-    const merchantSave = page.waitForRequest((r) => r.url().endsWith("/client/profile") && r.method() === "PATCH");
-    await switcher.click();
-    await expect(page).toHaveURL(/\/ar\/services$/);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("جميع الخدمات");
-    expect((await customerSave).postDataJSON()).toEqual({ locale: "ar" });
-    expect((await merchantSave).postDataJSON()).toEqual({ locale: "ar" });
-    expect(documents).toEqual([]);
-
-    await Promise.all(saves.map((route) => route.continue()));
-    await expect(async () => {
-      const [merchant, customer] = await Promise.all([page.request.get("/client/auth/me"), page.request.get("/store/v1/me")]);
-      expect((await merchant.json()).locale).toBe("ar");
-      expect((await customer.json()).locale).toBe("ar");
-    }).toPass();
-
-    // The demo accounts go back to English for the other specs.
-    const origin = new URL(BASE_URL).origin;
-    const back = await Promise.all([
-      page.request.patch("/store/v1/me", { headers: { Origin: origin, "X-CSRF-Token": storeCsrf }, data: { locale: "en" } }),
-      page.request.patch("/client/profile", { headers: { Origin: origin, "X-CSRF-Token": clientCsrf }, data: { locale: "en" } }),
-    ]);
-    for (const res of back) expect(res.ok(), await res.text()).toBe(true);
-  });
-
-  test("English pages never download the Arabic web font for the switcher's label", async ({ page }) => {
-    const fonts: string[] = [];
-    page.on("request", (request) => {
-      if (request.resourceType() === "font") fonts.push(request.url());
-    });
-    await page.goto("/en/services");
-    await page.waitForLoadState("networkidle");
-    // next/font names the files by hash: the Arabic one is the only font besides Inter, so English pages load one file.
-    expect(new Set(fonts).size, fonts.join("\n")).toBeLessThanOrEqual(1);
   });
 });

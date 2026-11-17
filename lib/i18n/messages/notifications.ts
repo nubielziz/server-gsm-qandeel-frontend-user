@@ -1,7 +1,7 @@
 // Notification center (the bell, the notifications page of both areas) and the unsubscribe page of marketing emails.
 // The API's own texts are English only: errors are translated by code (messages/errors.ts), the notifications' own
-// `title` and `body` come in the reader's language from the API and are shown as written.
-// "Unread" counts are written without number agreement ("Unread: 3") so Arabic needs no plural forms.
+// `title` and `body` come from the API and are shown as written.
+// "Unread" counts are written without number agreement ("Unread: 3").
 // `live` is the live stream's own text (feature 27): the toast of a new notification and the "New notifications" pill.
 // `sound` is the switch of the bell's arrival chime on the notifications page header (owner, 2026-11-15).
 import { defineMessages } from "../define";
@@ -57,57 +57,6 @@ export const notifications = defineMessages({
       invalidText:
         "It may be incomplete or out of date. Open the link in the email again, or turn marketing emails off in your account settings.",
       backHome: "Back to the shop",
-    },
-  },
-  ar: {
-    metaTitle: "الإشعارات",
-    title: "الإشعارات",
-    subtitle: "نتائج الطلبات وتنبيهات الحساب وأخبارنا.",
-    tabsLabel: "عرض الإشعارات",
-    tabAll: "الكل",
-    tabUnread: "غير المقروءة",
-    emptyTitle: "لا توجد إشعارات بعد",
-    emptyText: "عندما يحدث شيء، مثل نتيجة طلب، ستراه هنا.",
-    emptyUnreadTitle: "لا شيء جديد",
-    emptyUnreadText: "ليست لديك إشعارات غير مقروءة.",
-    showAll: "عرض كل الإشعارات",
-    unread: "غير مقروء",
-    markRead: "تحديد كمقروء",
-    markedRead: "تم تحديده كمقروء",
-    markAllRead: "تحديد الكل كمقروء",
-    markedAll: "تم تحديد {count} كمقروء",
-    markedNone: "كل الإشعارات مقروءة مسبقًا",
-    open: "فتح",
-    bell: "الإشعارات، غير المقروءة: {count}",
-    bellNone: "الإشعارات",
-    sound: { label: "صوت الإشعارات", on: "مفعّل", off: "متوقف" },
-    live: {
-      view: "عرض",
-      many: "{count} إشعارات جديدة",
-      pill: "إشعارات جديدة",
-      pillAction: "عرض",
-    },
-    categories: {
-      announcement: "إعلان",
-      marketing: "عروض",
-      order: "طلب",
-      payment: "دفع",
-      wallet: "المحفظة",
-      billing: "الفواتير",
-      support: "الدعم",
-      account: "الحساب",
-      alert: "تنبيه",
-    },
-    unsubscribe: {
-      metaTitle: "إيقاف الرسائل التسويقية",
-      title: "إيقاف الرسائل التسويقية",
-      text: "اضغط الزر لإيقاف وصول الرسائل التسويقية منّا إلى بريدك. لن يتغيّر شيء قبل أن تضغطه.",
-      submit: "إيقاف الرسائل التسويقية",
-      doneTitle: "تم إلغاء اشتراكك",
-      doneText: "لن تصلك رسائل تسويقية بعد الآن.",
-      invalidTitle: "هذا الرابط غير صالح",
-      invalidText: "قد يكون الرابط ناقصًا أو قديمًا. افتح الرابط من البريد مرة أخرى، أو أوقف الرسائل التسويقية من إعدادات حسابك.",
-      backHome: "العودة إلى المتجر",
     },
   },
 });

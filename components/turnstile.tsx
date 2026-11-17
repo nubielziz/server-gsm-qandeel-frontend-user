@@ -46,12 +46,10 @@ export type TurnstileProps = {
   onToken: (token: string | null) => void;
   /** Change it (e.g. a counter) to get a new token after a submit. */
   resetKey?: number;
-  /** `en` | `ar`: the widget's language. */
-  lang?: string;
   className?: string;
 };
 
-export function Turnstile({ onToken, resetKey = 0, lang, className }: TurnstileProps) {
+export function Turnstile({ onToken, resetKey = 0, className }: TurnstileProps) {
   const box = useRef<HTMLDivElement>(null);
   const widget = useRef<string | null>(null);
   const callback = useRef(onToken);
@@ -70,7 +68,8 @@ export function Turnstile({ onToken, resetKey = 0, lang, className }: TurnstileP
         if (cancelled || !box.current) return;
         widget.current = ts.render(box.current, {
           sitekey: TURNSTILE_SITE_KEY,
-          language: lang ?? "auto",
+          // The site is English only (decision 039): the widget speaks English whatever the browser's language.
+          language: "en",
           theme: "light",
           size: "flexible",
           callback: (token: string) => callback.current(token),
@@ -84,7 +83,7 @@ export function Turnstile({ onToken, resetKey = 0, lang, className }: TurnstileP
       if (widget.current && window.turnstile) window.turnstile.remove(widget.current);
       widget.current = null;
     };
-  }, [lang]);
+  }, []);
 
   useEffect(() => {
     if (resetKey === 0 || !widget.current || !window.turnstile) return;

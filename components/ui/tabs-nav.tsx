@@ -14,8 +14,7 @@
 //   and an attribute React did not render is a hydration mismatch (the lesson of nav-row.tsx). The pill's white text
 //   follows the slide through a <style> rule this nav renders itself (the links it covers, by href, timed with
 //   nav-pill-timing.ts), switched when the pill covers half of a link.
-// - Placed from physical offsets in the nav's content box (`translate` in px), the same numbers in both writing
-//   directions; the nav scrolls sideways on narrow screens and the indicator scrolls with the links.
+// - Placed from physical offsets in the nav's content box (`translate` in px); the nav scrolls sideways on narrow screens and the indicator scrolls with the links.
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { colourSwitch, firstBezier, firstTimeMs, type Span } from "@/components/layout/nav-pill-timing";

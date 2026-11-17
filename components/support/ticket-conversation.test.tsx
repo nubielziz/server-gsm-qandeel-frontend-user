@@ -1,8 +1,8 @@
 // Server-rendered markup of the live ticket parts (the state machine is tested in lib/support/*.test.ts; the stream and the
 // timers need a browser and are covered by e2e/support-live.spec.ts). What this guards: the first state is the server's ticket,
-// the receipt, the reserved lines, the files as plain links, the rating only for customers, the hints by status, the
-// Arabic text, that the reply box and the attach control are real labelled controls, and that a resolved ticket shows the
-// closed notice instead of them (owner, 2026-11-15).
+// the receipt, the reserved lines, the files as plain links, the rating only for customers, the hints by status, a message
+// typed in Arabic (user text, shown as typed), that the reply box and the attach control are real labelled controls, and that
+// a resolved ticket shows the closed notice instead of them (owner, 2026-11-15).
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ErrorTextProvider } from "@/lib/i18n/error-text";
@@ -33,16 +33,15 @@ const source = (overrides: Partial<TicketSource> = {}): TicketSource => ({
   ...overrides,
 });
 
-function render(options: { source?: TicketSource; access?: TicketAccess; locale?: "en" | "ar"; newTicketHref?: string } = {}) {
-  const locale = options.locale ?? "en";
-  const t = support[locale].ticket;
+function render(options: { source?: TicketSource; access?: TicketAccess; newTicketHref?: string } = {}) {
+  const t = support.en.ticket;
   return renderToStaticMarkup(
-    <ErrorTextProvider messages={errors[locale]}>
+    <ErrorTextProvider messages={errors.en}>
       <TicketLive number="T-1042" access={options.access ?? { kind: "token", token: "tok" }} source={options.source ?? source()}>
         <LiveTicketStatus labels={statuses} />
         <TicketConversation
-          locale={locale}
-          newTicketHref={options.newTicketHref ?? `/${locale}/support`}
+          locale="en"
+          newTicketHref={options.newTicketHref ?? "/en/support"}
           t={{ conversation: t.conversation, you: t.you, team: t.team, sentAt: t.sentAt, reply: t.reply, csat: t.csat, chat: t.chat, closed: t.closed }}
         />
       </TicketLive>
@@ -196,22 +195,12 @@ describe("a resolved ticket is closed: the notice instead of the reply box", () 
     expect(html).toMatch(/href="\/en\/merchant\/support\/new"[^>]*>Open a new ticket/);
     expect(html).not.toContain('name="body"');
   });
-
-  it("is written in Arabic on an Arabic page", () => {
-    const html = render({ locale: "ar", source: source({ status: "resolved" }) });
-    expect(html).toContain("هذه التذكرة مغلقة");
-    expect(html).toContain("فتح تذكرة جديدة");
-    expect(html).not.toContain("This ticket is closed");
-  });
 });
 
-describe("Arabic", () => {
-  it("is written in Arabic: the receipt, the attach control and the hint", () => {
-    const html = render({ locale: "ar", source: source({ messages: [message(1, "you", "مرحبا")], seenBySupport: 1 }) });
-    expect(html).toContain("شوهدت");
-    expect(html).toContain("إرفاق ملف");
-    expect(html).toContain("اضغط Enter للإرسال");
-    expect(html).not.toContain("Attach a file");
+describe("a message typed in Arabic (user text, kept as typed)", () => {
+  it("is shown as typed, escaped, inside a box that takes its own direction (dir=auto)", () => {
+    const html = render({ source: source({ messages: [message(1, "you", "مرحبا <b>")] }) });
+    expect(html).toMatch(/<div dir="auto"[^>]*><p class="whitespace-pre-wrap">مرحبا &lt;b&gt;<\/p>/);
   });
 });
 

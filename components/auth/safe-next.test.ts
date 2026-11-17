@@ -6,8 +6,18 @@ describe("safeNext", () => {
 
   it("keeps a path that starts with a supported language", () => {
     expect(safeNext("/en/account/orders", fallback)).toBe("/en/account/orders");
-    expect(safeNext("/ar/checkout?service=x#top", fallback)).toBe("/ar/checkout?service=x#top");
+    expect(safeNext("/en/checkout?service=x#top", fallback)).toBe("/en/checkout?service=x#top");
     expect(safeNext("/en", fallback)).toBe("/en");
+  });
+
+  it("reads an old Arabic address as the same path under /en (decision 039), then checks it as usual", () => {
+    expect(safeNext("/ar/account/orders", fallback)).toBe("/en/account/orders");
+    expect(safeNext("/ar/checkout?service=x#top", fallback)).toBe("/en/checkout?service=x#top");
+    expect(safeNext("/ar", fallback)).toBe("/en");
+    expect(safeNext("/ar?x=1", fallback)).toBe("/en?x=1");
+    for (const raw of ["/arabic/account", "/ar\\evil.test", "/ar/account\nSet-Cookie: a=b", "/arx/account"]) {
+      expect(safeNext(raw, fallback), raw).toBe(fallback);
+    }
   });
 
   it("falls back for anything that leaves the site or has no language", () => {
@@ -35,7 +45,7 @@ describe("targetAfterSignIn", () => {
   it("sends a customer who came from a portal link to the account, not the portal", () => {
     expect(targetAfterSignIn("customer", "/en/merchant/orders", "en")).toBe("/en/account");
     expect(targetAfterSignIn("customer", "/en/merchant", "en")).toBe("/en/account");
-    expect(targetAfterSignIn("customer", "/ar/merchant/settings?tab=1", "ar")).toBe("/ar/account");
+    expect(targetAfterSignIn("customer", "/en/merchant/settings?tab=1", "en")).toBe("/en/account");
   });
 
   it("keeps a portal path for a merchant", () => {
@@ -55,7 +65,7 @@ describe("targetAfterSignIn", () => {
   it("keeps any other same-site path for both kinds", () => {
     expect(targetAfterSignIn("customer", "/en/checkout?service=x", "en")).toBe("/en/checkout?service=x");
     expect(targetAfterSignIn("merchant", "/en/checkout?service=x", "en")).toBe("/en/checkout?service=x");
-    expect(targetAfterSignIn("customer", "/ar/services/foo", "ar")).toBe("/ar/services/foo");
+    expect(targetAfterSignIn("customer", "/en/services/foo", "en")).toBe("/en/services/foo");
     // A path that only starts with the same letters is not the portal.
     expect(targetAfterSignIn("customer", "/en/merchants-guide", "en")).toBe("/en/merchants-guide");
   });
@@ -65,8 +75,16 @@ describe("targetAfterSignIn", () => {
       expect(targetAfterSignIn("customer", next, "en")).toBe("/en/account");
       expect(targetAfterSignIn("merchant", next, "en")).toBe("/en/merchant");
     }
-    expect(targetAfterSignIn("customer", null, "ar")).toBe("/ar/account");
-    expect(targetAfterSignIn("merchant", null, "ar")).toBe("/ar/merchant");
+  });
+
+  it("applies the area rules to an old Arabic address after reading it under /en", () => {
+    expect(targetAfterSignIn("customer", "/ar/merchant/orders", "en")).toBe("/en/account");
+    expect(targetAfterSignIn("merchant", "/ar/merchant/orders", "en")).toBe("/en/merchant/orders");
+    expect(targetAfterSignIn("merchant", "/ar/account", "en")).toBe("/en/merchant");
+    expect(targetAfterSignIn("customer", "/ar/account/orders?page=2", "en")).toBe("/en/account/orders?page=2");
+    // A dot segment that resolves under /ar is the /en area the browser would end in.
+    expect(targetAfterSignIn("customer", "/en/x/../../ar/merchant", "en")).toBe("/en/account");
+    expect(targetAfterSignIn("merchant", "/en/x/../../ar/account", "en")).toBe("/en/merchant");
   });
 
   it("is not fooled by dot segments or percent escapes that resolve into the other area", () => {
@@ -77,10 +95,5 @@ describe("targetAfterSignIn", () => {
     expect(targetAfterSignIn("merchant", "/en/%61ccount/orders", "en")).toBe("/en/merchant");
     // An escape that cannot be decoded is not trusted.
     expect(targetAfterSignIn("customer", "/en/%E0%A4%A", "en")).toBe("/en/account");
-  });
-
-  it("follows the page language for the home", () => {
-    expect(targetAfterSignIn("customer", "/en/merchant", "ar")).toBe("/ar/account");
-    expect(targetAfterSignIn("merchant", "/ar/account", "en")).toBe("/en/merchant");
   });
 });

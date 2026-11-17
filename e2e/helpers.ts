@@ -82,6 +82,20 @@ export async function go(page: Page, url: string) {
   });
 }
 
+/**
+ * Waits until every form control on the page is hydrated. `go` waits for the first one only, and on a page with the
+ * workspace header that is the header's search box: the page's own form sits in a later Suspense boundary and hydrates a
+ * moment after it. Call this before typing into such a form, and after `page.reload()`. It is not part of `go`: some specs
+ * read what the server rendered before the page's effects run (the top-up return notice).
+ */
+export async function hydrated(page: Page) {
+  await page.waitForFunction(() =>
+    Array.from(document.querySelectorAll("form input, form textarea, form select")).every((control) =>
+      Object.keys(control).some((key) => key.startsWith("__reactProps")),
+    ),
+  );
+}
+
 /** A made-up address nobody owns; the isolated backend sends its mail to Mailpit. */
 export function uniqueEmail(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@example.test`;

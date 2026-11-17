@@ -1,7 +1,7 @@
 # GSM Store — public website
 
 One site for **customers** (shop, IMEI check, checkout, order tracking, support) and **merchants** (portal: prices,
-orders from the wallet, top-ups and invoices, API keys, webhooks, security), in English and Arabic (RTL).
+orders from the wallet, top-ups and invoices, API keys, webhooks, security), in English only (decision 039).
 Next.js 16.4 (App Router, Cache Components), React 19, Tailwind CSS 4. The API is the GSM backend in `../backend`.
 
 - Plan and backend facts: `../STOREFRONT-HANDOFF.md`
@@ -15,7 +15,7 @@ npm install
 cp .env.example .env.development.local   # then set GSM_API_ORIGIN
 scripts/dev-backend.sh bucket && scripts/dev-backend.sh reset   # once: isolated demo backend data
 scripts/dev-backend.sh start              # isolated demo API on :3100 (optional; :3000 is the owner's API)
-npm run dev                               # http://localhost:5175 → redirects to /en or /ar
+npm run dev                               # http://localhost:5175 → redirects to /en
 ```
 `/client/*` and `/store/v1/*` are proxied to `GSM_API_ORIGIN`, so the site and the API share one origin (cookies,
 CSRF). Mail sent by the isolated backend is caught by Mailpit at http://localhost:8025.
@@ -24,7 +24,7 @@ CSRF). Mail sent by the isolated backend is caught by Mailpit at http://localhos
 | Command | What |
 |---|---|
 | `npm run typecheck` | Route types + TypeScript |
-| `npm run lint` | ESLint (Next rules) |
+| `npm run lint` | ESLint (Next rules) + `scripts/check-english-only.mjs` (no Arabic script, `ar` locale or right-to-left layout code outside the allowlist of `scripts/english-only.config.json`) |
 | `npm run test` | Unit tests (Vitest) |
 | `npm run e2e` | Browser tests (Playwright) against the dev server and the isolated backend |
 | `npm run build && npm start` | Production build, served on :5176 |

@@ -61,7 +61,7 @@ docker build -t gsm-site:<tag> \
 - `GSM_API_ORIGIN=https://<SHOP_HOST>` reaches the API through Caddy: the build only sends public `GET` requests, and Caddy
   routes `/store/v1/*` to the API even while the `site` container is not running. The compose network is not reachable from
   `docker build`, which is why the build address and the rewrite address differ.
-- The build needs internet access for the two Google fonts (Inter and IBM Plex Sans Arabic, downloaded by `next/font`).
+- The build needs internet access for the one Google font (Inter, downloaded by `next/font`).
 - The API limits public routes per client address (300 requests a minute by default). The build makes few, cached reads;
   if it ends with a `429`, wait a minute and build again.
 - Build and runtime use one base image (`NODE_IMAGE`, default `node:26-slim`), because the native `sharp` module that

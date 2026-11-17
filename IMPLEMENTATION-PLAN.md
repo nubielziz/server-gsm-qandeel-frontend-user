@@ -6,6 +6,13 @@
 > marker (`lib/merchant/signup-locale.ts`, D4) and the e2e check "after `/ar/merchant/register` … `locale: \"ar\"`" is history:
 > do not rebuild it.
 
+> **Superseded in part, 2026-11-16 (owner's decision, backend decision 039, feature 30): English is the only language of the
+> system.** Everything below about Arabic, `/ar`, two languages, `defineMessages({ en, ar })`, the language switcher, the saved
+> language, `hreflang`, right-to-left layout, the "Arabic page" acceptance lines and the `locale` parameters is history: do not
+> rebuild it. Every old `/ar/…` address answers a permanent redirect to `/en/…`. What stays is Arabic text that people or
+> suppliers type (group C: `dir="auto"`, `<bdi>`, Arabic-digit parsing). The rules now are in `CLAUDE.md` ("Language") and the
+> status in `PROGRESS.md` ("English only").
+
 > **Owner decisions (2026-11-13), applied on top of this plan:** commit once per finished and verified wave (after a baseline commit of the earlier uncommitted work), local only, never pushed; every feature is tested against the isolated demo backend `http://localhost:3100` only (nothing is submitted through `:3000`/`:5175`, which sends real email). At most 4 agents at once; Fable 5.2 was called once, for this plan, and is not called again.
 
 Master plan for `/home/saifi/gsm-project/storefront` (Next.js 16.4 App Router). It was written once, from the two handoff files, the regenerated API contract, the backend contracts and the working tree as it stood on 2026-11-13. Nothing was run while writing it: every "verify" below is a step for an agent or the lead.
@@ -1406,9 +1413,9 @@ The reviewer reads the feature section, the diff of the owned files and the hand
 3. **Turnstile.** The widget is reset after every submit, success or failure. The token goes in the header only.
 4. **Money.** Strings and BigInt helpers only; no `Number()` on amounts used for a decision; display decimals from `/config`; USD wallet amounts labelled as such.
 5. **Caching.** Public reads use `cacheLife('catalog')` or `('content')`. Session reads go through `apiSession*`. `router.refresh()` after mutations. No `Date.now()` or `Math.random()` in a prerendered component (Next docs `08-caching.md`).
-6. **i18n and RTL.** Both languages for every string. No English left on `/ar`. Logical utilities only. Directional icons mirrored. Numbers, IMEIs, codes and amounts isolated left-to-right inside Arabic sentences. `lang` and `dir` on content in another language.
+6. **Language (since 2026-11-16, decision 039: English only).** Every string is English and lives in a message file. No `rtl:` variant, no `dir="rtl"`, no `locale` parameter or field. Logical utilities only. Text that people or suppliers type keeps its own direction (`dir="auto"`, `<bdi>`); numbers, IMEIs, codes and amounts stay left-to-right. `npm run lint` runs the English-only guard. (Before: both languages for every string, mirrored icons, `lang` and `dir` on content in another language.)
 7. **Accessibility.** Real labels; errors tied with `aria-describedby`; focus to the first error or to the message; `aria-live` for async results; 44 px targets; keyboard reach of every new control; status never by colour alone.
-8. **Layout.** No horizontal overflow at 360, 390, 768, 1440 px in both languages. Skeletons the size of the loaded content.
+8. **Layout.** No horizontal overflow at 360, 390, 768, 1440 px. Skeletons the size of the loaded content.
 9. **Scope.** Only owned files changed. No new dependency. No Server Action for an API call. No SVG artwork. No invented endpoint, no mock data.
 10. **Tests.** Unit tests cover the pure logic named in the feature. The spec asserts what the feature section lists and follows the F03 rules (throwaway accounts, no global switch-off, `toPass` for fresh catalog values).
 

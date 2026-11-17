@@ -125,13 +125,6 @@ test.describe("opening a checkout", () => {
     await expect(page).toHaveURL(/\/en\/checkout\/[A-Za-z0-9_-]{16,}$/);
   });
 
-  test("a slug of the other language redirects to this language's slug", async ({ page }) => {
-    await page.goto("/ar/checkout?service=icloud-clean-lost-check");
-    await expect(page).toHaveURL(/\/ar\/checkout\?service=fahs-icloud$/);
-    await expect(page.getByRole("heading", { level: 1, name: "إتمام الطلب بأمان" })).toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  });
-
   test("no service in the URL asks for one", async ({ page }) => {
     await page.goto("/en/checkout");
     await expect(page.getByText("Choose a service first")).toBeVisible();
@@ -187,6 +180,7 @@ test.describe("review and pay", () => {
     const token = await createSession(request);
     await page.goto(`/en/checkout/${token}`);
     await expect(page.getByRole("heading", { level: 1, name: "Review and pay" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Payment method" })).toBeVisible();
 
     // Pay without consents: nothing is sent, each missing box says so.
     let posted = false;
@@ -241,14 +235,6 @@ test.describe("review and pay", () => {
   test("an unknown checkout link is a friendly page", async ({ page }) => {
     await page.goto("/en/checkout/aaaaaaaaaaaaaaaaaaaaaa");
     await expect(page.getByText("We could not find this checkout")).toBeVisible();
-  });
-
-  test("the Arabic review page is right-to-left", async ({ page, request }) => {
-    const token = await createSession(request);
-    await page.goto(`/ar/checkout/${token}`);
-    await expect(page.getByRole("heading", { level: 1, name: "المراجعة والدفع" })).toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("heading", { name: "طريقة الدفع" })).toBeVisible();
   });
 });
 

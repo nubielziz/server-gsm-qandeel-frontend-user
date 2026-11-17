@@ -1,13 +1,12 @@
 "use client";
-// PreferencesForm: language, currency and the marketing opt-in of the signed-in customer. Only the keys that changed
-// are sent (`PATCH /store/v1/me`; marketingOptIn writes a consent record). The choices are mirrored in the `gsm_locale`
-// and `gsm_currency` cookies, which the shop reads for visitors; the language is a route param, so a language change
-// navigates to the same page in the other language.
-import { usePathname, useRouter } from "next/navigation";
+// PreferencesForm: currency and the marketing opt-in of the signed-in customer. Only the keys that changed are sent
+// (`PATCH /store/v1/me`; marketingOptIn writes a consent record). The currency is mirrored in the `gsm_currency` cookie,
+// which the shop reads for visitors.
+import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api/browser";
 import type { StoreMe } from "@/lib/api/types";
-import { CURRENCY_COOKIE, LOCALE_COOKIE, switchLocalePath, type Locale } from "@/lib/i18n/config";
+import { CURRENCY_COOKIE } from "@/lib/currency-cookie";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AccountMessages } from "@/lib/i18n/messages/account";
 import { FormAlert } from "@/components/auth/form-alert";
@@ -20,7 +19,7 @@ import { toast } from "@/components/ui/toast";
 
 export type PreferencesFormProps = {
   /** What the account holds now. `currency` is the one the shop shows (account, else cookie, else the base currency). */
-  initial: { locale: Locale; currency: string; marketingOptIn: boolean };
+  initial: { currency: string; marketingOptIn: boolean };
   currencies: { code: string; name: string }[];
   t: AccountMessages["settings"]["preferences"];
 };
@@ -31,10 +30,8 @@ function setCookie(name: string, value: string) {
 
 export function PreferencesForm({ initial, currencies, t }: PreferencesFormProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const errorText = useErrorText();
   const [saved, setSaved] = useState(initial);
-  const [language, setLanguage] = useState<Locale>(initial.locale);
   const [currency, setCurrency] = useState(initial.currency);
   const [marketing, setMarketing] = useState(initial.marketingOptIn);
   const [busy, setBusy] = useState(false);
@@ -45,8 +42,7 @@ export function PreferencesForm({ initial, currencies, t }: PreferencesFormProps
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
-    const changes: { locale?: Locale; currency?: string; marketingOptIn?: boolean } = {};
-    if (language !== saved.locale) changes.locale = language;
+    const changes: { currency?: string; marketingOptIn?: boolean } = {};
     if (currency !== saved.currency) changes.currency = currency;
     if (marketing !== saved.marketingOptIn) changes.marketingOptIn = marketing;
     if (Object.keys(changes).length === 0) {
@@ -58,17 +54,11 @@ export function PreferencesForm({ initial, currencies, t }: PreferencesFormProps
     try {
       const me = await api.patch<StoreMe>("/store/v1/me", changes);
       if (changes.currency) setCookie(CURRENCY_COOKIE, me.currency ?? changes.currency);
-      if (changes.locale) {
-        setCookie(LOCALE_COOKIE, changes.locale);
-        // The language is a route param: a full navigation to this page in the new language.
-        window.location.assign(switchLocalePath(pathname, changes.locale));
-        return;
-      }
-      setSaved({ locale: initial.locale, currency, marketingOptIn: marketing });
+      setSaved({ currency, marketingOptIn: marketing });
       toast.success(t.saved);
       router.refresh();
     } catch (error) {
-      setFeedback(feedbackFrom(error, errorText, ["locale", "currency", "marketingOptIn"]));
+      setFeedback(feedbackFrom(error, errorText, ["currency", "marketingOptIn"]));
     } finally {
       setBusy(false);
     }
@@ -77,17 +67,6 @@ export function PreferencesForm({ initial, currencies, t }: PreferencesFormProps
   return (
     <form ref={formRef} onSubmit={onSubmit} noValidate className="grid gap-5">
       <div className="grid items-start gap-5 sm:grid-cols-2">
-        <Select
-          name="locale"
-          label={t.language}
-          value={language}
-          onChange={(e) => setLanguage(e.target.value === "ar" ? "ar" : "en")}
-          options={[
-            { value: "en", label: t.languageNames.en },
-            { value: "ar", label: t.languageNames.ar },
-          ]}
-          error={feedback.fields.locale}
-        />
         <Select
           name="currency"
           label={t.currency}

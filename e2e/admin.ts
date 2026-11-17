@@ -385,9 +385,9 @@ export interface StoreService {
   quantity: { min: number; max: number; options: number[] };
 }
 
-/** `GET /store/v1/services/:slug?locale=en` on the API itself (no cache between). */
+/** `GET /store/v1/services/:slug` on the API itself (no cache between). */
 export async function storeService(slug: string): Promise<StoreService> {
-  const reply = await readReply(await fetchApi(`${API_ORIGIN}/store/v1/services/${encodeURIComponent(slug)}?locale=en`, { headers: { ...ADMIN_HEADERS } }));
+  const reply = await readReply(await fetchApi(`${API_ORIGIN}/store/v1/services/${encodeURIComponent(slug)}`, { headers: { ...ADMIN_HEADERS } }));
   if (reply.status !== 200) throw new AdminApiError(reply.status, describeProblem(reply.body).code, `GET /store/v1/services/${slug} answered ${reply.status} ${describeProblem(reply.body).text}`.trim());
   return reply.body as StoreService;
 }
@@ -711,18 +711,18 @@ export async function serviceIdByCode(code: string): Promise<number> {
 interface ListingRow {
   id: number;
   slug: string;
-  locale: string;
   imageUrl: string | null;
 }
 
 /**
  * Gives the listing of a store page a picture when it has none: uploads a file of `public/images/` as
- * `POST /admin/service-listings/:id/image` (multipart part `file`). Returns the picture's path.
+ * `POST /admin/service-listings/:id/image` (multipart part `file`). Returns the picture's path. One listing per service
+ * and one slug per listing (decision 039): the slug names it.
  */
-export async function ensureListingImage(slug: string, locale: "en" | "ar", publicFile: string): Promise<string> {
+export async function ensureListingImage(slug: string, publicFile: string): Promise<string> {
   const rows = (await adminCall<ListingRow[]>("GET", `/admin/service-listings?q=${encodeURIComponent(slug)}&_start=0&_end=25`)).body;
-  const listing = rows.find((r) => r.slug === slug && r.locale === locale);
-  if (!listing) throw new Error(`No ${locale} listing with the slug ${slug}.`);
+  const listing = rows.find((r) => r.slug === slug);
+  if (!listing) throw new Error(`No listing with the slug ${slug}.`);
   if (listing.imageUrl) return listing.imageUrl;
   const bytes = readFileSync(join(__dirname, "..", "public", "images", publicFile));
   const form = new FormData();
@@ -745,8 +745,6 @@ export interface CampaignOptions {
   title: string;
   /** Plain text; a line break shows as a line break. */
   body: string;
-  /** The Arabic text; without it an Arabic reader gets the English one. */
-  ar?: { title: string; body: string };
   /** A root-relative path for the target's area (`/account/orders`, `/merchant/orders`), or a link per area. */
   link?: string | { customer?: string; merchant?: string };
   purpose?: "service" | "marketing";
@@ -774,7 +772,8 @@ export async function sendCampaign(options: CampaignOptions): Promise<{ id: numb
       purpose,
       channels,
       audience,
-      content: { en: { title: options.title, body: options.body }, ...(options.ar ? { ar: options.ar } : {}) },
+      // One title and one body (decision 039; the campaign content was `{ en, ar? }` before).
+      content: { title: options.title, body: options.body },
       ...(link ? { link } : {}),
     },
   });

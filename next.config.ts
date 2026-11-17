@@ -63,6 +63,13 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // Arabic was removed on 2026-11-16 (decision 039). Every old /ar address (also /ar alone) answers 308 to the same path
+  // under /en with its query, so indexed and bookmarked Arabic links and the token links of old mails keep working.
+  // Redirects run before proxy.ts and the filesystem (Next docs, proxy.md "Execution order"). robots.ts must not
+  // disallow /ar: a crawler has to fetch an old address to see its redirect.
+  async redirects() {
+    return [{ source: "/ar/:path*", destination: "/en/:path*", permanent: true }];
+  },
   async rewrites() {
     return {
       // beforeFiles: these paths never reach a page; the API answers them (cookies, CSRF, problem+json, files).

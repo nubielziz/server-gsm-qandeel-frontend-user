@@ -33,7 +33,7 @@ test("the emailed link opens the page, which asks first; the button turns market
     channels: ["email"],
   });
 
-  // The visible link of the mail: `/unsubscribe?token=` on the shop host, with no language (the proxy adds it).
+  // The visible link of the mail: `/unsubscribe?token=` on the shop host, with no language segment (the proxy adds `/en`).
   const link = await waitForLink(page, email, /^\/unsubscribe\?token=/);
   expect(tokenOf(link)).not.toBe("");
 
@@ -67,6 +67,8 @@ test("the emailed link opens the page, which asks first; the button turns market
 test("a wrong token, a short one and a missing one all say the link is not valid", async ({ page }) => {
   // A well-formed token the API did not issue: 410 TOKEN_INVALID.
   await go(page, `/en/unsubscribe?token=${WRONG_TOKEN}`);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow, "the page scrolls sideways").toBeLessThanOrEqual(0);
   await page.getByRole("button", { name: "Stop marketing emails" }).click();
   await expect(page.getByText("This link is not valid")).toBeVisible();
   await expect(page.getByRole("button", { name: "Stop marketing emails" })).toHaveCount(0);
@@ -97,18 +99,4 @@ test("the page is never indexed and sends no referrer", async ({ page }) => {
   await page.goto(`/en/unsubscribe?token=${WRONG_TOKEN}`);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
-});
-
-test("the Arabic page is right-to-left and translated", async ({ page }) => {
-  await go(page, `/ar/unsubscribe?token=${WRONG_TOKEN}`);
-  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  await expect(page.locator("html")).toHaveAttribute("lang", "ar");
-  await expect(page.getByRole("heading", { level: 1, name: "إيقاف الرسائل التسويقية" })).toBeVisible();
-  await expect(page.getByText("لن يتغيّر شيء قبل أن تضغطه.")).toBeVisible();
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(0);
-
-  await page.getByRole("button", { name: "إيقاف الرسائل التسويقية" }).click();
-  await expect(page.getByText("هذا الرابط غير صالح")).toBeVisible();
-  await expect(page.getByRole("link", { name: "العودة إلى المتجر" })).toHaveAttribute("href", "/ar");
 });

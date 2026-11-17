@@ -13,10 +13,7 @@ import { go } from "./helpers";
 /** The width from which the shop header shows the nav row (Tailwind `lg`); under it the menu button opens the drawer. */
 const DESKTOP_NAV = 1024;
 
-const TEXT = {
-  en: { openMenu: "Open menu", menu: "Menu", close: "Close", trackOrder: "Track an order", openSearch: "Open search", search: "Search services" },
-  ar: { openMenu: "فتح القائمة", menu: "القائمة", close: "إغلاق", trackOrder: "تتبّع طلب", openSearch: "فتح البحث", search: "ابحث في الخدمات" },
-} as const;
+const TEXT = { openMenu: "Open menu", menu: "Menu", close: "Close", trackOrder: "Track an order", openSearch: "Open search", search: "Search services" } as const;
 
 const SERVICE = "/en/checkout?service=icloud-clean-lost-check";
 const IMEI = "490154203237518";
@@ -44,58 +41,54 @@ const hydrated = (page: Page, selector: string) =>
   page.locator(selector).first().evaluate((element) => Object.keys(element).some((key) => key.startsWith("__reactProps")));
 
 test.describe("before hydration", () => {
-  for (const locale of ["en", "ar"] as const) {
-    test(`${locale}: the menu button opens the drawer as a modal; its close button and Esc close it and focus returns`, async ({ page }) => {
-      test.skip(!narrow(page), "the menu button shows only under lg");
-      const aborted = await withoutClientJs(page);
-      await page.goto(`/${locale}`);
-      expect(aborted(), "no client script was blocked").toBeGreaterThan(0);
+  test("the menu button opens the drawer as a modal; its close button and Esc close it and focus returns", async ({ page }) => {
+    test.skip(!narrow(page), "the menu button shows only under lg");
+    const aborted = await withoutClientJs(page);
+    await page.goto("/en");
+    expect(aborted(), "no client script was blocked").toBeGreaterThan(0);
 
-      const button = page.getByRole("button", { name: TEXT[locale].openMenu, exact: true });
-      await expect(button).toHaveAttribute("aria-haspopup", "dialog");
-      expect(await hydrated(page, "header button[commandfor]"), "the page hydrated").toBe(false);
+    const button = page.getByRole("button", { name: TEXT.openMenu, exact: true });
+    await expect(button).toHaveAttribute("aria-haspopup", "dialog");
+    expect(await hydrated(page, "header button[commandfor]"), "the page hydrated").toBe(false);
 
-      await button.click();
-      const drawer = page.getByRole("dialog", { name: TEXT[locale].menu, exact: true });
-      await expect(drawer).toBeVisible();
-      // A modal: the focus trap and the inert page come from showModal(), not from a plain `open` attribute.
-      expect(await drawer.evaluate((element) => element.matches(":modal"))).toBe(true);
-      await expect(drawer.getByRole("link").first()).toBeVisible();
+    await button.click();
+    const drawer = page.getByRole("dialog", { name: TEXT.menu, exact: true });
+    await expect(drawer).toBeVisible();
+    // A modal: the focus trap and the inert page come from showModal(), not from a plain `open` attribute.
+    expect(await drawer.evaluate((element) => element.matches(":modal"))).toBe(true);
+    await expect(drawer.getByRole("link").first()).toBeVisible();
 
-      await drawer.getByRole("button", { name: TEXT[locale].close, exact: true }).click();
-      await expect(drawer).toBeHidden();
-      await expect(button).toBeFocused();
+    await drawer.getByRole("button", { name: TEXT.close, exact: true }).click();
+    await expect(drawer).toBeHidden();
+    await expect(button).toBeFocused();
 
-      await button.click();
-      await expect(drawer).toBeVisible();
-      await page.keyboard.press("Escape");
-      await expect(drawer).toBeHidden();
-      await expect(button).toBeFocused();
-    });
-  }
+    await button.click();
+    await expect(drawer).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(button).toBeFocused();
+  });
 
-  for (const locale of ["en", "ar"] as const) {
-    test(`${locale}: the search button opens the phone search row and its field has the focus`, async ({ page }) => {
-      test.skip(!narrow(page), "the search button shows only under lg");
-      const aborted = await withoutClientJs(page);
-      await page.goto(`/${locale}`);
-      expect(aborted(), "no client script was blocked").toBeGreaterThan(0);
+  test("the search button opens the phone search row and its field has the focus", async ({ page }) => {
+    test.skip(!narrow(page), "the search button shows only under lg");
+    const aborted = await withoutClientJs(page);
+    await page.goto("/en");
+    expect(aborted(), "no client script was blocked").toBeGreaterThan(0);
 
-      const button = page.getByRole("banner").getByRole("button", { name: TEXT[locale].openSearch, exact: true });
-      expect(await hydrated(page, "header button[popovertarget]"), "the page hydrated").toBe(false);
-      const mainTop = async () => (await page.locator("main").boundingBox())?.y;
-      const before = await mainTop();
-      await button.click();
-      // Before hydration the field is the plain search box (the combobox comes with the first interaction after it).
-      const field = page.getByRole("banner").getByRole("searchbox", { name: TEXT[locale].search, exact: true });
-      await expect(field).toBeVisible();
-      await expect(field).toBeFocused();
-      // The row lies over the page: opening it moved nothing below the header.
-      expect(await mainTop()).toBe(before);
-      await page.keyboard.press("Escape");
-      await expect(field).toBeHidden();
-    });
-  }
+    const button = page.getByRole("banner").getByRole("button", { name: TEXT.openSearch, exact: true });
+    expect(await hydrated(page, "header button[popovertarget]"), "the page hydrated").toBe(false);
+    const mainTop = async () => (await page.locator("main").boundingBox())?.y;
+    const before = await mainTop();
+    await button.click();
+    // Before hydration the field is the plain search box (the combobox comes with the first interaction after it).
+    const field = page.getByRole("banner").getByRole("searchbox", { name: TEXT.search, exact: true });
+    await expect(field).toBeVisible();
+    await expect(field).toBeFocused();
+    // The row lies over the page: opening it moved nothing below the header.
+    expect(await mainTop()).toBe(before);
+    await page.keyboard.press("Escape");
+    await expect(field).toBeHidden();
+  });
 
   test("checkout: Enter details opens the requirements drawer; Cancel closes it; Save does not leave the page", async ({ page }) => {
     const aborted = await withoutClientJs(page);
@@ -131,8 +124,8 @@ test.describe("after hydration", () => {
     await go(page, "/en");
     const banner = page.getByRole("banner");
     await expect.poll(() => hydrated(page, "header button[popovertarget]")).toBe(true);
-    await banner.getByRole("button", { name: TEXT.en.openSearch, exact: true }).click();
-    const field = banner.getByRole("combobox", { name: TEXT.en.search });
+    await banner.getByRole("button", { name: TEXT.openSearch, exact: true }).click();
+    const field = banner.getByRole("combobox", { name: TEXT.search });
     await expect(field).toBeVisible();
     await expect(field).toBeFocused();
     await banner.getByRole("button", { name: "Close search", exact: true }).click();
@@ -142,18 +135,18 @@ test.describe("after hydration", () => {
   test("the menu opens once per tap and a link inside it closes it", async ({ page }) => {
     test.skip(!narrow(page), "the menu button shows only under lg");
     await go(page, "/en");
-    const button = page.getByRole("button", { name: TEXT.en.openMenu, exact: true });
+    const button = page.getByRole("button", { name: TEXT.openMenu, exact: true });
     await expect.poll(() => hydrated(page, "header button[commandfor]")).toBe(true);
 
     // The click handler opens it first and the native command then finds it open: one modal, no error.
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await button.click();
-    const drawer = page.getByRole("dialog", { name: TEXT.en.menu, exact: true });
+    const drawer = page.getByRole("dialog", { name: TEXT.menu, exact: true });
     await expect(drawer).toBeVisible();
     expect(await drawer.evaluate((element) => element.matches(":modal"))).toBe(true);
 
-    await drawer.getByRole("link", { name: TEXT.en.trackOrder, exact: true }).click();
+    await drawer.getByRole("link", { name: TEXT.trackOrder, exact: true }).click();
     await expect(page).toHaveURL(/\/en\/track$/);
     await expect(drawer).toBeHidden();
     expect(errors).toEqual([]);

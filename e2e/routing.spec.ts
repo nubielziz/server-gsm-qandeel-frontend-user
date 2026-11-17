@@ -1,26 +1,130 @@
-// Routing layer: language redirects (email links must keep working), optimistic sign-in redirects and the API
-// rewrites. HTTP-level checks, no UI.
+// Routing layer: the one language (decision 039: /en only, old /ar addresses answer 308), the language-less links of
+// emails, optimistic sign-in redirects and the API rewrites. HTTP-level checks, no UI.
 import { expect, test } from "./fixtures";
 
-test.describe("language routing", () => {
-  test("a path without a language goes to the visitor's language and keeps the query", async ({ request }) => {
-    const en = await request.get("/sign-in?token=abc", { maxRedirects: 0, headers: { "accept-language": "en-GB,en;q=0.9" } });
-    expect(en.status()).toBe(307);
-    expect(en.headers()["location"]).toMatch(/\/en\/sign-in\?token=abc$/);
+/** The Location of a redirect, as a path with its query. */
+const target = (location: string | undefined) => {
+  const to = new URL(location ?? "", "http://x");
+  return `${to.pathname}${to.search}`;
+};
 
-    const ar = await request.get("/merchant/set-password?token=xyz", {
-      maxRedirects: 0,
-      headers: { "accept-language": "ar-JO,ar;q=0.9,en;q=0.5" },
-    });
-    expect(ar.headers()["location"]).toMatch(/\/ar\/merchant\/set-password\?token=xyz$/);
+test.describe("old Arabic addresses", () => {
+  test("/ar and every path under it answer 308 to the same path under /en, with the query", async ({ request }) => {
+    const cases: [string, string][] = [
+      ["/ar", "/en"],
+      ["/ar/services?brand=x", "/en/services?brand=x"],
+      ["/ar/help", "/en/help"],
+      ["/ar/track/t_abc", "/en/track/t_abc"],
+      ["/ar/support/tickets/t_abc", "/en/support/tickets/t_abc"],
+      ["/ar/checkout/resume?token=tok", "/en/checkout/resume?token=tok"],
+      ["/ar/unsubscribe?token=tok", "/en/unsubscribe?token=tok"],
+      ["/ar/merchant/register?ref=ABC", "/en/merchant/register?ref=ABC"],
+    ];
+    for (const [from, to] of cases) {
+      const res = await request.get(from, { maxRedirects: 0 });
+      expect(res.status(), from).toBe(308);
+      expect(target(res.headers()["location"]), from).toBe(to);
+    }
   });
 
-  test("the language cookie wins over Accept-Language", async ({ request }) => {
-    const res = await request.get("/support/tickets/t_abc", {
+  test("the redirect does not depend on a cookie or Accept-Language, and /arabic is not an old address", async ({ request }) => {
+    const res = await request.get("/ar/services", {
       maxRedirects: 0,
-      headers: { "accept-language": "en", cookie: "gsm_locale=ar" },
+      headers: { "accept-language": "ar-JO,ar;q=0.9", cookie: "gsm_locale=ar" },
     });
-    expect(res.headers()["location"]).toMatch(/\/ar\/support\/tickets\/t_abc$/);
+    expect(res.status()).toBe(308);
+    expect(target(res.headers()["location"])).toBe("/en/services");
+
+    const other = await request.get("/arabic", { maxRedirects: 0 });
+    expect(other.status()).toBe(307);
+    expect(target(other.headers()["location"])).toBe("/en/arabic");
+  });
+});
+
+test.describe("old service addresses (the two rows the demo seed keeps, plan 30 §4.5 and §7.1)", () => {
+  test("an old service address ends on the English page of the same service; one with no page on sale, on the list", async ({ page, request }) => {
+    // Where the seeded old address leads (the seed names one service of a seeded listing; its slug is the API's).
+    const answer = await request.get("/store/v1/legacy-slugs/service/legacy-demo-service");
+    expect(answer.status(), await answer.text()).toBe(200);
+    const { slug } = (await answer.json()) as { path: string; slug: string | null };
+    expect(slug, "the seeded old address leads to a service on sale").toBeTruthy();
+
+    const cases: [string, string][] = [
+      ["legacy-demo-service", `/en/services/${slug}`],
+      ["legacy-demo-gone", "/en/services"],
+    ];
+    for (const [old, final] of cases) {
+      // First hop: a real 308 (next.config.ts), for every /ar address.
+      const first = await request.get(`/ar/services/${old}`, { maxRedirects: 0 });
+      expect(first.status(), old).toBe(308);
+      expect(target(first.headers()["location"]), old).toBe(`/en/services/${old}`);
+
+      // The page in between streams, so its status line is a 200: it must never be indexed (the full answer says so).
+      const between = await request.get(`/en/services/${old}`, { maxRedirects: 0 });
+      expect(between.status(), old).toBe(200);
+      expect(await between.text(), old).toMatch(/<meta name="robots" content="noindex[^"]*"/);
+
+      // Second hop: the browser follows the redirect written into that page and ends on the English address.
+      await page.goto(`/ar/services/${old}`);
+      await expect.poll(() => new URL(page.url()).pathname, { message: old, timeout: 15_000 }).toBe(final);
+    }
+  });
+});
+
+test.describe("language-less links", () => {
+  test("an emailed link goes to /en and keeps the query, whatever cookie or Accept-Language is sent", async ({ request }) => {
+    const cases: [string, string][] = [
+      ["/sign-in?token=t", "/en/sign-in?token=t"],
+      ["/merchant/register?ref=r", "/en/merchant/register?ref=r"],
+      ["/merchant/set-password?token=xyz", "/en/merchant/set-password?token=xyz"],
+      ["/support/tickets/t_abc", "/en/support/tickets/t_abc"],
+      ["/", "/en"],
+    ];
+    const headers: Record<string, string>[] = [
+      {},
+      { "accept-language": "ar-JO,ar;q=0.9,en;q=0.5" },
+      { "accept-language": "en", cookie: "gsm_locale=ar" },
+    ];
+    for (const [from, to] of cases) {
+      for (const extra of headers) {
+        const res = await request.get(from, { maxRedirects: 0, headers: extra });
+        expect(res.status(), `${from} ${JSON.stringify(extra)}`).toBe(307);
+        expect(target(res.headers()["location"]), `${from} ${JSON.stringify(extra)}`).toBe(to);
+      }
+    }
+  });
+
+  test("an /en page is served as it is", async ({ request }) => {
+    const res = await request.get("/en/services", { maxRedirects: 0 });
+    expect(res.status()).toBe(200);
+  });
+});
+
+test.describe("English only in the markup and the sitemap", () => {
+  test("pages are lang=en dir=ltr and name no other language (no hreflang)", async ({ request }) => {
+    const first = await request.get("/store/v1/services?_start=0&_end=1");
+    expect(first.status(), await first.text()).toBe(200);
+    const [service] = (await first.json()) as { slug: string }[];
+    const paths = ["/en", "/en/services", "/en/help", "/en/track", "/en/imei-check", "/en/sign-in"];
+    if (service) paths.push(`/en/services/${encodeURIComponent(service.slug)}`);
+    for (const path of paths) {
+      const res = await request.get(path);
+      expect(res.status(), path).toBe(200);
+      const html = await res.text();
+      expect(html, path).toMatch(/<html[^>]*\slang="en"[^>]*\sdir="ltr"/);
+      expect(html.toLowerCase(), path).not.toContain("hreflang");
+      expect(html, path).not.toMatch(/href="\/ar[/"?#]/);
+    }
+  });
+
+  test("sitemap.xml lists no /ar address and no alternate", async ({ request }) => {
+    const res = await request.get("/sitemap.xml");
+    expect(res.status()).toBe(200);
+    const xml = await res.text();
+    expect(xml).toContain("/en</loc>");
+    expect(xml).not.toMatch(/\/ar[/<?]/);
+    expect(xml).not.toContain("hreflang");
+    expect(xml).not.toContain("xhtml:link");
   });
 });
 
@@ -33,7 +137,7 @@ test.describe("private areas", () => {
     expect(to.searchParams.get("as")).toBe("customer");
     expect(to.searchParams.get("next")).toBe("/en/account/orders");
 
-    const merchant = await request.get("/ar/merchant/orders", { maxRedirects: 0 });
+    const merchant = await request.get("/en/merchant/orders", { maxRedirects: 0 });
     expect(new URL(merchant.headers()["location"], "http://x").searchParams.get("as")).toBe("merchant");
   });
 

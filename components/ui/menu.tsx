@@ -38,9 +38,8 @@ export function Menu({ label, trigger, chevron, align = "end", width = 256, trig
     const btn = button.current;
     if (!el || !btn) return;
     const rect = btn.getBoundingClientRect();
-    const rtl = getComputedStyle(btn).direction === "rtl";
     const w = Math.min(width, window.innerWidth - 16);
-    const alignRight = (align === "end") !== rtl;
+    const alignRight = align === "end";
     const left = Math.max(8, Math.min(alignRight ? rect.right - w : rect.left, window.innerWidth - w - 8));
     const top = rect.bottom + 6;
     el.style.width = `${w}px`;

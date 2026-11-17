@@ -1,5 +1,5 @@
 // The "(n) " prefix of the tab title (owner, 2026-11-15): while the tab is hidden and something is unread, the tab strip
-// shows the bell's number ("(3) Orders", "99+" at the cap, kept as one left-to-right unit in an Arabic title).
+// shows the bell's number ("(3) Orders", "99+" at the cap, kept as one left-to-right unit).
 // - It is there only while the tab is hidden and the count is above 0. It goes when the count reaches 0 or the tab is
 //   shown again (the bell then rings once when something arrived meanwhile, lib/notifications/bell-motion.ts).
 // - Next rewrites the title on a client navigation (from the metadata, which may also stream in late): while a prefix is

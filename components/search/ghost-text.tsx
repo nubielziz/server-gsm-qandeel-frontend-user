@@ -13,9 +13,8 @@ export type GhostMetrics = CSSProperties;
 export function ghostMetrics(field: HTMLInputElement): GhostMetrics {
   const style = getComputedStyle(field);
   const px = (value: string) => Number.parseFloat(value) || 0;
-  const rtl = style.direction === "rtl";
-  const start = rtl ? px(style.paddingRight) + px(style.borderRightWidth) : px(style.paddingLeft) + px(style.borderLeftWidth);
-  const end = rtl ? px(style.paddingLeft) + px(style.borderLeftWidth) : px(style.paddingRight) + px(style.borderRightWidth);
+  const start = px(style.paddingLeft) + px(style.borderLeftWidth);
+  const end = px(style.paddingRight) + px(style.borderRightWidth);
   return {
     fontFamily: style.fontFamily,
     fontSize: style.fontSize,

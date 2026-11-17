@@ -64,7 +64,7 @@ async function freshCustomer(page: Page, withPassword?: string): Promise<string>
 async function me(page: Page) {
   const res = await page.request.get("/store/v1/me");
   expect(res.status()).toBe(200);
-  return (await res.json()) as { locale: string; currency: string | null; marketingOptIn: boolean; hasPassword: boolean };
+  return (await res.json()) as { currency: string | null; marketingOptIn: boolean; hasPassword: boolean };
 }
 
 test.describe("overview and orders (demo customer, read only)", () => {
@@ -115,39 +115,30 @@ test.describe("overview and orders (demo customer, read only)", () => {
     await expect(page.getByRole("cell", { name: /SF-\d+$/ }).first()).toBeVisible();
   });
 
-  test("Arabic overview and orders are right-to-left", async ({ page }) => {
-    await go(page, "/ar/account/orders");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("heading", { level: 1, name: "طلباتي" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "مكتمل", exact: true })).toBeVisible();
-  });
-
   test("the workspace never scrolls sideways: the wide orders table scrolls in its card, no blank strip beside the frame", async ({
     page,
     isMobile,
   }) => {
     test.skip(isMobile, "sets its own window sizes");
     // Regression (2026-11-15): the orders table's visually hidden "Track" header escaped the table's scroll box and made
-    // the document wider than the window at 768-1024px: a blank strip on the left in Arabic, the rail cut in English.
-    for (const lang of ["en", "ar"]) {
-      for (const path of ["/account", "/account/orders"]) {
-        await go(page, `/${lang}${path}`);
-        await expect(page.getByRole("cell", { name: /SF-\d+$/ }).first()).toBeVisible();
-        for (const width of [1024, 900, 768]) {
-          await page.setViewportSize({ width, height: 800 });
-          // Above zero means the page scrolls sideways; the reserved scrollbar gutter can make the difference negative.
-          await expect
-            .poll(
-              () =>
-                page.evaluate(() =>
-                  Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
-                ),
-              { message: `${lang}${path} at ${width}px` },
-            )
-            .toBe(0);
-        }
-        await page.setViewportSize({ width: 1440, height: 900 });
+    // the document wider than the window at 768-1024px: the rail was cut.
+    for (const path of ["/account", "/account/orders"]) {
+      await go(page, `/en${path}`);
+      await expect(page.getByRole("cell", { name: /SF-\d+$/ }).first()).toBeVisible();
+      for (const width of [1024, 900, 768]) {
+        await page.setViewportSize({ width, height: 800 });
+        // Above zero means the page scrolls sideways; the reserved scrollbar gutter can make the difference negative.
+        await expect
+          .poll(
+            () =>
+              page.evaluate(() =>
+                Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+              ),
+            { message: `${path} at ${width}px` },
+          )
+          .toBe(0);
       }
+      await page.setViewportSize({ width: 1440, height: 900 });
     }
   });
 
@@ -169,7 +160,7 @@ test.describe("settings (throwaway customer)", () => {
     await expect(page.getByRole("heading", { name: "No orders yet" })).toBeVisible();
   });
 
-  test("preferences: only changed keys are saved, the cookies follow, and a language change navigates", async ({ page }) => {
+  test("preferences: only changed keys are saved and the currency cookie follows", async ({ page }) => {
     await freshCustomer(page);
     await go(page, "/en/account/settings");
     await expect(page.getByRole("heading", { level: 1, name: "Account settings" })).toBeVisible();
@@ -190,20 +181,12 @@ test.describe("settings (throwaway customer)", () => {
     expect(JSON.parse(requests[0])).toEqual({ currency: "EUR", marketingOptIn: true });
 
     // Persisted on the API and in the shop's cookie; survives a reload.
-    expect(await me(page)).toMatchObject({ currency: "EUR", marketingOptIn: true, locale: "en" });
+    expect(await me(page)).toMatchObject({ currency: "EUR", marketingOptIn: true });
     const cookies = await page.context().cookies();
     expect(cookies.find((c) => c.name === "gsm_currency")?.value).toBe("EUR");
     await page.reload();
     await expect(page.locator('select[name="currency"]')).toHaveValue("EUR");
     await expect(page.getByRole("switch", { name: /Marketing emails/ })).toBeChecked();
-
-    // Language: saved on the account, cookie set, and the same page opens in Arabic.
-    await page.locator('select[name="locale"]').selectOption("ar");
-    await page.getByRole("button", { name: "Save changes" }).click();
-    await expect(page).toHaveURL(/\/ar\/account\/settings$/);
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    expect(await me(page)).toMatchObject({ locale: "ar" });
-    expect((await page.context().cookies()).find((c) => c.name === "gsm_locale")?.value).toBe("ar");
   });
 
   test("a customer without a password is pointed to the email link instead of a form", async ({ page }) => {
@@ -352,20 +335,15 @@ test.describe("workspace frame (demo customer, read only)", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the rail sits at the start edge of a wide screen, in English and in Arabic", async ({ page, isMobile }) => {
+  test("the rail sits at the start edge of a wide screen", async ({ page, isMobile }) => {
     test.skip(isMobile, "the rail shows from lg up");
     // Owner, 2026-11-15: no centred frame, so no strip of about 70px before the rail at 1920px.
     await page.setViewportSize({ width: 1920, height: 1080 });
-    for (const [lang, name] of [["en", "Workspace navigation"], ["ar", "التنقل في مساحة العمل"]] as const) {
-      await go(page, `/${lang}/account`);
-      const nav = page.getByRole("navigation", { name });
-      const start = await nav.evaluate((el) => {
-        const panel = el.parentElement!.getBoundingClientRect();
-        return document.documentElement.dir === "rtl" ? Math.min(document.documentElement.clientWidth, document.documentElement.scrollWidth) - panel.right : panel.left;
-      });
-      expect(start, `${lang}: room before the rail`).toBeGreaterThanOrEqual(0);
-      expect(start, `${lang}: room before the rail`).toBeLessThanOrEqual(16.5);
-    }
+    await go(page, "/en/account");
+    const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+    const start = await nav.evaluate((el) => el.parentElement!.getBoundingClientRect().left);
+    expect(start, "room before the rail").toBeGreaterThanOrEqual(0);
+    expect(start, "room before the rail").toBeLessThanOrEqual(16.5);
   });
 
   test("phone: the tab bar holds Overview, Orders, the wallet when it shows, Notifications and My tickets", async ({ page }) => {

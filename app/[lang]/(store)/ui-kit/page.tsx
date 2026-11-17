@@ -1,4 +1,4 @@
-// The design system on one page: every primitive and state, in both languages, for screenshots and review.
+// The design system on one page: every primitive and state, for screenshots and review.
 // Development only: a 404 in production, and never indexed.
 import { notFound } from "next/navigation";
 import {
@@ -60,7 +60,7 @@ import { ControlledModalDemo, ToastDemo } from "./demos";
 
 export const metadata: Metadata = { title: "UI kit", robots: { index: false } };
 
-// Sample copy for this page only (English and Arabic, so both writing directions can be reviewed).
+// Sample copy for this page only.
 const kit = defineMessages({
   en: {
     title: "UI kit",
@@ -197,142 +197,6 @@ const kit = defineMessages({
     imageSlot: "Image slot (the file is not added yet, so this is the placeholder)",
     markdown: "## Terms\n\nBy using the store you agree to these terms.\n\n- Orders are processed in the order they arrive\n- Prices include the taxes shown at checkout\n\nRead more on the [help center](/en/help) or visit [example.com](https://example.com).\n\n| Plan | Price |\n|---|---|\n| Basic | 1.00 |\n| Plus | 2.00 |\n",
   },
-  ar: {
-    title: "مجموعة المكونات",
-    description: "كل مكوّنات وحالات نظام تصميم GSM. للتطوير فقط.",
-    tokens: "المتغيّرات",
-    colours: "الألوان",
-    radii: "الحواف والظلال",
-    type: "سلّم الخطوط",
-    display: "عنوان رئيسي كبير",
-    titleSample: "عنوان الصفحة",
-    heading: "عنوان البطاقة",
-    subheading: "عنوان فرعي",
-    body: "نص أساسي بحجم خمسة عشر بكسل، مصمَّم للقراءة في لوحات المعلومات المزدحمة.",
-    small: "نص صغير للتلميحات وبيانات الجداول",
-    caption: "نص توضيحي",
-    buttons: "الأزرار",
-    sizes: "الأحجام",
-    withIcons: "مع أيقونات وحالة التحميل والتعطيل",
-    primary: "أساسي",
-    secondary: "ثانوي",
-    ghost: "شفاف",
-    inverse: "معكوس",
-    danger: "خطر",
-    link: "رابط",
-    saving: "جارٍ الحفظ",
-    disabled: "معطّل",
-    forms: "النماذج",
-    email: "البريد الإلكتروني",
-    emailHint: "نستخدمه فقط لإرسال تحديثات طلبك.",
-    emailPlaceholder: "name@example.com",
-    password: "كلمة المرور",
-    passwordPlaceholder: "أدخل كلمة المرور",
-    fullName: "الاسم الكامل",
-    fieldError: "هذا الحقل مطلوب.",
-    optional: "(اختياري)",
-    message: "الرسالة",
-    country: "الدولة",
-    selectCountry: "اختر دولة",
-    countries: { jo: "الأردن", ae: "الإمارات العربية المتحدة", sa: "المملكة العربية السعودية" },
-    terms: "أوافق على شروط الخدمة",
-    termsHint: "يمكنك قراءتها قبل المتابعة.",
-    termsError: "يجب قبول الشروط للمتابعة.",
-    notifications: "إشعارات البريد الإلكتروني",
-    notificationsHint: "تحديثات الطلبات والإيصالات.",
-    payment: "طريقة الدفع",
-    paymentHint: "اختر طريقة الدفع المناسبة لك.",
-    wallet: "محفظة GSM Store",
-    walletText: "ادفع من رصيد حسابك.",
-    card: "بطاقة",
-    cardText: "فيزا وماستركارد.",
-    bank: "تحويل بنكي",
-    bankText: "يتم تأكيده يدويًا خلال يوم.",
-    period: "الفترة",
-    week: "أسبوع",
-    month: "شهر",
-    year: "سنة",
-    searchServices: "ابحث في الخدمات",
-    search: "بحث",
-    copyValue: "نسخ",
-    status: "شارات الحالة",
-    cards: "البطاقات والإحصاءات",
-    cardTitle: "عنوان البطاقة",
-    cardText2: "بطاقة بيضاء بحدّ فاتح بسماكة بكسل واحد وحواف مدورة بقطر اثني عشر بكسل.",
-    cardAction: "إجراء",
-    cardFooter: "راجع تغييراتك قبل الحفظ.",
-    totalOrders: "إجمالي الطلبات",
-    allRequests: "كل طلبات الخدمة",
-    completed: "مكتملة",
-    finished: "أُنجزت بنجاح",
-    balance: "الرصيد المتاح",
-    addFunds: "إضافة رصيد",
-    transactions: "عرض الحركات",
-    invoice: "معاينة الفاتورة",
-    issueDate: "تاريخ الإصدار",
-    relatedOrder: "الطلب المرتبط",
-    item: "العنصر",
-    quantity: "الكمية",
-    total: "الإجمالي",
-    tables: "الجداول والتبويبات وترقيم الصفحات",
-    orderNo: "الطلب",
-    service: "الخدمة",
-    price: "السعر",
-    statusCol: "الحالة",
-    stackedNote: "عرض مكدّس (تحت 768 بكسل يصبح كل صف بطاقة)",
-    exampleService: "خدمة تجريبية",
-    all: "الكل",
-    open: "مفتوحة",
-    waiting: "بالانتظار",
-    resolved: "تم حلها",
-    ticketsNav: "حالة التذاكر",
-    breadcrumb: "مسار التنقل",
-    feedback: "التنبيهات والحالات",
-    info: "معلومة",
-    infoText: "تُعرض الأسعار بالعملة التي اخترتها.",
-    success: "تم الحفظ",
-    successText: "تم حفظ تغييراتك.",
-    warning: "مطلوب التحقق",
-    warningText: "أكّد بريدك الإلكتروني لتفعيل جميع الميزات.",
-    dangerTitle: "فشلت عملية الدفع",
-    dangerText: "لم يستجب مزوّد الدفع. حاول مرة أخرى بعد قليل.",
-    emptyTitle: "لا توجد طلبات بعد",
-    emptyText: "عندما تنشئ طلبًا سيظهر هنا.",
-    browse: "تصفّح الخدمات",
-    errorTitle: "تعذّر تحميل طلباتك",
-    errorText: "حدث خطأ من جهتنا. يرجى المحاولة مرة أخرى.",
-    reference: "المرجع: 7f3a9c21",
-    retry: "حاول مرة أخرى",
-    loading: "هياكل التحميل",
-    progress: "ملخص حالات الطلبات",
-    toasts: "الإشعارات المؤقتة",
-    toastBody: "تختفي هذه الرسالة من تلقاء نفسها.",
-    overlays: "الدرج والنافذة والقائمة",
-    openDrawer: "فتح الدرج",
-    drawerEyebrow: "متطلبات الخدمة",
-    drawerTitle: "فحص الجهاز",
-    drawerText: "أدخل معلومات الجهاز المطلوبة للمتابعة.",
-    imei: "رقم IMEI",
-    imeiPlaceholder: "أدخل رقم IMEI المكوّن من 15 رقمًا",
-    model: "طراز الجهاز",
-    selectModel: "اختر طراز الجهاز",
-    cancel: "إلغاء",
-    saveContinue: "حفظ البيانات والمتابعة",
-    openModal: "فتح النافذة",
-    modalTitle: "حذف هذا المفتاح؟",
-    modalText: "ستتوقف التطبيقات التي تستخدمه فورًا. لا يمكن التراجع عن هذا الإجراء.",
-    confirmDelete: "حذف المفتاح",
-    accountMenu: "قائمة الحساب",
-    account: "حسابي",
-    orders: "طلباتي",
-    settings: "الإعدادات",
-    signOut: "تسجيل الخروج",
-    misc: "الصورة الرمزية والفاصل والصور والمحتوى",
-    orContinue: "أو تابع باستخدام",
-    imageSlot: "مكان الصورة (الملف غير مضاف بعد، لذلك يظهر هذا البديل)",
-    markdown:
-      "## الشروط\n\nباستخدامك المتجر فإنك توافق على هذه الشروط.\n\n- تُعالج الطلبات بحسب ترتيب وصولها\n- الأسعار تشمل الضرائب الظاهرة عند الدفع\n\nاقرأ المزيد في [مركز المساعدة](/ar/help) أو زر [example.com](https://example.com).\n\n| الخطة | السعر |\n|---|---|\n| أساسية | 1.00 |\n| متقدمة | 2.00 |\n",
-  },
 });
 
 const swatches = [
@@ -428,7 +292,7 @@ export default async function UiKitPage() {
               <Button variant="ghost">{k.ghost}</Button>
               <Button variant="danger">{k.danger}</Button>
               <Button variant="link">{k.link}</Button>
-              <ButtonLink href={p("/services")} variant="secondary" endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}>
+              <ButtonLink href={p("/services")} variant="secondary" endIcon={<ArrowRight aria-hidden="true" />}>
                 {t.actions.browseServices}
               </ButtonLink>
             </div>
@@ -874,7 +738,8 @@ export default async function UiKitPage() {
                 <Avatar name="Alex Morgan" size="sm" />
                 <Avatar name="Alex Morgan" size="md" />
                 <Avatar name="Alex Morgan" size="lg" />
-                <Avatar name="سارة أحمد" size="lg" />
+                {/* A customer's name typed in Arabic script (user text): the initial is its first letter. */}
+                <Avatar name={"\u0633\u0627\u0631\u0629 \u0623\u062d\u0645\u062f"} size="lg" />
                 <VisuallyHidden>Avatar examples</VisuallyHidden>
               </div>
               <Divider label={k.orContinue} />

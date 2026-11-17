@@ -1,7 +1,6 @@
 "use client";
 // SegmentedControl: a small radio group drawn as joined buttons (period filters, view switches). Follows the WAI-ARIA
-// radio group pattern: one tab stop, arrow keys move AND select, Home/End jump. Arrow direction follows the writing
-// direction (in Arabic, ArrowLeft goes to the next option).
+// radio group pattern: one tab stop, arrow keys move AND select, Home/End jump.
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
@@ -31,7 +30,7 @@ export type SegmentedControlProps = {
   className?: string;
 };
 
-/** A radio group drawn as segmented buttons: keyboard arrows, roving tab stop, RTL-aware. */
+/** A radio group drawn as segmented buttons: keyboard arrows, roving tab stop. */
 export function SegmentedControl({
   label,
   options,
@@ -54,10 +53,9 @@ export function SegmentedControl({
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
     let step = 0;
-    if (event.key === "ArrowRight") step = rtl ? -1 : 1;
-    else if (event.key === "ArrowLeft") step = rtl ? 1 : -1;
+    if (event.key === "ArrowRight") step = 1;
+    else if (event.key === "ArrowLeft") step = -1;
     else if (event.key === "ArrowDown") step = 1;
     else if (event.key === "ArrowUp") step = -1;
     else if (event.key === "Home" || event.key === "End") step = 0;

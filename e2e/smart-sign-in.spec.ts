@@ -364,16 +364,3 @@ test.describe("Turnstile on the forgot-password forms", () => {
     await expect.poll(async () => (await widgetCounts(page)).renders).toBe(2);
   });
 });
-
-test.describe("language of a merchant account", () => {
-  test("signing in on the Arabic page never changes the language of the account (nothing saves one any more)", async ({ page }) => {
-    const { email, password } = await freshMerchant(page);
-    await go(page, "/ar/sign-in");
-    await page.locator('input[name="email"]').fill(email);
-    await page.locator('input[name="password"]').fill(password);
-    await page.getByRole("button", { name: "تسجيل الدخول", exact: true }).click();
-    await expect(page).toHaveURL(/\/ar\/merchant$/);
-    const me = await page.request.get("/client/auth/me");
-    expect(((await me.json()) as { locale: string }).locale).toBe("en");
-  });
-});

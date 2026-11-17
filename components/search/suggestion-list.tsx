@@ -231,7 +231,7 @@ export function SuggestionList({ id, groups, active, optionId, value, paths, lab
                   onFill(at);
                 }}
               >
-                <ArrowUpLeft className="size-4 rtl:-scale-x-100" />
+                <ArrowUpLeft className="size-4" />
               </span>
             ) : null;
           return href ? (

@@ -1,8 +1,10 @@
 // Content and legal pages (terms, privacy, refund, cookies and the pages staff write). The body is Markdown from the
-// admin console, rendered without raw HTML. 404 when the page is missing, a draft or not in force.
+// admin console, rendered without raw HTML. 404 when the page is missing, a draft or not in force. The address of a
+// retired Arabic page (decision 039) sends the reader on to the home page (`legacyPath`, plan 30 §7.1): inside a 200
+// answer that streams, so the metadata of a slug with no page is always `noindex`.
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { Scale } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { PageTransition } from "@/components/layout/page-transition";
@@ -11,7 +13,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Markdown } from "@/components/ui/markdown";
 import { demoteHeadings } from "@/components/store/markdown-source";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
-import { getContentPage } from "@/lib/api/public";
+import { getContentPage, legacyPath } from "@/lib/api/public";
 import { formatDate } from "@/lib/format";
 import { localePath } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
@@ -22,7 +24,8 @@ import { siteImage } from "@/lib/site-images";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/pages/[slug]">): Promise<Metadata> {
   const [{ slug }, locale] = await Promise.all([params, getLocale()]);
-  const page = await getContentPage(slug, locale);
+  const page = await getContentPage(slug);
+  // No page under this slug (missing, or an old address about to send the reader on): never indexed.
   if (!page) return { robots: { index: false } };
   const title = page.seoTitle || page.title;
   const og = siteImage("og-default.jpg");
@@ -31,7 +34,7 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/pages/[slu
     description: page.seoDescription || undefined,
     robots: page.noindex ? { index: false } : undefined,
     alternates: { canonical: page.canonicalUrl ?? localePath(locale, `/pages/${encodeURIComponent(page.slug)}`) },
-    openGraph: { title, description: page.seoDescription || undefined, type: "article", locale, images: og ? [{ url: og }] : undefined },
+    openGraph: { title, description: page.seoDescription || undefined, type: "article", locale: "en_US", images: og ? [{ url: og }] : undefined },
   };
 }
 
@@ -49,8 +52,12 @@ export default function ContentPage(props: PageProps<"/[lang]/pages/[slug]">) {
 
 async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const [{ slug }, locale, t, c] = await Promise.all([params, getLocale(), getMessages(store), getMessages(common)]);
-  const page = await getContentPage(slug, locale);
-  if (!page) notFound();
+  const page = await getContentPage(slug);
+  if (!page) {
+    const path = await legacyPath("page", slug);
+    if (path) permanentRedirect(localePath(locale, path));
+    notFound();
+  }
   return (
     <>
       <Breadcrumbs

@@ -1,7 +1,7 @@
 // The geometry of the workspace's sliding selection (components/layout/sliding-nav.tsx): where the indicator goes and
 // whether it slides or jumps there. Plain module (no DOM): unit-tested.
-// - Boxes are physical px relative to the nav's padding box (`getBoundingClientRect` differences), the same numbers in
-//   both writing directions, so the indicator is placed with a physical `translate` and works in Arabic as is.
+// - Boxes are physical px relative to the nav's padding box (`getBoundingClientRect` differences), so the indicator
+//   is placed with a physical `translate`.
 // - Only a change of the selected element after a navigation (a new pathname) slides. The first placement, a resize, a
 //   list that resolves its active link after hydration (the nav's <Suspense>) or a swapped list (the session's own nav)
 //   jumps, and the same element at the same box does nothing.

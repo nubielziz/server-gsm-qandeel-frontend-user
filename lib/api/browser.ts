@@ -72,7 +72,7 @@ export type RequestOptions = {
   accept?: string;
   /**
    * `fetch(…, { keepalive: true })`: the request completes even if the page is closed or left meanwhile (a save the
-   * caller does not wait for, such as the language switch). Small bodies only (the browser caps them at 64 KiB).
+   * caller does not wait for). Small bodies only (the browser caps them at 64 KiB).
    */
   keepalive?: boolean;
 };

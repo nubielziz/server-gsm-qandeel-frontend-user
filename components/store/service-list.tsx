@@ -10,7 +10,7 @@
 // Its state is the page URL (`?category=4-carrier-unlock&stock=1&type=imei&brand=Apple&brand=Samsung&max=20&sort=popular&page=2`):
 // it works without JavaScript and can be shared. It reads `searchParams` and the currency cookie, so render it inside
 // <Suspense>. Availability is only ever "in stock" or not: no stock level exists anywhere.
-// An English list with a text search is a search-engine page (feature 29, lib/catalog.ts `searchList`): rows and
+// A list with a text search is a search-engine page (feature 29, lib/catalog.ts `searchList`): rows and
 // option counts from `GET /store/v1/search`, "Best match" as the default sort (no "Featured"), "Did you mean …?", a
 // "Check IMEI" link for an IMEI, an empty state with popular searches, a quiet note while the database answers instead
 // of the engine (counts hidden then), and a note when a price sort covers only the best 1000 matches.
@@ -121,10 +121,10 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
     getCurrency(),
   ]);
   const input = readInput(params);
-  // An English text search is answered by the search engine: "Best match" is its default sort and "Featured" goes.
-  const searching = searchesEngine(locale, input.q);
+  // A text search is answered by the search engine: "Best match" is its default sort and "Featured" goes.
+  const searching = searchesEngine(input.q);
   const sort: ListSort = parseSort(firstParam(params.sort), searching);
-  const list = await catalogList(locale, currency.code, input, sort, Number(firstParam(params.page, 12)) || 1, config.perPage);
+  const list = await catalogList(currency.code, input, sort, Number(firstParam(params.page, 12)) || 1, config.perPage);
   const { filter, bounds } = list;
   // Nothing matched a search: offer the popular searches (a cached shared read; [] when it cannot be read).
   const popular = list.search && list.total === 0 ? await popularSearches() : [];
@@ -143,7 +143,7 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
   };
   const base = localePath(locale, config.path || undefined);
   const href = (change: Partial<ListState>) => pageHref(base, { ...state, ...change }, 1) + config.hash;
-  // Isolated left-to-right (LRI … PDI) inside the chip's sentence, so "15 US$" keeps its order in Arabic.
+  // Isolated left-to-right (LRI … PDI) inside the chip's sentence, so "15 US$" keeps its order.
   const money = (n: number) => `⁦${formatMoney(String(n), currency.code, locale, 0)}⁩`;
   const label = (key: FacetKey, value: string) =>
     key === "type" ? (c.serviceType[value as ServiceType] ?? value) : key === "country" ? countryName(value, locale) : value;

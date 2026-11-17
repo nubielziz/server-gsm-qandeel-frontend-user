@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t.track.title,
     description: t.track.metaDescription,
-    alternates: { canonical: localePath(locale, "/track"), languages: { en: "/en/track", ar: "/ar/track" } },
+    alternates: { canonical: localePath(locale, "/track") },
   };
 }
 

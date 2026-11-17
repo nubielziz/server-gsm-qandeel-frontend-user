@@ -1,6 +1,6 @@
-// How the shop shows a service (BH §2.1, §2.4, §14.3 to §14.5): delivery in the page's language, the "In stock" mark and
-// never "Pre-order" or "Out of stock" or a stock number, "per unit" and "From" for packs, a range and an exact N (page and
-// quick view), the language switch through `alternates`, service pictures through next/image and JOD with two decimals.
+// How the shop shows a service (BH §2.1, §2.4, §14.3 to §14.5): delivery, the "In stock" mark and never "Pre-order" or
+// "Out of stock" or a stock number, "per unit" and "From" for packs, a range and an exact N (page and quick view),
+// service pictures through next/image and JOD with two decimals.
 // Real browser → Next → the isolated demo backend (:3100). The services are the fixtures of the global setup
 // (e2e/global-setup.ts → e2e/.auth/fixtures.json): range = 2 to 50, packs = 5/10/25, exact = 5, stocked = in stock,
 // pictured = has a picture. Nothing here changes data. A catalog value the setup may have just changed is read through
@@ -19,19 +19,18 @@ interface ApiService {
   imageUrl: string | null;
   price: { gross: string; currency: string };
   quantity: { min: number; max: number; options: number[] };
-  alternates: { locale: "en" | "ar"; slug: string }[];
 }
 
 /** The service page as the API sends it, through the site's own `/store/v1` rewrite. */
-async function apiService(request: APIRequestContext, slug: string, locale: "en" | "ar" = "en"): Promise<ApiService> {
-  const res = await request.get(`/store/v1/services/${encodeURIComponent(slug)}?locale=${locale}`);
+async function apiService(request: APIRequestContext, slug: string): Promise<ApiService> {
+  const res = await request.get(`/store/v1/services/${encodeURIComponent(slug)}`);
   expect(res.status(), `${slug}: ${await res.text()}`).toBe(200);
   return (await res.json()) as ApiService;
 }
 
-/** The first page of the catalog of one language (the demo has fewer than 100 listed services). */
-async function apiServices(request: APIRequestContext, locale: "en" | "ar"): Promise<ApiService[]> {
-  const res = await request.get(`/store/v1/services?locale=${locale}&_start=0&_end=100`);
+/** The first page of the catalog (the demo has fewer than 100 listed services). */
+async function apiServices(request: APIRequestContext): Promise<ApiService[]> {
+  const res = await request.get("/store/v1/services?_start=0&_end=100");
   expect(res.status(), await res.text()).toBe(200);
   return (await res.json()) as ApiService[];
 }
@@ -70,9 +69,9 @@ async function expectPage(page: Page, path: string, check: () => Promise<void>) 
 /** What no page of the shop may say: a pre-order, a sold-out state or a stock number. */
 const FORBIDDEN = /pre-?order|out of stock|sold out|\b\d+\s+(left|in stock|remaining)\b/i;
 
-test.describe("delivery in the page's language", () => {
+test.describe("delivery", () => {
   test("English cards print the staff note or the minutes in English, never the supplier's raw text", async ({ page, request }) => {
-    const rows = await apiServices(request, "en");
+    const rows = await apiServices(request);
     expect(rows.length).toBeGreaterThan(0);
     await page.goto("/en/services");
     const cards = page.getByRole("article");
@@ -86,23 +85,6 @@ test.describe("delivery in the page's language", () => {
       } else {
         await expect(card, row.title).toContainText(/Delivery: \d+ (min|hr|day)/);
       }
-    }
-  });
-
-  test("Arabic cards print Arabic text: the staff note, else the minutes in Arabic", async ({ page, request }) => {
-    const rows = await apiServices(request, "ar");
-    expect(rows.length).toBeGreaterThan(0);
-    await page.goto("/ar/services");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    for (const row of rows) {
-      const card = cardOf(page, row.title);
-      await expect(card, row.title).toHaveCount(1);
-      const note = row.etaText.trim();
-      // The sentence a screen reader hears, and the visible time.
-      if (note) await expect(card, row.title).toContainText(`التسليم: ${note}`);
-      else await expect(card, row.title).toContainText(/التسليم: /);
-      // No English unit leaks into an Arabic card.
-      await expect(card, row.title).not.toContainText(/\b\d+\s*(min|hr|hour|hours|day|days)\b/i);
     }
   });
 
@@ -140,21 +122,6 @@ test.describe("availability", () => {
     await expect(purchaseCard(page)).not.toContainText("In stock");
     // The delivery row still tells the buyer when it arrives.
     await expect(purchaseCard(page)).toContainText("Delivery");
-  });
-
-  test("Arabic: the stocked service says متوفر on its card and on its page", async ({ page, request }) => {
-    const { stocked } = fixtures();
-    const english = await apiService(request, stocked.slug);
-    const arabicSlug = english.alternates.find((alt) => alt.locale === "ar")?.slug;
-    expect(arabicSlug, "the stocked fixture needs an Arabic page").toBeTruthy();
-    const arabic = await apiService(request, arabicSlug!, "ar");
-
-    await expectPage(page, "/ar/services", async () => {
-      await expect(cardOf(page, arabic.title)).toContainText("متوفر", { timeout: 3_000 });
-    });
-    await expectPage(page, `/ar/services/${arabicSlug}`, async () => {
-      await expect(page.getByRole("complementary", { name: "طلبك" }).getByText("متوفر")).toBeVisible({ timeout: 3_000 });
-    });
   });
 
   test("no page says Pre-order, Out of stock or a number left", async ({ page }) => {
@@ -253,35 +220,6 @@ test.describe("price and quantity on the service page", () => {
       expect(amount, amount).toMatch(/\d\.\d{2}$/);
       expect(amount, amount).not.toMatch(/\d\.\d{3}/);
     }
-  });
-});
-
-test.describe("the language switch (alternates)", () => {
-  test("an English slug on the Arabic page redirects to the Arabic page of the same service", async ({ page }) => {
-    await page.goto("/ar/services/icloud-clean-lost-check");
-    await expect(page).toHaveURL(/\/ar\/services\/fahs-icloud$/);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("فحص حالة iCloud");
-    await page.goto("/en/services/fahs-icloud");
-    await expect(page).toHaveURL(/\/en\/services\/icloud-clean-lost-check$/);
-  });
-
-  test("the hreflang links come from `alternates`: both ways for a translated service, none for an English-only one", async ({ page }) => {
-    await page.goto("/en/services/icloud-clean-lost-check");
-    await expect(page.locator('link[rel="alternate"][hreflang="ar"]')).toHaveAttribute("href", /\/ar\/services\/fahs-icloud$/);
-    await expect(page.locator('link[rel="alternate"][hreflang="en"]')).toHaveAttribute("href", /\/en\/services\/icloud-clean-lost-check$/);
-
-    await page.goto("/ar/services/fahs-icloud");
-    await expect(page.locator('link[rel="alternate"][hreflang="en"]')).toHaveAttribute("href", /\/en\/services\/icloud-clean-lost-check$/);
-
-    // An English-only service: wait for its own metadata (the canonical link), then check there is no Arabic alternate.
-    await page.goto("/en/services/t-mobile-usa-unlock");
-    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/en\/services\/t-mobile-usa-unlock$/);
-    await expect(page.locator('link[rel="alternate"][hreflang="ar"]')).toHaveCount(0);
-  });
-
-  test("a service with no Arabic page is a 404 in Arabic", async ({ page }) => {
-    await page.goto("/ar/services/t-mobile-usa-unlock");
-    await expect(page.getByRole("heading", { name: "الصفحة غير موجودة" })).toBeVisible();
   });
 });
 

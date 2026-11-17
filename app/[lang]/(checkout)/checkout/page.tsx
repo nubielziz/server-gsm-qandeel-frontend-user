@@ -2,12 +2,12 @@
 // and the URL stream in behind one <Suspense> with a same-size skeleton, and the signed-in customer behind a second one
 // inside it. The customer read is personal and uncached (`no-store`): a prefetch stops at it. Kept in its own boundary,
 // it leaves everything else to the per-link prefetch of "Buy now" (`prefetch={true}`, plan P3.1): the service's own
-// states (moved, missing, other language, file service) and, for a visitor without a customer session (no read at all),
+// states (moved, missing, file service) and, for a visitor without a customer session (no read at all),
 // the whole form. The form itself needs the customer when it mounts, so for a signed-in customer it streams in after the
 // click, behind the same skeleton.
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 import { PackageSearch, TriangleAlert } from "lucide-react";
 import { Container, PageHeader } from "@/components/layout/container";
 import { Alert } from "@/components/ui/alert";
@@ -24,7 +24,6 @@ import { getCustomer } from "@/lib/api/session";
 import { countryOptions } from "@/lib/countries";
 import { getCurrency } from "@/lib/currency";
 import { localePath } from "@/lib/i18n/config";
-import { fmt } from "@/lib/i18n/define";
 import { checkout } from "@/lib/i18n/messages/checkout";
 import { common } from "@/lib/i18n/messages/common";
 import { getLocale, getMessages } from "@/lib/i18n/server";
@@ -75,12 +74,13 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
   }
 
   const [currency, config] = await Promise.all([getCurrency(), getStoreConfig()]);
-  const resolved = await resolveService(slug, locale, currency.code);
+  const resolved = await resolveService(slug, currency.code);
 
-  if (resolved.kind === "redirect") {
-    redirect(`${p("/checkout")}?service=${encodeURIComponent(resolved.slug)}${quantityQuery}`);
+  // An old address of the service (decision 039): the checkout of its page on sale now; none on sale is "not found".
+  if (resolved.kind === "redirect" && resolved.slug) {
+    permanentRedirect(`${p("/checkout")}?service=${encodeURIComponent(resolved.slug)}${quantityQuery}`);
   }
-  if (resolved.kind === "missing") {
+  if (resolved.kind !== "found") {
     return (
       <Card>
         <EmptyState
@@ -92,24 +92,6 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
       </Card>
     );
   }
-  if (resolved.kind === "other-language") {
-    const language = c.languageNames[resolved.locale];
-    return (
-      <Card>
-        <EmptyState
-          icon={<PackageSearch aria-hidden="true" />}
-          title={t.start.otherLanguageTitle}
-          description={fmt(t.start.otherLanguageText, { language })}
-          action={
-            <ButtonLink href={`${localePath(resolved.locale, "/checkout")}?service=${encodeURIComponent(resolved.slug)}${quantityQuery}`}>
-              {fmt(t.start.otherLanguageAction, { language })}
-            </ButtonLink>
-          }
-        />
-      </Card>
-    );
-  }
-
   const { service } = resolved;
 
   if (service.type === "file") {

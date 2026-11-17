@@ -25,7 +25,7 @@ export function streamLockName(surface: NotificationSurface): string {
 export const NOTIFICATION_EVENT_NAMES = ["notification.created", "notification.read", "unread.changed"] as const;
 
 export type NotificationCreated = {
-  /** The list's own item shape, its text in the viewer's language (`item.locale`). */
+  /** The list's own item shape. */
   item: NotificationItem;
   /** The unread count after this item (capped at 100). */
   unread: number;
@@ -47,8 +47,6 @@ export type NotificationEvents = BaseEvents & {
   "unread.changed": { unread: number };
 };
 
-const LOCALES: readonly unknown[] = ["en", "ar"];
-
 function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
@@ -57,15 +55,18 @@ function isId(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
-/** True for the fields the page reads; the rest of the item is passed through as the API sent it. */
+/**
+ * True for the fields the page reads; the rest of the item is passed through as the API sent it. The item carries no
+ * language (decision 039): a frame is never dropped for a missing or unknown `locale`, which an API from before the
+ * change still sends and the page ignores.
+ */
 function isItem(value: unknown): value is NotificationItem {
   return (
     isRecord(value) &&
     isId(value.id) &&
     typeof value.title === "string" &&
     typeof value.body === "string" &&
-    (value.link === null || typeof value.link === "string") &&
-    LOCALES.includes(value.locale)
+    (value.link === null || typeof value.link === "string")
   );
 }
 

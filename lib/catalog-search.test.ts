@@ -16,16 +16,15 @@ import {
 } from "./catalog-facets";
 
 describe("which lists ask the search engine", () => {
-  it("English pages with a text search only", () => {
-    expect(searchesEngine("en", "samsung")).toBe(true);
-    expect(searchesEngine("en", "  ")).toBe(false);
-    expect(searchesEngine("en", "\u0000")).toBe(false);
-    expect(searchesEngine("ar", "samsung")).toBe(false);
+  it("a page with a text search asks the engine (every page: English only); a blank one does not", () => {
+    expect(searchesEngine("samsung")).toBe(true);
+    expect(searchesEngine("  ")).toBe(false);
+    expect(searchesEngine("\u0000")).toBe(false);
   });
 
   it("never a text the API normalises to nothing (it would answer 422)", () => {
-    for (const q of ["&", "()", "😀", "&amp;", " | ; "]) expect(searchesEngine("en", q), q).toBe(false);
-    expect(searchesEngine("en", "AT&amp;T")).toBe(true);
+    for (const q of ["&", "()", "😀", "&amp;", " | ; "]) expect(searchesEngine(q), q).toBe(false);
+    expect(searchesEngine("AT&amp;T")).toBe(true);
   });
 });
 

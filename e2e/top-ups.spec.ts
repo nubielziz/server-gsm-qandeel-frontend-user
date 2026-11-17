@@ -1,14 +1,14 @@
 // Add funds (plan F33, BH §3.3, §3.6): the form with its limits and checks, a manual top-up from the instructions to the
 // receipt, the staff decision (credited, rejected), cancel, the unpaid limit, the double-click guard, the return of an online
-// payment with its poller, the file checks, the other customer's top-up, the Arabic pages and the narrow screens.
+// payment with its poller, the file checks, the other customer's top-up and the narrow screens.
 // Runs against the isolated demo backend (:3100) with the customer wallet switched on and the manual gateway "CliQ transfer
 // (e2e)" made by the global setup (e2e/global-setup.ts).
 // Rules (F03): every test uses a throwaway customer (`freshCustomer`): the `wallet-topup` limiter allows 10 attempts per 10
 // minutes per customer, and refusals count. Nothing global is switched; staff credit and reject through e2e/admin.ts. The
 // customers' setup (create, receipt) goes through the site's own API paths (`page.request`), so what the UI is asked is the
 // part under test. The poller's answers are mocked in the browser (`page.route`): no demo gateway is online.
-// Amounts are checked on the English pages ("$25.00"); an Arabic page formats USD as "25.00 US$", so there the digits are matched.
-// An amount inside a sentence is wrapped in Unicode isolates (so it keeps its order in Arabic): sentences are matched in parts.
+// Amounts are checked on the English pages ("$25.00").
+// An amount inside a sentence is wrapped in Unicode isolates: sentences are matched in parts.
 import { randomUUID } from "node:crypto";
 import type { Locator, Page, Request } from "@playwright/test";
 import { approveTopUp, customerIdByEmail, freezeCustomerWallet, rejectTopUp } from "./admin";
@@ -149,6 +149,20 @@ test.describe("Add funds: the form", () => {
     await expect(vis(main(page).getByText(INSTRUCTIONS))).toBeVisible();
     await expect(main(page).getByText("Awaiting payment", { exact: true }).first()).toBeVisible();
     expect(posts).toHaveLength(1);
+    await expect(main(page).getByText("Top-up number", { exact: true })).toBeVisible();
+    await expect(main(page).getByRole("button", { name: "Send receipt" })).toBeVisible();
+    await expect(main(page).getByRole("button", { name: "Cancel top-up" })).toBeVisible();
+
+    // The receipt step is refused until a file is chosen, and nothing is sent.
+    await main(page).getByRole("button", { name: "Send receipt" }).click();
+    await expect(main(page).getByText("Upload your receipt first.")).toBeVisible();
+    expect(posts, "a refused receipt step sends nothing").toHaveLength(1);
+
+    // The wallet's list names the top-up.
+    await go(page, "/en/account/wallet");
+    const list = region(page, "Top-ups");
+    await expect(list.getByRole("link", { name: /^View top-up INV-/ })).toHaveCount(1);
+    await expect(vis(list.getByText("Awaiting payment", { exact: true }))).toHaveCount(1);
   });
 
   test("a text that is no amount and an amount above the maximum are refused on the field", async ({ page }) => {
@@ -468,104 +482,44 @@ test.describe("The return of an online payment", () => {
   });
 });
 
-test.describe("Arabic pages", () => {
-  test("the form, a refusal, the top-up page and the wallet's list are right-to-left and in Arabic", async ({ page }) => {
-    await freshCustomer(page);
-    await go(page, "/ar/account/wallet/add-funds");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("heading", { level: 1, name: "إضافة رصيد" })).toBeVisible();
-    const form = main(page).locator("form");
-    await expect(form.getByText("حدودك")).toBeVisible();
-    await expect(form.getByText("تحويل يدوي")).toBeVisible();
-    await expect(form.getByText("بلا رسوم")).toBeVisible();
-
-    await chooseMethod(page);
-    const amount = form.getByRole("textbox", { name: "المبلغ" });
-    await amount.fill("2");
-    await form.getByRole("button", { name: "متابعة" }).click();
-    await expect(form.getByText(/أقل مبلغ للإضافة هو/)).toContainText("5.00");
-    await expect(amount).toBeFocused();
-    await amount.fill("25");
-    await form.getByRole("button", { name: "متابعة" }).click();
-
-    await expect(page).toHaveURL(/\/ar\/account\/wallet\/top-ups\/\d+$/);
-    await expect(page.getByRole("heading", { level: 1, name: /^عملية إضافة رصيد INV-/ })).toBeVisible();
-    await expect(vis(main(page).getByText(INSTRUCTIONS))).toBeVisible(); // staff's own text, shown as written
-    await expect(main(page).getByText("رقم العملية")).toBeVisible();
-    await expect(main(page).getByText("بانتظار الدفع", { exact: true }).first()).toBeVisible();
-    await expect(main(page).getByRole("button", { name: "إرسال الإيصال" })).toBeVisible();
-    await expect(main(page).getByRole("button", { name: "إلغاء العملية" })).toBeVisible();
-    await expect(main(page).getByText(/Upload your receipt|Send receipt|Cancel top-up|Awaiting payment|How to pay|Details/)).toHaveCount(0);
-
-    // The refusal of the receipt step and the wallet's list, in Arabic.
-    await main(page).getByRole("button", { name: "إرسال الإيصال" }).click();
-    await expect(main(page).getByText("ارفع الإيصال أولًا.")).toBeVisible();
-
-    await go(page, "/ar/account/wallet");
-    const list = region(page, "عمليات إضافة الرصيد");
-    await expect(list.getByRole("link", { name: /^عرض العملية INV-/ })).toHaveCount(1);
-    await expect(vis(list.getByText("بانتظار الدفع", { exact: true }))).toHaveCount(1);
-    await expect(main(page).getByText(/Top-ups|Awaiting payment|No top-ups|View top-up/)).toHaveCount(0);
-  });
-
-  test("an Arabic rejection and an Arabic poller notice", async ({ page }) => {
-    await freshCustomer(page);
-    const topUp = await createTopUp(page, "25");
-    await page.route(`**/store/v1/me/wallet/top-ups/${topUp.id}`, (route) =>
-      route.request().method() === "GET"
-        ? route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(onlineTopUp(topUp.id, "credited", { creditedAt: new Date().toISOString() })) })
-        : route.fallback(),
-    );
-    await go(page, `/ar/account/wallet?topUp=${topUp.id}`);
-    await expect(main(page).getByText("أُضيف المبلغ إلى رصيدك", { exact: true })).toBeVisible();
-    await expect(main(page).getByText(/أُضيف .* إلى محفظتك/)).toContainText("25.00");
-    await expect(main(page).getByRole("link", { name: "عرض العملية", exact: true })).toBeVisible();
-    await expect(main(page).getByText(/Top-up credited|was added/)).toHaveCount(0);
-  });
-});
-
 test.describe("narrow screens", () => {
   test.beforeEach(async ({ page }) => page.setViewportSize({ width: 360, height: 800 }));
 
-  for (const [lang, labels] of [
-    ["en", { amount: "Amount", next: "Continue", receipt: "Send receipt" }],
-    ["ar", { amount: "المبلغ", next: "متابعة", receipt: "إرسال الإيصال" }],
-  ] as const) {
-    test(`the ${lang} Add funds form, the top-up page and the wallet's list have no horizontal overflow at 360 px`, async ({ page }) => {
-      await freshCustomer(page);
-      await go(page, `/${lang}/account/wallet/add-funds`);
-      await chooseMethod(page);
-      const form = main(page).locator("form");
-      const amount = form.getByRole("textbox", { name: labels.amount });
-      await amount.fill("25");
-      await expect(form.locator("aside")).toContainText("25.00");
-      await expectNoHorizontalOverflow(page);
-      await expectInsideViewport(page, amount);
-      await expectInsideViewport(page, form.getByRole("button", { name: labels.next }));
+  test("the Add funds form, the top-up page and the wallet's list have no horizontal overflow at 360 px", async ({ page }) => {
+    const labels = { amount: "Amount", next: "Continue", receipt: "Send receipt" };
+    await freshCustomer(page);
+    await go(page, "/en/account/wallet/add-funds");
+    await chooseMethod(page);
+    const form = main(page).locator("form");
+    const amount = form.getByRole("textbox", { name: labels.amount });
+    await amount.fill("25");
+    await expect(form.locator("aside")).toContainText("25.00");
+    await expectNoHorizontalOverflow(page);
+    await expectInsideViewport(page, amount);
+    await expectInsideViewport(page, form.getByRole("button", { name: labels.next }));
 
-      // A refusal does not push anything out either.
-      await amount.fill("2");
-      await form.getByRole("button", { name: labels.next }).click();
-      await expect(amount).toHaveAttribute("aria-invalid", "true");
-      await expectNoHorizontalOverflow(page);
+    // A refusal does not push anything out either.
+    await amount.fill("2");
+    await form.getByRole("button", { name: labels.next }).click();
+    await expect(amount).toHaveAttribute("aria-invalid", "true");
+    await expectNoHorizontalOverflow(page);
 
-      await amount.fill("25");
-      await form.getByRole("button", { name: labels.next }).click();
-      await expect(page).toHaveURL(new RegExp(`/${lang}/account/wallet/top-ups/\\d+$`));
-      const send = main(page).getByRole("button", { name: labels.receipt });
-      await expect(send).toBeVisible();
-      await expectNoHorizontalOverflow(page);
-      await expectInsideViewport(page, send);
-      // On a phone what to do comes before the facts: the instructions are above the table of details.
-      const instructions = vis(main(page).getByText(INSTRUCTIONS));
-      await expect(instructions).toBeVisible();
-      const facts = main(page).locator("dl").first();
-      const [instructionsBox, factsBox] = [await instructions.boundingBox(), await facts.boundingBox()];
-      expect(instructionsBox!.y, "the instructions come first on a phone").toBeLessThan(factsBox!.y);
+    await amount.fill("25");
+    await form.getByRole("button", { name: labels.next }).click();
+    await expect(page).toHaveURL(/\/en\/account\/wallet\/top-ups\/\d+$/);
+    const send = main(page).getByRole("button", { name: labels.receipt });
+    await expect(send).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await expectInsideViewport(page, send);
+    // On a phone what to do comes before the facts: the instructions are above the table of details.
+    const instructions = vis(main(page).getByText(INSTRUCTIONS));
+    await expect(instructions).toBeVisible();
+    const facts = main(page).locator("dl").first();
+    const [instructionsBox, factsBox] = [await instructions.boundingBox(), await facts.boundingBox()];
+    expect(instructionsBox!.y, "the instructions come first on a phone").toBeLessThan(factsBox!.y);
 
-      await go(page, `/${lang}/account/wallet`);
-      await expect(main(page).getByRole("link", { name: /INV-/ }).first()).toBeVisible();
-      await expectNoHorizontalOverflow(page);
-    });
-  }
+    await go(page, "/en/account/wallet");
+    await expect(main(page).getByRole("link", { name: /INV-/ }).first()).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
 });

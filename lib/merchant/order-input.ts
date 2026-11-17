@@ -130,7 +130,7 @@ export function defaultQuantityOf(rule: QuantityRule): number {
   return rule.kind === "fixed" ? rule.value : rule.kind === "options" ? rule.options[0] : rule.min;
 }
 
-/** Reads a typed quantity (Arabic-Indic digits too): a whole number the rule accepts, else null. A fixed rule is always its value. */
+/** Reads a typed quantity (Arabic-Indic and Persian digits too): a whole number the rule accepts, else null. A fixed rule is always its value. */
 export function parseQuantity(text: string, rule: QuantityRule): number | null {
   if (rule.kind === "fixed") return rule.value;
   const n = parseQuantityInput(text);

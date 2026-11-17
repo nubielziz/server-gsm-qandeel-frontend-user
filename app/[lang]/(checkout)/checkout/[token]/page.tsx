@@ -74,7 +74,7 @@ async function Session({ params }: { params: Promise<{ token: string }> }) {
 
   const [config, slug, balance] = await Promise.all([
     getStoreConfig(),
-    slugForService(session.service.id, locale),
+    slugForService(session.service.id),
     readBalanceContext(session),
   ]);
   const decimals = config.currencies.find((currency) => currency.code === session.currency)?.decimals ?? 2;

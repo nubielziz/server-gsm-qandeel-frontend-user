@@ -59,7 +59,7 @@ describe("the prefix text", () => {
     expect(titleWithBadge("Orders", "3")).toBe("(3) Orders");
     expect(titleWithBadge("(3) Orders", "4")).toBe("(4) Orders");
     expect(titleWithBadge("(3) (3) Orders", "99+")).toBe("(99+) Orders");
-    expect(titleWithBadge("(⁦99+⁩) الطلبات", "5")).toBe("(5) الطلبات");
+    expect(titleWithBadge("(\u206699+\u2069) Orders", "5")).toBe("(5) Orders");
     expect(titleWithBadge("(4) Orders", null)).toBe("Orders");
   });
 

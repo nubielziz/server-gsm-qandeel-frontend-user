@@ -30,6 +30,7 @@ import {
 } from "@/lib/support/attachments";
 import { shouldSendTyping } from "@/lib/support/conversation";
 import { TICKET_RESOLVED } from "@/lib/support/reply-area";
+import { sendsMessage } from "@/lib/support/send-key";
 import type { TicketAdapter } from "@/lib/support/ticket-api";
 import { FormAlert } from "@/components/auth/form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "@/components/auth/form-errors";
@@ -175,8 +176,8 @@ export function TicketReplyForm({ adapter, locale, t, hint, initialBody = "", on
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    // Enter sends; Shift+Enter is a new line. A key that confirms an input method's text (Arabic, Chinese …) is not a send.
-    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+    // Enter sends; Shift+Enter is a new line; a key that confirms an input method's text is not a send (lib/support/send-key.ts).
+    if (!sendsMessage({ key: event.key, shiftKey: event.shiftKey, isComposing: event.nativeEvent.isComposing })) return;
     event.preventDefault();
     void submit();
   }
@@ -270,7 +271,7 @@ export function TicketReplyForm({ adapter, locale, t, hint, initialBody = "", on
             {t.attachHint}
           </span>
         </div>
-        <Button type="submit" loading={busy} startIcon={<Send aria-hidden="true" className="rtl:-scale-x-100" />}>
+        <Button type="submit" loading={busy} startIcon={<Send aria-hidden="true" />}>
           {t.submit}
         </Button>
       </div>

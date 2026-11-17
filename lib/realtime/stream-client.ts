@@ -9,7 +9,7 @@
 //   frame on the `BroadcastChannel`; the other tabs only listen. A leader that closes or freezes (`pagehide`, `freeze`)
 //   lets the lock go, and the next tab opens a stream with the last cursor it heard. Without locks or a channel every
 //   tab runs its own stream (the server's per-session cap refuses the fourth, which then polls).
-// - URL: `<url>?locale=<page language>[&cursor=<last event id>]`. The client reconnects itself: an `EventSource` gives up
+// - URL: `<url>[?cursor=<last event id>]`. The client reconnects itself: an `EventSource` gives up
 //   after any non-200 answer (Caddy's 502 during a restart), so on `error` it closes the source and opens a new one
 //   after 5 s, doubling to 60 s, plus or minus 20 %; a `ready` resets the delay. A watchdog reconnects when nothing, not
 //   even `hb`, arrived for 45 s. A visible tab that finds the stream stale or waiting tries at once (at most every 5 s).
@@ -87,8 +87,6 @@ export type StreamEnv = {
   url: string;
   /** The name of the lock and of the broadcast channel: one per browser and stream (`gsm-stream-customer`). */
   lockName: string;
-  /** The page language for `?locale=`, or undefined to send none. */
-  locale(): string | undefined;
   createEventSource(url: string): EventSourceLike;
   /** `navigator.locks`, or null where the browser has none (every tab then runs its own stream). */
   locks: LockManagerLike | null;
@@ -460,8 +458,6 @@ export function createStreamClient<M extends BaseEvents = BaseEvents>(env: Strea
     gotReady = false;
     byeReason = null;
     const params = new URLSearchParams();
-    const locale = env.locale();
-    if (locale) params.set("locale", locale);
     if (cursor) params.set("cursor", cursor);
     const query = params.toString();
     let next: EventSourceLike;

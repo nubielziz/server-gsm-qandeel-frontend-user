@@ -6,7 +6,7 @@ import type { Page, Request } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { freshCustomer, go } from "./helpers";
 
-type Me = { name: string; phone: string; country: string; locale: string; currency: string | null; email: string };
+type Me = { name: string; phone: string; country: string; currency: string | null; email: string };
 
 async function me(page: Page): Promise<Me> {
   const res = await page.request.get("/store/v1/me");
@@ -14,7 +14,7 @@ async function me(page: Page): Promise<Me> {
   return (await res.json()) as Me;
 }
 
-/** The profile card of the settings page, whatever the language. */
+/** The profile card of the settings page. */
 const profile = (page: Page) => page.locator("section#profile");
 const field = (page: Page, name: "name" | "phone" | "email") => profile(page).locator(`input[name="${name}"]`);
 const countrySelect = (page: Page) => profile(page).locator('select[name="country"]');
@@ -173,26 +173,20 @@ test("emptying the phone sends an empty string, and the API clears it", async ({
   await expect(field(page, "phone")).toHaveValue("");
 });
 
-test("the Arabic page is right-to-left, in Arabic, and saves", async ({ page }) => {
+// Group C (plan 30 §9.1): a name typed in Arabic script is data. It is saved and read back as typed on the English page
+// (the escapes are the letters of an Arabic name; no Arabic script in this file).
+test("a name typed in Arabic script is saved as typed, and a one-letter one is refused like any other", async ({ page }) => {
+  const arabicName = "\u0623\u0645\u0644 \u062D\u062F\u0627\u062F";
   await freshCustomer(page);
-  await go(page, "/ar/account/settings");
-  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  await expect(profile(page).getByRole("heading", { name: "الملف الشخصي" })).toBeVisible();
-  await expect(profile(page).getByText("لتغيير بريدك الإلكتروني تواصل مع الدعم.")).toBeVisible();
-
-  // Country names come in Arabic, and the codes stay the API's.
-  const britain = await countrySelect(page).locator('option[value="GB"]').textContent();
-  expect(britain ?? "").toMatch(/[؀-ۿ]/);
-
-  await field(page, "name").fill("أمل حداد");
+  await go(page, "/en/account/settings");
+  await field(page, "name").fill(arabicName);
   await field(page, "phone").fill("+962790000000");
   await countrySelect(page).selectOption("DE");
-  await profile(page).getByRole("button", { name: "حفظ الملف الشخصي" }).click();
-  await expect(page.getByText("تم حفظ الملف الشخصي")).toBeVisible();
-  expect(await me(page)).toMatchObject({ name: "أمل حداد", phone: "+962790000000", country: "DE" });
+  await save(page).click();
+  await expect(page.getByText("Profile saved")).toBeVisible();
+  expect(await me(page)).toMatchObject({ name: arabicName, phone: "+962790000000", country: "DE" });
 
-  // A short name is refused in Arabic.
-  await field(page, "name").fill("أ");
-  await profile(page).getByRole("button", { name: "حفظ الملف الشخصي" }).click();
-  await expect(profile(page).getByText("أدخل اسمك، من حرفين إلى 120 حرفًا.")).toBeVisible();
+  await field(page, "name").fill("\u0623");
+  await save(page).click();
+  await expect(profile(page).getByText("Enter your name, from 2 to 120 characters.")).toBeVisible();
 });

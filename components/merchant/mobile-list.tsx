@@ -50,7 +50,7 @@ function Content({ row, link }: { row: MobileRow; link: boolean }) {
           {row.amountHint ? <span className="text-small text-ink-subtle">{row.amountHint}</span> : null}
         </span>
       ) : null}
-      {link ? <ChevronRight aria-hidden="true" className="size-4 shrink-0 self-center text-ink-subtle rtl:-scale-x-100" /> : null}
+      {link ? <ChevronRight aria-hidden="true" className="size-4 shrink-0 self-center text-ink-subtle" /> : null}
     </>
   );
 }

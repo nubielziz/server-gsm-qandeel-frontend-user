@@ -15,7 +15,7 @@ export type MoneyProps = {
   className?: string;
 };
 
-/** A formatted amount in tabular figures. Always laid out left-to-right (digits and symbol stay in order inside Arabic text). */
+/** A formatted amount in tabular figures. Always laid out left-to-right (digits and symbol stay in order inside the sentence). */
 export function Money({ amount, currency, locale, decimals, className }: MoneyProps) {
   return (
     <span dir="ltr" className={cn("num inline-block whitespace-nowrap", className)}>

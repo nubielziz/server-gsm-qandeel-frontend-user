@@ -26,15 +26,6 @@ export function unreadText(count: number, locale: Locale): string {
   return count >= UNREAD_CAP ? `${UNREAD_CAP - 1}+` : formatNumber(count, locale);
 }
 
-/**
- * The same text for a spot inside running text (a tab label): "99+" is kept as one left-to-right unit in an Arabic
- * sentence, where its "+" would otherwise land on the wrong side of the number. Plain numbers need nothing.
- */
-export function unreadTextInline(count: number, locale: Locale): string {
-  const text = unreadText(count, locale);
-  return text.endsWith("+") ? `\u2066${text}\u2069` : text;
-}
-
 /** The id of the feed block on the notifications page: after "Mark all as read" the focus moves there. */
 export const NOTIFICATION_FEED_ID = "notification-feed";
 
@@ -42,7 +33,10 @@ export const NOTIFICATION_FEED_ID = "notification-feed";
 export const MAX_LINK_LENGTH = 200;
 
 const CONTROL_CHARACTER = /[\u0000-\u001f\u007f-\u009f]/;
-/** A leading `/en` or `/ar` that is a whole path segment (`/en`, `/en/x`, `/en?x`, `/en#x`, never `/english`). */
+/**
+ * A leading `/en` or `/ar` that is a whole path segment (`/en`, `/en/x`, `/en?x`, `/en#x`, never `/english`). `/ar` is an
+ * old Arabic address that a stored notification may still hold (decision 039): it leads to the same path under `/en`.
+ */
 const LANGUAGE_PREFIX = /^\/(?:en|ar)(?=$|[/?#])/;
 /** `.` and `..`, also percent-encoded: the browser resolves these, so they could leave the area the check looked at. */
 const DOT_SEGMENT = /^(?:\.|%2e){1,2}$/i;
@@ -53,7 +47,8 @@ const DOT_SEGMENT = /^(?:\.|%2e){1,2}$/i;
  * The API sends a site path without the language (`/account/orders`). Only a root-relative path is accepted: one leading
  * `/`, no `//`, no backslash, no control character, no dot segment, at most 200 characters. A scheme can never pass
  * because every accepted value starts with `/`. In the merchant area the path must be `/merchant` or below it. The result
- * is `localePath(locale, link)`; a path that already starts with `/en` or `/ar` is used as it is.
+ * is `localePath(locale, link)`; a path that already starts with a language is used as it is, with `/ar` written as the
+ * page's language (`/ar/account/orders` → `/en/account/orders`: the old address would only redirect there).
  */
 export function notificationHref(link: string | null | undefined, locale: Locale, area: NotificationSurface): string | null {
   if (typeof link !== "string" || link.length === 0 || link.length > MAX_LINK_LENGTH) return null;
@@ -70,5 +65,5 @@ export function notificationHref(link: string | null | undefined, locale: Locale
   if (path.split("/").some((segment) => DOT_SEGMENT.test(segment))) return null;
   if (area === "merchant" && path !== "/merchant" && !path.startsWith("/merchant/")) return null;
 
-  return prefixed ? link : localePath(locale, link);
+  return prefixed ? link.replace(LANGUAGE_PREFIX, `/${locale}`) : localePath(locale, link);
 }

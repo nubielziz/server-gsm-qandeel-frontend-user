@@ -3,7 +3,7 @@
 // - `apiSession*`: forward the visitor's Cookie and X-Forwarded-For, so the API sees the visitor's session and IP
 //   (handoff §1.5, §3.9). They read request headers, so callers render behind <Suspense> and are never cached on the
 //   server: personal data must not enter a shared cache.
-// - `apiVisitor*`: shared data asked for one visitor (the searches: `GET /store/v1/search`, `GET /store/v1/services?q=`).
+// - `apiVisitor*`: shared data asked for one visitor (the search: `GET /store/v1/search`).
 //   No cookies; they forward only the visitor's address, User-Agent and the prefetch headers, so each visitor has their
 //   own `ip` budget and the API counts a search once, never for a prefetch or a bot (backend plan 29 §5.6, §7). Dynamic
 //   like `apiSession*`: render the caller behind <Suspense>; never call them inside `'use cache'`.
@@ -118,7 +118,7 @@ export async function apiVisitorGet<T>(path: string, init: Init = {}): Promise<T
   return json<T>(await call(path, { ...init, mode: "visitor" }));
 }
 
-/** A list read for one visitor (`GET /store/v1/services?q=`); the total comes from `x-total-count`. */
+/** A list read for one visitor; the total comes from `x-total-count`. */
 export async function apiVisitorList<T>(path: string, init: Init = {}): Promise<ListResult<T>> {
   const res = await call(path, { ...init, mode: "visitor" });
   const data = (await json<T[]>(res)) ?? [];

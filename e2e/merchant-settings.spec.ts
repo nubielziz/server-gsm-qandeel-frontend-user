@@ -191,14 +191,13 @@ test.describe("settings (active merchant)", () => {
     await expect(page.getByText(/not found/i).first()).toBeVisible();
   });
 
-  test("Arabic pages are right-to-left and translated", async ({ page }) => {
+  test("the settings, API keys and referrals pages open with their heading and do not scroll sideways", async ({ page }) => {
     for (const [path, heading] of [
-      ["/ar/merchant/settings", "إعدادات الحساب"],
-      ["/ar/merchant/api-keys", "مفاتيح API"],
-      ["/ar/merchant/referrals", "الإحالات"],
+      ["/en/merchant/settings", "Account settings"],
+      ["/en/merchant/api-keys", "API keys"],
+      ["/en/merchant/referrals", "Referrals"],
     ] as const) {
       await page.goto(path);
-      await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);

@@ -18,8 +18,7 @@ const row = (number: string, extra: Partial<TicketListRow> = {}): TicketListRow 
   ...extra,
 });
 
-const render = (rows: TicketListRow[], locale: "en" | "ar" = "en") =>
-  renderToStaticMarkup(<TicketList rows={rows} locale={locale} t={support[locale]} c={common[locale]} />);
+const render = (rows: TicketListRow[]) => renderToStaticMarkup(<TicketList rows={rows} locale="en" t={support.en} c={common.en} />);
 
 describe("TicketList: one markup for every screen", () => {
   it("is a single table with one row per ticket (no second, phone-only list)", () => {
@@ -43,13 +42,10 @@ describe("TicketList: one markup for every screen", () => {
     expect(html.match(/rounded-full bg-danger/g)).toHaveLength(1);
   });
 
-  it("says who wrote last, and what the ticket is about, in the page's language", () => {
+  it("says who wrote last", () => {
     expect(render([row("T-1", { lastMessageFrom: "you" })])).toContain("You wrote");
     expect(render([row("T-1", { lastMessageFrom: "support" })])).toContain("Support replied");
     expect(render([row("T-1", { lastMessageFrom: null, lastMessageAt: null })])).toContain("No messages yet");
-    const ar = render([row("T-1", { lastMessageFrom: "support" })], "ar");
-    expect(ar).toContain("ردّ الدعم");
-    expect(ar).toContain("فتح التذكرة T-1");
   });
 
   it("shows the status badge and the topic", () => {

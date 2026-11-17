@@ -4,7 +4,7 @@
 // - The underline (or the pill of `variant="pill"`) slides and resizes to the new tab on a client navigation: one
 //   indicator in the client nav (tabs-nav.tsx). Before hydration the current tab draws its own underline or pill.
 // - Wrap the view the tabs switch (the list, its card) in <TabPanel activeKey>: picking a tab towards the end side brings
-//   the new list in from the end side (the start side in Arabic is the right), a few px and a fade, about 200 ms. Each tab
+//   the new list in from the end side, a few px and a fade, about 200 ms. Each tab
 //   link tags its navigation with the direction (`transitionTypes`); a first load, paging, filters, refreshes and the
 //   browser's back and forward carry none, so the list swaps at once. The tab row itself never crossfades.
 import Link from "next/link";

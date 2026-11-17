@@ -27,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t.help.title,
     description: t.help.metaDescription,
-    alternates: { canonical: localePath(locale, "/help"), languages: { en: "/en/help", ar: "/ar/help" } },
+    alternates: { canonical: localePath(locale, "/help") },
   };
 }
 
@@ -59,8 +59,8 @@ async function HelpList({ searchParams }: { searchParams: Promise<SearchParams> 
 
   // The unfiltered list gives the categories (and is shared by every visitor); the filtered one is the page's content.
   const [all, filtered] = await Promise.all([
-    listHelpArticles({ locale, end: 100 }),
-    q || category ? listHelpArticles({ locale, q: q || undefined, category: category || undefined, end: 100 }) : null,
+    listHelpArticles({ end: 100 }),
+    q || category ? listHelpArticles({ q: q || undefined, category: category || undefined, end: 100 }) : null,
   ]);
   const articles = filtered ?? all;
   const categories = [...new Set(all.data.map((a) => a.category).filter(Boolean))];
@@ -103,13 +103,6 @@ async function HelpList({ searchParams }: { searchParams: Promise<SearchParams> 
                 icon={<LifeBuoy aria-hidden="true" />}
                 title={t.help.noneTitle}
                 description={t.help.noneText}
-                action={
-                  locale === "ar" ? (
-                    <ButtonLink href={localePath("en", "/help")} variant="secondary">
-                      {t.help.noneAction}
-                    </ButtonLink>
-                  ) : undefined
-                }
               />
             </Card>
           ) : articles.data.length === 0 ? (

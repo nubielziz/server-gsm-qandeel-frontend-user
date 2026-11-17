@@ -61,7 +61,7 @@ export function SignOutButton({ surface, label, pendingLabel, variant = "menu", 
         className,
       )}
     >
-      {pending ? <Spinner size={18} /> : <LogOut aria-hidden="true" className="rtl:-scale-x-100" />}
+      {pending ? <Spinner size={18} /> : <LogOut aria-hidden="true" />}
       {pending ? pendingLabel : label}
     </button>
   );

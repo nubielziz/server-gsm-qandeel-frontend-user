@@ -30,15 +30,6 @@ test.describe("sign-in page", () => {
     await expect(page.getByRole("link", { name: "Create account" })).toHaveAttribute("href", "/en/sign-up?as=merchant");
   });
 
-  test("Arabic page is right-to-left with Arabic text", async ({ page }) => {
-    await go(page, "/ar/sign-in");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("heading", { level: 1, name: "تسجيل الدخول" })).toBeVisible();
-    await expect(page.getByRole("radio")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "أرسل لي رابط دخول (للعملاء)" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "قدّم طلبًا كتاجر" })).toHaveAttribute("href", "/ar/merchant/register");
-  });
-
   test("a wrong password shows one generic message and keeps the page", async ({ page }) => {
     await go(page, "/en/sign-in");
     await page.locator('input[name="email"]').fill(uniqueEmail("nobody"));
@@ -122,7 +113,7 @@ test.describe("email-link pages", () => {
     await expect(page.getByText(`a link is on its way to ${email}`)).toBeVisible();
 
     const link = await waitForLink(page, email, /\/sign-in\?token=/);
-    await go(page, link); // proxy.ts adds the language
+    await go(page, link); // proxy.ts adds /en
     await expect(page).toHaveURL(/\/en\/sign-in\?token=/);
     // Never signs in by itself (mail scanners): a button does.
     await expect(page.getByRole("button", { name: "Sign in to GSM Store" })).toBeVisible();
@@ -289,7 +280,6 @@ const WHATSAPP_NUMBER = normaliseWhatsAppNumber(WHATSAPP_RAW);
 /** The number as the page shows it (the owner's own grouping when written with a plus, digits and spaces). */
 const WHATSAPP_DISPLAY = WHATSAPP_NUMBER ? displayWhatsAppNumber(WHATSAPP_RAW, WHATSAPP_NUMBER) : "";
 const WHATSAPP_MESSAGE_EN = "Hello, I would like to open a merchant account.";
-const WHATSAPP_MESSAGE_AR = "مرحبًا، أرغب في فتح حساب تاجر.";
 const waLink = (text: string) => `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
 
 /** Waits until the page's own script runs the WhatsApp link: the static fallback is replaced by the hydrated component. */
@@ -352,22 +342,6 @@ test.describe("merchant application page", () => {
     await expect(page.getByRole("link", { name: "Chat on WhatsApp" })).toHaveAttribute("href", waLink(WHATSAPP_MESSAGE_EN));
     await expect(page.getByText("will be included in your message.")).toHaveCount(0);
     await expect(page.locator("main")).not.toContainText("script");
-  });
-
-  test("Arabic: right-to-left, the Arabic message in the link, and the number and the code still left-to-right", async ({ page }) => {
-    await go(page, "/ar/merchant/register");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("heading", { level: 1, name: "قدّم طلبًا كتاجر" })).toBeVisible();
-    const chat = page.getByRole("link", { name: "تواصل معنا عبر واتساب" });
-    await expect(chat).toHaveAttribute("href", waLink(WHATSAPP_MESSAGE_AR));
-    await expect(chat).toHaveAttribute("target", "_blank");
-    await expect(chat).toHaveAccessibleName(/يفتح واتساب في تبويب جديد/);
-    await expect(page.locator('span[dir="ltr"]', { hasText: WHATSAPP_DISPLAY })).toBeVisible();
-    await expect(page.locator("p", { hasText: "أنت تاجر بالفعل؟" }).getByRole("link", { name: "تسجيل الدخول" })).toHaveAttribute("href", "/ar/sign-in");
-
-    await go(page, "/ar/merchant/register?ref=GSM0001");
-    await expect(chat).toHaveAttribute("href", waLink(`${WHATSAPP_MESSAGE_AR} رمز الإحالة: GSM0001.`));
-    await expect(page.locator('span[dir="ltr"]', { hasText: "GSM0001" })).toBeVisible();
   });
 
   test("the page sends no request to the register route", async ({ page }) => {

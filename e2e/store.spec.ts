@@ -1,4 +1,4 @@
-// Public store: home, catalog filters, service page, language switch by service id, IMEI check, order tracking.
+// Public store: home, catalog filters, service page, IMEI check, order tracking.
 // Real browser → Next → the isolated demo backend (:3100). The Cloudflare script is replaced by a stub that hands out the
 // backend's dev token, so the tests do not depend on the internet.
 import { expect, test } from "./fixtures";
@@ -19,8 +19,8 @@ async function stubTurnstile(page: Page) {
 type ApiCategory = { id: number; slug: string; name: string; serviceCount: number };
 
 /** The categories the API lists (`GET /store/v1/categories`), read through the site's own rewrite. */
-async function apiCategories(request: APIRequestContext, locale: "en" | "ar" = "en"): Promise<ApiCategory[]> {
-  const res = await request.get(`/store/v1/categories?locale=${locale}`);
+async function apiCategories(request: APIRequestContext): Promise<ApiCategory[]> {
+  const res = await request.get("/store/v1/categories");
   expect(res.status()).toBe(200);
   return ((await res.json()) as { categories: ApiCategory[] }).categories;
 }
@@ -216,13 +216,6 @@ test.describe("catalog", () => {
     if (isMobile) await filters.getByRole("button", { name: "Show results" }).click();
     await expect(page.getByRole("article")).toHaveCount(2);
   });
-
-  test("the Arabic catalog lists the Arabic listings only", async ({ page }) => {
-    await page.goto("/ar/services");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("جميع الخدمات");
-    await expect(page.getByRole("article")).toHaveCount(5);
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  });
 });
 
 test.describe("service page", () => {
@@ -236,26 +229,6 @@ test.describe("service page", () => {
       "/en/checkout?service=atandt-usa-premier-unlock",
     );
     await expect(page).toHaveTitle(/AT&T USA Premier Unlock/);
-  });
-
-  test("a slug of the other language redirects to this language's slug of the same service (matched by id)", async ({ page }) => {
-    await page.goto("/ar/services/icloud-clean-lost-check");
-    await expect(page).toHaveURL(/\/ar\/services\/fahs-icloud$/);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("فحص حالة iCloud");
-
-    await page.goto("/en/services/fahs-icloud");
-    await expect(page).toHaveURL(/\/en\/services\/icloud-clean-lost-check$/);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("iCloud Clean / Lost Check");
-  });
-
-  test("a service that exists only in English is a 404 in Arabic", async ({ page }) => {
-    await page.goto("/ar/services/t-mobile-usa-unlock");
-    await expect(page.getByRole("heading", { name: "الصفحة غير موجودة" })).toBeVisible();
-  });
-
-  test("hreflang alternates point at the other language's slug", async ({ page }) => {
-    await page.goto("/en/services/icloud-clean-lost-check");
-    await expect(page.locator('link[rel="alternate"][hreflang="ar"]')).toHaveAttribute("href", /\/ar\/services\/fahs-icloud$/);
   });
 });
 
@@ -323,12 +296,6 @@ test.describe("order tracking", () => {
   test("an unknown token gets a friendly page", async ({ page }) => {
     await page.goto("/en/track/zzzzzzzzzzzzzzzzzzzz");
     await expect(page.getByText("We could not find this order")).toBeVisible();
-  });
-
-  test("the Arabic tracking page is right-to-left with translated timeline labels", async ({ page }) => {
-    await page.goto("/ar/track/t_4056k559090000000000");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByText("استلمنا الطلب")).toBeVisible();
   });
 });
 

@@ -33,7 +33,7 @@ export function deliveryTime(service: DeliveryFields, locale: Locale): DeliveryT
 }
 
 /**
- * The delivery line: the staff note as written, else "Delivered within 1 hr 30 min" / "يُسلَّم خلال …". `''` when the
+ * The delivery line: the staff note as written, else "Delivered within 1 hr 30 min". `''` when the
  * service has no delivery information. `t` is `common.delivery`.
  */
 export function deliveryLine(service: DeliveryFields, locale: Locale, t: DeliveryMessages): string {

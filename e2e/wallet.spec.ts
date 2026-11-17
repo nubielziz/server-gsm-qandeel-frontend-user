@@ -1,11 +1,10 @@
 // The wallet pages (plan F21, BH §3.1, §3.2, §3.6): the customer wallet page with its balance cards, notices and dated
-// statement, the header pill and the nav item, the Arabic page, the narrow header, and the merchant wallet page that now
+// statement, the header pill and the nav item, the narrow header, and the merchant wallet page that now
 // shares its cards and statement with it. Runs against the isolated demo backend (:3100) with the customer wallet switched
 // on by the global setup (e2e/global-setup.ts).
 // Rules (F03): every test that changes data uses a throwaway customer (`freshCustomer`); nothing global is switched; staff
 // credit and freeze through e2e/admin.ts. `wallet-disabled.spec.ts` is the exclusive spec that switches the wallet off.
-// Amounts are checked on the English page ("$20.00"); an Arabic page formats USD as "20.00 US$", so there the digits are
-// matched, not the symbol.
+// Amounts are checked on the English page ("$20.00").
 import type { Locator, Page } from "@playwright/test";
 import { creditCustomer, customerIdByEmail, freezeCustomerWallet } from "./admin";
 import { expect, test } from "./fixtures";
@@ -18,8 +17,8 @@ const vis = (locator: Locator) => locator.filter({ visible: true });
 
 /** The workspace header (the page's own card header comes later in the document). */
 const header = (page: Page) => page.locator("header").first();
-const pill = (page: Page, lang: "en" | "ar") => header(page).locator(`a[href="/${lang}/account/wallet"][aria-label]`);
-const bell = (page: Page, lang: "en" | "ar") => header(page).locator(`a[href="/${lang}/account/notifications"]:not(dialog a)`);
+const pill = (page: Page) => header(page).locator('a[href="/en/account/wallet"][aria-label]');
+const bell = (page: Page) => header(page).locator('a[href="/en/account/notifications"]:not(dialog a)');
 
 /** A statistic card of the page, found by its label: the container of the label, the figure and the hint. */
 const card = (page: Page, label: string) => main(page).getByText(label, { exact: true }).locator("xpath=..");
@@ -89,8 +88,8 @@ test.describe("customer wallet", () => {
     await expect(main(page).getByRole("alert")).toHaveCount(0);
 
     // The pill is in the header from `sm` up; on a phone it steps aside (the navigation has the wallet).
-    if (isMobile) await expect(pill(page, "en")).toBeHidden();
-    else await expect(pill(page, "en")).toHaveAccessibleName("Store balance: $0.00");
+    if (isMobile) await expect(pill(page)).toBeHidden();
+    else await expect(pill(page)).toHaveAccessibleName("Store balance: $0.00");
 
     await expect(statementCard(page, "Statement").getByRole("heading", { name: "No transactions yet" })).toBeVisible();
     await expect(main(page).getByRole("columnheader")).toHaveCount(0);
@@ -111,7 +110,7 @@ test.describe("customer wallet", () => {
 
     await expect(card(page, "Available balance")).toContainText("$20.00");
     await expect(card(page, "Balance")).toContainText("$20.00");
-    if (!isMobile) await expect(pill(page, "en")).toHaveAccessibleName("Store balance: $20.00");
+    if (!isMobile) await expect(pill(page)).toHaveAccessibleName("Store balance: $20.00");
 
     const statement = statementCard(page, "Statement");
     await expect(vis(statement.getByText("Adjustment", { exact: true }))).toHaveCount(1);
@@ -139,6 +138,7 @@ test.describe("customer wallet", () => {
     await form.getByRole("button", { name: "Show" }).click();
     await expect(page).toHaveURL(new RegExp(`/en/account/wallet\\?from=${tomorrow}&to=${tomorrow}$`));
     await expect(statement.getByRole("heading", { name: "Nothing in this period" })).toBeVisible();
+    await expect(main(page).getByRole("link", { name: "Clear dates" })).toHaveCount(2); // the form's and the empty state's
     await expect(statement.getByText("Adjustment", { exact: true })).toHaveCount(0);
     await expect(field(form, "From")).toHaveValue(tomorrow);
     await expect(field(form, "To")).toHaveValue(tomorrow);
@@ -197,48 +197,11 @@ test.describe("customer wallet", () => {
     await expect(notice).toContainText(/Since .+ your balance cannot be used to pay/);
     await expect(card(page, "Available balance")).toContainText("$0.00");
     await expect(card(page, "Balance")).toContainText("$20.00");
-    if (!isMobile) await expect(pill(page, "en")).toHaveAccessibleName("Store balance: $0.00");
+    if (!isMobile) await expect(pill(page)).toHaveAccessibleName("Store balance: $0.00");
     // A bank top-up still works while the balance is on hold, so Add funds stays.
     await expect(main(page).getByRole("link", { name: "Add funds" })).toBeVisible();
     await expect(page.getByText(/Secret hold reason/)).toHaveCount(0);
     expect(await page.content()).not.toContain("Secret hold reason");
-  });
-
-  test("the Arabic page is right-to-left with translated labels and kinds", async ({ page, isMobile }) => {
-    await customerWith(page, "20.0000");
-    await go(page, "/ar/account/wallet");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("heading", { level: 1, name: "المحفظة" })).toBeVisible();
-
-    await expect(card(page, "الرصيد المتاح")).toContainText("20.00");
-    await expect(card(page, "الرصيد")).toContainText("20.00");
-    await expect(main(page).getByRole("link", { name: "إضافة رصيد" })).toHaveAttribute("href", "/ar/account/wallet/add-funds");
-
-    const statement = statementCard(page, "كشف الحساب");
-    await expect(vis(statement.getByText("تسوية", { exact: true }))).toHaveCount(1);
-    const form = rangeForm(page, "تصفية الكشف حسب التاريخ");
-    await expect(field(form, "من")).toBeVisible();
-    await expect(field(form, "إلى")).toBeVisible();
-    await expect(form.getByRole("button", { name: "عرض" })).toBeVisible();
-
-    // Nothing English is left on the page.
-    await expect(main(page).getByText(/Available balance|Statement|Add funds|Adjustment|No transactions/)).toHaveCount(0);
-
-    if (isMobile) {
-      await expect(pill(page, "ar")).toBeHidden();
-    } else {
-      await expect(pill(page, "ar")).toBeVisible();
-      await expect(pill(page, "ar")).toContainText("20.00");
-      await expect(page.getByRole("link", { name: "المحفظة", exact: true })).toBeVisible(); // the rail's item
-    }
-  });
-
-  test("the Arabic empty range says so in Arabic", async ({ page }) => {
-    await customerWith(page, "20.0000");
-    const tomorrow = utcDay(1);
-    await go(page, `/ar/account/wallet?from=${tomorrow}&to=${tomorrow}`);
-    await expect(main(page).getByRole("heading", { name: "لا حركات في هذه الفترة" })).toBeVisible();
-    await expect(main(page).getByRole("link", { name: "مسح التواريخ" })).toHaveCount(2); // the form's and the empty state's
   });
 
   test("the shop header shows the balance pill and a Wallet item in the account menu", async ({ page, isMobile }) => {
@@ -276,10 +239,10 @@ test.describe("narrow screens", () => {
     await customerWith(page, "20.0000");
     await go(page, "/en/account/wallet");
     await expect(card(page, "Available balance")).toContainText("$20.00");
-    await expect(bell(page, "en")).toBeVisible();
-    await expect(pill(page, "en")).toBeHidden();
+    await expect(bell(page)).toBeVisible();
+    await expect(pill(page)).toBeHidden();
     await expectNoHorizontalOverflow(page);
-    await expectInsideViewport(page, bell(page, "en"));
+    await expectInsideViewport(page, bell(page));
     await expectInsideViewport(page, page.getByRole("button", { name: "Account menu" }));
 
     // The date fields and the statement list stay inside the screen.
@@ -288,18 +251,6 @@ test.describe("narrow screens", () => {
     await expectInsideViewport(page, field(form, "To"));
     await expectInsideViewport(page, form.getByRole("button", { name: "Show" }));
     await expect(vis(statementCard(page, "Statement").getByText("Adjustment", { exact: true }))).toHaveCount(1);
-  });
-
-  test("the Arabic wallet has no overflow either", async ({ page }) => {
-    await customerWith(page, "20.0000");
-    await go(page, "/ar/account/wallet");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(card(page, "الرصيد المتاح")).toContainText("20.00");
-    await expect(bell(page, "ar")).toBeVisible();
-    await expect(pill(page, "ar")).toBeHidden();
-    await expectNoHorizontalOverflow(page);
-    await expectInsideViewport(page, bell(page, "ar"));
-    await expectInsideViewport(page, rangeForm(page, "تصفية الكشف حسب التاريخ").getByRole("button", { name: "عرض" }));
   });
 });
 

@@ -217,7 +217,7 @@ export function NewTicketForm({ locale, t, defaults }: NewTicketFormProps) {
         onChange={set("order")}
         error={feedback.fields.orderToken}
       />
-      <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} lang={locale} />
+      <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} />
       <FormAlert message={feedback.message} reference={feedback.reference} />
       <div>
         <Button type="submit" size="lg" loading={busy}>

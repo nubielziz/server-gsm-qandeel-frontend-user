@@ -33,7 +33,6 @@ function card(fields: Partial<StoreServiceCard> & { gross?: string }): StoreServ
   return {
     id: nextId++,
     slug: `s-${nextId}`,
-    locale: "en",
     title: "Service",
     summary: "",
     brand: "",
@@ -129,7 +128,7 @@ describe("sorts", () => {
   });
 
   it("reaches the query as best sellers and new arrivals do in the handoff (BH §2.8); featured sends no sort", () => {
-    const base = { locale: "en", currency: "USD" } as const;
+    const base = { currency: "USD" } as const;
     expect(toQueryString(storeServicesQuery({ ...base, ...sortQuery("popular") }))).toContain("_sort=popular&_order=desc");
     expect(toQueryString(storeServicesQuery({ ...base, ...sortQuery("newest") }))).toContain("_sort=listedAt&_order=desc");
     expect(toQueryString(storeServicesQuery({ ...base, ...sortQuery("price_desc") }))).toContain("_sort=price&_order=desc");
@@ -281,10 +280,10 @@ describe("categories", () => {
 });
 
 describe("listFilterArgs", () => {
-  it("is empty for no filter, so the request carries nothing but the language, currency and page", () => {
+  it("is empty for no filter, so the request carries nothing but the currency and page", () => {
     expect(listFilterArgs(NO_FILTER)).toEqual({});
-    const query = storeServicesQuery({ locale: "en", currency: "USD", ...listFilterArgs(NO_FILTER), start: 0, end: 24 });
-    expect(query).toStrictEqual({ _start: 0, _end: 24, locale: "en", currency: "USD" });
+    const query = storeServicesQuery({ currency: "USD", ...listFilterArgs(NO_FILTER), start: 0, end: 24 });
+    expect(query).toStrictEqual({ _start: 0, _end: 24, currency: "USD" });
   });
 
   it("carries every filter of the list: category ids, stock, type, brand, carrier, country, price range, search", () => {
@@ -302,7 +301,7 @@ describe("listFilterArgs", () => {
       minPrice: "5",
       maxPrice: "20",
     });
-    const text = toQueryString(storeServicesQuery({ locale: "en", currency: "JOD", ...args }));
+    const text = toQueryString(storeServicesQuery({ currency: "JOD", ...args }));
     expect(text).toContain("categoryId=1&categoryId=4");
     expect(text).toContain("availability=in_stock");
     expect(text).toContain("brand=Apple&brand=Samsung");

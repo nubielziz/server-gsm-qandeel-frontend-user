@@ -9,8 +9,8 @@ import { siteImage } from "@/lib/site-images";
 
 export type BannerTone = "inverse" | "light";
 
-/** The arrow of a link button (`endIcon`), mirrored in Arabic. The button leans it towards where the link goes on hover. */
-export const linkArrow = <ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />;
+/** The arrow of a link button (`endIcon`). The button leans it towards where the link goes on hover. */
+export const linkArrow = <ArrowRight aria-hidden="true" />;
 
 /** A short upper-case label in an outlined tag (mockup "FEATURED PRODUCT"). */
 export function OutlineTag({ tone, children }: { tone: BannerTone; children: ReactNode }) {
@@ -44,8 +44,7 @@ export type BannerArtProps = {
 /**
  * The owner's image on one side of a banner card, fading into the card towards the text. Renders nothing until the
  * file exists (the card then shows only its surface). The images keep their subject on the outer side (right for `end`,
- * left for `start`, docs/IMAGE-PROMPTS.md): the crop keeps that side, and Arabic mirrors the image so the subject stays
- * on the outer side.
+ * left for `start`, docs/IMAGE-PROMPTS.md): the crop keeps that side.
  */
 export function BannerArt({ file, alt, sizes, loading, fetchPriority, tone, side = "end", className }: BannerArtProps) {
   if (!siteImage(file)) return null;
@@ -59,13 +58,12 @@ export function BannerArt({ file, alt, sizes, loading, fetchPriority, tone, side
         loading={loading}
         fetchPriority={fetchPriority}
         objectPosition={end ? "right center" : "left center"}
-        className="rtl:-scale-x-100"
       />
       <div
         aria-hidden="true"
         className={cn(
           "absolute inset-0 via-40% to-transparent to-75%",
-          end ? "bg-linear-to-r rtl:bg-linear-to-l" : "bg-linear-to-l rtl:bg-linear-to-r",
+          end ? "bg-linear-to-r" : "bg-linear-to-l",
           tone === "inverse" ? "from-inverse via-inverse/75" : "from-surface via-surface/75",
         )}
       />

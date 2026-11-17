@@ -4,12 +4,12 @@ import { newTicketHref, orderParam } from "./new-ticket-link";
 describe("newTicketHref: the new-ticket form of the surface, with the closed ticket's order where it can take it", () => {
   it("a guest goes to the public form, without the order (its field takes a tracking link, not an id)", () => {
     expect(newTicketHref("en", "guest", 12)).toBe("/en/support");
-    expect(newTicketHref("ar", "guest", null)).toBe("/ar/support");
+    expect(newTicketHref("en", "guest", null)).toBe("/en/support");
   });
 
   it("a signed-in customer goes to the account form with the order", () => {
     expect(newTicketHref("en", "customer", 12)).toBe("/en/account/tickets/new?order=12");
-    expect(newTicketHref("ar", "customer", null)).toBe("/ar/account/tickets/new");
+    expect(newTicketHref("en", "customer", null)).toBe("/en/account/tickets/new");
   });
 
   it("a merchant goes to the portal form with the order", () => {

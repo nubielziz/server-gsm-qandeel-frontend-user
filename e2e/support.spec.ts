@@ -251,12 +251,4 @@ test.describe("ticket page", () => {
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
     await expect(page.locator("body")).not.toContainText(/stack|exception|undefined/i);
   });
-
-  test("Arabic ticket form is right-to-left", async ({ page }) => {
-    await stubTurnstile(page);
-    await go(page, "/ar/support");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("heading", { level: 1, name: "تواصل مع الدعم" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "أرسل التذكرة" })).toBeVisible();
-  });
 });

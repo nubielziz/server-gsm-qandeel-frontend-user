@@ -1,12 +1,11 @@
 "use client";
 // Toast: short confirmations ("Saved") that fade out by themselves. Mount <Toaster /> once in a layout; call
 // `toast.success("Saved")` from any Client Component or event handler. Announced politely to screen readers.
-// A toast may carry one link (`action`, for example "View" on a live notification) and the language of its own text.
+// A toast may carry one link (`action`, for example "View" on a live notification).
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { dirOf, type Locale } from "@/lib/i18n/config";
 import { buttonClasses } from "./button";
 import { useUiText } from "./ui-text";
 
@@ -20,12 +19,10 @@ export type ToastInput = {
   duration?: number;
   /** One link under the text (a site path or URL; the toast goes away when it is followed). */
   action?: { label: string; href: string };
-  /** The language of `title` and `description` when it is not the page's (sets `lang` and `dir` on the text). */
-  lang?: Locale;
 };
 
 type ToastItem = Required<Pick<ToastInput, "title" | "tone">> &
-  Pick<ToastInput, "action" | "lang"> & { id: number; description?: string };
+  Pick<ToastInput, "action"> & { id: number; description?: string };
 
 let items: ToastItem[] = [];
 let counter = 0;
@@ -43,9 +40,9 @@ export function dismissToast(id: number) {
 }
 
 /** Shows a toast and returns its id. Client-side only. */
-export function toast({ title, description, tone = "info", duration, action, lang }: ToastInput): number {
+export function toast({ title, description, tone = "info", duration, action }: ToastInput): number {
   const id = ++counter;
-  items = [...items.slice(-3), { id, title, description, tone, action, lang }];
+  items = [...items.slice(-3), { id, title, description, tone, action }];
   emit();
   setTimeout(() => dismissToast(id), duration ?? (tone === "danger" ? 8000 : 5000));
   return id;
@@ -91,7 +88,7 @@ export function Toaster() {
         >
           {icons[t.tone]}
           <div className="min-w-0 flex-1">
-            <div lang={t.lang} dir={t.lang ? dirOf(t.lang) : undefined}>
+            <div>
               <p className="break-words text-body font-semibold text-ink">{t.title}</p>
               {t.description ? <p className="mt-0.5 break-words text-small text-ink-muted">{t.description}</p> : null}
             </div>

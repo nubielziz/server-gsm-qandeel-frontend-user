@@ -21,12 +21,12 @@ const drawerItemClasses =
   "flex min-h-11 items-center gap-3 rounded-control px-3 text-body font-medium text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink";
 
 /**
- * The categories the menu lists: the cached read of one language, without any category that has no service (the API
- * leaves those out already). `[]` when the read fails (503, network): the header must never break the page.
+ * The categories the menu lists: the cached read, without any category that has no service (the API leaves those out
+ * already). `[]` when the read fails (503, network): the header must never break the page.
  */
-export async function loadMenuCategories(locale: Locale): Promise<StoreCategory[]> {
+export async function loadMenuCategories(): Promise<StoreCategory[]> {
   try {
-    const categories = await listStoreCategories(locale);
+    const categories = await listStoreCategories();
     return categories.filter((category) => category.serviceCount > 0 && category.slug !== "" && category.name !== "");
   } catch {
     return [];
@@ -68,7 +68,7 @@ export type CategoryMenuProps = {
  * Desktop: the "All categories" button of the nav row. It opens a panel (native popover: Esc and a click outside close
  * it, Up and Down move between the rows) with one link per category. Nothing when there are no categories.
  *
- * @example <CategoryMenu categories={await loadMenuCategories(locale)} locale={locale} label="All categories" listLabel="Categories" triggerClassName={…} />
+ * @example <CategoryMenu categories={await loadMenuCategories()} locale={locale} label="All categories" listLabel="Categories" triggerClassName={…} />
  */
 export function CategoryMenu({ categories, locale, label, listLabel, triggerClassName }: CategoryMenuProps) {
   if (categories.length === 0) return null;

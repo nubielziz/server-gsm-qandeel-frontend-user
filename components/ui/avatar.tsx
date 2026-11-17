@@ -14,7 +14,10 @@ export type AvatarProps = {
 
 const sizes = { sm: "size-8 text-caption", md: "size-10 text-small", lg: "size-14 text-heading" } as const;
 
-/** Up to two initials: "Alex Morgan" → "AM", "سارة" → "س". */
+/**
+ * Up to two initials: "Alex Morgan" → "AM". The first character of a word in any script, so a name typed in Arabic
+ * gives its first letter (group C).
+ */
 export function initialsOf(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return "?";

@@ -323,24 +323,6 @@ test.describe("customer: the token page", () => {
       await expect(log(page).getByText(reply)).toBeVisible({ timeout: 1_500 });
     }).toPass({ timeout: 30_000 });
   });
-
-  test("an Arabic page gets the reply and the typing line in Arabic, right to left", async ({ page }) => {
-    const { number, token } = await fileTicket(page.request);
-    const id = await ticketIdOf(number);
-    const opened = streamOpened(page, `/store/v1/tickets/${token}/stream`);
-    await go(page, `/ar/support/tickets/${token}`);
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await hydrated(box(page));
-    await opened;
-    await page.waitForTimeout(500);
-
-    const reply = `رد مباشر ${tag()}`;
-    await agentReply(id, reply);
-    await expect(log(page).getByText(reply)).toBeVisible({ timeout: 20_000 });
-    await agentTyping(id);
-    await expect(page.getByText("فريق الدعم يكتب…")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("إرفاق ملف")).toBeVisible();
-  });
 });
 
 // ── Customer: a closed ticket (owner, 2026-11-15) ───────────────────────────────────────────────────────────────────

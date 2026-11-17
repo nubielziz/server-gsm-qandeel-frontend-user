@@ -1,7 +1,7 @@
 "use client";
 // Drawer, Modal, DialogTrigger, DialogClose: built on the native <dialog> element, so the browser gives us the focus
 // trap, Esc to close, the inert background and the return of focus to the opener. A Drawer slides in from the END side
-// (right in English, left in Arabic) as a rounded panel inset from the screen edge; a Modal is centred.
+// (the right edge) as a rounded panel inset from the screen edge; a Modal is centred.
 //
 // Two ways to use them:
 //  - Uncontrolled, `id` mode (works from a Server Component page, and before hydration):
@@ -144,7 +144,7 @@ const drawerWidths = { sm: "22rem", md: "28rem", lg: "40rem" } as const;
 const modalWidths = { sm: "24rem", md: "32rem", lg: "44rem" } as const;
 
 export type DrawerProps = DialogContentProps & {
-  /** Which edge it slides from: `end` (default; right in English, left in Arabic) or `start` (navigation drawers). */
+  /** Which edge it slides from: `end` (default; the right edge) or `start` (navigation drawers). */
   side?: "start" | "end";
   /** `sm` 22rem, `md` 28rem (default), `lg` 40rem. Never wider than the screen minus 1.5rem. */
   size?: keyof typeof drawerWidths;

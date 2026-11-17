@@ -3,7 +3,7 @@
 // white when the moving pill covers half of the link and back to grey when it covers less than half, so the text is
 // never white on the light row, nor dark on the pill, for more than a frame or two. Plain module (no DOM): unit-tested.
 
-/** A horizontal span of the row in px: a link's box or the pill's (`start` = offsetLeft, physical in both directions). */
+/** A horizontal span of the row in px: a link's box or the pill's (`start` = offsetLeft, physical). */
 export type Span = { start: number; width: number };
 
 /** A CSS cubic-bezier as its four control values `[x1, y1, x2, y2]`. */

@@ -58,7 +58,7 @@ export default async function globalSetup(): Promise<void> {
   await ensureCurrency("JOD", 2);
 
   // 6. A service picture.
-  await ensureListingImage(SLUGS.pictured, "en", "service-imei.jpg");
+  await ensureListingImage(SLUGS.pictured, "service-imei.jpg");
 
   // 7. Post-conditions the specs rely on: fail here, with a clear message, rather than in the first spec.
   const after = await storeService(SLUGS.stocked);

@@ -21,15 +21,18 @@ Next code (caching = `01-app/01-getting-started/08-caching.md`, `use cache`, `ne
   UI icons come from `lucide-react` only.
 
 ## Commands
-`npm run dev` (http://localhost:5175) · `npm run typecheck` · `npm run lint` · `npm run test` (Vitest) ·
+`npm run dev` (http://localhost:5175) · `npm run typecheck` · `npm run lint` (ESLint + the English-only guard) · `npm run test` (Vitest) ·
 `npm run build` · `npm run e2e` (Playwright) · `npm run gen:api` (types from the backend OpenAPI) · `npm run check`.
 Dev API: `.env.development.local` sets `GSM_API_ORIGIN`. `scripts/dev-backend.sh start|stop|status|reset` runs an
 isolated, demo-seeded backend on :3100 (own DB `gsm_storefront`, Redis DB 5, bucket `gsm-files-storefront`, mail to
 Mailpit http://localhost:8025); the owner's API on :3000 and its data are never touched.
 
 ## Architecture
-- **Routes:** everything under `app/[lang]/` (`en`, `ar`; root layout `app/[lang]/layout.tsx` sets `lang`/`dir`).
-  `proxy.ts` redirects paths without a language (email links like `/sign-in?token=`, `/merchant/set-password?token=`).
+- **Routes:** everything under `app/[lang]/` (only `en` exists: decision 039, 2026-11-16; the cleanup wave of feature 30
+  renames the folder to `app/en`; root layout `app/[lang]/layout.tsx` sets `lang="en" dir="ltr"`).
+  `proxy.ts` redirects paths that do not start with `/en` to the same path under `/en` (email links like
+  `/sign-in?token=`, `/merchant/set-password?token=`), reading no cookie or `Accept-Language`; `next.config.ts` answers
+  every old `/ar…` address with a 308 to the same path under `/en`.
   Route groups: `(store)` public shop (+ support tickets), `(auth)` sign-in/up and email-link pages (including
   `(auth)/merchant/{register,set-password,verify-email}`), `(checkout)` checkout, `account/` customer area,
   `(portal)/merchant/` merchant portal. `/client/*` and `/store/v1/*` are rewritten to the API.
@@ -44,10 +47,18 @@ Mailpit http://localhost:8025); the owner's API on :3000 and its data are never 
     Components, then `router.refresh()`. Never Server Actions for API calls (Set-Cookie would not reach the browser).
   - Types: `lib/api/types.ts` (aliases of the generated `lib/api/schema.gen.ts`; JSDoc there = the API contract).
   - Lists: `listQuery()` (`lib/api/query.ts`); totals from `x-total-count`; unknown query params → 422, send none.
-- **Language:** server code calls `getLocale()` / `getMessages(namespace)` (`lib/i18n/server.ts`); Client Components
-  get the strings they need as props. Messages: one `defineMessages({ en, ar })` namespace per area in
-  `lib/i18n/messages/<area>.ts` (TypeScript forces both languages to match). Arabic = clear Modern Standard Arabic.
-  Links: `localePath(locale, '/path')`. Never derive business rules from mockup placeholder text.
+- **Language (decision 039): English only.** No language field, parameter, selector, translation or right-to-left layout
+  code: no request sends a `locale` (the API takes none; an unknown query key is a 422). Server code still calls
+  `getLocale()` (always `en`) / `getMessages(namespace)` (`lib/i18n/server.ts`) until the cleanup wave of feature 30
+  removes them; Client Components get the strings they need as props. Messages: one `defineMessages({ en })` namespace per
+  area in `lib/i18n/messages/<area>.ts`. Links: `localePath(locale, '/path')` (becomes `sitePath(path)`). Never derive
+  business rules from mockup placeholder text.
+  **Arabic text that people or suppliers type is data and must keep working** (group C): `dir="auto"` on text people type,
+  `<bdi>` around values of the API, `dir="ltr"` on codes and numbers, Arabic-Indic and Persian digits typed in quantity,
+  amount, IMEI and order boxes, the input-method guard of the ticket reply box, initials of a name in any script. Never
+  "clean" these. `scripts/check-english-only.mjs` (the same file in the backend, the console and here; part of
+  `npm run lint`, configured by `scripts/english-only.config.json`) fails on Arabic script, the `ar` locale, `rtl:`
+  variants or `dir="rtl"` outside its allowlist, and when a protected file loses what it protects (`keep`).
 - **Errors:** every failure is an `ApiError` (`lib/api/errors.ts`): translate with `useErrorText()` (client) by
   `code` and per-field `code`; show `reference()` (request id) on error screens. Sign out rules: handoff §3.4.
 - **Money:** 4-decimal strings. Display with `formatMoney()`; sum with `sumMoney()`; never floats.
@@ -60,7 +71,7 @@ Mailpit http://localhost:8025); the owner's API on :3000 and its data are never 
 - **Helpers added by the backend-handoff waves (2026-11-13/15):** `lib/api/store-query.ts` (store list filters, sorts,
   safe paging), `lib/api/idempotency.ts` (one `Idempotency-Key` per request body; new after success or
   `IDEMPOTENCY_KEY_REUSED`), `lib/quantity.ts` (one per order, exactly N, range, packs; texts keyed on
-  `invalid_quantity`; "From" prices), `lib/store/delivery.ts` (`etaText` else `deliveryMinutes` per language),
+  `invalid_quantity`; "From" prices), `lib/store/delivery.ts` (`etaText` else `deliveryMinutes`),
   `lib/wallet/*` and `components/wallet/*` (customer and merchant wallets, top-ups), the notification bell and pages
   (`components/notifications`). The customer wallet read is `no-store` inside `<Suspense>`. Wording: say "In stock" or
   "On request" with the delivery line, never "Pre-order", "Out of stock" or a count (handoff §14).
@@ -73,7 +84,7 @@ Mailpit http://localhost:8025); the owner's API on :3000 and its data are never 
   Design tokens live in `app/globals.css` (`@theme`); never hard-code colours, radii or shadows in pages.
 - Accessibility: real labels, `aria-describedby` for hints/errors, focus moves to the first error, keyboard support,
   visible focus, touch targets ≥ 44 px, `aria-live` for async results.
-- RTL: logical utilities only (`ms-/me-/ps-/pe-/start-/end-/text-start`); mirror directional icons with
-  `rtl:-scale-x-100`.
+- Layout is left-to-right only (no `rtl:` variants, no `dir="rtl"`: the guard fails on them). Logical utilities
+  (`ms-/me-/ps-/pe-/start-/end-/text-start`) stay: they are plain Tailwind.
 - Performance: small client components, `next/image` with explicit sizes, no layout shift (reserve space for
   async content with skeletons of the same size).

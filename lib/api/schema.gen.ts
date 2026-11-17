@@ -156,7 +156,6 @@ export type GetClientAuthMeResponse = {
   };
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
-  locale: "en" | "ar";
   address: string;
   taxId: string;
   mustChangePassword: boolean;
@@ -668,8 +667,6 @@ export type GetClientNotificationsQuery = {
   category?: Array<"announcement" | "marketing" | "order" | "payment" | "wallet" | "billing" | "support" | "account" | "alert">;
   /** `true` for unread items only, `false` for read ones. */
   unread?: "true" | "false";
-  /** The reader’s page language; default: a customer’s saved language, English for the others. */
-  locale?: "en" | "ar";
 };
 /** 200 */
 export type GetClientNotificationsResponse = Array<{
@@ -682,8 +679,6 @@ export type GetClientNotificationsResponse = Array<{
   body: string;
   /** A site path without the language prefix (for example `/account/orders`), or `null`. */
   link: string | null;
-  /** The language `title` and `body` are in. */
-  locale: "en" | "ar";
   readAt: IsoDateTime | null;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
@@ -976,7 +971,6 @@ export type PatchClientProfileBody = {
   company?: string;
   phone?: string;
   country?: string;
-  locale?: "en" | "ar";
   address?: string;
   taxId?: string;
 };
@@ -1004,7 +998,6 @@ export type PatchClientProfileResponse = {
   };
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
-  locale: "en" | "ar";
   address: string;
   taxId: string;
   mustChangePassword: boolean;
@@ -1188,8 +1181,6 @@ export type DeleteClientSessionsByIdResponse = void;
 
 // ── GET /client/stream — My live event stream
 export type GetClientStreamQuery = {
-  /** The page language: the text of every item comes in it. */
-  locale?: "en" | "ar";
   /** The last event id the page saw (`i9001`), for a new stream that should replay what it missed. */
   cursor?: string;
 };
@@ -1627,7 +1618,6 @@ export type PostStoreV1AuthVerifyResponse = {
   name: string;
   phone: string;
   country: string;
-  locale: string;
   /** The ISO code of the currency prices are shown in; null when none is chosen. */
   currency: string | null;
   marketingOptIn: boolean;
@@ -1638,21 +1628,16 @@ export type PostStoreV1AuthVerifyResponse = {
 };
 
 // ── GET /store/v1/categories — List the storefront categories
-export type GetStoreV1CategoriesQuery = {
-  locale?: "en" | "ar";
-};
 /** 200 */
 export type GetStoreV1CategoriesResponse = {
-  locale: "en" | "ar";
   categories: Array<{
     /** Numeric record id. */
     id: Id;
     /** `<id>-<words>`: only the number before the first hyphen counts. */
     slug: string;
-    /** The name in the requested language (the English name when there is no Arabic one). */
     name: string;
     type: "imei" | "server" | "remote" | "file";
-    /** Services with a switched-on page in the language that can be bought now. */
+    /** Services with a switched-on page that can be bought now. */
     serviceCount: number;
   }>;
 };
@@ -1874,8 +1859,6 @@ export type PostStoreV1CheckoutSessionsByTokenConsentsBody = {
     purpose: "terms" | "privacy" | "refund_policy" | "withdrawal_waiver" | "marketing";
     granted: boolean;
   }>;
-  /** The language of the texts the buyer saw (default `en`). */
-  locale?: "en" | "ar";
 };
 /** 201 */
 export type PostStoreV1CheckoutSessionsByTokenConsentsResponse = {
@@ -1885,7 +1868,6 @@ export type PostStoreV1CheckoutSessionsByTokenConsentsResponse = {
     document: {
       type: string;
       version: string;
-      locale: string;
     } | null;
     /** ISO 8601 UTC time with milliseconds. */
     recordedAt: IsoDateTime;
@@ -1966,7 +1948,6 @@ export type GetStoreV1ConfigResponse = {
   legalDocuments: Array<{
     type: "terms" | "privacy" | "refund" | "cookies";
     version: string;
-    locale: string;
     effectiveFrom: IsoDateTime | null;
   }>;
 };
@@ -2004,8 +1985,6 @@ export type GetStoreV1HelpQuery = {
   q?: string;
   /** Keep rows where category equals (repeat the key for IN) the value. */
   category?: string[];
-  /** The language: `en` or `ar`. */
-  locale?: string;
 };
 /** 200 */
 export type GetStoreV1HelpResponse = Array<{
@@ -2016,7 +1995,6 @@ export type GetStoreV1HelpResponse = Array<{
   category: string;
   question: string;
   answerMd: string;
-  locale: string;
   helpfulYes: number;
   helpfulNo: number;
   sort: number;
@@ -2037,7 +2015,6 @@ export type GetStoreV1HelpBySlugResponse = {
   category: string;
   question: string;
   answerMd: string;
-  locale: string;
   helpfulYes: number;
   helpfulNo: number;
   sort: number;
@@ -2088,6 +2065,19 @@ export type PostStoreV1ImeiCheckResponse = {
   checkedAt: IsoDateTime;
 };
 
+// ── GET /store/v1/legacy-slugs/:kind/:slug — Resolve an old address
+export type GetStoreV1LegacySlugsByKindBySlugParams = {
+  kind: "service" | "page" | "help";
+  slug: string;
+};
+/** 200 */
+export type GetStoreV1LegacySlugsByKindBySlugResponse = {
+  /** The path of the site to send the reader on to, without a language prefix (like notification links): `/services/<slug>`, `/services`, `/` or `/help`. */
+  path: string;
+  /** The slug of the service's page on sale now (the same rule as `GET /store/v1/services/:slug`); `null` when the address is not a service page that is on sale. */
+  slug: string | null;
+};
+
 // ── POST /store/v1/marketing/unsubscribe/:token — Stop marketing email
 export type PostStoreV1MarketingUnsubscribeByTokenParams = {
   token: string;
@@ -2105,7 +2095,6 @@ export type GetStoreV1MeResponse = {
   name: string;
   phone: string;
   country: string;
-  locale: string;
   /** The ISO code of the currency prices are shown in; null when none is chosen. */
   currency: string | null;
   marketingOptIn: boolean;
@@ -2115,13 +2104,11 @@ export type GetStoreV1MeResponse = {
   createdAt: IsoDateTime;
 };
 
-// ── PATCH /store/v1/me — Change name, phone, country, language, currency and marketing consent
+// ── PATCH /store/v1/me — Change name, phone, country, currency and marketing consent
 export type PatchStoreV1MeBody = {
   name?: string;
   phone?: string;
   country?: string;
-  /** `en` or `ar`. */
-  locale?: string;
   currency?: string;
   marketingOptIn?: boolean;
 };
@@ -2134,7 +2121,6 @@ export type PatchStoreV1MeResponse = {
   name: string;
   phone: string;
   country: string;
-  locale: string;
   /** The ISO code of the currency prices are shown in; null when none is chosen. */
   currency: string | null;
   marketingOptIn: boolean;
@@ -2184,8 +2170,6 @@ export type GetStoreV1MeNotificationsQuery = {
   category?: Array<"announcement" | "marketing" | "order" | "payment" | "wallet" | "billing" | "support" | "account" | "alert">;
   /** `true` for unread items only, `false` for read ones. */
   unread?: "true" | "false";
-  /** The reader’s page language; default: a customer’s saved language, English for the others. */
-  locale?: "en" | "ar";
 };
 /** 200 */
 export type GetStoreV1MeNotificationsResponse = Array<{
@@ -2198,8 +2182,6 @@ export type GetStoreV1MeNotificationsResponse = Array<{
   body: string;
   /** A site path without the language prefix (for example `/account/orders`), or `null`. */
   link: string | null;
-  /** The language `title` and `body` are in. */
-  locale: "en" | "ar";
   readAt: IsoDateTime | null;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
@@ -2285,8 +2267,6 @@ export type PostStoreV1MePasswordResponse = void;
 
 // ── GET /store/v1/me/stream — My live event stream
 export type GetStoreV1MeStreamQuery = {
-  /** The page language: the text of every item comes in it. */
-  locale?: "en" | "ar";
   /** The last event id the page saw (`i9001`), for a new stream that should replay what it missed. */
   cursor?: string;
 };
@@ -2786,14 +2766,11 @@ export type GetStoreV1PagesQuery = {
   q?: string;
   /** Keep rows where kind equals (repeat the key for IN) the value. */
   kind?: Array<"country" | "model" | "brand" | "carrier" | "tool" | "static" | "blog">;
-  /** The language: `en` or `ar`. */
-  locale?: string;
 };
 /** 200 */
 export type GetStoreV1PagesResponse = Array<{
   kind: "country" | "model" | "brand" | "carrier" | "tool" | "static" | "blog";
   slug: string;
-  locale: string;
   title: string;
   /** `''` when none. */
   seoDescription: string;
@@ -2805,10 +2782,6 @@ export type GetStoreV1PagesResponse = Array<{
 }>;
 
 // ── GET /store/v1/pages/:slug — Get a public page
-export type GetStoreV1PagesBySlugQuery = {
-  /** The language: `en` or `ar`. */
-  locale?: string;
-};
 export type GetStoreV1PagesBySlugParams = {
   slug: string;
 };
@@ -2816,7 +2789,6 @@ export type GetStoreV1PagesBySlugParams = {
 export type GetStoreV1PagesBySlugResponse = {
   kind: "country" | "model" | "brand" | "carrier" | "tool" | "static" | "blog" | "legal";
   slug: string;
-  locale: string;
   title: string;
   /** Markdown as stored; HTML inside is rendered only by the storefront. */
   bodyMd: string;
@@ -2882,7 +2854,6 @@ export type GetStoreV1SearchResponse = {
     /** The service id: what `POST /store/v1/checkout-sessions` takes as `serviceId`. */
     id: Id;
     slug: string;
-    locale: "en" | "ar";
     title: string;
     summary: string;
     brand: string;
@@ -2900,14 +2871,14 @@ export type GetStoreV1SearchResponse = {
       id: Id;
       /** `<id>-<words>`: only the number before the first hyphen counts. */
       slug: string;
-      /** The category name in the requested language (the English name when there is no Arabic one). */
+      /** The category name. */
       name: string;
     };
     /** `in_stock`: the available inventory codes cover the smallest order, so it is delivered at once; `on_request`: processed after the order. Both can be bought. Never a count. */
     availability: "in_stock" | "on_request";
-    /** The expected delivery time in minutes (the service SLA); the site formats it per language. */
+    /** The expected delivery time in minutes (the service SLA); the site formats it. */
     deliveryMinutes: number;
-    /** A delivery note in this page's language that replaces `deliveryMinutes` on screen; `''` when none. */
+    /** A delivery note that replaces `deliveryMinutes` on screen; `''` when none. */
     etaText: string;
     /** When the page first went on the site; never resets. `null` for pages from before it was recorded. */
     listedAt: IsoDateTime | null;
@@ -3052,8 +3023,6 @@ export type GetStoreV1ServicesQuery = {
   country?: string[];
   /** Keep rows where featured equals (repeat the key for IN) the value. */
   featured?: Array<"true" | "false">;
-  /** Keep rows where locale equals (repeat the key for IN) the value. */
-  locale?: Array<"en" | "ar">;
   /** Keep rows where type equals (repeat the key for IN) the value. */
   type?: Array<"imei" | "server" | "remote" | "file">;
   /** Keep rows where categoryId equals (repeat the key for IN) the value. */
@@ -3076,7 +3045,6 @@ export type GetStoreV1ServicesResponse = Array<{
   /** The service id: what `POST /store/v1/checkout-sessions` takes as `serviceId`. */
   id: Id;
   slug: string;
-  locale: "en" | "ar";
   title: string;
   summary: string;
   brand: string;
@@ -3094,14 +3062,14 @@ export type GetStoreV1ServicesResponse = Array<{
     id: Id;
     /** `<id>-<words>`: only the number before the first hyphen counts. */
     slug: string;
-    /** The category name in the requested language (the English name when there is no Arabic one). */
+    /** The category name. */
     name: string;
   };
   /** `in_stock`: the available inventory codes cover the smallest order, so it is delivered at once; `on_request`: processed after the order. Both can be bought. Never a count. */
   availability: "in_stock" | "on_request";
-  /** The expected delivery time in minutes (the service SLA); the site formats it per language. */
+  /** The expected delivery time in minutes (the service SLA); the site formats it. */
   deliveryMinutes: number;
-  /** A delivery note in this page's language that replaces `deliveryMinutes` on screen; `''` when none. */
+  /** A delivery note that replaces `deliveryMinutes` on screen; `''` when none. */
   etaText: string;
   /** When the page first went on the site; never resets. `null` for pages from before it was recorded. */
   listedAt: IsoDateTime | null;
@@ -3127,7 +3095,6 @@ export type GetStoreV1ServicesResponse = Array<{
 
 // ── GET /store/v1/services/:slug — Show a service page
 export type GetStoreV1ServicesBySlugQuery = {
-  locale?: "en" | "ar";
   /** The buyer's country: the tax of its window is added. Without it no tax is added. */
   buyerCountry?: string;
   /** The buyer's region, for the countries that tax by region. */
@@ -3143,7 +3110,6 @@ export type GetStoreV1ServicesBySlugResponse = {
   /** The service id: what `POST /store/v1/checkout-sessions` takes as `serviceId`. */
   id: Id;
   slug: string;
-  locale: "en" | "ar";
   title: string;
   summary: string;
   brand: string;
@@ -3161,14 +3127,14 @@ export type GetStoreV1ServicesBySlugResponse = {
     id: Id;
     /** `<id>-<words>`: only the number before the first hyphen counts. */
     slug: string;
-    /** The category name in the requested language (the English name when there is no Arabic one). */
+    /** The category name. */
     name: string;
   };
   /** `in_stock`: the available inventory codes cover the smallest order, so it is delivered at once; `on_request`: processed after the order. Both can be bought. Never a count. */
   availability: "in_stock" | "on_request";
-  /** The expected delivery time in minutes (the service SLA); the site formats it per language. */
+  /** The expected delivery time in minutes (the service SLA); the site formats it. */
   deliveryMinutes: number;
-  /** A delivery note in this page's language that replaces `deliveryMinutes` on screen; `''` when none. */
+  /** A delivery note that replaces `deliveryMinutes` on screen; `''` when none. */
   etaText: string;
   /** When the page first went on the site; never resets. `null` for pages from before it was recorded. */
   listedAt: IsoDateTime | null;
@@ -3214,11 +3180,6 @@ export type GetStoreV1ServicesBySlugResponse = {
   faqs: Array<{
     question: string;
     answerMd: string;
-  }>;
-  /** The switched-on pages of the same service in the other languages (for the language switch); empty when none. */
-  alternates: Array<{
-    locale: "en" | "ar";
-    slug: string;
   }>;
 };
 
@@ -3477,8 +3438,6 @@ export type PostStoreV1TicketsByTokenReadResponse = void;
 
 // ── GET /store/v1/tickets/:token/stream — Live events of a support ticket
 export type GetStoreV1TicketsByTokenStreamQuery = {
-  /** The page language (the events carry no text of their own). */
-  locale?: "en" | "ar";
   /** The last event id the page saw (`t5521`), for a new stream that should replay what it missed. */
   cursor?: string;
 };
@@ -3571,7 +3530,7 @@ export interface ApiRoutes {
   "POST /store/v1/auth/password/forgot": { query: never; params: never; body: PostStoreV1AuthPasswordForgotBody; response: PostStoreV1AuthPasswordForgotResponse; status: 204 };
   "POST /store/v1/auth/password/set": { query: never; params: never; body: PostStoreV1AuthPasswordSetBody; response: PostStoreV1AuthPasswordSetResponse; status: 204 };
   "POST /store/v1/auth/verify": { query: never; params: never; body: PostStoreV1AuthVerifyBody; response: PostStoreV1AuthVerifyResponse; status: 200 };
-  "GET /store/v1/categories": { query: GetStoreV1CategoriesQuery; params: never; body: never; response: GetStoreV1CategoriesResponse; status: 200 };
+  "GET /store/v1/categories": { query: never; params: never; body: never; response: GetStoreV1CategoriesResponse; status: 200 };
   "POST /store/v1/checkout-sessions": { query: never; params: never; body: PostStoreV1CheckoutSessionsBody; response: PostStoreV1CheckoutSessionsResponse; status: 201 };
   "GET /store/v1/checkout-sessions/:token": { query: never; params: GetStoreV1CheckoutSessionsByTokenParams; body: never; response: GetStoreV1CheckoutSessionsByTokenResponse; status: 200 };
   "POST /store/v1/checkout-sessions/:token/balance-payment": { query: never; params: PostStoreV1CheckoutSessionsByTokenBalancePaymentParams; body: never; response: PostStoreV1CheckoutSessionsByTokenBalancePaymentResponse; status: 201 };
@@ -3583,6 +3542,7 @@ export interface ApiRoutes {
   "GET /store/v1/help/:slug": { query: never; params: GetStoreV1HelpBySlugParams; body: never; response: GetStoreV1HelpBySlugResponse; status: 200 };
   "POST /store/v1/help/:slug/vote": { query: never; params: PostStoreV1HelpBySlugVoteParams; body: PostStoreV1HelpBySlugVoteBody; response: PostStoreV1HelpBySlugVoteResponse; status: 204 };
   "POST /store/v1/imei/check": { query: never; params: never; body: PostStoreV1ImeiCheckBody; response: PostStoreV1ImeiCheckResponse; status: 200 };
+  "GET /store/v1/legacy-slugs/:kind/:slug": { query: never; params: GetStoreV1LegacySlugsByKindBySlugParams; body: never; response: GetStoreV1LegacySlugsByKindBySlugResponse; status: 200 };
   "POST /store/v1/marketing/unsubscribe/:token": { query: never; params: PostStoreV1MarketingUnsubscribeByTokenParams; body: never; response: PostStoreV1MarketingUnsubscribeByTokenResponse; status: 204 };
   "GET /store/v1/me": { query: never; params: never; body: never; response: GetStoreV1MeResponse; status: 200 };
   "PATCH /store/v1/me": { query: never; params: never; body: PatchStoreV1MeBody; response: PatchStoreV1MeResponse; status: 200 };
@@ -3609,7 +3569,7 @@ export interface ApiRoutes {
   "GET /store/v1/orders/:token": { query: never; params: GetStoreV1OrdersByTokenParams; body: never; response: GetStoreV1OrdersByTokenResponse; status: 200 };
   "GET /store/v1/orders/:token/receipt": { query: never; params: GetStoreV1OrdersByTokenReceiptParams; body: never; response: GetStoreV1OrdersByTokenReceiptResponse; status: 200 };
   "GET /store/v1/pages": { query: GetStoreV1PagesQuery; params: never; body: never; response: GetStoreV1PagesResponse; status: 200 };
-  "GET /store/v1/pages/:slug": { query: GetStoreV1PagesBySlugQuery; params: GetStoreV1PagesBySlugParams; body: never; response: GetStoreV1PagesBySlugResponse; status: 200 };
+  "GET /store/v1/pages/:slug": { query: never; params: GetStoreV1PagesBySlugParams; body: never; response: GetStoreV1PagesBySlugResponse; status: 200 };
   "GET /store/v1/search": { query: GetStoreV1SearchQuery; params: never; body: never; response: GetStoreV1SearchResponse; status: 200 };
   "GET /store/v1/search/suggest": { query: GetStoreV1SearchSuggestQuery; params: never; body: never; response: GetStoreV1SearchSuggestResponse; status: 200 };
   "GET /store/v1/services": { query: GetStoreV1ServicesQuery; params: never; body: never; response: GetStoreV1ServicesResponse; status: 200 };

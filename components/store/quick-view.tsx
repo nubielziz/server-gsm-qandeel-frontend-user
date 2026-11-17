@@ -25,16 +25,16 @@ import { PriceBlock, ServicePrice, serviceFacts, serviceStockHint } from "./serv
 type Params = Promise<{ slug: string }>;
 
 /**
- * The service of the URL in this language; null when it is not listed in this language. A shared cached read (the base
- * currency, no cookie): the title, texts and links do not depend on the visitor. The price comes from `ServicePrice`.
+ * The service of the URL; null when it is not listed. A shared cached read (the base currency, no cookie): the title,
+ * texts and links do not depend on the visitor. The price comes from `ServicePrice`.
  */
 async function load(params: Params) {
   const [{ slug }, locale] = await Promise.all([params, getLocale()]);
-  const resolved = await resolveService(slug, locale);
+  const resolved = await resolveService(slug);
   let service: StoreServiceDetail | null = resolved.kind === "found" ? resolved.service : null;
-  // A slug of the other language: the same service in this language.
-  if (resolved.kind === "redirect") {
-    const own = await resolveService(resolved.slug, locale);
+  // An old address of the service (decision 039): its page under the current slug; none when it has no page on sale.
+  if (resolved.kind === "redirect" && resolved.slug) {
+    const own = await resolveService(resolved.slug);
     service = own.kind === "found" ? own.service : null;
   }
   return { locale, service };
@@ -139,7 +139,7 @@ export async function QuickViewActions({ params }: { params: Params }) {
   const slug = encodeURIComponent(service.slug);
   return (
     <>
-      <ButtonLink href={localePath(locale, `/services/${slug}`)} variant="secondary" endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}>
+      <ButtonLink href={localePath(locale, `/services/${slug}`)} variant="secondary" endIcon={<ArrowRight aria-hidden="true" />}>
         {t.quickView.details}
       </ButtonLink>
       {service.type === "file" ? (

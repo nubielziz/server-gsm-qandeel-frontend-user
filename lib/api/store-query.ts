@@ -4,13 +4,11 @@
 // the key (the API reads a repeated key as IN).
 import { listQuery, type QueryInput } from "./query";
 import type { ServiceAvailability, ServiceType } from "./types";
-import type { Locale } from "@/lib/i18n/config";
 
 /** Sorts the route accepts (`_sort`): `featured`, `sort`, `title`, `popular` (best sellers), `listedAt` (new arrivals), `price`. */
 export type ServiceSort = "featured" | "sort" | "title" | "popular" | "listedAt" | "price";
 
 export type ServiceListArgs = {
-  locale: Locale;
   /** ISO code of the currency to price in (one `GET /store/v1/config` lists). */
   currency: string;
   q?: string;
@@ -77,7 +75,8 @@ function ids(value: readonly number[] | undefined): string[] | undefined {
 /** The query record for one catalog page. Hand it to `apiPublicList('/store/v1/services', { query })`. */
 export function storeServicesQuery(args: ServiceListArgs): QueryInput {
   const { start, end } = pageWindow(args, 24);
-  const filters: QueryInput = { locale: args.locale, currency: args.currency };
+  // No `locale`: the site is English only (decision 039) and the route answers 422 to a key it does not know.
+  const filters: QueryInput = { currency: args.currency };
   const add = (key: string, value: string | string[] | boolean | undefined) => {
     if (value !== undefined) filters[key] = value;
   };
@@ -106,7 +105,7 @@ export function storeServicesQuery(args: ServiceListArgs): QueryInput {
 }
 
 // ── `GET /store/v1/search` (backend plan 29 §5.3): the English results page. Its own query dialect: `page` and
-// `perPage` (not `_start`/`_end`), `sort` and `order` (not `_sort`/`_order`), and no `locale` (English only). The same
+// `perPage` (not `_start`/`_end`), `sort` and `order` (not `_sort`/`_order`). The same
 // 422 rule: nothing empty is sent.
 
 /** Sorts of the results page: `relevance` (the default, sent as nothing), best sellers, name, new arrivals, price. */

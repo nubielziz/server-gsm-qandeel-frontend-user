@@ -19,12 +19,6 @@ describe("NavUnreadBadge: the unread count on the Notifications item", () => {
     expect(renderToStaticMarkup(<NavUnreadBadge surface="merchant" locale="en" initialCount={0} suffix="x" />)).toBe("");
     expect(renderToStaticMarkup(<NavUnreadBadge surface="merchant" locale="en" initialCount={null} suffix="x" />)).toBe("");
   });
-
-  it("Arabic: the suffix in Arabic, the number kept left to right", () => {
-    const html = renderToStaticMarkup(<NavUnreadBadge surface="customer" locale="ar" initialCount={2} suffix="، غير المقروءة: {count}" />);
-    expect(html).toContain('dir="ltr"');
-    expect(html).toMatch(/<span class="sr-only">، غير المقروءة: .+<\/span>/);
-  });
 });
 
 describe("NavSupportDot: the dot on Support / My tickets", () => {

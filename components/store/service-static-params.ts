@@ -2,11 +2,10 @@
 // page (`/[lang]/services/[slug]`) and the quick view dialog (`@modal/(.)quick-view/[slug]`). Their content then joins
 // the static output, so a prefetch of either is served from it instead of a server render (plan P3.3).
 import { allListedServices } from "@/lib/catalog";
-import { getLocale } from "@/lib/i18n/server";
 import { prerenderSlugs } from "./resolve-service";
 import { staticSlugParams } from "./static-params";
 
-/** At most this many services per language are prerendered: a build through the shop host stays under its request limit. */
+/** At most this many services are prerendered: a build through the shop host stays under its request limit. */
 export const MAX_STATIC_SLUGS = 50;
 
 /**
@@ -16,7 +15,7 @@ export const MAX_STATIC_SLUGS = 50;
  */
 export async function serviceStaticParams(): Promise<{ slug: string }[]> {
   try {
-    const rows = await allListedServices(await getLocale());
+    const rows = await allListedServices();
     return staticSlugParams(prerenderSlugs(rows, MAX_STATIC_SLUGS));
   } catch {
     // The API is unreachable at build time: every service page renders on demand instead.

@@ -36,37 +36,36 @@ interface CreatedPage {
 }
 
 /** Creates a static page as staff and publishes it (`POST /admin/content-pages`, then `…/:id/publish`). */
-async function publishPage(locale: "en" | "ar", slug: string, title: string): Promise<CreatedPage> {
-  const created = await adminCall<CreatedPage>("POST", "/admin/content-pages", { json: { kind: "static", title, locale, slug, bodyMd: "Made by the F32 sitemap spec." } });
+async function publishPage(slug: string, title: string): Promise<CreatedPage> {
+  const created = await adminCall<CreatedPage>("POST", "/admin/content-pages", { json: { kind: "static", title, slug, bodyMd: "Made by the F32 sitemap spec." } });
   await adminCall("POST", `/admin/content-pages/${created.body.id}/publish`, { json: { published: true } });
   return created.body;
 }
 
 test.describe("sitemap", () => {
-  test("lists a published content page in both languages and skips a noindex page", async ({ request }, testInfo) => {
+  test("lists a published content page and skips a noindex page", async ({ request }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop", "The sitemap is the same on every device: desktop only.");
     test.setTimeout(SITEMAP_CEILING + 120_000);
 
     // Staff cannot mark a page noindex (no admin route sets it), so the demo data's own noindex page is the subject.
-    const listed = await request.get("/store/v1/pages?locale=en&_start=0&_end=100");
+    const listed = await request.get("/store/v1/pages?_start=0&_end=100");
     expect(listed.status(), await listed.text()).toBe(200);
     const rows = (await listed.json()) as { slug: string; noindex: boolean }[];
     const noindexSlug = rows.find((row) => row.noindex)?.slug;
     if (!noindexSlug) testInfo.annotations.push({ type: "note", description: "The demo data has no noindex page: only the published pages are checked." });
 
     const slug = `e2e-sitemap-${Date.now().toString(36)}`;
-    const made = [await publishPage("en", slug, "E2E sitemap page"), await publishPage("ar", slug, "صفحة اختبار الخريطة")];
+    const made = [await publishPage(slug, "E2E sitemap page")];
     try {
       await expect(async () => {
         const res = await request.get("/sitemap.xml");
         expect(res.status()).toBe(200);
         const xml = await res.text();
-        expect(xml, "the published English page").toContain(`/en/pages/${slug}</loc>`);
-        expect(xml, "the published Arabic page").toContain(`/ar/pages/${slug}</loc>`);
+        expect(xml, "the published page").toContain(`/en/pages/${slug}</loc>`);
         if (noindexSlug) expect(xml, "a page marked noindex is live but never listed").not.toContain(`/en/pages/${noindexSlug}</loc>`);
         // What the sitemap held before is still there.
         expect(xml).toContain("/en/services</loc>");
-        expect(xml).toContain("/ar/help</loc>");
+        expect(xml).toContain("/en/help</loc>");
         // `lastModified` is the page's `updatedAt`.
         expect(xml).toMatch(new RegExp(`/en/pages/${slug}</loc>\\s*<lastmod>[^<]+</lastmod>`));
       }).toPass({ timeout: SITEMAP_CEILING, intervals: [10_000] });
@@ -119,12 +118,11 @@ test.describe("help vote", () => {
     await expect(page.getByText("Thank you for your feedback.")).toHaveCount(0);
   });
 
-  test("No sends helpful false; the Arabic page speaks Arabic", async ({ page }) => {
-    await page.goto(`/ar/help/${ARTICLE}`);
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("group", { name: "هل كانت هذه المقالة مفيدة؟" })).toBeVisible();
-    const yes = page.getByRole("button", { name: "نعم", exact: true });
-    const no = page.getByRole("button", { name: "لا", exact: true });
+  test("No sends helpful false, shows the thanks and locks both buttons", async ({ page }) => {
+    await page.goto(`/en/help/${ARTICLE}`);
+    await expect(page.getByRole("group", { name: "Was this article helpful?" })).toBeVisible();
+    const yes = page.getByRole("button", { name: "Yes", exact: true });
+    const no = page.getByRole("button", { name: "No", exact: true });
     await expectNoHorizontalOverflow(page);
     await hydrated(no);
 
@@ -133,7 +131,7 @@ test.describe("help vote", () => {
     const response = await sent;
     expect(response.status()).toBe(204);
     expect(response.request().postDataJSON()).toEqual({ helpful: false });
-    await expect(page.getByText("شكرًا على ملاحظاتك.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Thank you for your feedback.", { exact: true })).toBeVisible();
     await expect(yes).toBeDisabled();
     await expect(no).toBeDisabled();
   });
@@ -167,7 +165,7 @@ test.describe("help vote", () => {
     await expect(no).toBeDisabled();
   });
 
-  test("a mocked 429 shows the wait, and the Arabic page shows it in Arabic", async ({ page }) => {
+  test("a mocked 429 shows the wait", async ({ page }) => {
     await page.route(
       (url) => isVote(url.href),
       (route) =>
@@ -181,13 +179,5 @@ test.describe("help vote", () => {
     await expect(alert).toContainText("Try again in 42 s.");
     await expect(yes).toBeEnabled();
     await expect(page.getByText("Thank you for your feedback.")).toHaveCount(0);
-
-    await page.goto(`/ar/help/${ARTICLE}`);
-    const arabicYes = page.getByRole("button", { name: "نعم", exact: true });
-    await hydrated(arabicYes);
-    await arabicYes.click();
-    const arabicAlert = page.getByRole("alert").filter({ hasText: "محاولات كثيرة. انتظر قليلًا ثم حاول مرة أخرى." });
-    await expect(arabicAlert).toContainText("حاول مرة أخرى بعد 42 ث.");
-    await expect(arabicYes).toBeEnabled();
   });
 });

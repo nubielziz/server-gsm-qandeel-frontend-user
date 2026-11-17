@@ -7,6 +7,11 @@
 > `minPrice`/`maxPrice`). The customer wallet and the notification feed, once out of scope, were built too (features 21
 > and 23). The site uses all of them since waves 1 to 3 of `IMPLEMENTATION-PLAN.md`. What the backend still lacks is the
 > list under "Open (2026-11-15)" at the end; the items 1 to 8 stay below as the record of the requests.
+>
+> **Language, 2026-11-16 (decision 039):** English is the only language of the system, so everything below that speaks of
+> "a language", "the requested `locale`" or "per language" is the record of a request made while the site had two languages.
+> The API no longer takes or sends a language (backend feature 30), the site sends no `locale`, and the delivery time
+> (item 4), the category names and the listing rows are English only. Nothing here asks the backend for a language any more.
 
 For the backend lead and the owner. Each item says what the store's design (the owner's mockups in `screenshots/`)
 wants, what the API offers today, a suggested change, and where the storefront would use it. The storefront never
@@ -110,7 +115,7 @@ several services, favourites, customer wallet (phase 2W), notification feed, soc
 13. No route changes an email (customer or merchant); no ticket list, ticket attachments, cart, favourites, social
     sign-in, PayPal, Vodafone Cash or profile photo.
 14. Data-export delivery is undefined; model, network and MEP options cannot be ordered.
-15. `GET /store/v1/help/:slug` has no language parameter.
+15. ~~`GET /store/v1/help/:slug` has no language parameter.~~ No route has one any more (decision 039).
 16. A supplier's TIME text can give a misleading `deliveryMinutes`: staff should check it before the site says
     "Delivered within …".
 17. OpenAPI marks `createdByStaff` (and other always-sent fields) optional.

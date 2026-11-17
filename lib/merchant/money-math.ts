@@ -78,16 +78,17 @@ export function topUpFee(amount: string, feePercent: string, feeFixed: string): 
 }
 
 /**
- * Reads an amount a person typed: digits with an optional `.` (or the Arabic decimal mark) and at most
- * `maxDecimals` places (Arabic-Indic digits are accepted). A comma is refused on purpose: "1,000" could mean one
- * thousand or one. Returns the canonical 4-place string, or null when it is not a positive amount.
+ * Reads an amount a person typed: digits with an optional `.` (or the Arabic decimal mark, U+066B) and at most
+ * `maxDecimals` places (Arabic-Indic and Persian digits are accepted: an Arabic keyboard types them; group C). A comma
+ * is refused on purpose: "1,000" could mean one thousand or one. Returns the canonical 4-place string, or null when it
+ * is not a positive amount.
  */
 export function parseAmountInput(text: string, maxDecimals = SCALE): string | null {
   const latin = text
     .trim()
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
-    .replace(/٫/g, ".");
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/\u066B/g, ".");
   const m = /^(\d*)(?:\.(\d*))?$/.exec(latin);
   if (!m || (!m[1] && !m[2])) return null;
   const whole = m[1] || "0";

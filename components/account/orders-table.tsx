@@ -93,7 +93,7 @@ export async function OrdersTable({ orders, compact }: OrdersTableProps) {
                     href={localePath(locale, `/track/${encodeURIComponent(order.trackingToken)}`)}
                     variant="secondary"
                     size="sm"
-                    endIcon={<ArrowUpRight aria-hidden="true" className="rtl:-scale-x-100" />}
+                    endIcon={<ArrowUpRight aria-hidden="true" />}
                     aria-label={fmt(t.orders.trackOrder, { id: orderLabel(order.id) })}
                   >
                     {t.orders.track}

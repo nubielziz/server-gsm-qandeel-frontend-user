@@ -15,7 +15,6 @@ import { localePath } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { account } from "@/lib/i18n/messages/account";
-import { common } from "@/lib/i18n/messages/common";
 import { OrdersTable } from "@/components/account/orders-table";
 import { PageHeader } from "@/components/layout/container";
 import { Badge } from "@/components/ui/badge";
@@ -48,10 +47,9 @@ function OverviewSkeleton() {
 
 async function OverviewContent() {
   const locale = await getLocale();
-  const [me, t, c, orders] = await Promise.all([
+  const [me, t, orders] = await Promise.all([
     requireCustomer(locale),
     getMessages(account),
-    getMessages(common),
     apiSessionList<CustomerOrder>("/store/v1/me/orders", { query: listQuery({ start: 0, end: 5 }) }),
   ]);
   const o = t.overview;
@@ -140,7 +138,6 @@ async function OverviewContent() {
             <CardHeader titleAs="h2" title={<span id="preferences">{o.preferences.title}</span>} />
             <CardBody className="pt-2">
               <DescriptionList>
-                <DescriptionItem label={o.preferences.language}>{c.languageNames[me.locale === "ar" ? "ar" : "en"]}</DescriptionItem>
                 <DescriptionItem label={o.preferences.currency}>{me.currency ?? o.preferences.currencyDefault}</DescriptionItem>
                 <DescriptionItem label={o.preferences.marketing}>{me.marketingOptIn ? o.preferences.on : o.preferences.off}</DescriptionItem>
               </DescriptionList>
@@ -162,7 +159,7 @@ async function OverviewContent() {
                     >
                       {link.icon}
                       <span className="flex-1">{link.label}</span>
-                      <ChevronRight aria-hidden="true" className="rtl:-scale-x-100" />
+                      <ChevronRight aria-hidden="true" />
                     </Link>
                   </li>
                 ))}

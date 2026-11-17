@@ -63,17 +63,15 @@ describe("priceNotes: what goes under the unit price", () => {
 });
 
 describe("serviceCardLabels", () => {
-  it("carries the In stock badge text in both languages, from the shop namespace", () => {
+  it("carries the In stock badge text, from the shop namespace", () => {
     const en = serviceCardLabels(store.en, common.en);
-    const ar = serviceCardLabels(store.ar, common.ar);
     expect(en.inStock).toBe("In stock");
-    expect(ar.inStock).toBe("متوفر");
     expect(en.types.imei).toBe(common.en.serviceType.imei);
-    expect(ar.delivery).toContain("{time}");
+    expect(en.delivery).toContain("{time}");
   });
 
-  it("never uses the words the owner decided against, in either language, on any service string", () => {
-    const text = JSON.stringify([store.en.card, store.en.service, store.en.quickView, store.ar.card, store.ar.service, store.ar.quickView]);
-    expect(text).not.toMatch(/pre-?order|out of stock|sold out|left in stock|طلب مسبق|نفدت/i);
+  it("never uses the words the owner decided against on any service string", () => {
+    const text = JSON.stringify([store.en.card, store.en.service, store.en.quickView]);
+    expect(text).not.toMatch(/pre-?order|out of stock|sold out|left in stock/i);
   });
 });

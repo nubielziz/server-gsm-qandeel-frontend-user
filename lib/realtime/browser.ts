@@ -6,7 +6,6 @@
 // Import only from Client Components. Nothing here touches the browser until `start()` is called.
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
-import { isLocale } from "@/lib/i18n/config";
 import type { NotificationSurface } from "@/lib/notifications/link";
 import {
   dedupeKeyOf,
@@ -42,16 +41,7 @@ export type StreamOptions = {
   parseEvent?: (event: string, raw: string) => unknown;
   /** A key naming a frame for the duplicate check, or null for an event that never repeats. */
   dedupeKey?: (event: string, data: unknown) => string | null;
-  /** The page language sent as `?locale=`. Default: the `lang` of the page. */
-  locale?: () => string | undefined;
 };
-
-/** The page language, only when the API knows it (`en`, `ar`): anything else would be a 422. */
-function pageLocale(): string | undefined {
-  if (typeof document === "undefined") return undefined;
-  const lang = document.documentElement.lang;
-  return isLocale(lang) ? lang : undefined;
-}
 
 /** The answer of a plain route, in the three words the client acts on. Never rejects. */
 async function probeRoute(path: string): Promise<ProbeOutcome> {
@@ -79,7 +69,6 @@ function browserEnv(options: StreamOptions): StreamEnv {
   return {
     url: options.url,
     lockName: options.lockName,
-    locale: options.locale ?? pageLocale,
     createEventSource: (url) => new EventSource(url),
     locks: browserLocks(),
     createChannel: (name) => (typeof BroadcastChannel === "function" ? new BroadcastChannel(name) : null),

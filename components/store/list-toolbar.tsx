@@ -75,7 +75,7 @@ export function ListToolbar({ action, hash, q, sort, keep, labels, extra }: List
         leading={<Search aria-hidden="true" />}
         trailing={
           <IconButton type="submit" size="sm" label={labels.searchSubmit}>
-            <ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />
+            <ArrowRight aria-hidden="true" />
           </IconButton>
         }
         fieldClassName="min-w-0 flex-[1_1_16rem]"

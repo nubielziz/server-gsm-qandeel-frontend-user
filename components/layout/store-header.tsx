@@ -1,17 +1,17 @@
-// StoreHeader (mockup "E-Commerce"): logo, search, currency and language, account area, then a nav row ("All services",
+// StoreHeader (mockup "E-Commerce"): logo, search, currency, account area, then a nav row ("All services",
 // the "All categories" menu and the other links) whose black pill marks the current page's link and slides to the next
 // one (components/layout/nav-row.tsx); on pages without a current link (the home page) it rests on "All services".
 // There is no cart, no favourites, no bell and no social sign-in (the API has none).
 // Mobile: a compact bar (logo, search toggle, account, menu button) and a start-side drawer with the nav, the same
-// categories in a `<details>` block, and the pickers.
+// categories in a `<details>` block, and the currency picker.
 // Static shell: only the account area and the currency picker read request data, each inside its own <Suspense>. The
 // categories are a cached catalog read (components/layout/category-menu.tsx): a change shows when the cache turns over.
 // The two "All services" links use `prefetch={true}`: their prefetch carries the catalog's first page (cached, URL data),
 // so the list shows at once on the click (plan P3.1, Next docs "Optimizing prefetching"). The nav row is hidden below `lg`
 // and the drawer link is not in the viewport while the drawer is closed, so each costs a server render only when seen.
-// Search (feature 29, backend plan §7): on English pages each copy of the search form (desktop bar, phone row) is wrapped
-// in a SearchEnhancer, which turns it into the search combobox on the first interaction; Arabic pages keep the plain GET
-// form (the search engine is English only). The phone copy carries `autofocus`, so the row's popover focuses it inside
+// Search (feature 29, backend plan §7): each copy of the search form (desktop bar, phone row) is wrapped in a
+// SearchEnhancer, which turns it into the search combobox on the first interaction (without JavaScript it stays a plain
+// GET form). The phone copy carries `autofocus`, so the row's popover focuses it inside
 // the tap (a phone then opens its keyboard).
 import { Headset, LayoutGrid, ScanSearch, Store, PackageSearch, LifeBuoy } from "lucide-react";
 import { localePath } from "@/lib/i18n/config";
@@ -24,7 +24,6 @@ import type { SearchComboboxLabels } from "@/components/search/search-combobox";
 import { AccountArea } from "./account-area";
 import { CategoryDrawerList, CategoryMenu, loadMenuCategories } from "./category-menu";
 import { CurrencySwitcherSlot } from "./currency-switcher-slot";
-import { LanguageSwitcher } from "./language-switcher";
 import { Logo } from "./logo";
 import { NavLink } from "./nav-link";
 import { StoreHeaderFrame } from "./store-header-frame";
@@ -43,11 +42,10 @@ const drawerLinkClasses =
 /** The shop header. Render it in the (store) layout; it needs no props. */
 export async function StoreHeader() {
   const [locale, t, s] = await Promise.all([getLocale(), getMessages(common), getMessages(searchMessages)]);
-  const categories = await loadMenuCategories(locale);
+  const categories = await loadMenuCategories();
   const p = (path: string) => localePath(locale, path);
 
   // The combobox's texts (it is a Client Component: it gets only the strings it shows).
-  const enhance = locale === "en";
   const labels: SearchComboboxLabels = {
     label: s.label,
     suggestions: s.suggestions,
@@ -75,16 +73,14 @@ export async function StoreHeader() {
         label={t.header.searchLabel}
         placeholder={t.header.searchPlaceholder}
         submitLabel={t.actions.search}
-        enhance={enhance}
+        enhance
         autoFocus={phone}
       />
     );
-    return enhance ? (
+    return (
       <SearchEnhancer labels={labels} paths={{ results: p("/services"), imei: p("/imei-check") }}>
         {field}
       </SearchEnhancer>
-    ) : (
-      field
     );
   };
 
@@ -155,7 +151,6 @@ export async function StoreHeader() {
       </nav>
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
         <CurrencySwitcherSlot />
-        <LanguageSwitcher locale={locale} names={t.languageNames} />
       </div>
     </div>
   );
@@ -165,12 +160,7 @@ export async function StoreHeader() {
       logo={<Logo tagline />}
       search={searchCopy(false)}
       searchPhone={searchCopy(true)}
-      switchers={
-        <>
-          <CurrencySwitcherSlot />
-          <LanguageSwitcher locale={locale} names={t.languageNames} />
-        </>
-      }
+      switchers={<CurrencySwitcherSlot />}
       account={<AccountArea />}
       nav={nav}
       drawerContent={drawerContent}

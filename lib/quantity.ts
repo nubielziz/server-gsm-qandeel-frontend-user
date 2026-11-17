@@ -87,14 +87,15 @@ export function isAllowedQuantity(rule: QuantityRule, n: number): boolean {
 
 /**
  * Reads a quantity a person typed: a whole number from 1 to 100,000, nothing else (no sign, no decimals, no
- * separators). Arabic-Indic and Persian digits are accepted. Returns null when it is not such a number.
+ * separators). Arabic-Indic (U+0660 to U+0669) and Persian (U+06F0 to U+06F9) digits are accepted: an Arabic keyboard
+ * types them (group C, decision 039). Returns null when it is not such a number.
  * It does not check the service's rule: that is `isAllowedQuantity`.
  */
 export function parseQuantityInput(text: string): number | null {
   const latin = text
     .trim()
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
   if (!/^\d+$/.test(latin)) return null;
   const n = Number(latin);
   return Number.isSafeInteger(n) && n >= MIN_QUANTITY && n <= MAX_QUANTITY ? n : null;
@@ -123,9 +124,9 @@ function formatCount(n: number, locale: Locale): string {
   return new Intl.NumberFormat(intlLocaleOf(locale)).format(n);
 }
 
-/** "5, 10, 25" (the Arabic comma in Arabic). Digits stay Latin, so the list reads right inside an Arabic sentence. */
+/** "5, 10, 25". */
 function formatList(values: readonly number[], locale: Locale): string {
-  return values.map((n) => formatCount(n, locale)).join(locale === "ar" ? "، " : ", ");
+  return values.map((n) => formatCount(n, locale)).join(", ");
 }
 
 /**

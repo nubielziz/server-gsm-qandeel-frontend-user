@@ -122,7 +122,7 @@ export function ForgotPasswordForm({ locale, t }: ForgotPasswordFormProps) {
           onChange={(e) => setEmail(e.target.value)}
           error={feedback.fields.email}
         />
-        <Turnstile key="ts" onToken={ts.setToken} resetKey={ts.resetKey} lang={locale} />
+        <Turnstile key="ts" onToken={ts.setToken} resetKey={ts.resetKey} />
         <FormAlert message={feedback.message} reference={feedback.reference} />
         <Button type="submit" size="lg" block loading={busy}>
           {t.forgot.submit}

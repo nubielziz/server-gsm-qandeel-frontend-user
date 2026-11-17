@@ -328,16 +328,6 @@ test.describe("results page", () => {
     await expect(page).toHaveURL(/\/en\/services$/);
   });
 
-  test("Arabic pages keep the plain search (no combobox) and today's list search", async ({ page }) => {
-    await go(page, "/ar");
-    // The currency picker is a <select> (also a combobox): only the search field's name is checked.
-    await expect(page.getByRole("banner").getByRole("combobox", { name: "ابحث في الخدمات" })).toHaveCount(0);
-    await expect(page.locator("[data-search-enhance]")).toHaveCount(0);
-    await page.goto("/ar/services?q=iphone");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("جميع الخدمات");
-    await expect(page.getByRole("button", { name: "حاول مرة أخرى" })).toHaveCount(0);
-  });
-
   test("301 results-page searches in a minute from distinct addresses never hit the rate limit", async ({ request }) => {
     test.setTimeout(240_000);
     // The site forwards each visitor's address (apiVisitorGet), so 301 visitors are 301 budgets, not one shared one.

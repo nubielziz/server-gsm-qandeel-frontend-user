@@ -74,7 +74,7 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
     const signIn = localePath(locale, "/sign-in");
     return (
       <>
-        {/* Phones: an icon-only button keeps the header on one line, in both languages. */}
+        {/* Phones: an icon-only button keeps the header on one line. */}
         <Link
           href={signIn}
           aria-label={t.header.signIn}
@@ -84,7 +84,7 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
             (compact ? "border border-line-strong bg-surface text-ink" : "bg-inverse text-on-inverse")
           }
         >
-          <LogIn aria-hidden="true" className="size-5 rtl:-scale-x-100" />
+          <LogIn aria-hidden="true" className="size-5" />
         </Link>
         <span className="hidden sm:inline-flex">
           <ButtonLink href={signIn} variant={compact ? "secondary" : "primary"} size="md">

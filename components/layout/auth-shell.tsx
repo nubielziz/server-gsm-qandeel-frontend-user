@@ -1,6 +1,6 @@
 // AuthShell (mockup "Sign-In"): two columns from `lg` up. Left: a light-grey hero panel with the logo, a big headline,
 // a subtitle, three feature items and the `sign-in-hero.jpg` image filling the space under them. Right: the white form panel
-// (children), centred, max 28rem, language switcher on top and Terms / Privacy at the bottom.
+// (children), centred, max 28rem, Terms / Privacy at the bottom.
 // Mobile: the form comes first under a compact brand bar; no hero image.
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -10,7 +10,6 @@ import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { ImageSlot } from "@/components/ui/image-slot";
 import { ChromeProviders } from "./chrome-providers";
-import { LanguageSwitcher } from "./language-switcher";
 import { Logo } from "./logo";
 import { SkipLink } from "./skip-link";
 
@@ -68,9 +67,8 @@ export async function AuthShell({ children }: AuthShellProps) {
         </section>
 
         <div className="flex min-h-dvh flex-col lg:min-h-0">
-          <div className="flex items-center justify-between px-gutter py-3 lg:justify-end">
-            <Logo className="lg:hidden" />
-            <LanguageSwitcher locale={locale} names={t.languageNames} />
+          <div className="flex items-center px-gutter py-3 lg:hidden">
+            <Logo />
           </div>
           <main id="main" className="flex flex-1 items-center justify-center px-gutter py-8">
             <div className="w-full max-w-[28rem]">{children}</div>

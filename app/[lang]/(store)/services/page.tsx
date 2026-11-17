@@ -14,7 +14,6 @@ import { firstParam, type SearchParams } from "@/components/store/search-params"
 import { Container, PageHeader } from "@/components/layout/container";
 import { PageTransition } from "@/components/layout/page-transition";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
-import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ServiceList, ServiceListSkeleton, loadServiceList, type ServiceListConfig } from "@/components/store/service-list";
@@ -30,7 +29,7 @@ export async function generateMetadata(props: PageProps<"/[lang]/services">): Pr
   return {
     title: t.catalog.title,
     description: t.catalog.metaDescription,
-    alternates: { canonical: localePath(locale, "/services"), languages: { en: "/en/services", ar: "/ar/services" } },
+    alternates: { canonical: localePath(locale, "/services") },
     // A search result page: not indexed, its links still followed.
     robots: searched ? { index: false, follow: true } : undefined,
   };
@@ -63,25 +62,12 @@ export default async function ServicesPage(props: PageProps<"/[lang]/services">)
 
 async function Catalog({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const data = await loadServiceList(searchParams, CONFIG);
-  const { locale, t } = data;
+  const { t } = data;
   if (data.list.catalogSize > 0) return <ServiceList data={data} config={CONFIG} />;
-  // Nothing is listed in this language.
+  // Nothing is listed yet.
   return (
     <Card>
-      {locale === "ar" ? (
-        <EmptyState
-          icon={<PackageSearch aria-hidden="true" />}
-          title={t.catalog.arEmptyTitle}
-          description={t.catalog.arEmptyText}
-          action={
-            <ButtonLink href={localePath("en", "/services")} variant="secondary">
-              {t.catalog.arEmptyAction}
-            </ButtonLink>
-          }
-        />
-      ) : (
-        <EmptyState icon={<PackageSearch aria-hidden="true" />} title={t.catalog.noneTitle} description={t.catalog.noneText} />
-      )}
+      <EmptyState icon={<PackageSearch aria-hidden="true" />} title={t.catalog.noneTitle} description={t.catalog.noneText} />
     </Card>
   );
 }

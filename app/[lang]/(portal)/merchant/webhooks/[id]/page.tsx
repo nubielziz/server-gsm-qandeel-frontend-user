@@ -65,7 +65,7 @@ async function DeliveriesContent({
   const listPath = localePath(locale, "/merchant/webhooks");
   const back = (
     <Link href={listPath} className="inline-flex min-h-11 items-center gap-1.5 text-small font-semibold text-ink-muted hover:text-ink">
-      <ArrowLeft aria-hidden="true" className="size-4 rtl:-scale-x-100" />
+      <ArrowLeft aria-hidden="true" className="size-4" />
       {d.back}
     </Link>
   );

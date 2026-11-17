@@ -7,7 +7,6 @@ const item = {
   title: "Order done",
   body: "Your order is ready",
   link: "/account/orders",
-  locale: "ar",
   readAt: null,
   createdAt: "2026-11-15T10:00:00.000Z",
   campaignId: null,
@@ -33,11 +32,21 @@ describe("parseFrame", () => {
     expect(parseFrame("notification.created", JSON.stringify({ item, unread: 3 }))).toMatchObject({ live: false });
   });
 
+  it("accepts an item without a language, and one that still names one (an API from before English only)", () => {
+    expect(item).not.toHaveProperty("locale");
+    expect(parseFrame("notification.created", JSON.stringify({ item, unread: 1 }))).toEqual({ item, unread: 1, live: false });
+    for (const locale of ["en", "fr", null]) {
+      expect(parseFrame("notification.created", JSON.stringify({ item: { ...item, locale }, unread: 1 })), String(locale)).toMatchObject({
+        item: { id: 41 },
+        unread: 1,
+      });
+    }
+  });
+
   it("drops a notification.created that is not an item with a count", () => {
     expect(parseFrame("notification.created", "{")).toBeUndefined();
     expect(parseFrame("notification.created", JSON.stringify({ unread: 3 }))).toBeUndefined();
     expect(parseFrame("notification.created", JSON.stringify({ item: { ...item, id: "41" }, unread: 3 }))).toBeUndefined();
-    expect(parseFrame("notification.created", JSON.stringify({ item: { ...item, locale: "fr" }, unread: 3 }))).toBeUndefined();
     expect(parseFrame("notification.created", JSON.stringify({ item: { ...item, title: 5 }, unread: 3 }))).toBeUndefined();
     expect(parseFrame("notification.created", JSON.stringify({ item, unread: "3" }))).toBeUndefined();
   });

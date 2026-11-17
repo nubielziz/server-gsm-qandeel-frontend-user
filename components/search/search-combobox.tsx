@@ -17,7 +17,7 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalSt
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { SuggestBody } from "@/lib/api/types";
-import { CURRENCY_COOKIE } from "@/lib/i18n/config";
+import { CURRENCY_COOKIE } from "@/lib/currency-cookie";
 import { fmt } from "@/lib/i18n/define";
 import { ghostFor, ghostShown, isCaretAtEnd } from "@/lib/search/ghost";
 import { keyAction } from "@/lib/search/keyboard";

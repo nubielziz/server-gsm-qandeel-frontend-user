@@ -240,7 +240,7 @@ type PasswordStepProps = {
   onSignedIn: (result: SmartSignInResult) => void | Promise<void>;
 };
 
-function PasswordStep({ locale, t, notice, forgotHref, email, setEmail, password, setPassword, onSignedIn }: PasswordStepProps) {
+function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPassword, onSignedIn }: PasswordStepProps) {
   const errorText = useErrorText();
   const ts = useTurnstile();
   const form = useRef<HTMLFormElement>(null);
@@ -318,7 +318,7 @@ function PasswordStep({ locale, t, notice, forgotHref, email, setEmail, password
           </Link>
         </div>
       </div>
-      <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} lang={locale} />
+      <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} />
       <FormAlert message={feedback.message} reference={feedback.reference} />
       <Button type="submit" size="lg" block loading={busy}>
         {t.signIn.submit}

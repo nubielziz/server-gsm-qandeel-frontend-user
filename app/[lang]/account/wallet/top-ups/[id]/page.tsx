@@ -80,7 +80,7 @@ async function TopUpView({ params }: { params: Promise<{ id: string }> }) {
   }
 
   const topUp = result.data;
-  // "Top-up INV-2026-0042": the number stays left-to-right inside an Arabic title, without an invisible mark in the name.
+  // "Top-up INV-2026-0042": the number stays left-to-right inside the title, without an invisible mark in the name.
   const [before, after] = t.detail.title.split("{number}");
   return (
     <div className="grid gap-4">

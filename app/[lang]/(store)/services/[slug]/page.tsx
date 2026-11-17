@@ -2,11 +2,12 @@
 // currency, with "per unit", "From" and the packs), availability, delivery and quantity rules, "Buy now", description,
 // requirements and FAQ. `params` is read behind <Suspense>; the price and the merchant hint stream in behind their own
 // and wait for the navigation (`navigation()`), so a prefetch of a prerendered slug is served from the static output.
-// A slug of the other language redirects to this language's slug of the same service (through its `alternates`), else
-// 404; the language alternates of the metadata come from the same field.
+// An old address (a retired Arabic page, decision 039) sends the reader on to the service's page, else to the list
+// (`resolveService`, plan 30 §7.1); it streams, so it is an instant redirect inside a 200 answer that is `noindex`.
+// An unknown slug is a 404.
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { ArrowRight, TriangleAlert } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { PageTransition } from "@/components/layout/page-transition";
@@ -39,28 +40,24 @@ import { siteImage } from "@/lib/site-images";
 /** Also the metadata of a quick view link opened directly (../../quick-view/[slug]): only `params.slug` is read. */
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const [{ slug }, locale] = await Promise.all([params, getLocale()]);
-  const resolved = await resolveService(slug, locale);
+  const resolved = await resolveService(slug);
+  // Not found and old addresses alike: the answer before the redirect or the 404 is never indexed (plan 30 §7.1).
   if (resolved.kind !== "found") return { robots: { index: false } };
   const { service } = resolved;
   const own = localePath(locale, `/services/${encodeURIComponent(service.slug)}`);
-  // The switched-on pages of the same service in the other languages: an English-only service has no `ar` entry.
-  const languages: Record<string, string> = { [locale]: own };
-  for (const alt of service.alternates ?? []) {
-    if (alt.locale !== locale && alt.slug) languages[alt.locale] = localePath(alt.locale, `/services/${encodeURIComponent(alt.slug)}`);
-  }
   const title = service.seoTitle || service.title;
   const description = service.seoDescription || service.summary || undefined;
   const og = siteImage("og-default.jpg");
   return {
     title,
     description,
-    alternates: { canonical: own, languages },
-    openGraph: { title, description, type: "website", locale, images: og ? [{ url: og }] : undefined },
+    alternates: { canonical: own },
+    openGraph: { title, description, type: "website", locale: "en_US", images: og ? [{ url: og }] : undefined },
   };
 }
 
 /**
- * At most 50 services per language are prerendered (their content joins the static shell): the featured ones first, then
+ * At most 50 services are prerendered (their content joins the static shell): the featured ones first, then
  * the API's order (plan D20). The rest render on demand, so a build through the shop host stays under its request limit.
  * The quick view dialog prerenders the same slugs.
  */
@@ -82,8 +79,8 @@ export default function ServicePage(props: PageProps<"/[lang]/services/[slug]">)
 
 async function ServiceContent({ params }: { params: Promise<{ slug: string }> }) {
   const [{ slug }, locale, t, c] = await Promise.all([params, getLocale(), getMessages(store), getMessages(common)]);
-  const resolved = await resolveService(slug, locale);
-  if (resolved.kind === "redirect") redirect(localePath(locale, `/services/${encodeURIComponent(resolved.slug)}`));
+  const resolved = await resolveService(slug);
+  if (resolved.kind === "redirect") permanentRedirect(localePath(locale, resolved.path));
   if (resolved.kind !== "found") notFound();
   const { service } = resolved;
 
@@ -171,7 +168,7 @@ async function ServiceContent({ params }: { params: Promise<{ slug: string }> })
                     prefetch
                     size="lg"
                     block
-                    endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}
+                    endIcon={<ArrowRight aria-hidden="true" />}
                   >
                     {t.service.buyNow}
                   </ButtonLink>

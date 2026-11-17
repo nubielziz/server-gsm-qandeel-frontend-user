@@ -1,7 +1,9 @@
 // One help article: question, answer (Markdown), category, updated date, a helpful vote, and a way to reach support.
+// The address of a deleted Arabic article (decision 039) sends the reader on to the help centre (`legacyPath`, plan 30
+// §7.1): inside a 200 answer that streams, so the metadata of a slug with no article is always `noindex`.
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { ArrowLeft, Headset } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { PageTransition } from "@/components/layout/page-transition";
@@ -14,9 +16,9 @@ import { staticSlugParams } from "@/components/store/static-params";
 import { demoteHeadings } from "@/components/store/markdown-source";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { HelpVote } from "@/components/store/help-vote";
-import { getHelpArticle, listHelpArticles } from "@/lib/api/public";
+import { getHelpArticle, legacyPath, listHelpArticles } from "@/lib/api/public";
 import { formatDate } from "@/lib/format";
-import { dirOf, isLocale, localePath } from "@/lib/i18n/config";
+import { localePath } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { common } from "@/lib/i18n/messages/common";
 import { store } from "@/lib/i18n/messages/store";
@@ -31,6 +33,7 @@ function plainExcerpt(markdown: string, max = 160): string {
 export async function generateMetadata({ params }: PageProps<"/[lang]/help/[slug]">): Promise<Metadata> {
   const [{ slug }, locale] = await Promise.all([params, getLocale()]);
   const article = await getHelpArticle(slug);
+  // No article under this slug (missing, or an old address about to send the reader on): never indexed.
   if (!article) return { robots: { index: false } };
   return {
     title: article.question,
@@ -39,10 +42,10 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/help/[slug
   };
 }
 
-/** Every published help article of the language is prerendered; other slugs render on demand. */
+/** Every published help article is prerendered; other slugs render on demand. */
 export async function generateStaticParams() {
   try {
-    const list = await listHelpArticles({ locale: await getLocale(), end: 100 });
+    const list = await listHelpArticles({ end: 100 });
     return staticSlugParams(list.data.map((article) => article.slug));
   } catch {
     return staticSlugParams([]);
@@ -64,9 +67,11 @@ export default function HelpArticlePage(props: PageProps<"/[lang]/help/[slug]">)
 async function Article({ params }: { params: Promise<{ slug: string }> }) {
   const [{ slug }, locale, t, c] = await Promise.all([params, getLocale(), getMessages(store), getMessages(common)]);
   const article = await getHelpArticle(slug);
-  if (!article) notFound();
-  // `/help/:slug` has no language parameter: the article may be in the other language than the page.
-  const articleLocale = isLocale(article.locale) ? article.locale : locale;
+  if (!article) {
+    const path = await legacyPath("help", slug);
+    if (path) permanentRedirect(localePath(locale, path));
+    notFound();
+  }
   return (
     <>
       <Breadcrumbs
@@ -77,7 +82,7 @@ async function Article({ params }: { params: Promise<{ slug: string }> }) {
           { label: article.question },
         ]}
       />
-      <article className="mt-5 rounded-card border border-line bg-surface p-5 shadow-card sm:p-8" lang={articleLocale} dir={dirOf(articleLocale)}>
+      <article className="mt-5 rounded-card border border-line bg-surface p-5 shadow-card sm:p-8">
         <header className="grid gap-3">
           {article.category ? (
             <div>
@@ -114,7 +119,7 @@ async function Article({ params }: { params: Promise<{ slug: string }> }) {
         </CardBody>
       </Card>
       <p className="mt-6">
-        <ButtonLink href={localePath(locale, "/help")} variant="link" startIcon={<ArrowLeft aria-hidden="true" className="rtl:-scale-x-100" />}>
+        <ButtonLink href={localePath(locale, "/help")} variant="link" startIcon={<ArrowLeft aria-hidden="true" />}>
           {t.help.back}
         </ButtonLink>
       </p>

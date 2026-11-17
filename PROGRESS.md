@@ -186,6 +186,34 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
   (`docs/BACKEND-NEEDS.md` open item 2 is closed); the e2e helper `freshMerchant` still calls it
   directly.
 
+## English only (2026-11-16, owner's decision; backend decision 039, feature 30)
+- **Decision:** English is the only language of the system. No language field, parameter, selector, translation or
+  right-to-left layout code is left in the site. The decisions of 2026-11-09 below that say "URLs carry the language (`/en`,
+  `/ar`)" and "Fonts: Inter + IBM Plex Sans Arabic" are history; the lines of the milestones, the waves, the vitals table
+  (`/ar` runs) and the checks stay as they were written.
+- **URLs:** `/en/…` stays. Every `/ar/…` address answers a 308 to the same path under `/en` with its query (`next.config.ts`,
+  before `proxy.ts`). `proxy.ts` sends a path with no language (email links) to `/en…` and reads no cookie or
+  `Accept-Language`. The cookie `gsm_locale` is no longer read or written. An old Arabic service, page or help address that
+  the API remembers (`GET /store/v1/legacy-slugs/…`) sends the reader on to the English page (an instant redirect inside the
+  page; the pages are `noindex`), else to the list or the not-found page. No `hreflang`, no Arabic sitemap entry.
+- **Code:** the `ar` block of the 14 message files, the language switcher, the saved-language selects, the Arabic font
+  (one Google font remains: Inter), the `html:lang(ar)` CSS, the 37 `rtl:` variants, `:root[dir="rtl"]` and the
+  `--inline-dir` variable, the mirrored banner art and the three reads of the computed direction (`segmented-control`,
+  `menu`, `ghost-text`) are gone. No request carries `locale` (`lib/api/no-locale.test.ts`); the stream parser accepts an
+  item without one. `lib/api/schema.gen.ts` is regenerated from the backend contract (the lead does it again at L2).
+- **Kept (group C, Arabic text as data):** `dir="auto"` on text people type, `<bdi>` around API values, `dir="ltr"` on codes
+  and numbers, Arabic-Indic and Persian digits typed in quantity, amount, IMEI and order boxes (written as code points),
+  the input-method guard of the ticket reply box (`lib/support/send-key.ts`), initials of a name in any script, the
+  `cleanText` pass-through of an Arabic search. `components/user-text.test.tsx` and the group C unit tests protect them.
+- **Guard:** `scripts/check-english-only.mjs` (the same file in the backend, the console and here) runs in `npm run lint`,
+  with `scripts/english-only.config.json` (roots, an allowlist of group C tests and old-address code, and `keep` entries for
+  the files that protect user text). It fails on Arabic script, the `ar` locale, `rtl:` variants and `dir="rtl"` outside
+  the allowlist. `npm run lint` is red on `lib/api/schema.gen.ts` (its `"en" | "ar"` unions) until the lead regenerates
+  it from the final backend contract.
+- **Still to do (cleanup wave S6 to S9, no URL, text or behaviour change):** drop the constant `locale` argument and prop
+  everywhere, `localePath` → `sitePath`, `getLocale()` and `getMessages()` go, and `app/[lang]` is renamed `app/en`.
+  The lead runs `next build` and the full e2e.
+
 ## Wiring (changed 2026-11-09, late evening, at the owner's request)
 - **Dev site (`npm run dev`, :5175) → the isolated demo API (:3100) since 2026-11-10**, at the owner's request (to
   see the home page with data). `.env.development.local`: `GSM_API_ORIGIN=http://localhost:3100`; start the API with

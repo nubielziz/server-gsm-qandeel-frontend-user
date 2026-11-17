@@ -67,7 +67,7 @@
   --shadow-button-soft: 0 4px 10px -6px rgb(17 17 17 / 0.16);
 
   /* ── Font ───────────────────────────────────────────────────────────────────────────────────────────────── */
-  --font-sans: var(--font-inter), var(--font-plex-arabic), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
   /* ── Type scale (semantic). Use these instead of text-xl/2xl/3xl … in pages. ───────────────────────────── */
@@ -171,7 +171,7 @@
       opacity: 1;
     }
   }
-  /* Symmetric swings, so the same keyframes serve both writing directions. */
+  /* Symmetric swings. */
   @keyframes bell-ring {
     0%,
     100% {
@@ -261,8 +261,6 @@
 /* ── Gutters: 16px mobile, 24px tablet, 32px desktop. `px-gutter` is the only horizontal page padding. ────── */
 :root {
   --gutter: 1rem;
-  /* +1 in left-to-right, −1 in right-to-left: lets transforms (drawer slide, chevrons) follow the writing direction. */
-  --inline-dir: 1;
   color-scheme: light;
   /* Motion distances (no utilities): how far a new page rises on a client navigation, how far a block rises while it
      scrolls into view, how much scrolling that takes, and how much later each next card of a grid row starts. */
@@ -276,9 +274,6 @@
      bottom padding, the toasts and the scroll padding make room for it. */
   --ws-tabbar-h: 4rem;
 }
-:root[dir="rtl"] {
-  --inline-dir: -1;
-}
 @media (min-width: 40rem) {
   :root {
     --gutter: 1.5rem;
@@ -288,46 +283,6 @@
   :root {
     --gutter: 2rem;
   }
-}
-
-/* Metric fallback for Inter, limited to Inter's Latin range. next/font writes its own "Inter Fallback" as
-   `src: local("Arial")` with no unicode-range, so in the Arabic stack it would sit ahead of IBM Plex Sans Arabic and
-   draw every Arabic character in size-adjusted Arial wherever Arial has Arabic glyphs (Windows, likely macOS). This
-   face has the same metric overrides (Inter against Arial, from next/dist/server/font-utils.js) but only answers for
-   the Latin range Inter's own file covers, so Arabic script falls through to Plex. */
-@font-face {
-  font-family: "Inter Latin Fallback";
-  src: local("Arial");
-  ascent-override: 90.44%;
-  descent-override: 22.52%;
-  line-gap-override: 0%;
-  size-adjust: 107.12%;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
-    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-/* ── Arabic: Inter leads for Latin text and digits (it has no Arabic glyphs, so Arabic script falls through to IBM Plex
-   Sans Arabic and Plex's Latin files are not needed), joins must never be broken by tracking, and lines need more
-   air. The stack differs from the one in @theme (used by /en) on purpose: it names "Inter" and "Inter Latin Fallback"
-   instead of var(--font-inter), because that variable also expands to next/font's unbounded 'Inter Fallback'.
-   "Inter" is the face name next/font emits unhashed in Next 16.4 (postcss-next-font.js, formatFamily), so a Next
-   upgrade must re-check it (and the override values above) against the built CSS. */
-html:lang(ar) {
-  --font-sans: "Inter", "Inter Latin Fallback", var(--font-plex-arabic), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --text-body--line-height: 1.75;
-  --text-small--line-height: 1.7;
-  --text-caption--line-height: 1.6;
-  --text-heading--line-height: 1.5;
-  --text-subheading--line-height: 1.6;
-  --text-title--line-height: 1.4;
-  --text-display--line-height: 1.3;
-  --text-hero--line-height: 1.3;
-  --text-micro--line-height: 1.6;
-}
-html:lang(ar) *,
-html:lang(ar) *::before,
-html:lang(ar) *::after {
-  letter-spacing: 0 !important;
 }
 
 /* ── Utilities ───────────────────────────────────────────────────────────────────────────────────────────── */
@@ -354,17 +309,17 @@ html:lang(ar) *::after {
 }
 
 /* Lit surfaces (mockup "E-Commerce"): the dark banner cards carry a soft diagonal light, quiet cards a pale grey sweep.
-   Token colours only. The light falls from the END side, so it follows the writing direction. Decoration, never
+   Token colours only. The light falls from the END side. Decoration, never
    information: the card must read the same without it. */
 @utility sheen-inverse {
   background-image:
     radial-gradient(
-      85% 130% at calc(50% + 50% * var(--inline-dir)) 0%,
+      85% 130% at 100% 0%,
       color-mix(in srgb, var(--color-on-inverse) 13%, transparent) 0%,
       transparent 62%
     ),
     linear-gradient(
-      calc(var(--inline-dir) * 118deg),
+      118deg,
       transparent 44%,
       color-mix(in srgb, var(--color-on-inverse) 6%, transparent) 52%,
       transparent 60%,
@@ -375,7 +330,7 @@ html:lang(ar) *::after {
 }
 @utility sheen-surface {
   background-image: linear-gradient(
-    calc(var(--inline-dir) * 122deg),
+    122deg,
     var(--color-surface) 38%,
     var(--color-surface-muted) 58%,
     var(--color-surface) 70%,
@@ -395,7 +350,7 @@ html:lang(ar) *::after {
     text-size-adjust: 100%;
     scroll-padding-top: 6rem;
     /* Keep room for the vertical scrollbar on short pages too, so the layout does not jump sideways between short and
-       long pages or when a dialog locks scrolling (in Arabic the workspace rail moved 15px). */
+       long pages or when a dialog locks scrolling. */
     scrollbar-gutter: stable;
   }
   body {
@@ -585,31 +540,31 @@ html:lang(ar) *::after {
 }
 
 /* ── Link tab panels (components/ui/tabs.tsx <TabPanel>; owner, 2026-11-15) ─────────────────────────────────────────
-   A tab click swaps the view under the tabs with a short directional move: picking a tab towards the end side (left in
-   Arabic) brings the new list in from the end side while the old one leaves toward the start side, `--shift-tab` px and
+   A tab click swaps the view under the tabs with a short directional move: picking a tab towards the end side brings
+   the new list in from the end side while the old one leaves toward the start side, `--shift-tab` px and
    a fade (old: --duration-fast, new: --duration-base). The direction comes from the link's transition type
    (`tab-to-end` / `tab-to-start`, tabs-indicator.ts); everything else (first load, paging, filters, refreshes, the
    browser's back and forward) swaps at once. The tab row is part of the root, which swaps at once, so it never fades and
-   its sliding indicator stays live. `--inline-dir` mirrors the move in Arabic; reduced motion makes it instant. */
+   its sliding indicator stays live. Reduced motion makes it instant. */
 ::view-transition-old(.tab-out-to-start),
 ::view-transition-old(.tab-out-to-end) {
   animation: tab-out var(--duration-fast) var(--ease-standard) both;
 }
 ::view-transition-old(.tab-out-to-start) {
-  --tab-shift: calc(var(--inline-dir) * -1 * var(--shift-tab));
+  --tab-shift: calc(-1 * var(--shift-tab));
 }
 ::view-transition-old(.tab-out-to-end) {
-  --tab-shift: calc(var(--inline-dir) * var(--shift-tab));
+  --tab-shift: var(--shift-tab);
 }
 ::view-transition-new(.tab-in-from-end),
 ::view-transition-new(.tab-in-from-start) {
   animation: tab-in var(--duration-base) var(--ease-glide) both;
 }
 ::view-transition-new(.tab-in-from-end) {
-  --tab-shift: calc(var(--inline-dir) * var(--shift-tab));
+  --tab-shift: var(--shift-tab);
 }
 ::view-transition-new(.tab-in-from-start) {
-  --tab-shift: calc(var(--inline-dir) * -1 * var(--shift-tab));
+  --tab-shift: calc(-1 * var(--shift-tab));
 }
 @keyframes tab-out {
   to {
@@ -629,7 +584,7 @@ html:lang(ar) *::after {
    scroll-driven animation (no JavaScript), fully shown once their top is `--reveal-distance` above the bottom of the
    screen. Whatever is already in view on load is at its end state, so never use them on the hero or anything that is
    always above the fold. Cards of a grid row start one `--reveal-step` apart (by column of a 4-column row, counted from
-   the start side, so Arabic runs right to left). Inside a block that already reveals nothing reveals twice. Browsers
+   the start side). Inside a block that already reveals nothing reveals twice. Browsers
    without scroll-driven animations, print and reduced motion show everything as it is. */
 @keyframes reveal-in {
   from {
@@ -688,7 +643,7 @@ html:lang(ar) *::after {
   }
   @media (hover: hover) {
     .btn-motion:not(:disabled, [aria-disabled="true"], [aria-busy="true"]):hover .btn-end-icon {
-      translate: calc(var(--inline-dir) * 3px) 0;
+      translate: 3px 0;
     }
     .btn-lift:not(:disabled, [aria-disabled="true"], [aria-busy="true"]):hover {
       translate: 0 -1px;
@@ -737,8 +692,7 @@ html:lang(ar) *::after {
   }
   /* The link the pill covers gets white text from a rule the nav row renders itself (nav-row.tsx): never an attribute
      on the link, which hydrates in its own <Suspense> boundary and would report a mismatch. */
-  /* Placed from the measured offsets of the link (physical px, the same in both writing directions), so `left`/`top`
-     are physical on purpose. */
+  /* Placed from the measured offsets of the link (physical px), so `left`/`top` are physical on purpose. */
   .nav-pill {
     position: absolute;
     top: 0;
@@ -761,9 +715,8 @@ html:lang(ar) *::after {
      - Once the indicator is placed (`data-indicator`): the indicator draws it and slides to the next link on a client
        navigation (`translate` only, --duration-slow, --ease-glide; instant with reduced motion, see "Motion
        preferences"). The active link never shows the hover square (it would cover the arriving indicator).
-     - The indicator is placed from measured physical offsets (the same px in both writing directions), so `left`/`top`
-       are physical on purpose; everything drawn around it (the mark, the tooltip, the badges) is logical, so Arabic
-       mirrors it: the mark sits on the rail's right edge and the tooltip opens to its left. */
+     - The indicator is placed from measured physical offsets , so `left`/`top` are physical on
+       purpose; everything drawn around it (the mark, the tooltip, the badges) is logical. */
   .ws-indicator {
     position: absolute;
     top: 0;
@@ -849,7 +802,7 @@ html:lang(ar) *::after {
     font-weight: 600;
     box-shadow: var(--shadow-raised);
     opacity: 0;
-    translate: calc(var(--inline-dir) * -0.25rem) 0;
+    translate: -0.25rem 0;
     transition:
       opacity var(--duration-fast) var(--ease-standard),
       translate var(--duration-base) var(--ease-glide);
@@ -931,7 +884,7 @@ html:lang(ar) *::after {
        stretched with `scale`, tabs-indicator.ts) move on `translate` and `scale` only, --duration-slow and --ease-glide;
        instant with reduced motion (see "Motion preferences"). On the pill, a link's text turns white when the pill covers
        half of it (a rule the nav renders itself, by href); a covered link never shows the hover background.
-     - Placed from measured physical offsets (the same px in both writing directions), so `left`/`top` and the caps'
+     - Placed from measured physical offsets, so `left`/`top` and the caps'
        corners are physical on purpose. */
   .tabs-link {
     color: var(--color-ink-muted);
@@ -1130,7 +1083,7 @@ html:lang(ar) *::after {
     }
   }
 
-  /* Drawer: slides in from the END side (right in English, left in Arabic), inset from the screen edge. */
+  /* Drawer: slides in from the END side (the right edge), inset from the screen edge. */
   .dialog-drawer {
     position: fixed;
     margin: 0;
@@ -1146,17 +1099,17 @@ html:lang(ar) *::after {
     translate: 0 0;
   }
   .dialog-drawer:not([open]) {
-    translate: calc(var(--inline-dir) * 110%) 0;
+    translate: 110% 0;
   }
   .dialog-drawer[data-side="start"]:not([open]) {
-    translate: calc(var(--inline-dir) * -110%) 0;
+    translate: -110% 0;
   }
   @starting-style {
     .dialog-drawer[open] {
-      translate: calc(var(--inline-dir) * 110%) 0;
+      translate: 110% 0;
     }
     .dialog-drawer[data-side="start"][open] {
-      translate: calc(var(--inline-dir) * -110%) 0;
+      translate: -110% 0;
     }
   }
 

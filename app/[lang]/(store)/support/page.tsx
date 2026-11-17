@@ -89,7 +89,7 @@ export default async function SupportPage({ searchParams }: PageProps<"/[lang]/s
                   <span className="mt-1 block text-body text-ink-muted">{item.text}</span>
                   <span className="mt-2 inline-flex items-center gap-1 text-body font-semibold text-ink underline decoration-1 underline-offset-4 group-hover:decoration-2">
                     {item.action}
-                    <ChevronRight aria-hidden="true" className="size-4 rtl:-scale-x-100" />
+                    <ChevronRight aria-hidden="true" className="size-4" />
                   </span>
                 </span>
               </Link>

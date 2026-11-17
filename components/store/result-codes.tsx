@@ -90,7 +90,7 @@ export function ResultCodes({ code, locale, labels }: ResultCodesProps) {
             <span aria-hidden="true" className="w-7 shrink-0 text-small text-ink-subtle">
               {formatNumber(index + 1, locale)}
             </span>
-            {/* Codes are Latin text: isolated left-to-right inside an Arabic page, and broken anywhere on a narrow screen. */}
+            {/* Codes are Latin text: isolated left-to-right, and broken anywhere on a narrow screen. */}
             <div className="min-w-0 flex-1">
               <bdi dir="ltr" className="break-all font-mono text-body text-ink">
                 {value}

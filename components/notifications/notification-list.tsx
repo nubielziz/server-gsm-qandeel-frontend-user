@@ -1,8 +1,8 @@
 // The notifications page of both areas (customer and merchant): All / Unread tabs, 20 items a page, "Mark all as read".
 // A server component that reads the session, so the page renders it inside <Suspense> with <NotificationListSkeleton />.
 // The tab and the page live in the URL (`?unread=1`, `?page=2`). Plan D11: `title` and `body` are plain text and are
-// rendered as React text nodes (line breaks by CSS), never as HTML; each item names its own language and direction; the
-// link goes through `notificationHref`; the list always asks for the page's language. <LiveRefresh /> keeps it current
+// rendered as React text nodes (line breaks by CSS), never as HTML; the link goes through `notificationHref`; the list
+// sends no language (English only: the list routes answer 422 to an unknown query key). <LiveRefresh /> keeps it current
 // from the live stream (feature 27): page 1 draws again in place, other pages get a "New notifications" pill.
 import { Bell, BellOff } from "lucide-react";
 import { redirect } from "next/navigation";
@@ -12,7 +12,7 @@ import { apiSessionList } from "@/lib/api/server";
 import type { NotificationItem } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
-import { dirOf, localePath } from "@/lib/i18n/config";
+import { localePath } from "@/lib/i18n/config";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { notifications } from "@/lib/i18n/messages/notifications";
 import { first, type SearchParams } from "@/lib/merchant/lists";
@@ -21,7 +21,7 @@ import {
   NOTIFICATION_FEED_ID,
   NOTIFICATIONS_PAGE,
   notificationHref,
-  unreadTextInline,
+  unreadText,
   type NotificationSurface,
 } from "@/lib/notifications/link";
 import { BusyState } from "@/components/ui/busy-state";
@@ -60,7 +60,7 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
   let rows: { data: NotificationItem[]; total: number };
   try {
     rows = await apiSessionList<NotificationItem>(NOTIFICATION_API[surface], {
-      query: listQuery({ start, end }, { unread: unreadOnly ? "true" : undefined, locale }),
+      query: listQuery({ start, end }, { unread: unreadOnly ? "true" : undefined }),
     });
   } catch (error) {
     if (isApiError(error) && error.status === 429) return <BusyState error={error} retryHref={pageHref(basePath, filters, page)} />;
@@ -81,7 +81,7 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
       key: "unread",
       label: t.tabUnread,
       href: pageHref(basePath, { unread: "1" }, 1),
-      count: unreadTotal !== null && unreadTotal > 0 ? unreadTextInline(unreadTotal, locale) : undefined,
+      count: unreadTotal !== null && unreadTotal > 0 ? unreadText(unreadTotal, locale) : undefined,
     },
   ];
 
@@ -150,8 +150,7 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
                         <CategoryIcon category={item.category} />
                       </span>
                       <div className="min-w-0">
-                        {/* The text is in the language the API chose for it, which may not be the page's. */}
-                        <div lang={item.locale} dir={dirOf(item.locale)}>
+                        <div>
                           <h2 id={titleId} className={cn("break-words text-body text-ink", unread ? "font-bold" : "font-semibold")}>
                             {item.title}
                           </h2>

@@ -36,7 +36,7 @@ export function countryOptions(locale: Locale): CountryOption[] {
   return list;
 }
 
-/** One country's name in the page language ("JO" → "Jordan" / "الأردن"); the code itself when unknown or empty. */
+/** One country's name in English ("JO" → "Jordan"); the code itself when unknown or empty. */
 export function countryName(code: string, locale: Locale): string {
   if (!code) return "";
   try {

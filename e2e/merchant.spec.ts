@@ -88,12 +88,6 @@ test.describe("dashboard", () => {
     await expect(page).toHaveURL(/\/en\/merchant\/services\?q=unlock/);
   });
 
-  test("Arabic is right-to-left", async ({ page }) => {
-    await go(page, "/ar/merchant");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(main(page).getByRole("heading", { level: 1 })).toContainText("أهلًا بعودتك");
-  });
-
   test("the rail keeps all its links on its dark panel in a short laptop window", async ({ page, isMobile }) => {
     test.skip(isMobile, "the rail shows from lg up");
     // Regression (2026-11-15): at 1366×657 (a 1366×768 laptop's browser window) the last links and Settings spilled
@@ -304,17 +298,6 @@ test.describe("quantity rules (the three services the global setup configured, n
     await expect(main(page).getByRole("textbox", { name: /^Quantity/ })).toHaveCount(0);
     await expect(place(page)).toContainText(usdTotal(price, 5));
   });
-
-  test("the rule is worded in Arabic too", async ({ page }) => {
-    const { packs, range, exact } = fixtures();
-    await go(page, `/ar/merchant/services/${packs.id}`);
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(main(page).getByText("حزم من 5، 10، 25")).toBeVisible();
-    await go(page, `/ar/merchant/services/${range.id}`);
-    await expect(main(page).getByText("من 2 إلى 50 لكل طلب")).toHaveCount(2);
-    await go(page, `/ar/merchant/services/${exact.id}`);
-    await expect(main(page).getByText("5 لكل طلب")).toBeVisible();
-  });
 });
 
 test.describe("orders", () => {
@@ -480,7 +463,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
     await expect(main(page).getByRole("textbox", { name: /^Z3X account/ })).toBeFocused();
   });
 
-  test("a refused quantity (422 invalid_quantity) is worded from the pack list in the page's language, never with the API's English", async ({ page }) => {
+  test("a refused quantity (422 invalid_quantity) is worded from the pack list, never with the API's own sentence", async ({ page }) => {
     const { packs } = fixtures();
     await refuse(page, "**/client/orders", 422, {
       code: "VALIDATION_FAILED",
@@ -561,11 +544,6 @@ test.describe("a merchant waiting for approval", () => {
       await expect(page.getByText("Waiting for approval").first()).toBeVisible();
     });
   }
-
-  test("the notice is in Arabic too", async ({ page }) => {
-    await go(page, "/ar/merchant/orders", ACCOUNTS.pendingMerchant);
-    await expect(main(page).getByText("متاحة بعد الموافقة")).toBeVisible();
-  });
 });
 
 // ── Lists and frame (plan P1) ─────────────────────────────────────────────────────────────────────────────────────────
@@ -685,28 +663,21 @@ test.describe("workspace frame", () => {
 
 test.describe("rail and tab bar", () => {
   /** The rail's nav landmark (the drawer's has the same name but is hidden while closed). */
-  const rail = (page: Page, name = "Workspace navigation") => vis(page.getByRole("navigation", { name }));
+  const rail = (page: Page) => vis(page.getByRole("navigation", { name: "Workspace navigation" }));
 
-  test("the rail sits at the start edge of a wide screen, in English and in Arabic, with no sideways scroll", async ({ page, isMobile }) => {
+  test("the rail sits at the start edge of a wide screen, with no sideways scroll", async ({ page, isMobile }) => {
     test.skip(isMobile, "the rail shows from lg up");
     // Regression (2026-11-15): the frame was centred at 110rem, leaving a strip of about 70px before the rail at 1920px.
     await page.setViewportSize({ width: 1920, height: 1080 });
-    for (const [lang, name] of [["en", "Workspace navigation"], ["ar", "التنقل في مساحة العمل"]] as const) {
-      await go(page, `/${lang}/merchant`);
-      const edges = await rail(page, name).evaluate((nav) => {
-        const panel = nav.parentElement!.getBoundingClientRect();
-        const width = document.documentElement.clientWidth;
-        // The reserved scrollbar gutter (scrollbar-gutter: stable) is not part of the page: measure from the page's own edge.
-        const edge = Math.min(width, document.documentElement.scrollWidth);
-        return {
-          start: document.documentElement.dir === "rtl" ? edge - panel.right : panel.left,
-          overflow: document.documentElement.scrollWidth - width,
-        };
-      });
-      expect(edges.start, `${lang}: room before the rail`).toBeGreaterThanOrEqual(0);
-      expect(edges.start, `${lang}: room before the rail`).toBeLessThanOrEqual(16.5); // the page padding only
-      expect(edges.overflow, `${lang}: the page scrolls sideways`).toBeLessThanOrEqual(0);
-    }
+    await go(page, "/en/merchant");
+    const edges = await rail(page).evaluate((nav) => {
+      const panel = nav.parentElement!.getBoundingClientRect();
+      const width = document.documentElement.clientWidth;
+      return { start: panel.left, overflow: document.documentElement.scrollWidth - width };
+    });
+    expect(edges.start, "room before the rail").toBeGreaterThanOrEqual(0);
+    expect(edges.start, "room before the rail").toBeLessThanOrEqual(16.5); // the page padding only
+    expect(edges.overflow, "the page scrolls sideways").toBeLessThanOrEqual(0);
   });
 
   test("a hovered icon shows its label beside the rail, and the selection moves to the page a click opens", async ({ page, isMobile }) => {

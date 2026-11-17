@@ -55,10 +55,10 @@ const FILTER_TILES = 7;
 /** One row of dense cards: the best sellers beside "How it works" and the new arrivals. */
 const MINI_CARDS = 4;
 
-/** The filtered states of the home list (`/en?brand=Apple`) are the same page: one canonical URL per language. */
+/** The filtered states of the home list (`/en?brand=Apple`) are the same page: one canonical URL. */
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { alternates: { canonical: localePath(locale), languages: { en: "/en", ar: "/ar" } } };
+  return { alternates: { canonical: localePath(locale) } };
 }
 
 export default async function HomePage(props: PageProps<"/[lang]">) {
@@ -131,7 +131,7 @@ async function GuestPointFromConfig({ t }: { t: StoreMessages["home"] }) {
 /** "Starting from": the lowest price of the catalog in the visitor's currency. Nothing for an empty catalog. */
 async function LowestPrice({ locale, label }: { locale: Locale; label: string }) {
   const currency = await getCurrency();
-  const price = await lowestPrice(locale, currency.code);
+  const price = await lowestPrice(currency.code);
   if (!price) return null;
   return <HeroPrice amount={price.gross} currency={price.currency} locale={locale} decimals={currency.decimals} label={label} />;
 }
@@ -148,7 +148,7 @@ async function ViewAll({ locale, sort }: { locale: Locale; sort?: Exclude<ListSo
       variant="ghost"
       size="sm"
       className="-me-3.5 -mb-1.5"
-      endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}
+      endIcon={<ArrowRight aria-hidden="true" />}
     >
       {c.actions.viewAll}
     </ButtonLink>
@@ -160,7 +160,7 @@ async function ViewAll({ locale, sort }: { locale: Locale; sort?: Exclude<ListSo
  * them. Nothing while the catalog has neither.
  */
 async function Tiles({ locale }: { locale: Locale }) {
-  const [t, c, catalog] = await Promise.all([getMessages(store), getMessages(common), catalogCounts(locale)]);
+  const [t, c, catalog] = await Promise.all([getMessages(store), getMessages(common), catalogCounts()]);
   const count = (n: number) => plural(locale, n, t.catalog.results, formatNumber(n, locale));
   const tile = (kind: CatalogTile["kind"]) => (row: CatalogCount): CatalogTile => ({ kind, name: row.name, count: count(row.count) });
   const tiles = [...catalog.brands.map(tile("brand")), ...catalog.networks.map(tile("network"))].slice(0, FILTER_TILES);
@@ -170,8 +170,8 @@ async function Tiles({ locale }: { locale: Locale }) {
 
 /** Featured services (priced in the visitor's currency), or an empty state for an empty catalog. */
 async function Featured({ locale }: { locale: Locale }) {
-  const [t, c, currency, catalog] = await Promise.all([getMessages(store), getMessages(common), getCurrency(), catalogCounts(locale)]);
-  const featured = await listStoreServices({ locale, currency: currency.code, featured: true, start: 0, end: 8 });
+  const [t, c, currency, catalog] = await Promise.all([getMessages(store), getMessages(common), getCurrency(), catalogCounts()]);
+  const featured = await listStoreServices({ currency: currency.code, featured: true, start: 0, end: 8 });
   if (featured.data.length === 0) {
     if (catalog.total > 0) return null;
     return (
@@ -204,7 +204,7 @@ function FeaturedSkeleton({ title }: { title: string }) {
 /** The featured collections (brands, countries, carriers with the most services) priced in the visitor's currency; none below two. */
 async function Collections({ locale }: { locale: Locale }) {
   const [t, currency] = await Promise.all([getMessages(store), getCurrency()]);
-  const collections = await catalogCollections(locale, currency.code);
+  const collections = await catalogCollections(currency.code);
   if (collections.length < 2) return null;
   return (
     <Section reveal headingId="home-collections" title={t.home.collections.title}>
@@ -246,7 +246,7 @@ function HowAndMore({ t, more, action }: { t: StoreMessages["home"]; more: React
  */
 async function HowAndBestSellers({ locale }: { locale: Locale }) {
   const [t, c, currency] = await Promise.all([getMessages(store), getMessages(common), getCurrency()]);
-  const list = await listStoreServices({ locale, currency: currency.code, ...sortQuery("popular"), start: 0, end: MINI_CARDS });
+  const list = await listStoreServices({ currency: currency.code, ...sortQuery("popular"), start: 0, end: MINI_CARDS });
   if (list.data.length === 0) return <HowAndMore t={t.home} more={null} />;
   const labels = serviceCardLabels(t, c);
   return (
@@ -270,7 +270,7 @@ async function HowAndBestSellers({ locale }: { locale: Locale }) {
  */
 async function NewArrivals({ locale }: { locale: Locale }) {
   const [t, c, currency] = await Promise.all([getMessages(store), getMessages(common), getCurrency()]);
-  const list = await listStoreServices({ locale, currency: currency.code, ...sortQuery("newest"), start: 0, end: MINI_CARDS });
+  const list = await listStoreServices({ currency: currency.code, ...sortQuery("newest"), start: 0, end: MINI_CARDS });
   if (list.data.length === 0) return null;
   const labels = serviceCardLabels(t, c);
   return (

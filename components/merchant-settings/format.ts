@@ -6,10 +6,7 @@ import type { Locale } from "@/lib/i18n/config";
 
 /** "Nov 9, 2026, 6:22 PM UTC" */
 export function utcDateTime(iso: string, locale: Locale, utcLabel: string): string {
-  // Arabic uses the 24-hour clock: no "م/ص" marker, so the whole value reads as one left-to-right run of digits.
-  const options: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" };
-  if (locale === "ar") options.hourCycle = "h23";
-  return `${formatDate(iso, locale, options)} ${utcLabel}`;
+  return `${formatDate(iso, locale, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} ${utcLabel}`;
 }
 
 /** "Nov 9, 2026" (the calendar day in UTC). */

@@ -67,7 +67,7 @@ describe("colourSwitch: the text colour follows the slide", () => {
     expect(colourSwitch(A, far, A, 300).arriveAt).toBeGreaterThan(colourSwitch(A, B, A, 300).arriveAt);
   });
 
-  it("works the same towards the start (right to left in Arabic: offsets are physical)", () => {
+  it("works the same towards the start (offsets are physical, in either direction)", () => {
     const right = colourSwitch(A, B, A, 300);
     const left = colourSwitch(B, A, B, 300);
     expect(Math.abs(left.arriveAt - right.arriveAt)).toBeLessThanOrEqual(15);

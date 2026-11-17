@@ -58,14 +58,14 @@ describe("splitCodes: when a result is a list of codes", () => {
 });
 
 describe("ResultCodes: the markup of the tracking result", () => {
-  const labelsOf = (locale: "en" | "ar"): ResultCodesLabels => ({
-    title: store[locale].track.codesTitle,
-    copyAll: store[locale].track.copyAll,
-    copyCode: store[locale].track.copyCode,
-    copy: locale === "en" ? "Copy" : "نسخ",
-    copied: locale === "en" ? "Copied" : "تم النسخ",
-  });
-  const render = (code: string, locale: "en" | "ar" = "en") => renderToStaticMarkup(createElement(ResultCodes, { code, locale, labels: labelsOf(locale) }));
+  const labels: ResultCodesLabels = {
+    title: store.en.track.codesTitle,
+    copyAll: store.en.track.copyAll,
+    copyCode: store.en.track.copyCode,
+    copy: "Copy",
+    copied: "Copied",
+  };
+  const render = (code: string) => renderToStaticMarkup(createElement(ResultCodes, { code, locale: "en", labels }));
   const count = (html: string, pattern: RegExp) => (html.match(pattern) ?? []).length;
 
   it("five codes: a heading, a list of five, a Copy button each and Copy all", () => {
@@ -78,13 +78,9 @@ describe("ResultCodes: the markup of the tracking result", () => {
     for (const code of codes(5)) expect(html).toContain(code);
   });
 
-  it("every code is isolated left-to-right (the page may be Arabic)", () => {
-    const html = render(codes(3).join("\n"), "ar");
+  it("every code is isolated left-to-right (a code is a Latin value, whatever text sits around it)", () => {
+    const html = render(codes(3).join("\n"));
     expect(count(html, /<bdi dir="ltr"/g)).toBe(3);
-    expect(html).toContain("رموزك");
-    expect(html).toContain("نسخ الكل");
-    expect(html).toContain('aria-label="نسخ الرمز 2"');
-    expect(html).not.toMatch(/Copy code/);
   });
 
   it("a staff reply and a single code keep the one block with one Copy button", () => {

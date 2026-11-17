@@ -1,18 +1,17 @@
-// Catalog lookups the API does not offer directly. A listing's slug differs per language and there is no lookup by
-// service id (handoff §5.2, trap 16), so these read the whole listed catalog of one language (pages of 100, cached
-// like the catalog) and index it. The browsable service list (home and /services) takes its rows and total from the
+// Catalog lookups the API does not offer directly. There is no lookup by service id (handoff §5.2, trap 16), so these
+// read the whole listed catalog (pages of 100, cached like the catalog) and index it. The browsable service list (home and /services) takes its rows and total from the
 // API, which filters, sorts and pages (`GET /store/v1/services`, plan D12); the numbers beside the options (how many
 // services each would show, "In stock only") and the price slider's span are counted here over the cached catalog, with
 // the API's own rules (lib/catalog-facets.ts), because that route has no facet counts. Shared data only.
-// A text search (feature 29, backend plan §7) is read for the visitor, never from the cache (lib/api/visitor.ts): on
-// English pages from the search engine (`GET /store/v1/search`: rows, facet counts, price span, "Did you mean"); on
-// Arabic pages from `GET /store/v1/services?q=`. When the engine is down the search route answers from the database
-// without facets (`engine: 'fallback'`): the options then come from the cached catalog again, without their numbers.
+// A text search (feature 29, backend plan §7) is read for the visitor, never from the cache (lib/api/visitor.ts), from
+// the search engine (`GET /store/v1/search`: rows, facet counts, price span, "Did you mean"). When the engine is down the
+// search route answers from the database without facets (`engine: 'fallback'`): the options then come from the cached
+// catalog again, without their numbers.
 import { cacheLife, cacheTag } from "next/cache";
 import { listStoreCategories, listStoreServices } from "@/lib/api/public";
-import { MAX_PAGE_SIZE, SEARCH_MAX_PAGE, SEARCH_MAX_PER_PAGE, type ServiceListArgs } from "@/lib/api/store-query";
+import { MAX_PAGE_SIZE, SEARCH_MAX_PAGE, SEARCH_MAX_PER_PAGE } from "@/lib/api/store-query";
 import type { SearchBody, SearchEngineName, StoreCategory, StoreServiceCard } from "@/lib/api/types";
-import { searchStore, searchStoreServices } from "@/lib/api/visitor";
+import { searchStore } from "@/lib/api/visitor";
 import {
   FACET_KEYS,
   clampPage,
@@ -40,40 +39,39 @@ import {
   type ListSort,
 } from "@/lib/catalog-facets";
 import { compareMoney } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { imeiFromQuery, searchText } from "@/lib/search/terms";
 
 const PAGE = 100;
 const MAX_ROWS = 1000;
 
 /**
- * Every listed service card of one language (no tax), at most 1000, in the API's default order (featured first, then
- * the staff's order, then by title). Prices in `currency`: USD unless a price is shown.
+ * Every listed service card (no tax), at most 1000, in the API's default order (featured first, then the staff's order,
+ * then by title). Prices in `currency`: USD unless a price is shown.
  */
-export async function allListedServices(locale: Locale, currency = "USD"): Promise<StoreServiceCard[]> {
+export async function allListedServices(currency = "USD"): Promise<StoreServiceCard[]> {
   "use cache";
   cacheLife("catalog");
   cacheTag("store-services");
   const rows: StoreServiceCard[] = [];
   for (let start = 0; start < MAX_ROWS; start += PAGE) {
-    const page = await listStoreServices({ locale, currency, start, end: start + PAGE });
+    const page = await listStoreServices({ currency, start, end: start + PAGE });
     rows.push(...page.data);
     if (rows.length >= page.total || page.data.length < PAGE) break;
   }
   return rows;
 }
 
-/** The slug of a service in a language, or null when it is not listed in that language. */
-export async function slugForService(serviceId: number, locale: Locale): Promise<string | null> {
-  const rows = await allListedServices(locale);
+/** The slug of a service's page, or null when it is not listed. */
+export async function slugForService(serviceId: number): Promise<string | null> {
+  const rows = await allListedServices();
   return rows.find((row) => row.id === serviceId)?.slug ?? null;
 }
 
 export type CatalogCount = { name: string; count: number };
 
 /** The brands and carriers with how many listed services each has (largest first, then by name), and the catalog size. */
-export async function catalogCounts(locale: Locale): Promise<{ total: number; brands: CatalogCount[]; networks: CatalogCount[] }> {
-  const rows = await allListedServices(locale);
+export async function catalogCounts(): Promise<{ total: number; brands: CatalogCount[]; networks: CatalogCount[] }> {
+  const rows = await allListedServices();
   const count = (pick: (row: StoreServiceCard) => string): CatalogCount[] => {
     const counts = new Map<string, number>();
     for (const row of rows) {
@@ -86,7 +84,7 @@ export async function catalogCounts(locale: Locale): Promise<{ total: number; br
 }
 
 export type CatalogList = {
-  /** Listed services in the language, whatever the filters (counted over the cached catalog, at most 1000). */
+  /** Listed services, whatever the filters (counted over the cached catalog, at most 1000). */
   catalogSize: number;
   /** Services that pass the filters (the API's `x-total-count`). */
   total: number;
@@ -96,7 +94,7 @@ export type CatalogList = {
   rows: StoreServiceCard[];
   /** Each filter field's options with their counts next to the other active filters. */
   options: Record<FacetKey, FacetOption[]>;
-  /** The categories the API lists for the language, in its order, each with `serviceCount` (no other filter narrows it). */
+  /** The categories the API lists, in its order, each with `serviceCount` (no other filter narrows it). */
   categories: StoreCategory[];
   /** The `category` values of the URL resolved against `categories` (listed or not). */
   categoryEntries: CategoryEntry[];
@@ -108,7 +106,7 @@ export type CatalogList = {
   filter: ListFilter;
   /** Whether the numbers beside the options are real (false on a search the database answered: they are hidden then). */
   counts: boolean;
-  /** What only an English text search has; null on every other list. */
+  /** What only a text search has; null on every other list. */
   search: SearchInfo | null;
 };
 
@@ -130,27 +128,25 @@ export type SearchInfo = {
  * as the last page.
  */
 export async function catalogList(
-  locale: Locale,
   currency: string,
   input: ListInput,
   sort: ListSort,
   page: number,
   perPage: number,
 ): Promise<CatalogList> {
-  const [catalog, categories] = await Promise.all([allListedServices(locale, currency), listStoreCategories(locale)]);
+  const [catalog, categories] = await Promise.all([allListedServices(currency), listStoreCategories()]);
   const bounds = priceBounds(catalog);
   const { entries, ids } = resolveCategories(input.category, categories);
   const applied: ListFilter = { ...input, category: ids, ...fitPriceRange(input.min, input.max, bounds) };
-  // An English text the API normalises to nothing (`&`, `()`, an emoji) is no search: both routes would answer 422
+  // A text the API normalises to nothing (`&`, `()`, an emoji) is no search: the route would answer 422
   // (backend plan 29 §5.3: `q` is 1-100 characters after normalising), so the page shows the plain list instead.
-  if (locale === "en" && searchText(applied.q) === "") applied.q = "";
+  if (searchText(applied.q) === "") applied.q = "";
 
-  if (searchesEngine(locale, applied.q)) return searchList({ catalog, categories, entries, applied, bounds, currency, sort, page, perPage });
+  if (searchesEngine(applied.q)) return searchList({ catalog, categories, entries, applied, bounds, currency, sort, page, perPage });
 
+  // No text search is left here (`applied.q` is ""): the list is the cached one.
   const size = Math.min(Math.max(1, Math.floor(perPage)), MAX_PAGE_SIZE);
-  // A text search is the visitor's own read (counted and limited per visitor); every other list is the cached one.
-  const list = (args: ServiceListArgs) => (cleanText(applied.q) ? searchStoreServices(args) : listStoreServices(args));
-  const read = (n: number) => list({ locale, currency, ...listFilterArgs(applied), ...sortQuery(sort), start: (n - 1) * size, end: n * size });
+  const read = (n: number) => listStoreServices({ currency, ...listFilterArgs(applied), ...sortQuery(sort), start: (n - 1) * size, end: n * size });
   const wanted = requestedPage(page);
   let result = await read(wanted);
   const current = clampPage(wanted, result.total, size);
@@ -196,7 +192,7 @@ function spanOf(range: SearchBody["priceRange"]): { min: number; max: number } |
 }
 
 /**
- * One English search page from the search engine: its rows and total, the options with the engine's facet counts (each
+ * One search page from the search engine: its rows and total, the options with the engine's facet counts (each
  * group ignores its own selection), the price slider over the matches (page 1 without a price bound; later pages, a
  * bounded page and the fallback use the catalog's span), "Did you mean", the IMEI intent. Pages stop at 50 (the route's limit). When the database answered
  * (`engine: 'fallback'`, no facets), the options come from the cached catalog with their numbers hidden.
@@ -241,14 +237,14 @@ async function searchList({ catalog, categories, entries, applied, bounds, curre
   };
 }
 
-/** The featured collections of a language, each with its lowest card price in `currency`. */
-export async function catalogCollections(locale: Locale, currency: string): Promise<Collection[]> {
-  return pickCollections(await allListedServices(locale, currency));
+/** The featured collections, each with its lowest card price in `currency`. */
+export async function catalogCollections(currency: string): Promise<Collection[]> {
+  return pickCollections(await allListedServices(currency));
 }
 
 /** The lowest listed price in `currency` (what its card shows: no tax), or null for an empty catalog. */
-export async function lowestPrice(locale: Locale, currency: string): Promise<StoreServiceCard["price"] | null> {
-  const rows = await allListedServices(locale, currency);
+export async function lowestPrice(currency: string): Promise<StoreServiceCard["price"] | null> {
+  const rows = await allListedServices(currency);
   let lowest: StoreServiceCard["price"] | null = null;
   for (const row of rows) {
     if (!lowest || compareMoney(row.price.gross, lowest.gross) < 0) lowest = row.price;

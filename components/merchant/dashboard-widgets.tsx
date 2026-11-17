@@ -65,7 +65,7 @@ export function BalanceCard({ data, locale, t }: Props) {
           className="touch-target inline-flex min-h-11 items-center gap-1 rounded-badge font-semibold text-on-inverse underline underline-offset-4 hover:no-underline"
         >
           {b.viewTransactions}
-          <ChevronRight aria-hidden="true" className="size-4 rtl:-scale-x-100" />
+          <ChevronRight aria-hidden="true" className="size-4" />
         </Link>
       </div>
     </StatCard>
@@ -162,7 +162,7 @@ export function RecentOrders({ data, locale, t, c }: Props) {
       <CardHeader
         title={r.title}
         actions={
-          <ButtonLink href={localePath(locale, "/merchant/orders")} variant="ghost" size="sm" endIcon={<ChevronRight aria-hidden="true" className="rtl:-scale-x-100" />}>
+          <ButtonLink href={localePath(locale, "/merchant/orders")} variant="ghost" size="sm" endIcon={<ChevronRight aria-hidden="true" />}>
             {r.viewAll}
           </ButtonLink>
         }

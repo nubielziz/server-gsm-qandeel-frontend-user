@@ -10,7 +10,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { StoreMe, StoreMeInput } from "@/lib/api/types";
-import { CURRENCY_COOKIE } from "@/lib/i18n/config";
+import { CURRENCY_COOKIE } from "@/lib/currency-cookie";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AccountMessages } from "@/lib/i18n/messages/account";

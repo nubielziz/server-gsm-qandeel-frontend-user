@@ -104,7 +104,7 @@ export function NotificationActions({ id, surface, unread, href, leavesList, tit
           size="sm"
           onClick={onOpen}
           aria-describedby={titleId}
-          endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}
+          endIcon={<ArrowRight aria-hidden="true" />}
         >
           {labels.open}
         </ButtonLink>

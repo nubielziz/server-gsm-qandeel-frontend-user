@@ -193,7 +193,7 @@ async function Order({ params }: { params: Promise<{ token: string }> }) {
               </div>
             </CardBody>
           </Card>
-          <ButtonLink href={localePath(locale, "/track")} variant="link" startIcon={<ArrowLeft aria-hidden="true" className="rtl:-scale-x-100" />}>
+          <ButtonLink href={localePath(locale, "/track")} variant="link" startIcon={<ArrowLeft aria-hidden="true" />}>
             {t.track.tryAgain}
           </ButtonLink>
         </aside>

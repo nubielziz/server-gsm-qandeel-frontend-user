@@ -1,6 +1,6 @@
-// Profile (mockup "Personal Information"): editable name, company, phone, country, address, tax id and the language of
-// our emails; read-only email (with "Resend verification email" while unverified), username, group, referral code,
-// status and verification. Works for pending merchants too (handoff §4.15).
+// Profile (mockup "Personal Information"): editable name, company, phone, country, address and tax id; read-only email
+// (with "Resend verification email" while unverified), username, group, referral code, status and verification. Works
+// for pending merchants too (handoff §4.15).
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -50,11 +50,9 @@ async function ProfileContent() {
           country: me.country,
           address: me.address,
           taxId: me.taxId,
-          locale: me.locale,
         }}
         email={me.email}
         emailVerified={me.emailVerifiedAt !== null}
-        languageNames={c.languageNames}
         t={t.profile}
         fieldTexts={t.fieldErrors}
         optional={t.optional}

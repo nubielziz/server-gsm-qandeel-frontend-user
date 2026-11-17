@@ -17,7 +17,7 @@ export type BreadcrumbsProps = {
   className?: string;
 };
 
-/** A breadcrumb trail with chevrons that point the right way in Arabic. */
+/** A breadcrumb trail with chevrons. */
 export function Breadcrumbs({ label, items, className }: BreadcrumbsProps) {
   return (
     <nav aria-label={label} className={className}>
@@ -39,7 +39,7 @@ export function Breadcrumbs({ label, items, className }: BreadcrumbsProps) {
               </li>
               {last ? null : (
                 <li aria-hidden="true" className="flex">
-                  <ChevronRight className="size-3.5 rtl:-scale-x-100" />
+                  <ChevronRight className="size-3.5" />
                 </li>
               )}
             </Fragment>

@@ -24,7 +24,7 @@ export type MerchantWhatsAppActionsProps = {
   referral?: { code: string; note: string } | null;
 };
 
-/** The referral note with the code in its own left-to-right run (a Latin code inside an Arabic sentence). */
+/** The referral note with the code in its own left-to-right run (a Latin code inside a sentence). */
 function ReferralNote({ code, note }: { code: string; note: string }) {
   const [before, after = ""] = note.split("{code}");
   return (
@@ -46,7 +46,7 @@ export function MerchantWhatsAppActions({ href, display, t, referral }: Merchant
           {t.chat}
           <VisuallyHidden> ({t.opensNewTab})</VisuallyHidden>
         </ButtonLink>
-        {/* Reserved in both renderings (two lines of this text size cover a typical code at 320px): the block never changes height. */}
+        {/* Reserved with or without a code (two lines of this text size cover a typical code at 320px): the block never changes height. */}
         <div className="min-h-[2lh] text-small">
           {referral ? <ReferralNote code={referral.code} note={referral.note} /> : null}
         </div>

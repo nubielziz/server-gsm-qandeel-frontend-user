@@ -25,11 +25,6 @@ describe("formatMoney", () => {
     expect(formatMoney("1234.5000", "USD", "en", 2)).toBe("$1,234.50");
     expect(formatMoney("100.0000", "JOD", "en", 3)).toContain("100.000");
   });
-  it("keeps Latin digits in Arabic", () => {
-    const text = formatMoney("12.4900", "USD", "ar", 2);
-    expect(text).toMatch(/12[.,٫]49/);
-    expect(text).not.toMatch(/[٠-٩]/);
-  });
   it("falls back to plain text for an unknown currency code", () => {
     expect(formatMoney("5.0000", "NOT-A-CODE", "en")).toBe("5.0000 NOT-A-CODE");
   });

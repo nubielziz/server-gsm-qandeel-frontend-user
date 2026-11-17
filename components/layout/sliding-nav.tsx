@@ -11,8 +11,7 @@
 //   `data-indicator` on this nav (React state, never an attribute written from an effect) hands the look over to the
 //   indicator. Never write attributes or classes on the links: they render inside other <Suspense> boundaries and an
 //   attribute React did not render is a hydration mismatch (the lesson of nav-row.tsx).
-// - Placed from physical offsets (`translate` in px) relative to the nav, the same numbers in both writing directions:
-//   the indicator works in Arabic as is. The caller positions the nav (`relative`, `fixed`).
+// - Placed from physical offsets (`translate` in px) relative to the nav. The caller positions the nav (`relative`, `fixed`).
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { boxWithin, nextMove, translateOf, type Box } from "./sliding-indicator";

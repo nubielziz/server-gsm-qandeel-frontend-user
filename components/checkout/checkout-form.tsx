@@ -166,10 +166,10 @@ export function CheckoutForm({
   const readService = useCallback(
     (signal?: AbortSignal) =>
       api.get<StoreServiceDetail>(`/store/v1/services/${encodeURIComponent(service.slug)}`, {
-        query: { locale, currency, buyerCountry: country || undefined, region: region || undefined },
+        query: { currency, buyerCountry: country || undefined, region: region || undefined },
         signal,
       }),
-    [service.slug, locale, currency, country, region],
+    [service.slug, currency, country, region],
   );
 
   /**
@@ -640,7 +640,7 @@ export function CheckoutForm({
               {labels.summary.locked}
             </p>
 
-            <Turnstile onToken={setToken} resetKey={resetKey} lang={locale} />
+            <Turnstile onToken={setToken} resetKey={resetKey} />
 
             {formError ? (
               <div id="checkout-error" tabIndex={-1} className="outline-none">
@@ -668,7 +668,7 @@ export function CheckoutForm({
               block
               loading={busy}
               disabled={!token}
-              endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}
+              endIcon={<ArrowRight aria-hidden="true" />}
             >
               {busy ? labels.summary.continuing : labels.summary.continue}
             </Button>

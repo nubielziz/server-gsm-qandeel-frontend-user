@@ -1,4 +1,4 @@
-// The notification center (plan F11, BH §4.1, §4.2, §4.4): the bell in both workspace headers, the notifications page of the
+// The notification center (plan F11, BH §4.1, §4.2, §4.4): the bell in both workspace headers (customer and merchant), the notifications page of the
 // customer area and of the merchant portal, reading one item or all of them, and the safe rendering of the text.
 // Runs against the isolated demo backend (:3100). Staff create the campaigns through e2e/admin.ts (`sendCampaign`); the
 // isolated worker fans each one out, so every test waits for the count to move before it opens the page (up to 20 s).
@@ -21,7 +21,7 @@ const COUNT_PATH: Record<Surface, string> = {
 const tag = () => Math.random().toString(36).slice(2, 8);
 
 /** The bell of the workspace header (the rail's own "Notifications" link lives outside the header). */
-const bell = (page: Page) => page.locator("header").getByRole("link", { name: /^(Notifications|الإشعارات)/ });
+const bell = (page: Page) => page.locator("header").getByRole("link", { name: /^Notifications/ });
 
 /** The items on the page, or the one whose title holds `title`. */
 const items = (page: Page) => page.locator("li[data-notification-id]");
@@ -79,7 +79,6 @@ test.describe("customer", () => {
       to: { type: "customer", id: await customerIdByEmail(email) },
       title,
       body: "Line one\nLine two &lt;b&gt;x&lt;/b&gt; and 1 <2> 3",
-      ar: { title: `تحديث ${tag()}`, body: "السطر الأول\nالسطر الثاني" },
       link: "/account/orders",
     });
     await waitForUnread(page, "customer", 1);
@@ -95,50 +94,22 @@ test.describe("customer", () => {
     await expect(row.getByText("Unread", { exact: true })).toBeVisible();
 
     // Text nodes only: the entity and the angle brackets appear exactly as sent, and no element came out of them.
-    const body = row.locator("[lang] > p");
+    const body = row.locator("h2 + p");
     await expect(body).toHaveText("Line one\nLine two &lt;b&gt;x&lt;/b&gt; and 1 <2> 3", { useInnerText: true });
     expect(((await body.innerText()).match(/\n/g) ?? []).length, "the line break is kept: two lines").toBe(1);
     await expect(body).toHaveCSS("white-space", "pre-line");
     await expect(row.locator("b, i, script")).toHaveCount(0);
   });
 
-  test("the item link is locale-prefixed; the text keeps its own language and direction", async ({ page }) => {
+  test("the item link points to the page under /en", async ({ page }) => {
     const email = await freshCustomer(page);
     const id = await customerIdByEmail(email);
-    const withArabic = `With Arabic ${tag()}`;
-    const arabicTitle = `بالعربية ${tag()}`;
-    const englishOnly = `English only ${tag()}`;
-    await sendCampaign({
-      to: { type: "customer", id },
-      title: withArabic,
-      body: "Both languages",
-      ar: { title: arabicTitle, body: "بلغتين" },
-      link: "/account/orders",
-    });
+    const title = `With link ${tag()}`;
+    await sendCampaign({ to: { type: "customer", id }, title, body: "Opens the orders", link: "/account/orders" });
     await waitForUnread(page, "customer", 1);
-    await sendCampaign({ to: { type: "customer", id }, title: englishOnly, body: "No Arabic text for this one", link: "/account/orders" });
-    await waitForUnread(page, "customer", 2);
 
     await page.goto("/en/account/notifications");
-    await expect(item(page, withArabic).getByRole("link", { name: "Open" })).toHaveAttribute("href", "/en/account/orders");
-    await expect(item(page, withArabic).locator("[lang]")).toHaveAttribute("lang", "en");
-
-    await page.goto("/ar/account/notifications");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("heading", { level: 1, name: "الإشعارات" })).toBeVisible();
-    await expect(bell(page)).toHaveAccessibleName("الإشعارات، غير المقروءة: 2");
-
-    const arabic = item(page, arabicTitle);
-    await expect(arabic.locator("[lang]")).toHaveAttribute("lang", "ar");
-    await expect(arabic.locator("[lang]")).toHaveAttribute("dir", "rtl");
-    await expect(arabic.getByRole("link", { name: "فتح" })).toHaveAttribute("href", "/ar/account/orders");
-    await expect(arabic.getByText("غير مقروء", { exact: true })).toBeVisible();
-
-    // No Arabic text for this campaign: the API sends the English one, and the page says so with `lang` and `dir`.
-    const english = item(page, englishOnly);
-    await expect(english.locator("[lang]")).toHaveAttribute("lang", "en");
-    await expect(english.locator("[lang]")).toHaveAttribute("dir", "ltr");
-    await expect(english.getByRole("link", { name: "فتح" })).toHaveAttribute("href", "/ar/account/orders");
+    await expect(item(page, title).getByRole("link", { name: "Open" })).toHaveAttribute("href", "/en/account/orders");
   });
 
   test("an empty list says so on both tabs", async ({ page }) => {
@@ -272,7 +243,7 @@ test.describe("merchant", () => {
       await expect(rail.getByRole("link", { name: /^Notifications\s*,\s*2 unread$/ })).toBeVisible();
     }
 
-    await expect(item(page, withLink).locator("[lang] > p")).toHaveText("Line A\nLine B", { useInnerText: true });
+    await expect(item(page, withLink).locator("h2 + p")).toHaveText("Line A\nLine B", { useInnerText: true });
     await expect(item(page, withLink).getByRole("link", { name: "Open" })).toHaveAttribute("href", "/en/merchant/settings/notifications");
     await expect(item(page, plain).getByRole("link", { name: "Open" })).toHaveCount(0);
 
@@ -358,14 +329,5 @@ test.describe("narrow screens", () => {
     await expectNoHorizontalOverflow(page);
     await expectInsideViewport(page, bell(page));
     await expectInsideViewport(page, page.getByRole("button", { name: "Account menu" }));
-  });
-
-  test("the Arabic page has no overflow either", async ({ page }) => {
-    await signInCustomer(page, ACCOUNTS.customer);
-    await page.goto("/ar/account/notifications");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(bell(page)).toBeVisible();
-    await expectNoHorizontalOverflow(page);
-    await expectInsideViewport(page, bell(page));
   });
 });

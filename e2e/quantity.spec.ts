@@ -12,7 +12,6 @@ import { checkout } from "../lib/i18n/messages/checkout";
 import { expect, test } from "./fixtures";
 import { DEV_TURNSTILE_TOKEN, fixtures, stubTurnstile } from "./helpers";
 
-type Lang = "en" | "ar";
 type Rule = { min: number; max: number; options: number[] };
 
 interface ApiService {
@@ -22,7 +21,6 @@ interface ApiService {
   etaText: string;
   quantity: Rule;
   price: { net: string; gross: string; currency: string };
-  alternates: { locale: Lang; slug: string }[];
 }
 
 interface ApiSession {
@@ -38,8 +36,8 @@ const SERVER_TEXT = "Choose one of the quantities this service sells: 5, 10, 25.
 test.beforeEach(async ({ page }) => stubTurnstile(page));
 
 /** The service as the API sends it, through the site's own `/store/v1` rewrite. */
-async function apiService(request: APIRequestContext, slug: string, locale: Lang = "en"): Promise<ApiService> {
-  const res = await request.get(`/store/v1/services/${encodeURIComponent(slug)}?locale=${locale}`);
+async function apiService(request: APIRequestContext, slug: string): Promise<ApiService> {
+  const res = await request.get(`/store/v1/services/${encodeURIComponent(slug)}`);
   expect(res.status(), `${slug}: ${await res.text()}`).toBe(200);
   return (await res.json()) as ApiService;
 }
@@ -76,8 +74,8 @@ function dollars(amount: string, quantity = 1): string {
  * Opens a checkout and waits until the form is hydrated and the (stubbed) security check has answered. With `rule` the page
  * is reloaded until the quantity rule text shows (a rule the global setup just wrote may still be cached).
  */
-async function openCheckout(page: Page, path: string, options: { rule?: string; lang?: Lang } = {}) {
-  const t = checkout[options.lang ?? "en"].start;
+async function openCheckout(page: Page, path: string, options: { rule?: string } = {}) {
+  const t = checkout.en.start;
   if (options.rule) {
     const rule = options.rule;
     await expect(async () => {
@@ -91,19 +89,19 @@ async function openCheckout(page: Page, path: string, options: { rule?: string; 
 }
 
 /** Opens the "Service requirements" drawer. */
-async function openDrawer(page: Page, lang: Lang = "en"): Promise<Locator> {
-  await page.getByRole("button", { name: checkout[lang].start.info.enter }).first().click();
+async function openDrawer(page: Page): Promise<Locator> {
+  await page.getByRole("button", { name: checkout.en.start.info.enter }).first().click();
   const drawer = page.getByRole("dialog");
   await expect(drawer).toBeVisible();
   return drawer;
 }
 
-async function saveDrawer(drawer: Locator, lang: Lang = "en") {
-  await drawer.getByRole("button", { name: checkout[lang].start.drawer.save }).click();
+async function saveDrawer(drawer: Locator) {
+  await drawer.getByRole("button", { name: checkout.en.start.drawer.save }).click();
 }
 
-async function fillBuyer(page: Page, lang: Lang = "en") {
-  const t = checkout[lang].start;
+async function fillBuyer(page: Page) {
+  const t = checkout.en.start;
   await page.getByLabel(t.you.email).fill("e2e-qty-buyer@example.com");
   await page.getByLabel(t.you.country).selectOption("DE");
 }
@@ -114,8 +112,8 @@ function rowValue(page: Page, label: string | RegExp): Locator {
 }
 
 /** The tax row shows once the price was read again for the country: no read is then still on its way. */
-async function priceSettled(page: Page, lang: Lang = "en") {
-  await expect(page.locator("dt").filter({ visible: true }).filter({ hasText: lang === "en" ? "Tax (19%)" : /الضريبة/ })).toBeVisible();
+async function priceSettled(page: Page) {
+  await expect(page.locator("dt").filter({ visible: true }).filter({ hasText: "Tax (19%)" })).toBeVisible();
 }
 
 /** A 422 the way the API sends it (problem+json). */
@@ -372,16 +370,11 @@ test.describe("a refused quantity", () => {
     await expect(page.getByText("Choose one of the quantities this service sells")).toHaveCount(0);
   });
 
-  test("Arabic: the refusal, the new packs and the stock hint are in Arabic and right-to-left", async ({ page, request }) => {
+  test("an in-stock service: the refusal shows the new packs and the stock hint, and not the server's sentence", async ({ page, request }) => {
     const { stocked } = fixtures();
-    const english = await apiService(request, stocked.slug);
-    const arabicSlug = english.alternates.find((alt) => alt.locale === "ar")?.slug;
-    expect(arabicSlug, "the stocked fixture needs an Arabic page").toBeTruthy();
-    const row = await apiService(request, arabicSlug!, "ar");
+    const row = await apiService(request, stocked.slug);
     expect(row.availability).toBe("in_stock");
-    const note = row.etaText.trim();
-    expect(note, "the stocked fixture has a delivery note in Arabic").not.toBe("");
-    const t = checkout.ar.start;
+    const t = checkout.en.start;
 
     const changed: Rule = { min: 20, max: 40, options: [20, 40] };
     let rule: Rule | null = null;
@@ -390,35 +383,29 @@ test.describe("a refused quantity", () => {
       rule = changed;
       return route.fulfill(problem([{ field: "quantity", code: "invalid_quantity", message: SERVER_TEXT }]));
     });
-    await page.route(new RegExp(`/store/v1/services/${arabicSlug}(\\?|$)`), async (route) => {
+    await page.route(new RegExp(`/store/v1/services/${stocked.slug}(\\?|$)`), async (route) => {
       if (!rule) return route.fallback();
       const response = await route.fetch();
       return route.fulfill({ response, json: { ...(await response.json()), quantity: rule } });
     });
 
-    await openCheckout(page, `/ar/checkout?service=${arabicSlug}`, { lang: "ar" });
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    // The delivery is the staff note in Arabic, never the supplier's English text.
-    await expect(page.getByText(note, { exact: true })).toBeVisible();
-    await expect(page.getByText("1 min")).toHaveCount(0);
-
-    const drawer = await openDrawer(page, "ar");
+    await openCheckout(page, `/en/checkout?service=${stocked.slug}`);
+    const drawer = await openDrawer(page);
     await drawer.getByLabel(t.drawer.imei).fill(IMEI);
-    await saveDrawer(drawer, "ar");
+    await saveDrawer(drawer);
     await expect(drawer).toBeHidden();
-    await fillBuyer(page, "ar");
-    await priceSettled(page, "ar");
+    await fillBuyer(page);
+    await priceSettled(page);
 
     await page.getByRole("button", { name: t.summary.continue }).click();
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByText("اختر إحدى هذه الكميات: 20، 40.")).toBeVisible();
+    await expect(drawer.getByText("Choose one of these quantities: 20, 40.")).toBeVisible();
     const radios = drawer.getByRole("radio");
     await expect(radios).toHaveCount(2);
     expect(await radioValues(radios)).toEqual(["20", "40"]);
-    await expect(drawer).toContainText("حزم من 20، 40");
-    await expect(drawer).toContainText("تسليم فوري ما دام المخزون متوفرًا"); // an in-stock service sold in packs
-    await expect(drawer).not.toContainText("Choose");
-    await expect(drawer).not.toContainText("quantities");
+    await expect(drawer).toContainText("Packs of 20, 40");
+    await expect(drawer).toContainText("Instant delivery while stock lasts"); // an in-stock service sold in packs
+    await expect(drawer).not.toContainText("Choose one of the quantities this service sells");
   });
 });
 

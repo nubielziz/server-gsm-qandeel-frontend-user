@@ -1,13 +1,12 @@
 "use client";
-// Error boundary for everything under a language. Friendly and non-technical: a short message, "Try again" and a way
-// home. It replaces the page and its group layout, so it carries its own tiny brand bar. The language comes from the
-// route (`useParams`), the texts from <ErrorTextProvider> (root layout): importing `common` here would add about 5 KB
-// (gzip) to the shared chunk that 52 of 53 routes load.
-import { useParams } from "next/navigation";
+// Error boundary for every page of the site. Friendly and non-technical: a short message, "Try again" and a way home.
+// It replaces the page and its group layout, so it carries its own tiny brand bar. The texts come from
+// <ErrorTextProvider> (root layout): importing `common` here would add about 5 KB (gzip) to the shared chunk that 52 of
+// 53 routes load.
 import { useEffect } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
-import { isLocale, localePath, DEFAULT_LOCALE } from "@/lib/i18n/config";
+import { localePath } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorPageText, useErrorText } from "@/lib/i18n/error-text";
 
@@ -22,8 +21,6 @@ export default function ErrorPage({
   /** Re-renders without re-fetching; used when `retry` is not provided. */
   reset?: () => void;
 }) {
-  const params = useParams<{ lang?: string }>();
-  const locale = isLocale(params.lang) ? params.lang : DEFAULT_LOCALE;
   const t = useErrorPageText();
   const errorText = useErrorText();
 
@@ -39,7 +36,7 @@ export default function ErrorPage({
     <div className="grid min-h-dvh grid-rows-[auto_1fr] bg-page">
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex h-16 w-full max-w-wide items-center px-gutter">
-          <a href={localePath(locale)} className="inline-flex min-h-11 items-center gap-2.5 rounded-control" aria-label={t.logoAlt}>
+          <a href={localePath("en")} className="inline-flex min-h-11 items-center gap-2.5 rounded-control" aria-label={t.logoAlt}>
             <span
               aria-hidden="true"
               className="grid size-9 place-items-center rounded-[10px] bg-inverse text-[0.6875rem] font-extrabold leading-none tracking-wide text-on-inverse"
@@ -62,7 +59,7 @@ export default function ErrorPage({
               <Button size="lg" onClick={() => (retry ?? reset)?.()}>
                 {t.retry}
               </Button>
-              <ButtonLink href={localePath(locale)} variant="secondary" size="lg">
+              <ButtonLink href={localePath("en")} variant="secondary" size="lg">
                 {t.goHome}
               </ButtonLink>
             </>

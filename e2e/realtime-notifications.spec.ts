@@ -24,7 +24,7 @@ const COUNT_PATH: Record<Surface, string> = {
 const tag = () => Math.random().toString(36).slice(2, 8);
 
 /** The bell of the workspace header. */
-const bell = (page: Page) => page.locator("header").getByRole("link", { name: /^(Notifications|الإشعارات)/ });
+const bell = (page: Page) => page.locator("header").getByRole("link", { name: /^Notifications/ });
 
 /** The items on the notifications page. */
 const items = (page: Page) => page.locator("li[data-notification-id]");
@@ -158,7 +158,7 @@ test.describe("customer", () => {
     await hydrated(bell(second));
     await second.waitForTimeout(1_000);
     expect(streams, "one stream for the browser, not one per tab").toHaveLength(1);
-    expect(streams[0]).toBe("?locale=en");
+    expect(streams[0], "the stream sends no language").toBe("");
 
     const first = `Shared one ${tag()}`;
     await markPage(second);
@@ -171,7 +171,7 @@ test.describe("customer", () => {
     // The leader closes: the lock passes to the other tab, which opens a stream with the cursor of the last item.
     await page.close();
     await expect.poll(() => streams.length, { timeout: 15_000 }).toBe(2);
-    expect(streams[1]).toMatch(/^\?locale=en&cursor=i\d+(-t\d+)?$/);
+    expect(streams[1]).toMatch(/^\?cursor=i\d+(-t\d+)?$/);
     await second.waitForTimeout(500);
 
     const next = `Shared two ${tag()}`;
@@ -179,33 +179,6 @@ test.describe("customer", () => {
     await expect(bell(second)).toHaveAccessibleName("Notifications, 2 unread", { timeout: 20_000 });
     await expect(toastOf(second, next).getByText(next, { exact: true })).toBeVisible();
     await expectNotReloaded(second);
-  });
-
-  test("an Arabic page gets the toast in Arabic, with its own language and direction", async ({ page }) => {
-    const email = await freshCustomer(page);
-    const arabic = `إشعار مباشر ${tag()}`;
-    const opened = streamOpened(page, "customer");
-    await page.goto("/ar/account");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await hydrated(bell(page));
-    await opened;
-    await page.waitForTimeout(500);
-
-    await sendCampaign({
-      to: { type: "customer", id: await customerIdByEmail(email) },
-      title: `Live Arabic ${tag()}`,
-      body: "English text",
-      ar: { title: arabic, body: "نص عربي" },
-      link: "/account/orders",
-    });
-
-    await expect(bell(page)).toHaveAccessibleName("الإشعارات، غير المقروءة: 1", { timeout: 20_000 });
-    const toast = toastOf(page, arabic);
-    const text = toast.getByText(arabic, { exact: true });
-    await expect(text).toBeVisible();
-    await expect(text.locator("xpath=ancestor::div[@lang][1]")).toHaveAttribute("lang", "ar");
-    await expect(text.locator("xpath=ancestor::div[@lang][1]")).toHaveAttribute("dir", "rtl");
-    await expect(toast.getByRole("link", { name: "عرض" })).toHaveAttribute("href", "/ar/account/orders");
   });
 
   // Owner, 2026-11-15: the bell belongs in the shop header too. A signed-in visitor gets it (and its stream) on every shop page.

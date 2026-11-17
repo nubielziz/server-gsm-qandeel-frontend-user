@@ -1,0 +1,113 @@
+{
+  "roots": ["app", "components", "lib", "e2e", "scripts", "public", "proxy.ts", "next.config.ts"],
+  "frontend": true,
+  "notScanned": [],
+  "allow": [
+    {
+      "path": "next.config.ts",
+      "why": "The one redirect rule of the old addresses: every /ar address answers 308 to the same path under /en (plan 30 §7.1). It has to name the old prefix."
+    },
+    {
+      "path": "components/auth/safe-next.ts",
+      "why": "Reads a leading /ar of a ?next= value (a bookmark or an old sign-in redirect) as /en before the usual checks (plan 30 §7.1). It has to name the old prefix."
+    },
+    {
+      "path": "components/auth/safe-next.test.ts",
+      "why": "Tests of that rule: they need the old /ar addresses as input."
+    },
+    {
+      "path": "lib/notifications/link.ts",
+      "why": "A stored notification link that still starts with /ar leads to /en (plan 30 §7.1). It has to name the old prefix."
+    },
+    {
+      "path": "lib/notifications/link.test.ts",
+      "why": "Tests of that rule: they need the old /ar links as input."
+    },
+    {
+      "path": "e2e/routing.spec.ts",
+      "why": "Tries every old /ar address against the build: the 308 to /en, the token links and the two seeded old slugs."
+    },
+    {
+      "path": "lib/format/format.test.ts",
+      "why": "Group C: IMEI digits typed on an Arabic keyboard (Arabic-Indic and Persian) are read as Latin digits; the test needs those digits."
+    },
+    {
+      "path": "lib/quantity.test.ts",
+      "why": "Group C: a quantity typed with Arabic-Indic or Persian digits is read; the test needs those digits."
+    },
+    {
+      "path": "lib/merchant/money-math.test.ts",
+      "why": "Group C: an amount typed with Arabic-Indic digits and the Arabic decimal mark is read; the test needs them."
+    },
+    {
+      "path": "lib/merchant/order-input.test.ts",
+      "why": "Group C: a typed quantity or IMEI list with Arabic-Indic digits is read; the test needs those digits."
+    },
+    {
+      "path": "lib/search/terms.test.ts",
+      "why": "Group C: an IMEI typed with Arabic-Indic digits in the search box is recognised; the test needs those digits."
+    },
+    {
+      "path": "lib/catalog-facets.test.ts",
+      "why": "Group C: a search typed in Arabic passes through the text clean-up unchanged; the test needs an Arabic query."
+    },
+    {
+      "path": "lib/contact/whatsapp.test.ts",
+      "why": "Group C: Arabic text in a WhatsApp link is percent-encoded and a referral code in Arabic is refused; the tests need Arabic samples."
+    },
+    {
+      "path": "components/support/ticket-conversation.test.tsx",
+      "why": "Group C: a ticket message typed in Arabic is shown as typed, in a box with dir=\"auto\"; the test needs an Arabic body."
+    },
+    {
+      "path": "components/user-text.test.tsx",
+      "why": "Group C (plan 30 §9.5): ticket text, file names, API values, initials and the input-method Enter for text typed in Arabic; the samples are Arabic."
+    },
+    {
+      "path": "e2e/merchant.spec.ts",
+      "why": "Group C: a quantity typed with an Arabic-Indic digit is read in the order form."
+    }
+  ],
+  "keep": [
+    {
+      "path": "components/support/ticket-messages.tsx",
+      "has": "dir=\"auto\"",
+      "why": "A ticket message is text a person typed, and may be Arabic: it keeps its own direction (group C, decision 039)."
+    },
+    {
+      "path": "components/forms/file-upload.tsx",
+      "has": "dir=\"auto\"",
+      "why": "A file name is chosen by a person and may be Arabic: it keeps its own direction (group C)."
+    },
+    {
+      "path": "components/store/bdi-text.tsx",
+      "has": "<bdi>",
+      "why": "A value of the API (or a supplier's own words) is isolated from the sentence around it (group C)."
+    },
+    {
+      "path": "components/ui/avatar.tsx",
+      "has": "Array.from(",
+      "why": "The initial of a name typed in any script, Arabic included, is its first character, not its first UTF-16 unit (group C)."
+    },
+    {
+      "path": "lib/format/index.ts",
+      "has": "\\u0660-\\u0669\\u06F0-\\u06F9",
+      "why": "An IMEI typed on an Arabic keyboard (Arabic-Indic and Persian digits) is read as Latin digits (group C)."
+    },
+    {
+      "path": "lib/quantity.ts",
+      "has": "\\u0660-\\u0669",
+      "why": "A quantity typed on an Arabic keyboard is read (group C)."
+    },
+    {
+      "path": "lib/merchant/money-math.ts",
+      "has": "\\u0660-\\u0669",
+      "why": "An amount typed on an Arabic keyboard is read (group C)."
+    },
+    {
+      "path": "lib/support/send-key.ts",
+      "has": "isComposing",
+      "why": "The Enter that confirms an input method's text (Arabic, Chinese, Japanese) does not send a ticket reply (group C)."
+    }
+  ]
+}

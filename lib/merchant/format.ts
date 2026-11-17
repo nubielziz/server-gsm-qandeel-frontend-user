@@ -1,7 +1,7 @@
 // Small display helpers for the merchant pages. Safe to import anywhere.
 import { intlLocaleOf, type Locale } from "@/lib/i18n/config";
 
-/** `90` → "1 hr, 30 min" (en) / the Arabic form (ar). Used for the services' delivery target (`slaMinutes`). */
+/** `90` → "1 hr, 30 min". Used for the services' delivery target (`slaMinutes`). */
 export function formatMinutes(minutes: number, locale: Locale): string {
   const tag = intlLocaleOf(locale);
   const parts: [number, "day" | "hour" | "minute"][] = [
@@ -39,9 +39,9 @@ export function isHttpUrl(value: string): boolean {
 
 /**
  * Wraps text that must stay left-to-right (amounts, percentages, IMEIs) in Unicode isolates, so it keeps its order when
- * it is inserted into an Arabic sentence: `fmt(t.priceChanged, { current: ltr(formatMoney(…)) })`.
+ * it is inserted into a sentence: `fmt(t.priceChanged, { current: ltr(formatMoney(…)) })`.
  */
 export function ltr(text: string): string {
-  // Arabic currency strings start with a right-to-left mark (U+200F), which would turn the number around again.
+  // Direction marks (U+200E, U+200F, U+061C) in the text would turn the number around again: they are removed first.
   return `\u2066${text.replace(/[\u200e\u200f\u061c]/g, "")}\u2069`;
 }

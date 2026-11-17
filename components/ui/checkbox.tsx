@@ -120,7 +120,7 @@ export function Switch({ label, description, className, wrapperClassName, id, ..
         />
         <span
           aria-hidden="true"
-          className="pointer-events-none relative ms-0.5 size-5 rounded-full bg-surface shadow-card transition-transform duration-(--duration-fast) peer-checked:translate-x-5 rtl:peer-checked:-translate-x-5"
+          className="pointer-events-none relative ms-0.5 size-5 rounded-full bg-surface shadow-card transition-transform duration-(--duration-fast) peer-checked:translate-x-5"
         />
       </span>
     </label>

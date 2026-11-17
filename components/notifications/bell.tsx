@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
 import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
-import { unreadText, unreadTextInline, type NotificationSurface } from "@/lib/notifications/link";
+import { unreadText, type NotificationSurface } from "@/lib/notifications/link";
 import { unreadStore } from "@/lib/notifications/unread-store";
 import { playRing } from "@/lib/notifications/bell-ring";
 import { notificationChime } from "@/lib/notifications/chime";
@@ -57,8 +57,7 @@ export function Bell({ surface, locale, href, initialCount, labels }: BellProps)
   }, [view.ring, view.rings, settle]);
   // Browsers play sound only after a gesture: the chime starts listening for the first one (once per page).
   useEffect(() => notificationChime.arm(), []);
-  // In an Arabic title "99+" must stay one left-to-right unit, or its "+" lands on the wrong side.
-  useTitleBadge(count, locale === "ar" ? unreadTextInline(count, locale) : text);
+  useTitleBadge(count, text);
   return (
     <Link
       href={href}
@@ -68,8 +67,7 @@ export function Bell({ surface, locale, href, initialCount, labels }: BellProps)
         "transition-colors hover:bg-surface-muted",
       )}
     >
-      {/* One icon element for good: the swing is played on it (playRing), never by a remount. It pivots on the top centre:
-          symmetric, so RTL needs nothing. */}
+      {/* One icon element for good: the swing is played on it (playRing), never by a remount. It pivots on the top centre. */}
       <BellIcon ref={iconRef} aria-hidden="true" className="size-5 origin-top" />
       {count > 0 ? (
         <CountBadge

@@ -22,7 +22,6 @@ const EXACT: QuantityRule = { min: 5, max: 5, options: [] };
 const ONE_PACK: QuantityRule = { min: 10, max: 10, options: [10] };
 
 const en = common.en.quantity;
-const ar = common.ar.quantity;
 
 describe("quantityMode (BH §14.2)", () => {
   it("one per order is single", () => {
@@ -136,12 +135,6 @@ describe("quantityRuleText", () => {
     expect(quantityRuleText(RANGE, en, "en")).toBe("2 to 50 per order");
     expect(quantityRuleText(PACKS, en, "en")).toBe("Packs of 5, 10, 25");
   });
-  it("says the rule in Arabic, with Latin digits and the Arabic comma", () => {
-    expect(quantityRuleText(SINGLE, ar, "ar")).toBe("1 لكل طلب");
-    expect(quantityRuleText(EXACT, ar, "ar")).toBe("5 لكل طلب");
-    expect(quantityRuleText(RANGE, ar, "ar")).toBe("من 2 إلى 50 لكل طلب");
-    expect(quantityRuleText(PACKS, ar, "ar")).toBe("حزم من 5، 10، 25");
-  });
   it("groups the digits of large numbers", () => {
     expect(quantityRuleText({ min: 1, max: 100000, options: [] }, en, "en")).toBe("1 to 100,000 per order");
   });
@@ -150,16 +143,13 @@ describe("quantityRuleText", () => {
 describe("invalidQuantityText (BH §14.6)", () => {
   it("packs: lists the packs", () => {
     expect(invalidQuantityText(PACKS, en, "en")).toBe("Choose one of these quantities: 5, 10, 25.");
-    expect(invalidQuantityText(PACKS, ar, "ar")).toBe("اختر إحدى هذه الكميات: 5، 10، 25.");
   });
   it("range: names the bounds", () => {
     expect(invalidQuantityText(RANGE, en, "en")).toBe("Enter a quantity from 2 to 50.");
-    expect(invalidQuantityText(RANGE, ar, "ar")).toBe("أدخل كمية من 2 إلى 50.");
   });
   it("exactly N and one per order: names the one quantity, never a range from N to N", () => {
     expect(invalidQuantityText(EXACT, en, "en")).toBe("This service sells 5 per order.");
     expect(invalidQuantityText(SINGLE, en, "en")).toBe("This service sells 1 per order.");
-    expect(invalidQuantityText(EXACT, ar, "ar")).toBe("تُباع هذه الخدمة بكمية 5 لكل طلب.");
     expect(invalidQuantityText(EXACT, en, "en")).not.toMatch(/from 5 to 5/);
   });
   it("is built from the rule after a re-read, not from the old one", () => {
@@ -183,24 +173,32 @@ describe("fromPrice", () => {
 });
 
 describe("the strings of common.quantity", () => {
-  it("has the same placeholders in both languages", () => {
+  it("keeps the placeholders the code fills", () => {
     const placeholders = (text: string) => (text.match(/\{\w+\}/g) ?? []).sort().join(",");
-    for (const key of ["one", "exact", "range", "packs", "invalidRange", "invalidPacks", "invalidExact", "perUnit", "from", "exactFor", "packFor", "estimated"] as const) {
-      expect(placeholders(ar[key]), key).toBe(placeholders(en[key]));
+    const expected = {
+      one: "",
+      exact: "{count}",
+      range: "{max},{min}",
+      packs: "{options}",
+      invalidRange: "{max},{min}",
+      invalidPacks: "{options}",
+      invalidExact: "{count}",
+      perUnit: "",
+      from: "{price}",
+      exactFor: "{count},{price}",
+      packFor: "{count},{price}",
+      estimated: "",
+    } as const;
+    for (const key of Object.keys(expected) as (keyof typeof expected)[]) {
+      expect(placeholders(en[key]), key).toBe(expected[key]);
     }
   });
-  it("builds the subtotal label with the plural forms of each language", () => {
+  it("builds the subtotal label with the plural forms", () => {
     expect(plural("en", 1, en.subtotal)).toBe("Subtotal (1 unit)");
     expect(plural("en", 3, en.subtotal)).toBe("Subtotal (3 units)");
-    expect(plural("ar", 1, ar.subtotal)).toBe("المجموع الفرعي (وحدة واحدة)");
-    expect(plural("ar", 2, ar.subtotal)).toBe("المجموع الفرعي (وحدتان)");
-    expect(plural("ar", 3, ar.subtotal)).toBe("المجموع الفرعي (3 وحدات)");
-    expect(plural("ar", 11, ar.subtotal)).toBe("المجموع الفرعي (11 وحدة)");
   });
-  it("uses the handoff's own Arabic and English wording (BH §14.6)", () => {
+  it("uses the handoff's own wording (BH §14.6)", () => {
     expect(en.invalidRange).toBe("Enter a quantity from {min} to {max}.");
     expect(en.invalidPacks).toBe("Choose one of these quantities: {options}.");
-    expect(ar.invalidRange).toBe("أدخل كمية من {min} إلى {max}.");
-    expect(ar.invalidPacks).toBe("اختر إحدى هذه الكميات: {options}.");
   });
 });

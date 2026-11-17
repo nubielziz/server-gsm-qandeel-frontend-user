@@ -11,8 +11,8 @@ describe("boxWithin: the selected element's box in the nav's padding box", () =>
     expect(boxWithin(link, nav, { left: 1, top: 2 })).toEqual({ x: 15, y: 58, w: 48, h: 48 });
   });
 
-  it("gives physical px, the same numbers in Arabic (the rail on the right edge)", () => {
-    // A right-to-left page: the rail sits at the right edge, its link 16px in from the rail's left side as in English.
+  it("gives the same numbers wherever the nav sits on the page (physical px)", () => {
+    // A nav far from the left edge of a wide window: its link is still 16px in from the nav's own left side.
     const nav = { left: 1824, top: 16, width: 80, height: 900 };
     const link = { left: 1840, top: 120, width: 48, height: 48 };
     expect(boxWithin(link, nav)).toEqual({ x: 16, y: 104, w: 48, h: 48 });

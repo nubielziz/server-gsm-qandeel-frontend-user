@@ -81,11 +81,11 @@ export async function Pagination({ total, pageSize, page, basePath, searchParams
             <li>
               {current > 1 ? (
                 <Link href={href(current - 1)} aria-label={t.pagination.previous} rel="prev" className={cn(itemClasses, "text-ink hover:bg-surface-sunken")}>
-                  <ChevronLeft aria-hidden="true" className="size-5 rtl:-scale-x-100" />
+                  <ChevronLeft aria-hidden="true" className="size-5" />
                 </Link>
               ) : (
                 <span aria-disabled="true" className={cn(itemClasses, "text-ink-subtle opacity-50")}>
-                  <ChevronLeft aria-hidden="true" className="size-5 rtl:-scale-x-100" />
+                  <ChevronLeft aria-hidden="true" className="size-5" />
                 </span>
               )}
             </li>
@@ -110,11 +110,11 @@ export async function Pagination({ total, pageSize, page, basePath, searchParams
             <li>
               {current < pages ? (
                 <Link href={href(current + 1)} aria-label={t.pagination.next} rel="next" className={cn(itemClasses, "text-ink hover:bg-surface-sunken")}>
-                  <ChevronRight aria-hidden="true" className="size-5 rtl:-scale-x-100" />
+                  <ChevronRight aria-hidden="true" className="size-5" />
                 </Link>
               ) : (
                 <span aria-disabled="true" className={cn(itemClasses, "text-ink-subtle opacity-50")}>
-                  <ChevronRight aria-hidden="true" className="size-5 rtl:-scale-x-100" />
+                  <ChevronRight aria-hidden="true" className="size-5" />
                 </span>
               )}
             </li>

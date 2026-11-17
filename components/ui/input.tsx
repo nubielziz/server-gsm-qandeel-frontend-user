@@ -45,8 +45,8 @@ export function Input({
   dir: dirProp,
   ...props
 }: InputProps) {
-  // Email, URL and phone values are always left-to-right text, even on an Arabic page. The wrapper follows, so the
-  // icons and the padding stay on the right sides.
+  // Email, URL and phone values are always left-to-right text. The wrapper follows, so the icons and the padding stay
+  // on the right sides.
   const dir = dirProp ?? (props.type === "email" || props.type === "url" || props.type === "tel" ? "ltr" : undefined);
   const control = (wiring: Wiring) => (
     <div dir={dir} className={cn("relative flex items-center", wrapperClassName)}>

@@ -1,5 +1,5 @@
 "use client";
-// Translates ApiErrors in Client Components. The root layout provides the current language's error texts once;
+// Translates ApiErrors in Client Components. The root layout provides the error texts once;
 // forms call `useErrorText()` to get a message for a whole error and per field, and the error page calls
 // `useErrorPageText()` for its own strings. Server Components use `errorText(errors[locale])` from ./error-text-core
 // instead (a "use client" module cannot serve them).

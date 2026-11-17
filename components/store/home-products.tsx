@@ -52,7 +52,7 @@ function SectionHeading({ t, total, catalogHref }: { t: StoreMessages["home"]["p
           variant="ghost"
           size="sm"
           className="-me-3.5 -mb-1.5"
-          endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}
+          endIcon={<ArrowRight aria-hidden="true" />}
         >
           {t.openCatalog}
         </ButtonLink>

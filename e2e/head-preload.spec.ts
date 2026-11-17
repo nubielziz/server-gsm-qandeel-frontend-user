@@ -38,7 +38,7 @@ function headerPreloadsFont(link: string | undefined): boolean {
 }
 
 test.describe("font preload in the document head", () => {
-  for (const path of ["/en", "/ar", "/en/services", "/ar/services"]) {
+  for (const path of ["/en", "/en/services"]) {
     test(`${path}: the head holds the font preload as a <link>, not only the Link header`, async ({ request }, testInfo) => {
       test.skip(testInfo.project.name !== "desktop", "The document is the same on every device: desktop only.");
       const res = await request.get(path);

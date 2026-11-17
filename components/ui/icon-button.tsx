@@ -28,7 +28,7 @@ const frame = "btn-motion relative inline-flex shrink-0 items-center justify-cen
 export type IconButtonProps = Omit<ComponentProps<"button">, "aria-label" | "children"> & {
   /** Accessible name and tooltip (e.g. "Close"). Required: an icon alone says nothing to a screen reader. */
   label: string;
-  /** The icon: a lucide element. Mirror directional icons with `rtl:-scale-x-100`. */
+  /** The icon: a lucide element. */
   children: ReactNode;
   variant?: IconButtonVariant;
   size?: IconButtonSize;
@@ -74,7 +74,7 @@ export type IconButtonLinkProps = Omit<ComponentProps<typeof Link>, "aria-label"
   label: string;
   /** In-site path, already language-prefixed with `localePath`. */
   href: string;
-  /** The icon: a lucide element. Mirror directional icons with `rtl:-scale-x-100`. */
+  /** The icon: a lucide element. */
   children: ReactNode;
   variant?: IconButtonVariant;
   size?: IconButtonSize;

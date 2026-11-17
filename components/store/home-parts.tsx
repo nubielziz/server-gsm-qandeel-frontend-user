@@ -36,11 +36,11 @@ import { Logo, logoFile } from "./service-art";
 
 type Home = StoreMessages["home"];
 
-/** The quick check's submit arrow: it leans 3px towards the reading direction while its `group` button is hovered, like a button's end icon. */
+/** The quick check's submit arrow: it leans 3px towards the end of the line while its `group` button is hovered, like a button's end icon. */
 const submitArrow = (
   <ArrowRight
     aria-hidden="true"
-    className="transition-[translate] duration-(--duration-base) ease-standard group-hover:translate-x-[calc(var(--inline-dir)*3px)] rtl:-scale-x-100"
+    className="transition-[translate] duration-(--duration-base) ease-standard group-hover:translate-x-[3px]"
   />
 );
 
@@ -63,8 +63,8 @@ export function GuestPoint({ guestCheckout, t }: { guestCheckout: boolean; t: Ho
 export function HeroPrice({ amount, currency, locale, decimals, label }: { amount: string; currency: string; locale: Locale; decimals: number; label: string }) {
   return (
     <p className="flex items-baseline gap-2.5">
-      {/* English shows the amount first, like the mockup; it is still read as "Starting from $0.79". */}
-      <span className="text-small font-medium text-on-inverse-muted ltr:order-2">{label}</span>
+      {/* The amount shows first, like the mockup; it is still read as "Starting from $0.79". */}
+      <span className="text-small font-medium text-on-inverse-muted order-2">{label}</span>
       <Money amount={amount} currency={currency} locale={locale} decimals={decimals} className="text-stat text-on-inverse" />
     </p>
   );

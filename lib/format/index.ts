@@ -1,4 +1,4 @@
-// Display formatting for both languages. Money arrives as a 4-decimal string ("12.4900"): it is formatted from the
+// Display formatting. Money arrives as a 4-decimal string ("12.4900"): it is formatted from the
 // string (Intl accepts exact decimal strings) and summed with integer math, never as floats. Safe to import anywhere.
 import { intlLocaleOf, type Locale } from "@/lib/i18n/config";
 
@@ -101,8 +101,8 @@ export function compareMoney(a: string, b: string): -1 | 0 | 1 {
 
 // ── IMEI helpers (the API checks too; these only give early feedback).
 /**
- * Removes spaces and dashes, as the API does, and turns Arabic-Indic (٠-٩) and Persian (۰-۹) digits into 0-9: an Arabic
- * keyboard types those, and the API only takes Latin digits.
+ * Removes spaces and dashes, as the API does, and turns Arabic-Indic (U+0660 to U+0669) and Persian (U+06F0 to U+06F9)
+ * digits into 0-9: an Arabic keyboard types those, and the API only takes Latin digits (group C, decision 039).
  */
 export function normalizeImei(value: string): string {
   return value

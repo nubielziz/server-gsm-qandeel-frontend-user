@@ -67,7 +67,7 @@ export async function SecurityShortcuts({ locale }: { locale: Locale }) {
             <Link href={`${base}#password`} className={rowClasses}>
               <Lock aria-hidden="true" className="text-ink-muted" />
               <span className="flex-1">{t.password}</span>
-              <ChevronRight aria-hidden="true" className="text-ink-subtle rtl:-scale-x-100" />
+              <ChevronRight aria-hidden="true" className="text-ink-subtle" />
             </Link>
           </li>
           <li>
@@ -79,14 +79,14 @@ export async function SecurityShortcuts({ locale }: { locale: Locale }) {
                   {me.twofaEnabled ? t.on : t.off}
                 </span>
               </span>
-              <ChevronRight aria-hidden="true" className="text-ink-subtle rtl:-scale-x-100" />
+              <ChevronRight aria-hidden="true" className="text-ink-subtle" />
             </Link>
           </li>
           <li>
             <Link href={`${base}#sessions`} className={rowClasses}>
               <Laptop aria-hidden="true" className="text-ink-muted" />
               <span className="flex-1">{t.sessions}</span>
-              <ChevronRight aria-hidden="true" className="text-ink-subtle rtl:-scale-x-100" />
+              <ChevronRight aria-hidden="true" className="text-ink-subtle" />
             </Link>
           </li>
         </ul>

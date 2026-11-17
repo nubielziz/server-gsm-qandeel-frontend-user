@@ -7,13 +7,12 @@
 //   are worked out in memory over the cards that lib/catalog.ts reads (cached): the API has no facet counts (handoff
 //   §1.7). `passes` follows the API's own rules (brand, carrier, country: exact, case-insensitive; `q` over title,
 //   summary, brand and carrier; the price range inclusive, no tax), so a count equals the total the API would answer.
-// An English text search (feature 29) asks the search route instead (`searchFilterArgs`, `searchSortQuery`; options from
+// A text search (feature 29) asks the search route instead (`searchFilterArgs`, `searchSortQuery`; options from
 // its facet counts, `facetOptionsFromCounts`) and has its own sorts ("Best match" first, no "Featured").
 // Also the "Featured collections" of the home page. Pure functions: unit-tested, safe anywhere.
 import type { ServiceListArgs, StoreSearchArgs } from "@/lib/api/store-query";
 import type { SearchFacetCount, ServiceType, StoreCategory, StoreServiceCard } from "@/lib/api/types";
 import { compareMoney } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { searchText } from "@/lib/search/terms";
 
 /** The card fields the list can be filtered by; each is a query parameter that may repeat (`brand=A&brand=B`). */
@@ -171,7 +170,7 @@ export type CategoryEntry = {
   id: number | null;
   /** The category's name; for an unlisted one the words of the text (`99-old-phones` → "old phones"). */
   label: string;
-  /** False when the API lists no such category (an outdated link, or a category of the other language). */
+  /** False when the API lists no such category (an outdated link). */
   known: boolean;
 };
 
@@ -190,7 +189,7 @@ function categoryWords(text: string): string {
 /**
  * The `category` values of the URL against the categories the API lists, one entry each (the same category twice, by
  * id or by slug, counts once). `ids` are the listed ones only: an unlisted id is not sent to the API (it would show an
- * empty list for a link that is merely outdated, or for a category the other language lacks) but keeps its entry, so
+ * empty list for a link that is merely outdated) but keeps its entry, so
  * it still shows as a chip the visitor can remove.
  */
 export function resolveCategories(raw: readonly string[], categories: readonly CategoryRef[]): { entries: CategoryEntry[]; ids: number[] } {
@@ -217,19 +216,19 @@ export function resolveCategories(raw: readonly string[], categories: readonly C
 /** The sorts of the toolbar. `featured` is the default and sends no `_sort` (the API's own order). */
 export const LIST_SORTS = ["featured", "popular", "newest", "price_asc", "price_desc", "title"] as const;
 /**
- * The sorts of an English page with a text search (backend plan 29 §7): "Best match" (`relevance`) first and the
+ * The sorts of a page with a text search (backend plan 29 §7): "Best match" (`relevance`) first and the
  * default, so it never shows in the URL; "Featured" is not offered there.
  */
 export const SEARCH_SORTS = ["relevance", "popular", "newest", "price_asc", "price_desc", "title"] as const;
 export type ListSort = (typeof LIST_SORTS)[number] | (typeof SEARCH_SORTS)[number];
 
 /**
- * Whether a list page is answered by the search engine (`GET /store/v1/search`): English, with a text search the API
- * accepts (`searchText`: not empty after its normalising, so `&`, `()` or an emoji alone is no search and the route never
- * answers 422). Arabic pages keep the database search of `GET /store/v1/services` (the engine is English only).
+ * Whether a list page is answered by the search engine (`GET /store/v1/search`): a text search the API accepts
+ * (`searchText`: not empty after its normalising, so `&`, `()` or an emoji alone is no search and the route never
+ * answers 422). Every text search goes there (English only, decision 039).
  */
-export function searchesEngine(locale: Locale, q: string): boolean {
-  return locale === "en" && searchText(q) !== "";
+export function searchesEngine(q: string): boolean {
+  return searchText(q) !== "";
 }
 
 /** The sorts a page offers, in display order. */

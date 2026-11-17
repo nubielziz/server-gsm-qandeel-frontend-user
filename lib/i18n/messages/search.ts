@@ -1,6 +1,4 @@
-// Product search (feature 29, backend plan §7): the header combobox on English pages and the results page's search
-// extras. Arabic pages do not mount the combobox (the search engine is English only), but every key has its Arabic
-// text so the namespace stays complete.
+// Product search (feature 29, backend plan §7): the header combobox and the results page's search extras.
 import { defineMessages } from "../define";
 
 export const search = defineMessages({
@@ -28,28 +26,5 @@ export const search = defineMessages({
     category: "Category: {name}",
     bestMatch: "Best match",
     priceTruncated: "Sorted by price among the best 1000 matches",
-  },
-  ar: {
-    label: "ابحث في الخدمات",
-    suggestions: "اقتراحات",
-    services: "الخدمات",
-    filters: "عوامل التصفية",
-    recent: "عمليات البحث الأخيرة",
-    clearRecent: "مسح عمليات البحث الأخيرة",
-    popular: "عمليات البحث الشائعة",
-    fill: "إكمال الحقل بـ {text}",
-    imei: "افحص رقم IMEI {imei}",
-    didYouMean: "هل تقصد {q}؟",
-    fallback: "البحث المبسّط مستخدم حاليًا",
-    taxNote: "الأسعار قبل الضريبة",
-    noResults: "لا توجد خدمات تطابق «{q}»",
-    noResultsText: "تحقّق من الكتابة، أو جرّب كلمات أقل، أو ابدأ من عملية بحث شائعة.",
-    status: "{suggestions} اقتراحات، {services} خدمات",
-    country: "البلد: {name}",
-    brand: "العلامة التجارية: {name}",
-    network: "الشبكة: {name}",
-    category: "الفئة: {name}",
-    bestMatch: "الأكثر مطابقة",
-    priceTruncated: "مرتّبة حسب السعر بين أفضل 1000 نتيجة مطابقة",
   },
 });

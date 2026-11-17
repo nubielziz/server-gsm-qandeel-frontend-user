@@ -66,7 +66,7 @@ export function RangeSlider({ min, max, step = 1, value, names, labels, format, 
   return (
     <div className={className}>
       <div aria-hidden="true" className="flex items-center justify-between gap-3 text-small font-semibold text-ink">
-        {/* Amounts are always laid out left-to-right, like <Money>, so "15 US$" keeps its order in Arabic. */}
+        {/* Amounts are always laid out left-to-right, like <Money>, so "15 US$" keeps its order. */}
         <span dir="ltr" className="num inline-block whitespace-nowrap">
           {format(current[0])}
         </span>

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTransition, type ChangeEvent } from "react";
 import { ChevronDown, Coins } from "lucide-react";
 import { api, csrfToken } from "@/lib/api/browser";
-import { CURRENCY_COOKIE } from "@/lib/i18n/config";
+import { CURRENCY_COOKIE } from "@/lib/currency-cookie";
 import { cn } from "@/lib/cn";
 
 export type CurrencySwitcherProps = {

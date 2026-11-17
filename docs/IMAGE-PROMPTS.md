@@ -14,7 +14,7 @@ every prompt:
 > palette: black, charcoal, graphite, grey, silver and white only. Neutral daylight-balanced white light (5500 K), no
 > coloured lighting, no colour cast. Soft realistic shadows, crisp detail. No text, no numbers, no logos, no watermark.
 
-The phone in every image is a **Samsung Galaxy S26 Ultra** (owner, 2026-11-15) in Black, White or Silver Shadow, described by its shape (many generators do not know the 2026 model by name) and always without the Samsung logo or wordmark: the Arabic site mirrors the images, so a logo would read backwards.
+The phone in every image is a **Samsung Galaxy S26 Ultra** (owner, 2026-11-15) in Black, White or Silver Shadow, described by its shape (many generators do not know the 2026 model by name) and always without the Samsung logo or wordmark (no image carries text or a logo).
 
 Negative prompt (for tools that take one): `purple, violet, lavender, lilac, magenta, pink, blue tint, teal, neon glow,
 RGB lighting, coloured smoke, colour cast, text, letters, numbers, logo, brand mark, Samsung logo, Apple logo, iPhone, watermark, frame, border`.
@@ -39,12 +39,11 @@ RGB lighting, coloured smoke, colour cast, text, letters, numbers, logo, brand m
 
 The five `home-*.jpg` images sit on the right side of their card and fade into it on the left, where the text is. Keep
 the subject in the right half and the left half empty, in the card's colour (near-black `#111111` for the dark cards,
-white for the light ones). The Arabic site shows them mirrored, so they must not contain text, logos or anything that
-reads wrong when flipped. Until a file exists its card shows a plain lit surface instead.
+white for the light ones). Until a file exists its card shows a plain lit surface instead.
 
 The `collections/*.jpg` images are the other way round: they sit on the LEFT side of a light card and fade into it on
 the right, where the text is. Keep the subject in the left half and the right half empty and white. A card with an
-image is always light (only a card without one may be dark). They are mirrored on the Arabic site too.
+image is always light (only a card without one may be dark).
 
 ## Prompts
 

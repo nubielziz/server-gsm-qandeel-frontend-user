@@ -1,6 +1,6 @@
 // Account settings (mockup "Account Settings"): a section list on the start side, the forms in the middle and an
 // account summary + help on the end side. Sections: Profile (name, phone, country; the email is read-only, no route
-// changes it), Preferences (language, currency, marketing), Password and Privacy (data export / deletion requests).
+// changes it), Preferences (currency, marketing), Password and Privacy (data export / deletion requests).
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { BadgeCheck } from "lucide-react";
@@ -117,7 +117,7 @@ async function SettingsContent() {
             {/* Keyed by the shown currency: a country change in the profile resets it on the API, and the form must start again from it. */}
             <PreferencesForm
               key={currency}
-              initial={{ locale: me.locale === "ar" ? "ar" : "en", currency, marketingOptIn: me.marketingOptIn }}
+              initial={{ currency, marketingOptIn: me.marketingOptIn }}
               currencies={currencies}
               t={s.preferences}
             />

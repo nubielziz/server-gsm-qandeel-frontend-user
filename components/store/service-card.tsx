@@ -76,7 +76,7 @@ const frame =
   "has-[.card-link:focus-visible]:outline-2 has-[.card-link:focus-visible]:outline-offset-2 has-[.card-link:focus-visible]:outline-focus";
 
 /**
- * Room for two title lines, one summary line and the meta row, in both languages (their line heights differ), wherever
+ * Room for two title lines, one summary line and the meta row, wherever
  * cards stand side by side (`sm` up). A shorter title leaves the spare room above the price row. The skeleton reserves
  * the same.
  */

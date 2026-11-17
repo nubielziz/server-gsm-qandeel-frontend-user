@@ -1,12 +1,11 @@
 "use client";
-// Profile (PATCH /client/profile): name, company, phone, country, address (300), tax id (40) and the language of our
-// emails (`locale`) are editable; the email is shown read-only with its verification badge (no route changes it) and,
-// while it is not verified, a "Resend verification email" button. Only the changed keys are sent, then the page refreshes.
+// Profile (PATCH /client/profile): name, company, phone, country, address (300) and tax id (40) are editable; the email
+// is shown read-only with its verification badge (no route changes it) and, while it is not verified, a "Resend
+// verification email" button. Only the changed keys are sent, then the page refreshes.
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/browser";
 import type { MerchantMe, MerchantProfileInput } from "@/lib/api/types";
-import { isLocale, type Locale } from "@/lib/i18n/config";
 import type { MerchantSettingsMessages } from "@/lib/i18n/messages/merchant-settings";
 import { cn } from "@/lib/cn";
 import { Badge } from "@/components/ui/badge";
@@ -25,8 +24,6 @@ export type ProfileValues = {
   country: string;
   address: string;
   taxId: string;
-  /** The language of the merchant's emails and notifications. */
-  locale: Locale;
 };
 
 type Props = {
@@ -35,16 +32,14 @@ type Props = {
   initial: ProfileValues;
   email: string;
   emailVerified: boolean;
-  /** Names of the languages in their own script (`{ en: "English", ar: "العربية" }`). */
-  languageNames: Record<Locale, string>;
   t: MerchantSettingsMessages["profile"];
   fieldTexts: MerchantSettingsMessages["fieldErrors"];
   optional: string;
 };
 
-const FIELDS = ["name", "company", "phone", "country", "address", "taxId", "locale"];
+const FIELDS = ["name", "company", "phone", "country", "address", "taxId"];
 
-/** Free-text keys are compared and sent trimmed; the country and the language are codes. */
+/** Free-text keys are compared and sent trimmed; the country is a code. */
 const TEXT_KEYS = ["name", "company", "phone", "address", "taxId"] as const;
 
 /** The keys that differ from what the server shows (the body of the PATCH): nothing else is ever sent. */
@@ -55,11 +50,10 @@ export function changedProfileFields(values: ProfileValues, initial: ProfileValu
     if (now !== initial[key].trim()) changed[key] = now;
   }
   if (values.country !== initial.country) changed.country = values.country;
-  if (values.locale !== initial.locale) changed.locale = values.locale;
   return changed;
 }
 
-export function ProfileForm({ countries, initial, email, emailVerified, languageNames, t, fieldTexts, optional }: Props) {
+export function ProfileForm({ countries, initial, email, emailVerified, t, fieldTexts, optional }: Props) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [values, setValues] = useState<ProfileValues>(initial);
@@ -189,21 +183,6 @@ export function ProfileForm({ countries, initial, email, emailVerified, language
             value={values.address}
             onChange={(e) => set("address")(e.target.value)}
             error={problem?.fields.address}
-          />
-          <Select
-            label={t.emailLanguage}
-            hint={t.emailLanguageHint}
-            name="locale"
-            options={[
-              { value: "en", label: languageNames.en },
-              { value: "ar", label: languageNames.ar },
-            ]}
-            value={values.locale}
-            onChange={(e) => {
-              if (isLocale(e.target.value)) set("locale")(e.target.value);
-            }}
-            error={problem?.fields.locale}
-            fieldClassName="sm:max-w-xs"
           />
         </CardBody>
         <CardFooter>

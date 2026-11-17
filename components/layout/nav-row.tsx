@@ -8,8 +8,8 @@
 //   link with a new pathname slides; a link that resolves its active mark after hydration (NavLink's <Suspense>) jumps.
 // - Before this script runs (server HTML, no JavaScript) the selected link draws the black box itself (globals.css),
 //   so nothing moves when the pill takes over.
-// - Measured with offsetLeft/offsetWidth relative to the row, which are physical px in both writing directions: the
-//   pill works in Arabic as is. The "All categories" menu button is a row item like the links; it is never selected.
+// - Measured with offsetLeft/offsetWidth relative to the row, which are physical px. The
+//   "All categories" menu button is a row item like the links; it is never selected.
 // - Not a React <ViewTransition>: a named view transition is drawn above the page and would hide the labels while
 //   it moves. Reduced motion: the global rule makes the transition instant and the colours switch at once.
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";

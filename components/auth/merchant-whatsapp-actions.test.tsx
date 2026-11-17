@@ -5,7 +5,6 @@ import { auth } from "@/lib/i18n/messages/auth";
 import { MerchantWhatsAppActions } from "./merchant-whatsapp-actions";
 
 const en = auth.en.register;
-const ar = auth.ar.register;
 const href = whatsAppLink("12025550100", en.message);
 
 describe("MerchantWhatsAppActions", () => {
@@ -20,8 +19,8 @@ describe("MerchantWhatsAppActions", () => {
   });
 
   it("shows the number as left-to-right selectable text after its label", () => {
-    const html = renderToStaticMarkup(<MerchantWhatsAppActions href={href} display="+12025550100" t={ar} />);
-    expect(html).toContain(ar.numberLabel);
+    const html = renderToStaticMarkup(<MerchantWhatsAppActions href={href} display="+12025550100" t={en} />);
+    expect(html).toContain(en.numberLabel);
     expect(html).toMatch(/<span dir="ltr"[^>]*>\+12025550100<\/span>/);
   });
 
@@ -32,10 +31,6 @@ describe("MerchantWhatsAppActions", () => {
       <MerchantWhatsAppActions href={href} display="+12025550100" t={en} referral={{ code: "GSM0001", note: en.referralNote }} />,
     );
     expect(withCode).toMatch(/The referral code <span dir="ltr"[^>]*>GSM0001<\/span> will be included in your message\./);
-    const arabic = renderToStaticMarkup(
-      <MerchantWhatsAppActions href={href} display="+12025550100" t={ar} referral={{ code: "GSM0001", note: ar.referralNote }} />,
-    );
-    expect(arabic).toMatch(/<span dir="ltr"[^>]*>GSM0001<\/span>/);
   });
 
   it("reserves the note's slot with and without a referral code, so the block keeps its height and nothing moves", () => {
@@ -54,11 +49,10 @@ describe("MerchantWhatsAppActions", () => {
 });
 
 describe("merchant register messages", () => {
-  it("has the same three steps and the same placeholders in both languages", () => {
-    expect(ar.steps).toHaveLength(en.steps.length);
+  it("has the three steps, and the referral texts carry the code placeholder", () => {
+    expect(en.steps).toHaveLength(3);
     for (const key of ["referralSentence", "referralNote"] as const) {
       expect(en[key]).toContain("{code}");
-      expect(ar[key]).toContain("{code}");
     }
   });
 });

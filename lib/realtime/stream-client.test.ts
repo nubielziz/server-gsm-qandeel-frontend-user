@@ -119,7 +119,7 @@ const lone: Shared = { locks: null, bus: null };
 const flush = () => vi.advanceTimersByTimeAsync(0);
 
 /** One tab: its own client, EventSources, page lifecycle and probe, over the locks and channel it shares with others. */
-function makeTab(shared: Shared, options: { locale?: string | undefined; withDedupe?: boolean; events?: string[] } = {}) {
+function makeTab(shared: Shared, options: { withDedupe?: boolean; events?: string[] } = {}) {
   const sources: FakeSource[] = [];
   const probe = vi.fn<() => Promise<ProbeOutcome>>(async () => ({ kind: "ok" }));
   const visibility = new Set<() => void>();
@@ -135,7 +135,6 @@ function makeTab(shared: Shared, options: { locale?: string | undefined; withDed
   const env: StreamEnv = {
     url: "/store/v1/me/stream",
     lockName: "gsm-stream-customer",
-    locale: () => ("locale" in options ? options.locale : "en"),
     createEventSource,
     locks: shared.locks,
     createChannel: (name) => shared.bus?.create(name) ?? null,
@@ -212,12 +211,12 @@ afterEach(() => {
 });
 
 describe("one tab", () => {
-  it("opens the stream with the page language, is live after ready, and listens for base and subscribed events", () => {
+  it("opens the stream with no query (no language: the API answers in English), is live after ready, and listens for base and subscribed events", () => {
     const tab = makeTab(lone, { events: ["unread.changed"] });
     const created = vi.fn();
     tab.client.subscribe("notification.created", created);
     tab.client.start();
-    expect(tab.createEventSource).toHaveBeenCalledWith("/store/v1/me/stream?locale=en");
+    expect(tab.createEventSource).toHaveBeenCalledWith("/store/v1/me/stream");
     expect(tab.client.status()).toEqual({ state: "connecting", live: false });
     expect(tab.source.names()).toEqual(expect.arrayContaining(["error", "ready", "hb", "resync", "bye", "unread.changed", "notification.created"]));
     expect(tab.source.names()).not.toContain("stream.refetch");
@@ -228,8 +227,8 @@ describe("one tab", () => {
     expect(created).toHaveBeenCalledWith({ id: 7 });
   });
 
-  it("sends no locale when the page has none, and starts only once", () => {
-    const tab = makeTab(lone, { locale: undefined });
+  it("starts only once", () => {
+    const tab = makeTab(lone);
     tab.client.start();
     tab.client.start();
     expect(tab.sources).toHaveLength(1);
@@ -283,7 +282,7 @@ describe("cursor and bye", () => {
     tab.source.frame("hb", 1_700_000_000, "i12");
     tab.source.fail();
     await vi.advanceTimersByTimeAsync(5_000);
-    expect(tab.source.url).toBe("/store/v1/me/stream?locale=en&cursor=i12");
+    expect(tab.source.url).toBe("/store/v1/me/stream?cursor=i12");
   });
 
   it("does not send a cursor the server would refuse (more than 64 characters)", async () => {
@@ -291,7 +290,7 @@ describe("cursor and bye", () => {
     tab.source.frame("hb", 1, "i".repeat(65));
     tab.source.fail();
     await vi.advanceTimersByTimeAsync(5_000);
-    expect(tab.source.url).toBe("/store/v1/me/stream?locale=en");
+    expect(tab.source.url).toBe("/store/v1/me/stream");
   });
 
   it("comes back within two seconds after a bye for max_age or reauth", async () => {
@@ -582,7 +581,7 @@ describe("events", () => {
     expect(vi.getTimerCount()).toBe(0);
 
     tab.client.start();
-    expect(tab.source.url).toBe("/store/v1/me/stream?locale=en");
+    expect(tab.source.url).toBe("/store/v1/me/stream");
     tab.source.frame("ready", ready());
     tab.source.frame("notification.created", { id: 1 }, "i1");
     expect(refetch).not.toHaveBeenCalled();
@@ -606,7 +605,7 @@ describe("page lifecycle", () => {
 
     tab.resume();
     expect(tab.sources).toHaveLength(2);
-    expect(tab.source.url).toBe("/store/v1/me/stream?locale=en&cursor=i3");
+    expect(tab.source.url).toBe("/store/v1/me/stream?cursor=i3");
     tab.source.frame("ready", ready(true));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
@@ -706,7 +705,7 @@ describe("several tabs", () => {
     expect(a.source.closed).toBe(true);
     expect(b.sources).toHaveLength(1);
     expect(c.sources).toHaveLength(0);
-    expect(b.source.url).toBe("/store/v1/me/stream?locale=en&cursor=i5");
+    expect(b.source.url).toBe("/store/v1/me/stream?cursor=i5");
 
     b.source.frame("ready", ready(true));
     b.source.frame("notification.created", { id: 5 }, "i5"); // a replay of what C already has

@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t.imei.title,
     description: t.imei.metaDescription,
-    alternates: { canonical: localePath(locale, "/imei-check"), languages: { en: "/en/imei-check", ar: "/ar/imei-check" } },
+    alternates: { canonical: localePath(locale, "/imei-check") },
   };
 }
 

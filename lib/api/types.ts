@@ -22,6 +22,13 @@ export type ServiceAvailability = StoreServiceCard["availability"];
 export type StoreQuantityRule = StoreServiceDetail["quantity"];
 export type HelpArticle = S.GetStoreV1HelpResponse[number];
 export type HelpArticleDetail = S.GetStoreV1HelpBySlugResponse;
+/** What kind of old address `GET /store/v1/legacy-slugs/:kind/:slug` looks up: a service, a content page or a help article. */
+export type LegacySlugKind = S.GetStoreV1LegacySlugsByKindBySlugParams["kind"];
+/**
+ * An address retired by English only (decision 039): `path` is where the reader goes now (no language prefix:
+ * `/services/<slug>`, `/services`, `/` or `/help`); `slug` is the service's page on sale now, else null.
+ */
+export type LegacySlug = S.GetStoreV1LegacySlugsByKindBySlugResponse;
 export type ImeiCheckResult = S.PostStoreV1ImeiCheckResponse;
 export type CheckoutSession = S.GetStoreV1CheckoutSessionsByTokenResponse;
 export type CheckoutSessionInput = S.PostStoreV1CheckoutSessionsBody;

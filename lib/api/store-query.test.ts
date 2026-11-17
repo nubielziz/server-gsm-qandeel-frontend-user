@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { toQueryString } from "./query";
 import { defaultOrder, pageWindow, storeServicesQuery } from "./store-query";
 
-const base = { locale: "en", currency: "USD" } as const;
+const base = { currency: "USD" } as const;
 
 describe("storeServicesQuery", () => {
-  it("sends the language, the currency and the default page, and nothing else", () => {
-    expect(storeServicesQuery(base)).toStrictEqual({ _start: 0, _end: 24, locale: "en", currency: "USD" });
-    expect(toQueryString(storeServicesQuery(base))).toBe("?_start=0&_end=24&locale=en&currency=USD");
+  it("sends the currency and the default page, and nothing else (no language: English only)", () => {
+    expect(storeServicesQuery(base)).toStrictEqual({ _start: 0, _end: 24, currency: "USD" });
+    expect(toQueryString(storeServicesQuery(base))).toBe("?_start=0&_end=24&currency=USD");
   });
 
   it("repeats the key of an array (the API reads a repeated key as IN)", () => {
@@ -55,7 +55,7 @@ describe("storeServicesQuery", () => {
       maxPrice: "  ",
       buyerCountry: "",
     });
-    expect(query).toStrictEqual({ _start: 0, _end: 24, locale: "en", currency: "USD" });
+    expect(query).toStrictEqual({ _start: 0, _end: 24, currency: "USD" });
     for (const key of ["q", "brand", "network", "country", "type", "categoryId", "availability", "minPrice", "maxPrice", "buyerCountry", "_sort", "_order"]) {
       expect(query).not.toHaveProperty(key);
     }
@@ -126,14 +126,13 @@ describe("storeServicesQuery", () => {
 
   it("keeps the arguments the existing call sites send", () => {
     // app/[lang]/(store)/page.tsx and lib/catalog.ts
-    expect(storeServicesQuery({ locale: "ar", currency: "JOD", featured: true, start: 0, end: 8 })).toStrictEqual({
+    expect(storeServicesQuery({ currency: "JOD", featured: true, start: 0, end: 8 })).toStrictEqual({
       _start: 0,
       _end: 8,
-      locale: "ar",
       currency: "JOD",
       featured: true,
     });
-    expect(storeServicesQuery({ locale: "en", currency: "USD", featured: false, sort: "title", start: 0, end: 12 })).toMatchObject({
+    expect(storeServicesQuery({ currency: "USD", featured: false, sort: "title", start: 0, end: 12 })).toMatchObject({
       _sort: "title",
       _order: "asc",
       featured: false,

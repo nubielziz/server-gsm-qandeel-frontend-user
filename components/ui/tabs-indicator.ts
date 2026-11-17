@@ -3,8 +3,7 @@
 //   only: three pieces, a start cap, a middle and an end cap, each moved with `translate` and the middle stretched with
 //   `scale` (a round cap never stretches, so the pill keeps its round ends while it changes width). All three run on the
 //   same transition, so they stay joined at every frame; the middle reaches `SEAM` px under each cap so no hairline shows.
-// - Boxes are physical px relative to the nav's padding box at scroll origin (the same numbers in both writing
-//   directions), so the indicator works in Arabic as is.
+// - Boxes are physical px relative to the nav's padding box at scroll origin.
 // - The list under the tabs slides a few px and fades toward the side of the tab that was picked: the tab links carry a
 //   transition type (`TAB_TO_END` / `TAB_TO_START`, by their place against the current tab) and `<TabPanel>`'s
 //   <ViewTransition> maps it to its enter/exit classes (globals.css "Link tabs"). Other navigations carry no type and the
@@ -12,7 +11,7 @@
 import type { ViewTransitionClassPerType } from "react";
 import type { Box, RectLike } from "@/components/layout/sliding-indicator";
 
-/** The transition type of a tab link after the current one (towards the end side: left in Arabic). */
+/** The transition type of a tab link after the current one (towards the end side). */
 export const TAB_TO_END = "tab-to-end";
 /** The transition type of a tab link before the current one (towards the start side). */
 export const TAB_TO_START = "tab-to-start";
@@ -67,8 +66,7 @@ export function piecesOf(box: Box): Pieces {
 
 /**
  * The box of `el` inside the scrolling nav `container`, in the nav's content coordinates: the offset from its padding box
- * (`clientLeft`/`clientTop`) plus how far it is scrolled (`scrollLeft` is negative in a right-to-left list scrolled to the
- * left, which gives the same content position), where an absolute child at `top: 0; left: 0` starts.
+ * (`clientLeft`/`clientTop`) plus how far it is scrolled, where an absolute child at `top: 0; left: 0` starts.
  */
 export function boxInScroller(
   el: RectLike,

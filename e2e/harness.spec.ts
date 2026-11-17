@@ -61,22 +61,22 @@ test.describe("demo data from the global setup", () => {
 
   test("the three quantity rules read back from the store", async ({ request }) => {
     const f = fixtures();
-    const range = await getJson<ServicePage>(request, `/store/v1/services/${f.range.slug}?locale=en`);
+    const range = await getJson<ServicePage>(request, `/store/v1/services/${f.range.slug}`);
     expect(range.id).toBe(f.range.id);
     expect(range.quantity).toEqual({ min: 2, max: 50, options: [] });
 
-    const packs = await getJson<ServicePage>(request, `/store/v1/services/${f.packs.slug}?locale=en`);
+    const packs = await getJson<ServicePage>(request, `/store/v1/services/${f.packs.slug}`);
     expect(packs.id).toBe(f.packs.id);
     expect(packs.quantity).toEqual({ min: 5, max: 25, options: [5, 10, 25] });
 
-    const exact = await getJson<ServicePage>(request, `/store/v1/services/${f.exact.slug}?locale=en`);
+    const exact = await getJson<ServicePage>(request, `/store/v1/services/${f.exact.slug}`);
     expect(exact.id).toBe(f.exact.id);
     expect(exact.quantity).toEqual({ min: 5, max: 5, options: [] });
   });
 
   test("the stocked service reads in_stock and has codes; the merchant service has enough for merchant.spec", async ({ request }) => {
     const f = fixtures();
-    const stocked = await getJson<ServicePage>(request, `/store/v1/services/${f.stocked.slug}?locale=en`);
+    const stocked = await getJson<ServicePage>(request, `/store/v1/services/${f.stocked.slug}`);
     expect(stocked.availability).toBe("in_stock");
     // Stock goes down while specs sell codes (the setup tops it up again), so check that it is there, not the top-up target.
     expect(await availableCodes(f.stocked.id)).toBeGreaterThan(0);
@@ -90,7 +90,7 @@ test.describe("demo data from the global setup", () => {
 
   test("the pictured listing has a picture that the store serves", async ({ request }) => {
     const f = fixtures();
-    const page = await getJson<ServicePage>(request, `/store/v1/services/${f.pictured.slug}?locale=en`);
+    const page = await getJson<ServicePage>(request, `/store/v1/services/${f.pictured.slug}`);
     expect(page.imageUrl).toMatch(/^\/store\/v1\/media\/[0-9a-f]{64}\.(jpg|png|webp)$/);
     const image = await request.get(page.imageUrl as string);
     expect(image.status()).toBe(200);
@@ -216,18 +216,17 @@ test.describe("helpers", () => {
       to: { type: "customer", id },
       title: "Harness hello",
       body: "Line 1\nLine 2",
-      ar: { title: "مرحبا", body: "السطر الأول" },
       link: "/account/orders",
     });
     await expect
       .poll(async () => (await getJson<{ unread: number }>(page.request, "/store/v1/me/notifications/unread-count")).unread, { timeout: 20_000, intervals: [500, 1_000] })
       .toBe(1);
 
-    const feed = await getJson<{ title: string; body: string; link: string | null; locale: string; readAt: string | null }[]>(
+    const feed = await getJson<{ title: string; body: string; link: string | null; readAt: string | null }[]>(
       page.request,
-      "/store/v1/me/notifications?locale=en&_start=0&_end=20",
+      "/store/v1/me/notifications?_start=0&_end=20",
     );
-    expect(feed[0]).toMatchObject({ title: "Harness hello", body: "Line 1\nLine 2", link: "/account/orders", locale: "en", readAt: null });
+    expect(feed[0]).toMatchObject({ title: "Harness hello", body: "Line 1\nLine 2", link: "/account/orders", readAt: null });
   });
 });
 

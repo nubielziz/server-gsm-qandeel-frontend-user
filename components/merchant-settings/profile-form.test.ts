@@ -8,7 +8,6 @@ const initial: ProfileValues = {
   country: "JO",
   address: "",
   taxId: "",
-  locale: "en",
 };
 
 describe("changedProfileFields: the body of PATCH /client/profile", () => {
@@ -19,7 +18,6 @@ describe("changedProfileFields: the body of PATCH /client/profile", () => {
 
   it("sends only the changed keys", () => {
     expect(changedProfileFields({ ...initial, phone: "+962 79 555 0100" }, initial)).toEqual({ phone: "+962 79 555 0100" });
-    expect(changedProfileFields({ ...initial, locale: "ar" }, initial)).toEqual({ locale: "ar" });
     expect(changedProfileFields({ ...initial, country: "AE" }, initial)).toEqual({ country: "AE" });
   });
 
@@ -41,11 +39,11 @@ describe("changedProfileFields: the body of PATCH /client/profile", () => {
     expect(changedProfileFields({ ...saved, address: "12 Rainbow St" }, saved)).toEqual({});
   });
 
-  it("sends several changes together, and the language alone when only the language changed", () => {
-    expect(changedProfileFields({ ...initial, name: "New Name", address: "Amman", locale: "ar" }, initial)).toEqual({
+  it("sends several changes together", () => {
+    expect(changedProfileFields({ ...initial, name: "New Name", address: "Amman", country: "AE" }, initial)).toEqual({
       name: "New Name",
       address: "Amman",
-      locale: "ar",
+      country: "AE",
     });
   });
 });

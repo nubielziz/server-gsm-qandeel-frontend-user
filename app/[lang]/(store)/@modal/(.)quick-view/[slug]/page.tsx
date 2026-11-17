@@ -18,7 +18,7 @@ import { serviceStaticParams } from "@/components/store/service-static-params";
 import { store } from "@/lib/i18n/messages/store";
 import { getMessages } from "@/lib/i18n/server";
 
-/** The service page's prerendered slugs (at most 50 per language; every other slug renders on demand). */
+/** The service page's prerendered slugs (at most 50; every other slug renders on demand). */
 export async function generateStaticParams() {
   return serviceStaticParams();
 }

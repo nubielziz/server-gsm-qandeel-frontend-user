@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_LINK_LENGTH, notificationHref, UNREAD_CAP, unreadText, unreadTextInline } from "./link";
+import { MAX_LINK_LENGTH, notificationHref, UNREAD_CAP, unreadText } from "./link";
 
 describe("notificationHref: what is refused", () => {
   const refused = [
@@ -24,7 +24,7 @@ describe("notificationHref: what is refused", () => {
   for (const [name, link] of refused) {
     it(`refuses ${name}`, () => {
       expect(notificationHref(link, "en", "customer")).toBeNull();
-      expect(notificationHref(link, "ar", "merchant")).toBeNull();
+      expect(notificationHref(link, "en", "merchant")).toBeNull();
     });
   }
 
@@ -43,24 +43,32 @@ describe("notificationHref: what is refused", () => {
 
 describe("notificationHref: the language prefix", () => {
   it("prefixes a path with the page's language", () => {
-    expect(notificationHref("/account/orders", "ar", "customer")).toBe("/ar/account/orders");
     expect(notificationHref("/account/orders", "en", "customer")).toBe("/en/account/orders");
-    expect(notificationHref("/", "ar", "customer")).toBe("/ar");
+    expect(notificationHref("/", "en", "customer")).toBe("/en");
   });
 
   it("keeps the query string and the fragment", () => {
     expect(notificationHref("/account/orders?status=pending#top", "en", "customer")).toBe("/en/account/orders?status=pending#top");
   });
 
-  it("keeps a path that already starts with /en or /ar", () => {
-    expect(notificationHref("/en/account", "ar", "customer")).toBe("/en/account");
-    expect(notificationHref("/ar/account", "en", "customer")).toBe("/ar/account");
-    expect(notificationHref("/en", "ar", "customer")).toBe("/en");
-    expect(notificationHref("/en?x=1", "ar", "customer")).toBe("/en?x=1");
+  it("keeps a path that already starts with /en", () => {
+    expect(notificationHref("/en/account", "en", "customer")).toBe("/en/account");
+    expect(notificationHref("/en", "en", "customer")).toBe("/en");
+    expect(notificationHref("/en?x=1", "en", "customer")).toBe("/en?x=1");
+  });
+
+  it("writes an old /ar address as the same path under /en (decision 039)", () => {
+    expect(notificationHref("/ar/account/orders", "en", "customer")).toBe("/en/account/orders");
+    expect(notificationHref("/ar", "en", "customer")).toBe("/en");
+    expect(notificationHref("/ar?x=1#top", "en", "customer")).toBe("/en?x=1#top");
+    expect(notificationHref("/ar/merchant/orders", "en", "merchant")).toBe("/en/merchant/orders");
+    expect(notificationHref("/ar/account", "en", "merchant")).toBeNull();
+    expect(notificationHref("/ar//evil.test", "en", "customer")).toBeNull();
+    expect(notificationHref("/ar/merchant/../account", "en", "merchant")).toBeNull();
   });
 
   it("does not take a longer first segment for a language", () => {
-    expect(notificationHref("/english", "ar", "customer")).toBe("/ar/english");
+    expect(notificationHref("/english", "en", "customer")).toBe("/en/english");
     expect(notificationHref("/arabic/news", "en", "customer")).toBe("/en/arabic/news");
   });
 });
@@ -68,13 +76,13 @@ describe("notificationHref: the language prefix", () => {
 describe("notificationHref: the merchant area", () => {
   it("accepts /merchant and everything below it", () => {
     expect(notificationHref("/merchant", "en", "merchant")).toBe("/en/merchant");
-    expect(notificationHref("/merchant/settings/notifications", "ar", "merchant")).toBe("/ar/merchant/settings/notifications");
+    expect(notificationHref("/merchant/settings/notifications", "en", "merchant")).toBe("/en/merchant/settings/notifications");
     expect(notificationHref("/merchant/orders?page=2", "en", "merchant")).toBe("/en/merchant/orders?page=2");
     expect(notificationHref("/merchant#top", "en", "merchant")).toBe("/en/merchant#top");
   });
 
   it("accepts a language-prefixed merchant path as it is", () => {
-    expect(notificationHref("/en/merchant/orders", "ar", "merchant")).toBe("/en/merchant/orders");
+    expect(notificationHref("/en/merchant/orders", "en", "merchant")).toBe("/en/merchant/orders");
   });
 
   it("refuses a customer path and look-alikes", () => {
@@ -94,7 +102,7 @@ describe("notificationHref: the merchant area", () => {
 describe("notificationHref: the customer area", () => {
   it("accepts any site path", () => {
     expect(notificationHref("/track/abc_DEF-123", "en", "customer")).toBe("/en/track/abc_DEF-123");
-    expect(notificationHref("/services/unlock", "ar", "customer")).toBe("/ar/services/unlock");
+    expect(notificationHref("/services/unlock", "en", "customer")).toBe("/en/services/unlock");
   });
 });
 
@@ -102,21 +110,12 @@ describe("unreadText", () => {
   it("writes 99+ at the API's cap of 100", () => {
     expect(UNREAD_CAP).toBe(100);
     expect(unreadText(100, "en")).toBe("99+");
-    expect(unreadText(100, "ar")).toBe("99+");
     expect(unreadText(250, "en")).toBe("99+");
   });
 
-  it("writes the number below the cap, with Latin digits in Arabic", () => {
+  it("writes the number below the cap", () => {
     expect(unreadText(0, "en")).toBe("0");
     expect(unreadText(1, "en")).toBe("1");
     expect(unreadText(99, "en")).toBe("99");
-    expect(unreadText(99, "ar")).toBe("99");
-  });
-
-  it("keeps 99+ one left-to-right unit inside running text, and leaves plain numbers alone", () => {
-    expect(unreadTextInline(100, "ar")).toBe("\u206699+\u2069");
-    expect(unreadTextInline(100, "en")).toBe("\u206699+\u2069");
-    expect(unreadTextInline(7, "ar")).toBe("7");
-    expect(unreadTextInline(99, "ar")).toBe("99");
   });
 });

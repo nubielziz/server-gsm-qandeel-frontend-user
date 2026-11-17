@@ -7,7 +7,7 @@
 // bell and no stream. Leaving every page with a bell stops it.
 // Toast rules: only `live: true` items (a replayed one is not news), only in a tab the visitor is looking at, not on the
 // notifications page (the list shows the item there), at most one toast every 3 s and the rest of the window as one
-// "{count} new notifications". The text is plain text (plan D11), in the item's own language.
+// "{count} new notifications". The text is plain text (plan D11).
 // The bell's animation (lib/notifications/bell-motion.ts) gets its cues here, before each count reaches the store: a
 // created item (it rings only when `live`, in a visible tab, at most once every 3 s) and a read (the number rolls down).
 import { usePathname } from "next/navigation";
@@ -56,7 +56,6 @@ export function NotificationStream({ surface, locale, href, labels }: Notificati
           description: toastDescription(item.body) || undefined,
           tone: "info",
           duration: TOAST_MS,
-          lang: item.locale,
           action: { label: texts.view, href: notificationHref(item.link, pageLocale, surface) ?? listHref },
         });
       },

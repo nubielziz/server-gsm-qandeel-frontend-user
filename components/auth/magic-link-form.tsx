@@ -37,7 +37,7 @@ export type MagicLinkFormProps = {
   children?: ReactNode;
 };
 
-export function MagicLinkForm({ locale, strings: s, defaultEmail = "", children }: MagicLinkFormProps) {
+export function MagicLinkForm({ strings: s, defaultEmail = "", children }: MagicLinkFormProps) {
   const errorText = useErrorText();
   const ts = useTurnstile();
   const form = useRef<HTMLFormElement>(null);
@@ -103,7 +103,7 @@ export function MagicLinkForm({ locale, strings: s, defaultEmail = "", children 
         onChange={(e) => setEmail(e.target.value)}
         error={feedback.fields.email}
       />
-      <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} lang={locale} />
+      <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} />
       <FormAlert message={feedback.message} reference={feedback.reference} />
       <Button type="submit" size="lg" block loading={busy}>
         {s.submit}

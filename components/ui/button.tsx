@@ -2,7 +2,7 @@
 // Motion (globals.css, "Button motion"): every variant eases its colours and presses to 0.97 (`btn-motion`); the
 // primary rises 1px with a soft shadow on hover (`btn-lift`), the secondary's border turns ink and it rises a little
 // (`btn-lift-soft`); ghost, inverse and danger only change their background; the link's underline grows. An end icon
-// leans 3px towards the reading direction on hover (mirrored in Arabic); a start icon stays. Disabled or busy buttons
+// leans 3px towards the end of the line on hover; a start icon stays. Disabled or busy buttons
 // never move.
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
@@ -65,9 +65,9 @@ export function buttonClasses({ variant = "primary", size = "md", block, pill, c
 }
 
 type CommonProps = ButtonClassOptions & {
-  /** Icon (a lucide element) before the label. Mirror directional icons with `rtl:-scale-x-100`. */
+  /** Icon (a lucide element) before the label. */
   startIcon?: ReactNode;
-  /** Icon after the label (usually an arrow): it leans towards the reading direction on hover. */
+  /** Icon after the label (usually an arrow): it leans towards the end of the line on hover. */
   endIcon?: ReactNode;
 };
 

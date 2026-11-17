@@ -85,12 +85,6 @@ describe("boxInScroller: the tab's box in the nav's content (the nav scrolls sid
     expect(boxInScroller(link, nav, { clientLeft: 0, clientTop: 0, scrollLeft: 80, scrollTop: 0 })).toEqual({ x: 40, y: 1, w: 90, h: 44 });
   });
 
-  it("in Arabic a list scrolled to the left has a negative scrollLeft: the same content position", () => {
-    // Unscrolled, the link sits at x = 200 in the nav. Scrolled 50px to the left, it shows 50px further right.
-    const scrolled = { left: 100 + 200 + 50, top: 200, width: 90, height: 44 };
-    expect(boxInScroller(scrolled, nav, { clientLeft: 0, clientTop: 0, scrollLeft: -50, scrollTop: 0 }).x).toBe(200);
-  });
-
   it("starts at the padding box (inside the nav's border)", () => {
     const link = { left: 101, top: 201, width: 90, height: 44 };
     expect(boxInScroller(link, nav, { clientLeft: 1, clientTop: 1, scrollLeft: 0, scrollTop: 0 })).toEqual({ x: 0, y: 0, w: 90, h: 44 });

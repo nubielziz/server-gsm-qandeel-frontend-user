@@ -143,13 +143,10 @@ describe("topUpAmountProblem", () => {
 
 describe("amountProblemText", () => {
   const en = { t: topUps.en.errors, locale: "en" as const, method: CLIQ, limits: LIMITS };
-  const ar = { t: topUps.ar.errors, locale: "ar" as const, method: CLIQ, limits: LIMITS };
 
-  it("names the limit in both languages (amounts isolated left-to-right)", () => {
+  it("names the limit (amounts isolated left-to-right)", () => {
     expect(amountProblemText("min", en)).toBe("The smallest top-up is ⁦$5.00⁩.");
     expect(amountProblemText("max", en)).toBe("The largest top-up is ⁦$500.00⁩.");
-    expect(amountProblemText("min", ar)).toContain("5.00");
-    expect(amountProblemText("min", ar)).toMatch(/[؀-ۿ]/);
   });
 
   it("leaves a limit it does not know out of the sentence", () => {
@@ -180,12 +177,12 @@ describe("topUpErrorText: every row of the plan's table", () => {
     new ApiError({ status: 422, code: "VALIDATION_FAILED", fieldErrors, requestId: "req-1" });
   const problem = (status: number, code: string, retryAfter?: number) => new ApiError({ status, code, retryAfter, requestId: "req-2" });
 
-  const text = (error: unknown, action: TopUpAction, locale: "en" | "ar" = "en") =>
+  const text = (error: unknown, action: TopUpAction) =>
     topUpErrorText(error, {
       action,
-      locale,
-      t: topUps[locale].errors,
-      generic: errorText(errors[locale]),
+      locale: "en",
+      t: topUps.en.errors,
+      generic: errorText(errors.en),
       method: CLIQ,
       limits: LIMITS,
     });
@@ -253,7 +250,6 @@ describe("topUpErrorText: every row of the plan's table", () => {
 
   it("409 WALLET_FROZEN: by code, plus a bank transfer still works", () => {
     expect(text(problem(409, "WALLET_FROZEN"), "create")).toEqual({ text: `${errors.en.codes.WALLET_FROZEN} A bank transfer still works.` });
-    expect(text(problem(409, "WALLET_FROZEN"), "create", "ar").text).toBe(`${errors.ar.codes.WALLET_FROZEN} ${topUps.ar.errors.frozenHint}`);
   });
 
   it("409 idempotency codes: by code, and a reused key is forgotten", () => {
@@ -282,22 +278,6 @@ describe("topUpErrorText: every row of the plan's table", () => {
 
   it("reads the first field error it can place", () => {
     expect(text(unprocessable(field("idempotency-key", "invalid_type"), field("gatewayId", "unavailable")), "create").field).toBe("gatewayId");
-  });
-
-  it("answers in Arabic with no English left in the sentence", () => {
-    const arabic = [
-      text(unprocessable(field("amount", "min")), "create", "ar").text,
-      text(unprocessable(field("amount", "max_balance")), "create", "ar").text,
-      text(unprocessable(field("gatewayId", "unavailable")), "create", "ar").text,
-      text(unprocessable(field("reference", "taken")), "receipt", "ar").text,
-      text(problem(409, "CONFLICT"), "create", "ar").text,
-      text(problem(409, "CONFLICT"), "cancel", "ar").text,
-      text(problem(413, "PAYLOAD_TOO_LARGE"), "upload", "ar").text,
-    ];
-    for (const sentence of arabic) {
-      expect(sentence).toMatch(/[؀-ۿ]/);
-      expect(sentence.replace(/[⁦⁩]/g, "").replace(/[\d.,]+/g, "")).not.toMatch(/[A-Za-z]{3,}/);
-    }
   });
 });
 

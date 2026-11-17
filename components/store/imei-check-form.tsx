@@ -122,7 +122,7 @@ export function ImeiCheckForm({ locale, labels, initialImei, servicesHref }: Ime
               inputSize="lg"
               leading={<ScanSearch aria-hidden="true" />}
             />
-            <Turnstile onToken={setToken} resetKey={resetKey} lang={locale} />
+            <Turnstile onToken={setToken} resetKey={resetKey} />
             {formError ? (
               <Alert tone="danger">
                 <p>{formError.message}</p>
@@ -183,7 +183,7 @@ export function ImeiCheckForm({ locale, labels, initialImei, servicesHref }: Ime
                 </h3>
                 <Alert tone="info" icon={<CircleHelp aria-hidden="true" />} title={status === "unknown" ? labels.statusUnknown : status} className="mt-2">
                   <p>{labels.statusNote}</p>
-                  <ButtonLink href={servicesHref} variant="secondary" size="sm" className="mt-3" endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}>
+                  <ButtonLink href={servicesHref} variant="secondary" size="sm" className="mt-3" endIcon={<ArrowRight aria-hidden="true" />}>
                     {labels.statusCta}
                   </ButtonLink>
                 </Alert>

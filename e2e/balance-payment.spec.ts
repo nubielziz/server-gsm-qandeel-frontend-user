@@ -6,15 +6,10 @@
 // What is mocked at the browser boundary: answers that cannot be provoked on demand (401 on the payment, 402, 503, the
 // two idempotency conflicts). What is real: the 403 of another customer's checkout and the 409 of a wallet put on hold
 // after the page loaded.
-// Amounts are checked on the English page ("$20.00"); an Arabic page formats USD as "20.00 US$", so there the digits are
-// matched, not the symbol. Arabic names come from the message file, never from English text.
 import type { APIRequestContext, Locator, Page, Request } from "@playwright/test";
-import { checkout } from "../lib/i18n/messages/checkout";
 import { creditCustomer, customerIdByEmail, freezeCustomerWallet } from "./admin";
 import { expect, test } from "./fixtures";
 import { DEV_TURNSTILE_TOKEN, freshCustomer, stubTurnstile } from "./helpers";
-
-type Lang = "en" | "ar";
 
 /** Service 1: an IMEI service sold at $3.99 net, one at a time. */
 const SLUG = "icloud-clean-lost-check";
@@ -24,8 +19,6 @@ const IMEI = "490154203237518";
 /** The balance payment route of any checkout. */
 const BALANCE_URL = "**/store/v1/checkout-sessions/*/balance-payment";
 const isBalancePost = (request: Request) => request.method() === "POST" && /\/checkout-sessions\/[^/]+\/balance-payment$/.test(request.url());
-
-const ar = checkout.ar.session;
 
 interface SessionBody {
   token: string;
@@ -118,37 +111,32 @@ async function statementOf(page: Page): Promise<StatementRow[]> {
 
 const main = (page: Page) => page.getByRole("main");
 
-const balanceRadio = (page: Page, lang: Lang = "en") =>
-  main(page).getByRole("radio", { name: lang === "en" ? /Store balance/ : new RegExp(ar.balance.title) });
+const balanceRadio = (page: Page) => main(page).getByRole("radio", { name: /Store balance/ });
 
 /** The card gateway's radio (a name from the session's payment methods). */
 const cardRadio = (page: Page) => main(page).getByRole("radio", { name: /Card gateway/ });
 
-const payButton = (page: Page, lang: Lang = "en") =>
-  main(page).getByRole("button", { name: lang === "en" ? /^Pay / : new RegExp(`^${ar.summary.pay.split("{")[0]}`) });
+const payButton = (page: Page) => main(page).getByRole("button", { name: /^Pay / });
 
 /** The error box under the summary. */
 const payError = (page: Page) => page.locator("#pay-error");
 
-const CONSENTS: Record<Lang, RegExp[]> = {
-  en: [/Terms of service/, /Privacy policy/, /lose my right to withdraw/],
-  ar: [new RegExp(ar.consent.termsLink), new RegExp(ar.consent.privacyLink), /أفقد حقي في الانسحاب/],
-};
+const CONSENTS: RegExp[] = [/Terms of service/, /Privacy policy/, /lose my right to withdraw/];
 
 /** The review page is drawn and React is attached: a box ticked before that would be reset at hydration. */
-async function reviewReady(page: Page, lang: Lang = "en") {
-  const button = payButton(page, lang);
+async function reviewReady(page: Page) {
+  const button = payButton(page);
   await expect(button).toBeVisible();
   await expect.poll(() => button.evaluate((element) => Object.keys(element).some((key) => key.startsWith("__reactProps")))).toBe(true);
 }
 
-async function openReview(page: Page, token: string, lang: Lang = "en") {
-  await page.goto(`/${lang}/checkout/${token}`);
-  await reviewReady(page, lang);
+async function openReview(page: Page, token: string) {
+  await page.goto(`/en/checkout/${token}`);
+  await reviewReady(page);
 }
 
-async function acceptConsents(page: Page, lang: Lang = "en") {
-  for (const name of CONSENTS[lang]) await main(page).getByRole("checkbox", { name }).check();
+async function acceptConsents(page: Page) {
+  for (const name of CONSENTS) await main(page).getByRole("checkbox", { name }).check();
 }
 
 /** Records every balance payment the page sends, with the headers that matter. */
@@ -426,35 +414,15 @@ test.describe("pay from the store balance", () => {
     expect((await statementOf(page)).filter((row) => row.kind === "b2c_payment")).toHaveLength(1);
   });
 
-  test("the Arabic review page is right-to-left, names the balance in Arabic and pays to /ar/track", async ({ page }) => {
-    const { email } = await customerWith(page, "20.0000");
+  test("at 360 px the review page does not scroll sideways and the balance choice and Pay stay on screen", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const { email } = await customerWith(page, "1.0000");
     const session = await openCustomerSession(page, email);
-    await openReview(page, session.token, "ar");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("heading", { level: 1, name: ar.title })).toBeVisible();
-    await expect(balanceRadio(page, "ar")).toBeChecked();
-    await expect(main(page).getByText(ar.balance.available.split("{")[0].trim())).toBeVisible();
-    await expect(main(page).getByText(/20\.00/).first()).toBeVisible();
-    // Nothing of the balance choice is left in English.
-    await expect(main(page).getByText(/Store balance|Available:/)).toHaveCount(0);
-
-    await acceptConsents(page, "ar");
-    await payButton(page, "ar").click();
-    await expect(page).toHaveURL(/\/ar\/track\/[A-Za-z0-9_-]+$/);
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    // $1 against a total of about $4.75: the longest state (the disabled choice with its figures and Add funds).
+    await openReview(page, session.token);
+    await expect(balanceRadio(page)).toBeDisabled();
+    await expectNoHorizontalOverflow(page);
+    await expectInsideViewport(page, main(page).locator("label:has(input[value='balance'])"));
+    await expectInsideViewport(page, payButton(page));
   });
-
-  for (const lang of ["en", "ar"] as const) {
-    test(`at 360 px the ${lang} review page does not scroll sideways and the balance choice and Pay stay on screen`, async ({ page }) => {
-      await page.setViewportSize({ width: 360, height: 800 });
-      const { email } = await customerWith(page, "1.0000");
-      const session = await openCustomerSession(page, email);
-      // $1 against a total of about $4.75: the longest state (the disabled choice with its figures and Add funds).
-      await openReview(page, session.token, lang);
-      await expect(balanceRadio(page, lang)).toBeDisabled();
-      await expectNoHorizontalOverflow(page);
-      await expectInsideViewport(page, main(page).locator("label:has(input[value='balance'])"));
-      await expectInsideViewport(page, payButton(page, lang));
-    });
-  }
 });

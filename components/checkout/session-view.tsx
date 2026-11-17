@@ -240,7 +240,7 @@ export function SessionView({ session, locale, labels, quantityLabels, typeLabel
     ];
     const signature = JSON.stringify(grants);
     if (grants.length > 0 && consentsSent.current !== signature) {
-      await api.post(`/store/v1/checkout-sessions/${encodeURIComponent(session.token)}/consents`, { consents: grants, locale });
+      await api.post(`/store/v1/checkout-sessions/${encodeURIComponent(session.token)}/consents`, { consents: grants });
       consentsSent.current = signature;
     }
   }
@@ -588,7 +588,7 @@ export function SessionView({ session, locale, labels, quantityLabels, typeLabel
             loading={busy}
             disabled={!canSubmit}
             onClick={pay}
-            endIcon={<ArrowRight aria-hidden="true" className="rtl:-scale-x-100" />}
+            endIcon={<ArrowRight aria-hidden="true" />}
           >
             {busy
               ? viaBalance

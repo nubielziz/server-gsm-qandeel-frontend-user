@@ -12,7 +12,6 @@ import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Money } from "@/components/ui/money";
 import { Skeleton } from "@/components/ui/skeleton";
-import { otherLocale } from "@/components/store/resolve-service";
 import { firstParam, type SearchParams } from "@/components/store/search-params";
 import { isApiError } from "@/lib/api/errors";
 import { BusyState } from "@/components/ui/busy-state";
@@ -93,16 +92,11 @@ async function Resume({ searchParams }: { searchParams: Promise<SearchParams> })
     );
   }
 
-  // The service may be listed in this language, the other one, or no longer at all.
-  const [config, own] = await Promise.all([getStoreConfig(), slugForService(session.service.id, locale)]);
-  const other = own ? null : await slugForService(session.service.id, otherLocale(locale));
+  // The service may still be listed, or no longer at all.
+  const [config, own] = await Promise.all([getStoreConfig(), slugForService(session.service.id)]);
   // The new checkout keeps the quantity of the unfinished one: the form checks it against today's rule.
   const quantityQuery = `&quantity=${session.quantity}`;
-  const href = own
-    ? `${p("/checkout")}?service=${encodeURIComponent(own)}${quantityQuery}`
-    : other
-      ? `${localePath(otherLocale(locale), "/checkout")}?service=${encodeURIComponent(other)}${quantityQuery}`
-      : null;
+  const href = own ? `${p("/checkout")}?service=${encodeURIComponent(own)}${quantityQuery}` : null;
   const decimals = config.currencies.find((currency) => currency.code === session.currency)?.decimals ?? 2;
 
   return (

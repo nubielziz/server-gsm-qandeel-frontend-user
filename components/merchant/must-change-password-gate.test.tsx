@@ -27,12 +27,6 @@ describe("mustChangeDecision: what the gate does on a portal page", () => {
     expect(mustChangeDecision({ mustChange: true, pathname: `${SECURITY}/`, securityPath: SECURITY })).toBe("warn");
   });
 
-  it("follows the page language: the Arabic security page is its own destination", () => {
-    const ar = "/ar/merchant/settings/security";
-    expect(mustChangeDecision({ mustChange: true, pathname: ar, securityPath: ar })).toBe("warn");
-    expect(mustChangeDecision({ mustChange: true, pathname: ar, securityPath: SECURITY })).toBe("redirect");
-  });
-
   it("a page that merely starts like the security page is another page", () => {
     expect(mustChangeDecision({ mustChange: true, pathname: `${SECURITY}-help`, securityPath: SECURITY })).toBe("redirect");
     expect(mustChangeDecision({ mustChange: true, pathname: `${SECURITY}/extra`, securityPath: SECURITY })).toBe("redirect");
@@ -46,7 +40,6 @@ describe("mustChangeDecision: what the gate does on a portal page", () => {
 describe("mustChangeHref: where the redirect lands", () => {
   it("aims at the warning's own id, not the password card, so the warning is in view after the redirect", () => {
     expect(mustChangeHref(SECURITY)).toBe("/en/merchant/settings/security#must-change-password");
-    expect(mustChangeHref("/ar/merchant/settings/security")).toBe("/ar/merchant/settings/security#must-change-password");
   });
 });
 

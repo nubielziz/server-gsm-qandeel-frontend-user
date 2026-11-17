@@ -8,12 +8,6 @@ describe("formatMinutes", () => {
     expect(formatMinutes(90, "en")).toBe("1 hr 30 min");
     expect(formatMinutes(2880, "en")).toBe("2 days");
   });
-  it("uses Arabic units with Latin digits", () => {
-    const text = formatMinutes(90, "ar");
-    expect(text).toMatch(/1/);
-    expect(text).toMatch(/30/);
-    expect(text).not.toMatch(/[٠-٩]/);
-  });
 });
 
 describe("kinds and urls", () => {

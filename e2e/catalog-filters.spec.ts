@@ -9,16 +9,16 @@ import { fixtures } from "./helpers";
 type ApiCategory = { id: number; slug: string; name: string; serviceCount: number };
 type ApiService = { slug: string; title: string; price: { gross: string } };
 
-/** The categories the API lists, in one language. */
-async function apiCategories(request: APIRequestContext, locale: "en" | "ar" = "en"): Promise<ApiCategory[]> {
-  const res = await request.get(`/store/v1/categories?locale=${locale}`);
+/** The categories the API lists. */
+async function apiCategories(request: APIRequestContext): Promise<ApiCategory[]> {
+  const res = await request.get("/store/v1/categories");
   expect(res.status()).toBe(200);
   return ((await res.json()) as { categories: ApiCategory[] }).categories;
 }
 
 /** One page of the API's service list in English and USD (what the site shows a visitor with no currency cookie). */
 async function apiServices(request: APIRequestContext, query: string): Promise<{ rows: ApiService[]; total: number }> {
-  const res = await request.get(`/store/v1/services?locale=en&currency=USD&${query}`);
+  const res = await request.get(`/store/v1/services?currency=USD&${query}`);
   expect(res.status(), await res.text()).toBe(200);
   return { rows: (await res.json()) as ApiService[], total: Number(res.headers()["x-total-count"]) };
 }
@@ -31,9 +31,9 @@ const categoryCheckbox = (category: ApiCategory) => new RegExp(`^${escapeRegExp(
 const servicesText = (n: number) => (n === 1 ? "1 service" : `${n} services`);
 
 /** The filter sidebar on a desktop; on a phone the drawer, opened here. */
-async function openFilters(page: Page, isMobile: boolean, name = "Filters") {
-  if (isMobile) await page.getByRole("button", { name: new RegExp(`^${escapeRegExp(name)}`) }).click();
-  return isMobile ? page.getByRole("dialog", { name }) : page.getByRole("complementary", { name });
+async function openFilters(page: Page, isMobile: boolean) {
+  if (isMobile) await page.getByRole("button", { name: /^Filters/ }).click();
+  return isMobile ? page.getByRole("dialog", { name: "Filters" }) : page.getByRole("complementary", { name: "Filters" });
 }
 
 /** The titles of the cards on the page, in order. */
@@ -111,15 +111,13 @@ test.describe("categories", () => {
     await expect(chip).toHaveCount(0);
   });
 
-  test("the header search is a combobox on English pages only; the list keeps its own plain search box", async ({ page, isMobile }) => {
+  test("the header search is a combobox; the list keeps its own plain search box", async ({ page, isMobile }) => {
     await page.goto("/en/services");
     if (isMobile) await page.getByRole("banner").getByRole("button", { name: "Open search" }).click();
     // In the header only: the list's sort control is a <select> (a combobox too), and its search box is a plain field.
     await expect(page.getByRole("banner").getByRole("combobox", { name: "Search services" })).toBeVisible();
     await expect(page.locator("main").getByRole("combobox", { name: "Search services" })).toHaveCount(0);
     await expect(page.locator("main").getByRole("searchbox", { name: "Search", exact: true })).toBeVisible();
-    await page.goto("/ar/services");
-    await expect(page.getByRole("banner").getByRole("combobox", { name: "ابحث في الخدمات" })).toHaveCount(0);
   });
 
   test("search, sort and filters keep each other in the URL", async ({ page, request }) => {
@@ -284,41 +282,5 @@ test.describe("price range, paging and crafted links", () => {
       await expect(page.getByRole("heading", { level: 1, name: "All services" }), query).toBeVisible();
       await expect(page.getByRole("button", { name: "Try again" }), query).toHaveCount(0);
     }
-  });
-});
-
-test.describe("Arabic", () => {
-  test("category names and counts come from the API and the page is right-to-left", async ({ page, request, isMobile }) => {
-    const categories = (await apiCategories(request, "ar")).filter((category) => category.serviceCount > 0);
-    expect(categories.length).toBeGreaterThan(0);
-    await page.goto("/ar/services");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("جميع الخدمات");
-    const filters = await openFilters(page, isMobile, "التصفية");
-    const group = filters.getByRole("group", { name: "الفئات" });
-    for (const category of categories) {
-      await expect(group.getByRole("checkbox", { name: new RegExp(`^${escapeRegExp(category.name)}`) })).toBeVisible();
-    }
-    await expect(filters.getByRole("group", { name: "نوع الخدمة" })).toBeVisible();
-    if (isMobile) await filters.getByRole("button", { name: "عرض النتائج" }).click();
-
-    // A category lists its Arabic services; the chip speaks Arabic around the API's name.
-    const [category] = categories;
-    await page.goto(`/ar/services?category=${category.slug}`);
-    await expect(page.getByRole("article")).toHaveCount(category.serviceCount);
-    await expect(page.getByRole("link", { name: `إزالة عامل التصفية: ${category.name}` })).toBeVisible();
-    // The sorts are named in Arabic.
-    expect(await page.getByLabel("الترتيب").locator("option").allInnerTexts()).toEqual(expect.arrayContaining(["الأكثر مبيعًا", "وصل حديثًا"]));
-  });
-
-  test("a category that exists only in English is ignored on the Arabic page", async ({ page, request }) => {
-    const [english, arabic] = await Promise.all([apiCategories(request, "en"), apiCategories(request, "ar")]);
-    const englishOnly = english.find((category) => !arabic.some((other) => other.id === category.id));
-    test.skip(!englishOnly, "every English category also has Arabic services in the demo catalog");
-    await page.goto(`/ar/services?category=${englishOnly!.slug}`);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("جميع الخدمات");
-    // Not applied (the link may come from the English page's language switch): the Arabic catalog is listed, not an empty state.
-    await expect(page.getByRole("article").first()).toBeVisible();
-    await expect(page.getByText("لا توجد خدمات مطابقة")).toHaveCount(0);
   });
 });

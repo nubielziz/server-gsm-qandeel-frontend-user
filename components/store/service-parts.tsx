@@ -89,7 +89,7 @@ export function serviceStockHint(service: StoreServiceDetail, locale: Locale, c:
   return stockHint(service, locale, c.delivery);
 }
 
-/** Fills `{price}` of a sentence with a Money: it is laid out left-to-right, so the amount keeps its order inside Arabic text. */
+/** Fills `{price}` of a sentence with a Money: it is laid out left-to-right, so the amount keeps its order inside the sentence. */
 function WithMoney({ template, amount, currency, locale, decimals }: { template: string; amount: string; currency: string; locale: Locale; decimals: number }) {
   const marker = "{price}";
   const at = template.indexOf(marker);
@@ -196,7 +196,7 @@ export function PriceBlock(props: PriceBlockProps) {
 export async function ServicePrice({ slug }: { slug: string }) {
   await navigation();
   const [locale, currency, t, c] = await Promise.all([getLocale(), getCurrency(), getMessages(store), getMessages(common)]);
-  const service = await getStoreService(slug, { locale, currency: currency.code });
+  const service = await getStoreService(slug, { currency: currency.code });
   if (!service) return null;
   return <PriceBlock price={service.price} decimals={currency.decimals} rule={service.quantity} locale={locale} q={c.quantity} t={t.service} />;
 }
