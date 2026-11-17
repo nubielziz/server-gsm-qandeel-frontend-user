@@ -59,10 +59,23 @@ test.describe("old service addresses (the two rows the demo seed keeps, plan 30 
       expect(first.status(), old).toBe(308);
       expect(target(first.headers()["location"]), old).toBe(`/en/services/${old}`);
 
-      // The page in between streams, so its status line is a 200: it must never be indexed (the full answer says so).
+      // The page in between is never indexed, in any of the forms its answer takes. In development, and on the first hit of
+      // a production build, it streams: a 200 whose full answer says `noindex` and carries the redirect. A production build
+      // (`next start`) that already resolved the address answers 308: with a `Location` (the final address; Next sometimes
+      // writes that header twice with the same value), or, when the redirect comes out of the postponed part of the page,
+      // without one and with the same `noindex` page (all seen on 2026-11-17).
       const between = await request.get(`/en/services/${old}`, { maxRedirects: 0 });
-      expect(between.status(), old).toBe(200);
-      expect(await between.text(), old).toMatch(/<meta name="robots" content="noindex[^"]*"/);
+      const locations = between
+        .headersArray()
+        .filter((header) => header.name.toLowerCase() === "location")
+        .map((header) => target(header.value));
+      if (locations.length > 0) {
+        expect(between.status(), old).toBe(308);
+        expect([...new Set(locations)], old).toEqual([final]);
+      } else {
+        expect([200, 308], old).toContain(between.status());
+        expect(await between.text(), old).toMatch(/<meta name="robots" content="noindex[^"]*"/);
+      }
 
       // Second hop: the browser follows the redirect written into that page and ends on the English address.
       await page.goto(`/ar/services/${old}`);

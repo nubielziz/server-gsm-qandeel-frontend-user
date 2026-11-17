@@ -5,8 +5,8 @@
 // - Mutating integration tests (API keys, webhooks) run on the desktop project only.
 import { createHmac } from "node:crypto";
 import { expect, test } from "./fixtures";
-import { type APIRequestContext } from "@playwright/test";
-import { ACCOUNTS, BASE_URL, signInMerchant } from "./helpers";
+import { type APIRequestContext, type Request } from "@playwright/test";
+import { ACCOUNTS, BASE_URL, hydrated, signInMerchant } from "./helpers";
 
 // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -147,18 +147,34 @@ test.describe("settings (active merchant)", () => {
   });
 
   test("notifications: saving sends only what changed, and the change is restored", async ({ page }) => {
+    const isSave = (r: Request) => r.url().endsWith("/client/notification-preferences") && r.method() === "PUT";
+    /** Saves the form and waits for the API's answer: a request that is only sent can still be dropped when the test ends. */
+    const save = async () => {
+      const sent = page.waitForRequest(isSave);
+      await page.getByRole("button", { name: "Save changes" }).click();
+      const request = await sent;
+      expect((await request.response())?.ok(), "the API saved it").toBe(true);
+      await expect(page.getByText("Notification settings saved").first()).toBeVisible();
+      return request.postDataJSON() as unknown;
+    };
     await page.goto("/en/merchant/settings/notifications");
-    const put = page.waitForRequest((r) => r.url().endsWith("/client/notification-preferences") && r.method() === "PUT");
-    await page.getByLabel(/Alert me when my available balance/).fill("12.5");
-    await page.getByRole("button", { name: "Save changes" }).click();
-    expect((await put).postDataJSON()).toEqual({ lowBalanceThreshold: "12.5" });
-    await expect(page.getByText("Notification settings saved").first()).toBeVisible();
+    await hydrated(page);
+    const alert = page.getByLabel(/Alert me when my available balance/);
+    // Start from "no alert": a run that ended before its last save was answered left 12.5 behind (seen 2026-11-17), and
+    // typing the stored value changes nothing, so the button stayed disabled for every later run.
+    if ((await alert.inputValue()) !== "") {
+      await alert.fill("");
+      await save();
+      await page.reload();
+      await hydrated(page);
+    }
+
+    await alert.fill("12.5");
+    expect(await save()).toEqual({ lowBalanceThreshold: "12.5" });
 
     // Empty = remove the alert.
-    const clear = page.waitForRequest((r) => r.url().endsWith("/client/notification-preferences") && r.method() === "PUT");
-    await page.getByLabel(/Alert me when my available balance/).fill("");
-    await page.getByRole("button", { name: "Save changes" }).click();
-    expect((await clear).postDataJSON()).toEqual({ lowBalanceThreshold: null });
+    await alert.fill("");
+    expect(await save()).toEqual({ lowBalanceThreshold: null });
   });
 
   test("verification: an approved merchant sees the status and no form", async ({ page }) => {
