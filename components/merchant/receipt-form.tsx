@@ -85,13 +85,13 @@ export function ReceiptForm({ invoiceId, methods, labels: t, upload, optionalLab
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-busy={submitting || undefined} className="grid gap-5">
+    <form onSubmit={onSubmit} noValidate aria-busy={submitting || undefined} className="grid grid-cols-1 gap-5">
       {alert ? (
         <Alert tone={alert.tone} title={alert.title}>
           {alert.text}
         </Alert>
       ) : null}
-      <div id="receipt-file" tabIndex={-1} className="grid gap-2 focus:outline-none">
+      <div id="receipt-file" tabIndex={-1} className="grid grid-cols-1 gap-2 focus:outline-none">
         <FileUpload
           required
           max={1}

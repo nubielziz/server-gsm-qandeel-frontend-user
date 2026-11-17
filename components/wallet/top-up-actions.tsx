@@ -162,7 +162,7 @@ export function TopUpActions({ id, canReceipt, canCancel, labels: t, errors }: T
   if (!canReceipt && !canCancel && !stale) return null;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       {stale ? (
         <Alert tone="warning" title={t.staleTitle}>
           {stale}
@@ -173,14 +173,14 @@ export function TopUpActions({ id, canReceipt, canCancel, labels: t, errors }: T
         <Card>
           <CardHeader title={t.receiptTitle} description={t.receiptText} />
           <CardBody>
-            <form onSubmit={onSend} noValidate aria-busy={busy === "send" || undefined} className="grid gap-5">
+            <form onSubmit={onSend} noValidate aria-busy={busy === "send" || undefined} className="grid grid-cols-1 gap-5">
               {formError ? (
                 <Alert ref={errorBox} tabIndex={-1} tone="danger" className="focus:outline-none">
                   {formError.message}
                   {formError.reference ? <span className="num mt-1 block text-small">{formError.reference}</span> : null}
                 </Alert>
               ) : null}
-              <div id={FILE_ID} tabIndex={-1} className="grid gap-2 focus:outline-none">
+              <div id={FILE_ID} tabIndex={-1} className="grid grid-cols-1 gap-2 focus:outline-none">
                 <FileUpload
                   required
                   max={1}
