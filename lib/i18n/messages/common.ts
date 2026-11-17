@@ -5,11 +5,11 @@
 
 export const common = {
   brand: {
-    name: "GSM Store",
-    tagline: "Digital Services Marketplace",
+    name: "IMEI-HUB",
+    tagline: "GSM Services & IMEI Solutions",
     description:
       "IMEI checks, unlocks, tool activations and digital credits for GSM professionals and the customers they serve.",
-    logoAlt: "GSM Store home",
+    logoAlt: "IMEI-HUB home",
   },
 
   /** Header, navigation and footer. */
@@ -63,7 +63,7 @@ export const common = {
     cookies: "Cookie policy",
     portal: "Merchant portal",
     becomeMerchant: "Become a merchant",
-    rights: "© {year} GSM Store. All rights reserved.",
+    rights: "© {year} IMEI-HUB. All rights reserved.",
   },
   checkoutHeader: {
     backToStore: "Back to store",

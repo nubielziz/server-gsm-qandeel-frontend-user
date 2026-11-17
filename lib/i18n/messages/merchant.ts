@@ -51,7 +51,7 @@ export const merchant = {
     },
     balance: {
       title: "Available balance",
-      walletName: "GSM Store wallet",
+      walletName: "IMEI-HUB wallet",
       balance: "Balance",
       reserved: "Reserved",
       creditLimit: "Credit limit",

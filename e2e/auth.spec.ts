@@ -116,10 +116,10 @@ test.describe("email-link pages", () => {
     await go(page, link); // proxy.ts adds /en
     await expect(page).toHaveURL(/\/en\/sign-in\?token=/);
     // Never signs in by itself (mail scanners): a button does.
-    await expect(page.getByRole("button", { name: "Sign in to GSM Store" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in to IMEI-HUB" })).toBeVisible();
     await page.waitForTimeout(500);
     await expect(page).toHaveURL(/\/en\/sign-in\?token=/);
-    await page.getByRole("button", { name: "Sign in to GSM Store" }).click();
+    await page.getByRole("button", { name: "Sign in to IMEI-HUB" }).click();
     await expect(page).toHaveURL(/\/en\/account$/);
     await expect(page.getByRole("heading", { level: 1, name: "Welcome back" })).toBeVisible();
     expect(((await (await page.request.get("/store/v1/me")).json()) as { email: string }).email).toBe(email);
@@ -127,7 +127,7 @@ test.describe("email-link pages", () => {
     // Used up: a second visit says expired and offers a new link.
     await page.context().clearCookies();
     await go(page, link);
-    await page.getByRole("button", { name: "Sign in to GSM Store" }).click();
+    await page.getByRole("button", { name: "Sign in to IMEI-HUB" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "This sign-in link has expired" })).toBeVisible();
     await page.getByRole("button", { name: "Request a new link" }).click();
     await expect(page.getByRole("button", { name: "Email me the link" })).toBeVisible();

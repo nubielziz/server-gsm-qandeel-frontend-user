@@ -133,7 +133,7 @@ export const account = {
       currency: "Currency",
       currencyHint: "Prices in the shop are shown in this currency. You still pay in the currency you choose at checkout.",
       marketing: "Marketing emails",
-      marketingHint: "Offers and news from GSM Store. Order and support emails are always sent.",
+      marketingHint: "Offers and news from IMEI-HUB. Order and support emails are always sent.",
       save: "Save changes",
       saved: "Preferences saved",
       nothingChanged: "No changes to save",

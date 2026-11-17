@@ -81,7 +81,7 @@ export const store = {
       priceChip: "Price: {from} to {to}",
     },
     explore: {
-      title: "More from GSM Store",
+      title: "More from IMEI-HUB",
       merchants: {
         tag: "For merchants",
         title: "Resell at group prices",

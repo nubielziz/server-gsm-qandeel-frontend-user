@@ -43,7 +43,7 @@ export function TicketMessages({ messages, t, fileHref, receipt }: TicketMessage
               </p>
             ) : null}
             <div className={cn("flex items-end gap-3", mine ? "justify-end" : "justify-start")}>
-              {mine ? null : <Avatar name="GSM Store" size="sm" />}
+              {mine ? null : <Avatar name="IMEI-HUB" size="sm" />}
               <div className="min-w-0 max-w-[88%] sm:max-w-[75%]">
                 {/* dir="auto": a message typed in another script (Arabic, for one) keeps its own punctuation and alignment. */}
                 <div

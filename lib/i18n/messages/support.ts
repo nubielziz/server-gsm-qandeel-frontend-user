@@ -64,7 +64,7 @@ export const support = {
     newTicket: "Send a new ticket",
     conversation: "Conversation",
     you: "You",
-    team: "GSM Store Support",
+    team: "IMEI-HUB Support",
     sentAt: "{who} · {time}",
     reply: {
       label: "Your reply",

@@ -144,3 +144,20 @@ transfer and Crypto transfer have no file: they show the bank and the coin icon.
 | `payments/instapay.png` | the InstaPay Egypt app icon from its Google Play listing (`com.egyptianbanks.instapay`), fetched 2026-11-17 | trademark of its owner |
 | `payments/nowpayments.png` | the NOWPayments GitHub organisation picture (`https://github.com/NowPaymentsIO.png`), fetched 2026-11-17 | trademark of its owner |
 | `payments/vodafone_cash.png` | Simple Icons `vodafone` (the Vodafone speech mark, `#E60000`), fetched 2026-11-17 | CC0-1.0 icon data; trademark of its owner |
+
+## The IMEI-HUB logo
+
+The site's own logo is the owner's (`IH Orbit IMEI-HUB Logo.png`, supplied 2026-11-17), cut into files by a script that only
+crops, removes the white ground and, for the two `-inverse` files (dark surfaces), turns the dark ink white:
+
+| File | What |
+|---|---|
+| `public/images/logo-mark.png`, `logo-mark-inverse.png` | the mark, the "IH" in its orbit (575 × 432, transparent) |
+| `public/images/logo-wordmark.png`, `logo-wordmark-inverse.png` | the name "IMEI-HUB" (984 × 160, transparent) |
+| `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png` | the mark on a white tile, so the dark ink reads on a dark tab strip: the browser tab (16, 32 and 48 px), the 192 px icon, the touch icon |
+
+`components/layout/logo.tsx` shows them (the mark about 1.8 times as tall as the name, as in the owner's picture; both a size
+smaller below 640 px, so a signed-in header still fits a phone, and the name hidden from 360 px down). The owner's source
+picture, the script and the full lock-ups (mark, name and tagline in one picture) are kept outside the repository
+(`/home/saifi/gsm-project/.brand/`). To replace the logo, replace these files; a logo of another shape also needs the boxes
+(`MARK_BOX`, `WORDMARK_BOX`) in `components/layout/logo.tsx`, in whole pixels.

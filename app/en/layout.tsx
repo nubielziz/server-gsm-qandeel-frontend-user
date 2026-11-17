@@ -18,7 +18,7 @@ const inter = Inter({
   display: "swap",
 });
 
-const title = "GSM Store — Digital Services Marketplace";
+const title = "IMEI-HUB — GSM Services & IMEI Solutions";
 const description = "IMEI checks, unlocks, tool activations and digital credits for GSM professionals and their customers.";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -27,10 +27,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     // Absolute URLs for social cards and canonicals. Set NEXT_PUBLIC_SITE_URL in production (https://<site>).
     metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:5175"),
-    title: { default: title, template: "%s · GSM Store" },
+    title: { default: title, template: "%s · IMEI-HUB" },
     description,
     openGraph: {
-      siteName: "GSM Store",
+      siteName: "IMEI-HUB",
       locale: "en_US",
       type: "website",
       title,

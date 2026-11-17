@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 
-export const metadata: Metadata = { title: "Page not found · GSM Store" };
+export const metadata: Metadata = { title: "Page not found · IMEI-HUB" };
 
 export default function GlobalNotFound() {
   return (
@@ -16,7 +16,7 @@ export default function GlobalNotFound() {
           <p className="mt-3 text-ink-muted">The page you are looking for does not exist.</p>
           <p className="mt-6 flex justify-center gap-3">
             <Link className="rounded-control bg-inverse px-4 py-2.5 font-semibold text-on-inverse" href="/en">
-              GSM Store
+              IMEI-HUB
             </Link>
           </p>
         </main>

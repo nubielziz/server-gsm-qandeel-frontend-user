@@ -21,7 +21,7 @@ RGB lighting, coloured smoke, colour cast, text, letters, numbers, logo, brand m
 
 | File | Size (px) | Where it shows |
 |---|---|---|
-| `logo-mark.png` | 512 × 512, transparent | Brand mark next to "GSM Store" in every header and the sidebar |
+| `logo-mark.png` | 575 × 432, transparent | The brand mark (the "IH" in its orbit) beside the name in every header and the sidebar. It is the owner's own logo, not a generated picture (docs/LOGOS.md, "The IMEI-HUB logo"), and comes with `logo-mark-inverse.png` for dark surfaces and `logo-wordmark.png` / `logo-wordmark-inverse.png` (984 × 160, the name "IMEI-HUB") |
 | `sign-in-hero.jpg` | 1600 × 1800 | Left half of the sign-in and sign-up pages (desktop) |
 | `home-hero.jpg` | 1920 × 1080 | Right side of the large dark banner at the top of the shop home page |
 | `home-promo.jpg` | 1200 × 900 | Right side of the small dark "Track your order" card beside the home banner |
@@ -33,7 +33,7 @@ RGB lighting, coloured smoke, colour cast, text, letters, numbers, logo, brand m
 | `service-remote.jpg` | 1200 × 900 | Art for remote / tool-activation services |
 | `service-file.jpg` | 1200 × 900 | Art for file services (firmware, unlock files) |
 | `og-default.jpg` | 1200 × 630 | Preview image when a page is shared on social media |
-| `app/favicon.ico` (replace the file; NOT in public/images) | 48 × 48 ICO | Browser tab icon (today it is the Next.js scaffold's icon). Make it from `logo-mark.png` |
+| `app/favicon.ico` (NOT in public/images), with `app/icon.png` and `app/apple-icon.png` | ICO with 16, 32 and 48 px; 192 × 192; 180 × 180 | Browser tab icon and the touch icon: the IMEI-HUB mark on a square, made from the owner's logo (docs/LOGOS.md) |
 | `brands/<name>.png`, `carriers/<name>.png` | transparent PNG, ~96 px high, cropped to the logo | Brand and carrier logos on tiles, cards and the service page. 86 are in place; how to add one, naming, sources and trademarks: `docs/LOGOS.md` (then run `npm run logos`) |
 | `collections/<kind>-<name>.jpg` (optional) | 1200 × 900 | Left side of a "Featured collections" banner on the home page. The site picks the brands, countries and carriers with the most services, so add the ones your catalog has: `<kind>` = `brand`, `country` or `carrier`; `<name>` = the brand or carrier name, or the 2-letter country code, lower-cased, every space or symbol → `-` (e.g. `brand-apple.jpg`, `brand-samsung.jpg`, `country-us.jpg`, `country-gb.jpg`, `carrier-at-t.jpg`) |
 
@@ -48,9 +48,8 @@ image is always light (only a card without one may be dark).
 ## Prompts
 
 ### logo-mark.png
-Minimal flat app-icon style brand mark for "GSM Store": a stylised smartphone outline combined with a small gear,
-bold geometric strokes, solid near-black (#111111) on a fully transparent background, centred, generous padding,
-crisp vector-like edges, no text.
+Not generated. The mark and the wordmark are cut from the owner's logo picture (`IH Orbit IMEI-HUB Logo.png`, 2026-11-17):
+see "The IMEI-HUB logo" in docs/LOGOS.md. To replace the logo, replace the four `logo-*.png` files and the two icons in `app/`.
 
 ### sign-in-hero.jpg
 3:2 (1536 × 1024; it fills the panel under the text, anchored at the bottom). Bright minimalist studio scene: a modern

@@ -48,7 +48,7 @@ export const auth = {
     },
     totp: {
       title: "Two-step verification",
-      text: "Open your authenticator app and enter the 6-digit code for your GSM Store account.",
+      text: "Open your authenticator app and enter the 6-digit code for your IMEI-HUB account.",
       submit: "Verify and sign in",
       invalidCode: "That code is not right. Check the app and try again.",
     },
@@ -65,7 +65,7 @@ export const auth = {
     link: {
       title: "You opened a sign-in link",
       text: "Select the button to finish signing in. We ask you to confirm so that an email scanner cannot use the link up before you.",
-      submit: "Sign in to GSM Store",
+      submit: "Sign in to IMEI-HUB",
       expiredTitle: "This sign-in link has expired",
       expiredText: "Links work once and last 1 hour. Request a new one and we will email it right away.",
     },
@@ -74,7 +74,7 @@ export const auth = {
   signUp: {
     metaTitle: "Create account",
     title: "Create your account",
-    subtitle: "Choose how you will use GSM Store.",
+    subtitle: "Choose how you will use IMEI-HUB.",
     choose: "I am a",
     customer: {
       title: "Customer",
@@ -130,9 +130,9 @@ export const auth = {
   verifyEmail: {
     metaTitle: "Confirm your email",
     title: "Confirm your email",
-    customerText: "Confirm your email address to finish signing in to GSM Store.",
+    customerText: "Confirm your email address to finish signing in to IMEI-HUB.",
     customerSubmit: "Confirm and sign in",
-    merchantText: "Confirm your email address for your GSM Store merchant account.",
+    merchantText: "Confirm your email address for your IMEI-HUB merchant account.",
     merchantSubmit: "Verify my email",
     missingTitle: "This page needs the link from your email",
     missingText: "Open the link in your email again. If it does not work, sign in and ask for a new one.",

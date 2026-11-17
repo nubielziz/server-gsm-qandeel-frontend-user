@@ -1,4 +1,4 @@
-# GSM Store — public website
+# IMEI-HUB — public website
 
 One site for **customers** (shop, IMEI check, checkout, order tracking, support) and **merchants** (portal: prices,
 orders from the wallet, top-ups and invoices, API keys, webhooks, security), in English only (decision 039).

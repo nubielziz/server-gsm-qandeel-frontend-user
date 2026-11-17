@@ -104,7 +104,7 @@ const kit = {
   notificationsHint: "Order updates and receipts.",
   payment: "Payment method",
   paymentHint: "Choose how you want to pay.",
-  wallet: "GSM Store wallet",
+  wallet: "IMEI-HUB wallet",
   walletText: "Pay using your account balance.",
   card: "Card",
   cardText: "Visa and Mastercard.",
