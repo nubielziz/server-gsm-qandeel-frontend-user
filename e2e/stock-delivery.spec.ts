@@ -103,7 +103,7 @@ test("a stocked order completes at once, its codes are listed with a Copy button
   expect(await availableCodes(packs.id), "the packs service holds fewer than 10 codes, so a 10-unit order cannot be filled").toBeLessThan(10);
   const waiting = await buyFromBalance(page, email, packs.id, 10);
   await page.goto(`/en/track/${waiting.trackingToken}`);
-  const pending = main.getByText(store.en.track.pendingText, { exact: true });
+  const pending = main.getByText(store.track.pendingText, { exact: true });
   await expect(pending).toBeVisible();
   expect(await pending.textContent()).not.toMatch(PROMISES_A_TIME);
   await expect(main.getByText("Pending", { exact: true }).first()).toBeVisible();

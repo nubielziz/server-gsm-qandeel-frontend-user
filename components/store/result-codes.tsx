@@ -4,7 +4,6 @@
 import { useId } from "react";
 import { CopyButton } from "@/components/ui/copy-button";
 import { formatNumber } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 
 /** The import rule of the backend: a code is 6 to 128 characters with no space. */
@@ -53,12 +52,11 @@ export type ResultCodesLabels = {
 export type ResultCodesProps = {
   /** `result.code` of the tracked order (not empty). */
   code: string;
-  locale: Locale;
   labels: ResultCodesLabels;
 };
 
 /** The result of a delivered order: a list of codes, or the text as one block. */
-export function ResultCodes({ code, locale, labels }: ResultCodesProps) {
+export function ResultCodes({ code, labels }: ResultCodesProps) {
   const headingId = useId();
   const codes = splitCodes(code);
 
@@ -88,7 +86,7 @@ export function ResultCodes({ code, locale, labels }: ResultCodesProps) {
         {codes.map((value, index) => (
           <li key={`${index}-${value}`} className="flex items-center gap-3 rounded-control border border-line bg-surface-muted py-1.5 ps-4 pe-1.5">
             <span aria-hidden="true" className="w-7 shrink-0 text-small text-ink-subtle">
-              {formatNumber(index + 1, locale)}
+              {formatNumber(index + 1)}
             </span>
             {/* Codes are Latin text: isolated left-to-right, and broken anywhere on a narrow screen. */}
             <div className="min-w-0 flex-1">
@@ -99,7 +97,7 @@ export function ResultCodes({ code, locale, labels }: ResultCodesProps) {
             <CopyButton
               iconOnly
               value={value}
-              label={fmt(labels.copyCode, { n: formatNumber(index + 1, locale) })}
+              label={fmt(labels.copyCode, { n: formatNumber(index + 1) })}
               copiedLabel={labels.copied}
             />
           </li>

@@ -21,10 +21,9 @@ import type { MerchantServiceDetail, StoreServiceDetail } from "@/lib/api/types"
 import { getCurrency } from "@/lib/currency";
 import { formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 import { common, type CommonMessages } from "@/lib/i18n/messages/common";
 import type { StoreMessages } from "@/lib/i18n/messages/store";
-import { getLocale, getMessages } from "@/lib/i18n/server";
 import { store } from "@/lib/i18n/messages/store";
 import { deliveryLine, stockHint } from "@/lib/store/delivery";
 import { quantityRuleText, type QuantityRule } from "@/lib/quantity";
@@ -61,7 +60,7 @@ export type ServiceFact = { key: "availability" | "delivery" | "quantity"; icon:
  * no stock number exists), delivery (the staff note as written, else "Delivered within {time}" in the page's language;
  * no row without delivery information) and the quantity rule ("2 to 50 per order", "Packs of 5, 10, 25").
  */
-export function serviceFacts(service: StoreServiceDetail, locale: Locale, t: StoreMessages, c: CommonMessages): ServiceFact[] {
+export function serviceFacts(service: StoreServiceDetail, t: StoreMessages, c: CommonMessages): ServiceFact[] {
   const facts: ServiceFact[] = [];
   if (service.availability === "in_stock") {
     facts.push({
@@ -75,9 +74,9 @@ export function serviceFacts(service: StoreServiceDetail, locale: Locale, t: Sto
       ),
     });
   }
-  const delivery = deliveryLine(service, locale, c.delivery);
+  const delivery = deliveryLine(service, c.delivery);
   if (delivery) facts.push({ key: "delivery", icon: Clock, label: c.delivery.label, value: <bdi>{delivery}</bdi> });
-  facts.push({ key: "quantity", icon: Hash, label: t.service.quantity, value: <bdi>{quantityRuleText(service.quantity, c.quantity, locale)}</bdi> });
+  facts.push({ key: "quantity", icon: Hash, label: t.service.quantity, value: <bdi>{quantityRuleText(service.quantity, c.quantity)}</bdi> });
   return facts;
 }
 
@@ -85,19 +84,19 @@ export function serviceFacts(service: StoreServiceDetail, locale: Locale, t: Sto
  * "Instant delivery while stock lasts, otherwise within {time}": for an `in_stock` service sold as a range or packs
  * (the stock covers only the smallest order); null for every other service.
  */
-export function serviceStockHint(service: StoreServiceDetail, locale: Locale, c: CommonMessages): string | null {
-  return stockHint(service, locale, c.delivery);
+export function serviceStockHint(service: StoreServiceDetail, c: CommonMessages): string | null {
+  return stockHint(service, c.delivery);
 }
 
 /** Fills `{price}` of a sentence with a Money: it is laid out left-to-right, so the amount keeps its order inside the sentence. */
-function WithMoney({ template, amount, currency, locale, decimals }: { template: string; amount: string; currency: string; locale: Locale; decimals: number }) {
+function WithMoney({ template, amount, currency, decimals }: { template: string; amount: string; currency: string; decimals: number }) {
   const marker = "{price}";
   const at = template.indexOf(marker);
   if (at < 0) return template;
   return (
     <>
       {template.slice(0, at)}
-      <Money amount={amount} currency={currency} locale={locale} decimals={decimals} />
+      <Money amount={amount} currency={currency} decimals={decimals} />
       {template.slice(at + marker.length)}
     </>
   );
@@ -118,7 +117,6 @@ function PriceLine({ pending, width, className, children }: { pending: boolean; 
 export type PriceBlockProps = {
   /** The quantity rule of the service: it decides which notes follow the price (`priceNotes`). */
   rule: QuantityRule;
-  locale: Locale;
   /** Strings: `common.quantity` and `store.service`. */
   q: CommonMessages["quantity"];
   t: StoreMessages["service"];
@@ -140,19 +138,19 @@ export type PriceBlockProps = {
  * the money lines as skeletons while the price streams in, so nothing moves.
  */
 export function PriceBlock(props: PriceBlockProps) {
-  const { rule, locale, q, t } = props;
+  const { rule, q, t } = props;
   const pending = props.pending === true;
   const notes = priceNotes(pending ? "0.0000" : props.price.gross, rule);
-  const count = (n: number) => formatNumber(n, locale);
+  const count = (n: number) => formatNumber(n);
   const money = (amount: string, template: string) =>
-    props.pending ? null : <WithMoney template={template} amount={amount} currency={props.price.currency} locale={locale} decimals={props.decimals} />;
+    props.pending ? null : <WithMoney template={template} amount={amount} currency={props.price.currency} decimals={props.decimals} />;
   return (
     <div className="grid gap-1.5">
       <div className="flex flex-wrap items-baseline gap-x-2 text-stat text-ink">
         {props.pending ? (
           <Skeleton className="h-[1lh] w-36" />
         ) : (
-          <Money amount={props.price.gross} currency={props.price.currency} locale={locale} decimals={props.decimals} />
+          <Money amount={props.price.gross} currency={props.price.currency} decimals={props.decimals} />
         )}
         {notes.perUnit && !pending ? <span className="text-small font-semibold tracking-normal text-ink-muted">{q.perUnit}</span> : null}
       </div>
@@ -195,10 +193,12 @@ export function PriceBlock(props: PriceBlockProps) {
  */
 export async function ServicePrice({ slug }: { slug: string }) {
   await navigation();
-  const [locale, currency, t, c] = await Promise.all([getLocale(), getCurrency(), getMessages(store), getMessages(common)]);
+  const currency = await getCurrency();
+  const t = store;
+  const c = common;
   const service = await getStoreService(slug, { currency: currency.code });
   if (!service) return null;
-  return <PriceBlock price={service.price} decimals={currency.decimals} rule={service.quantity} locale={locale} q={c.quantity} t={t.service} />;
+  return <PriceBlock price={service.price} decimals={currency.decimals} rule={service.quantity} q={c.quantity} t={t.service} />;
 }
 
 /**
@@ -210,7 +210,7 @@ export async function ServicePrice({ slug }: { slug: string }) {
  */
 export async function MerchantPriceHint({ serviceId }: { serviceId: number }) {
   await navigation();
-  const [locale, t] = await Promise.all([getLocale(), getMessages(store)]);
+  const t = store;
   let service: MerchantServiceDetail | null = null;
   try {
     const me = await getMerchant();
@@ -223,9 +223,9 @@ export async function MerchantPriceHint({ serviceId }: { serviceId: number }) {
   return (
     <div className="rounded-card border border-line bg-surface-muted p-4">
       <p className="text-small text-ink-muted">{t.service.merchantPrice}</p>
-      <Money amount={service.price} currency={service.currency} locale={locale} decimals={2} className="text-heading font-bold text-ink" />
+      <Money amount={service.price} currency={service.currency} decimals={2} className="text-heading font-bold text-ink" />
       <Link
-        href={localePath(locale, `/merchant/services/${serviceId}`)}
+        href={sitePath(`/merchant/services/${serviceId}`)}
         className="touch-target mt-1 flex text-small font-semibold text-ink underline underline-offset-4"
       >
         {t.service.merchantManage}

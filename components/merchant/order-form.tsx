@@ -20,7 +20,6 @@ import { isApiError, type FieldError } from "@/lib/api/errors";
 import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { MerchantOrder, MerchantOrderInput, MerchantServiceDetail, UploadedFile } from "@/lib/api/types";
 import { compareMoney, formatMoney, formatNumber, isValidImei, normalizeImei, subtractMoney } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt, plural } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
@@ -70,7 +69,6 @@ export type OrderFormProps = {
   service: Pick<MerchantServiceDetail, "id" | "name" | "type" | "price" | "currency" | "minQty" | "maxQty" | "qtyOptions" | "fields">;
   /** The wallet's spendable balance (`available`), or null when it could not be read. */
   available: string | null;
-  locale: Locale;
   hrefs: { orders: string; orderBase: string; topUp: string; services: string };
   labels: OrderFormLabels;
   /** Server-rendered service details shown above the inputs. */
@@ -91,7 +89,7 @@ const ID = { imei: "order-imei", bulk: "order-bulk", quantity: "order-quantity",
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export function OrderForm({ service, available, locale, hrefs, labels, intro }: OrderFormProps) {
+export function OrderForm({ service, available, hrefs, labels, intro }: OrderFormProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const { form: f, summary: s } = labels;
@@ -175,7 +173,7 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
 
   /** What to say about a refused quantity: the pack list or the range, from the rule the page holds now. */
   function quantityProblem(): string {
-    return invalidQuantityText(wording, labels.quantity, locale);
+    return invalidQuantityText(wording, labels.quantity);
   }
 
   const hasLocalErrors = Boolean(local.imei || local.bulk || local.quantity || local.file || Object.keys(local.inputs).length);
@@ -377,7 +375,7 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
         {intro}
 
         <div ref={bannerRef} tabIndex={-1} className="empty:hidden focus:outline-none" aria-live="polite">
-          {banner ? <BannerView banner={banner} labels={labels} locale={locale} hrefs={hrefs} reloading={reloading} onReload={() => startReload(() => router.refresh())} generic={f} /> : null}
+          {banner ? <BannerView banner={banner} labels={labels} hrefs={hrefs} reloading={reloading} onReload={() => startReload(() => router.refresh())} generic={f} /> : null}
         </div>
 
         <Card>
@@ -452,15 +450,15 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
                       hint={fmt(f.bulkHint, { max: MAX_BULK_IMEIS })}
                     />
                     <p className="text-small font-semibold text-ink" aria-live="polite">
-                      {plural(locale, readyCount, f.bulkReady, formatNumber(readyCount, locale))}
-                      {list.invalid.length + list.duplicates.length > 0 ? ` · ${fmt(f.bulkToFix, { count: formatNumber(new Set([...list.invalid, ...list.duplicates].map((l) => l.line)).size, locale) })}` : ""}
+                      {plural(readyCount, f.bulkReady, formatNumber(readyCount))}
+                      {list.invalid.length + list.duplicates.length > 0 ? ` · ${fmt(f.bulkToFix, { count: formatNumber(new Set([...list.invalid, ...list.duplicates].map((l) => l.line)).size) })}` : ""}
                     </p>
                     {lineProblems.length > 0 ? (
                       <ul className="grid gap-1 rounded-control bg-danger-soft px-3 py-2.5 text-small text-danger-ink">
                         {lineProblems.slice(0, 8).map((p) => (
                           <li key={p.line}>{p.text}</li>
                         ))}
-                        {lineProblems.length > 8 ? <li>… +{formatNumber(lineProblems.length - 8, locale)}</li> : null}
+                        {lineProblems.length > 8 ? <li>… +{formatNumber(lineProblems.length - 8)}</li> : null}
                       </ul>
                     ) : null}
                   </div>
@@ -479,7 +477,7 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
                   setQtyText(e.target.value);
                   dropServerError({ quantity: undefined });
                 }}
-                options={rule.options.map((n) => ({ value: String(n), label: formatNumber(n, locale) }))}
+                options={rule.options.map((n) => ({ value: String(n), label: formatNumber(n) }))}
                 error={shown.quantity}
                 fieldClassName="sm:max-w-xs"
               />
@@ -497,7 +495,7 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
                 inputMode="numeric"
                 autoComplete="off"
                 dir="ltr"
-                hint={<bdi>{quantityRuleText(wording, labels.quantity, locale)}</bdi>}
+                hint={<bdi>{quantityRuleText(wording, labels.quantity)}</bdi>}
                 error={shown.quantity}
                 fieldClassName="sm:max-w-xs"
               />
@@ -587,29 +585,29 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
             <DescriptionList>
               <DescriptionItem label={s.service}>{service.name}</DescriptionItem>
               <DescriptionItem label={s.unitPrice}>
-                <Money amount={service.price} currency={service.currency} locale={locale} />
+                <Money amount={service.price} currency={service.currency} />
               </DescriptionItem>
               <DescriptionItem label={s.quantity}>
-                <span className="num">{formatNumber(shownQuantity, locale)}</span>
+                <span className="num">{formatNumber(shownQuantity)}</span>
               </DescriptionItem>
               {needsImei && mode === "bulk" ? (
                 <DescriptionItem label={s.imeis}>
-                  <span className="num">{formatNumber(imeiCount, locale)}</span>
+                  <span className="num">{formatNumber(imeiCount)}</span>
                 </DescriptionItem>
               ) : null}
               <DescriptionItem label={s.total} emphasis>
-                <Money amount={total} currency={service.currency} locale={locale} />
+                <Money amount={total} currency={service.currency} />
               </DescriptionItem>
             </DescriptionList>
 
             {available !== null ? (
               <DescriptionList className="text-small">
                 <DescriptionItem label={s.available}>
-                  <Money amount={available} currency={service.currency} locale={locale} />
+                  <Money amount={available} currency={service.currency} />
                 </DescriptionItem>
                 {afterOrder !== null ? (
                   <DescriptionItem label={s.after}>
-                    <Money amount={afterOrder} currency={service.currency} locale={locale} />
+                    <Money amount={afterOrder} currency={service.currency} />
                   </DescriptionItem>
                 ) : null}
               </DescriptionList>
@@ -624,7 +622,7 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
             <Button type="submit" size="lg" block loading={submitting} aria-label={submitting ? s.placing : undefined}>
               <span>{s.place}</span>
               <span aria-hidden="true">·</span>
-              <Money amount={total} currency={service.currency} locale={locale} />
+              <Money amount={total} currency={service.currency} />
             </Button>
             <p className="text-small text-ink-subtle">{s.note}</p>
           </CardBody>
@@ -637,7 +635,6 @@ export function OrderForm({ service, available, locale, hrefs, labels, intro }: 
 function BannerView({
   banner,
   labels,
-  locale,
   hrefs,
   reloading,
   onReload,
@@ -645,7 +642,6 @@ function BannerView({
 }: {
   banner: Banner;
   labels: OrderFormLabels;
-  locale: Locale;
   hrefs: OrderFormProps["hrefs"];
   reloading: boolean;
   onReload: () => void;
@@ -665,8 +661,8 @@ function BannerView({
           }
         >
           {fmt(e.priceChangedText, {
-            listed: banner.listed ? ltr(formatMoney(banner.listed, "USD", locale)) : "—",
-            current: banner.current ? ltr(formatMoney(banner.current, "USD", locale)) : "—",
+            listed: banner.listed ? ltr(formatMoney(banner.listed, "USD")) : "—",
+            current: banner.current ? ltr(formatMoney(banner.current, "USD")) : "—",
           })}
         </Alert>
       );

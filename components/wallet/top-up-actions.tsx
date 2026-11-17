@@ -14,7 +14,6 @@ import { Ban } from "lucide-react";
 import { api, forgetCsrf } from "@/lib/api/browser";
 import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { UploadedFile } from "@/lib/api/types";
-import type { Locale } from "@/lib/i18n/config";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
 import { isSignedOutError } from "@/lib/merchant/signed-out";
@@ -37,14 +36,13 @@ export type TopUpActionsProps = {
   canReceipt: boolean;
   /** The same condition: the cancel button shows. */
   canCancel: boolean;
-  locale: Locale;
   labels: TopUpsMessages["actions"];
   errors: TopUpsMessages["errors"];
 };
 
 type Failure = { message: string; reference?: string };
 
-export function TopUpActions({ id, canReceipt, canCancel, locale, labels: t, errors }: TopUpActionsProps) {
+export function TopUpActions({ id, canReceipt, canCancel, labels: t, errors }: TopUpActionsProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const [receiptKeys] = useState(() => createIdempotencyKeys());
@@ -73,7 +71,7 @@ export function TopUpActions({ id, canReceipt, canCancel, locale, labels: t, err
       router.refresh();
       return null;
     }
-    return topUpErrorText(error, { action, generic: errorText, t: errors, locale });
+    return topUpErrorText(error, { action, generic: errorText, t: errors });
   }
 
   async function onSend(event: FormEvent<HTMLFormElement>) {

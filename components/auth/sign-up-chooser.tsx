@@ -7,19 +7,18 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Check, Store, UserRound } from "lucide-react";
-import { localePath, type Locale } from "@/lib/i18n/config";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
+import { sitePath } from "@/lib/site-path";
 import { ButtonLink } from "@/components/ui/button";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-card";
 import { authLinkClass } from "./auth-heading";
 import { MagicLinkForm } from "./magic-link-form";
 
 export type SignUpChooserProps = {
-  locale: Locale;
   t: Pick<AuthMessages, "fields" | "shared" | "signUp" | "signIn">;
 };
 
-export function SignUpChooser({ locale, t }: SignUpChooserProps) {
+export function SignUpChooser({ t }: SignUpChooserProps) {
   const params = useSearchParams();
   const [kind, setKind] = useState<"customer" | "merchant">(params.get("as") === "merchant" ? "merchant" : "customer");
 
@@ -48,7 +47,6 @@ export function SignUpChooser({ locale, t }: SignUpChooserProps) {
 
       {kind === "customer" ? (
         <MagicLinkForm
-          locale={locale}
           strings={{
             email: t.fields.email,
             emailPlaceholder: t.fields.emailPlaceholder,
@@ -71,7 +69,7 @@ export function SignUpChooser({ locale, t }: SignUpChooserProps) {
               </li>
             ))}
           </ul>
-          <ButtonLink href={localePath(locale, "/merchant/register")} size="lg" block>
+          <ButtonLink href={sitePath("/merchant/register")} size="lg" block>
             {t.signUp.merchantInfo.submit}
           </ButtonLink>
         </div>
@@ -79,7 +77,7 @@ export function SignUpChooser({ locale, t }: SignUpChooserProps) {
 
       <p className="text-center text-body text-ink-muted">
         {t.signUp.haveAccount}{" "}
-        <Link href={localePath(locale, "/sign-in")} className={authLinkClass}>
+        <Link href={sitePath("/sign-in")} className={authLinkClass}>
           {t.signIn.submit}
         </Link>
       </p>

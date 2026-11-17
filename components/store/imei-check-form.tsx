@@ -17,18 +17,16 @@ import type { ImeiCheckResult } from "@/lib/api/types";
 import { formatDateTime, isValidImei, normalizeImei } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
-import type { Locale } from "@/lib/i18n/config";
 import type { StoreMessages } from "@/lib/i18n/messages/store";
 
 export type ImeiCheckFormProps = {
-  locale: Locale;
   labels: StoreMessages["imei"];
   /** Prefill from `?imei=` (the home page's quick check). A valid one is checked as soon as the security check is ready. */
   initialImei: string;
   servicesHref: string;
 };
 
-export function ImeiCheckForm({ locale, labels, initialImei, servicesHref }: ImeiCheckFormProps) {
+export function ImeiCheckForm({ labels, initialImei, servicesHref }: ImeiCheckFormProps) {
   const errorText = useErrorText();
   const [imei, setImei] = useState(initialImei);
   const [token, setToken] = useState<string | null>(null);
@@ -190,7 +188,7 @@ export function ImeiCheckForm({ locale, labels, initialImei, servicesHref }: Ime
               </section>
 
               <p className="text-small text-ink-subtle">
-                {labels.checkedAt}: {formatDateTime(result.checkedAt, locale)}
+                {labels.checkedAt}: {formatDateTime(result.checkedAt)}
               </p>
               <Link
                 href="#"

@@ -21,7 +21,7 @@ const PACKS: QuantityRule = { min: 5, max: 25, options: [5, 10, 25] };
 const EXACT: QuantityRule = { min: 5, max: 5, options: [] };
 const ONE_PACK: QuantityRule = { min: 10, max: 10, options: [10] };
 
-const en = common.en.quantity;
+const en = common.quantity;
 
 describe("quantityMode (BH §14.2)", () => {
   it("one per order is single", () => {
@@ -129,31 +129,31 @@ describe("coerceQuantity", () => {
 
 describe("quantityRuleText", () => {
   it("says the rule in English", () => {
-    expect(quantityRuleText(SINGLE, en, "en")).toBe("1 per order");
-    expect(quantityRuleText(EXACT, en, "en")).toBe("5 per order");
-    expect(quantityRuleText(ONE_PACK, en, "en")).toBe("10 per order");
-    expect(quantityRuleText(RANGE, en, "en")).toBe("2 to 50 per order");
-    expect(quantityRuleText(PACKS, en, "en")).toBe("Packs of 5, 10, 25");
+    expect(quantityRuleText(SINGLE, en)).toBe("1 per order");
+    expect(quantityRuleText(EXACT, en)).toBe("5 per order");
+    expect(quantityRuleText(ONE_PACK, en)).toBe("10 per order");
+    expect(quantityRuleText(RANGE, en)).toBe("2 to 50 per order");
+    expect(quantityRuleText(PACKS, en)).toBe("Packs of 5, 10, 25");
   });
   it("groups the digits of large numbers", () => {
-    expect(quantityRuleText({ min: 1, max: 100000, options: [] }, en, "en")).toBe("1 to 100,000 per order");
+    expect(quantityRuleText({ min: 1, max: 100000, options: [] }, en)).toBe("1 to 100,000 per order");
   });
 });
 
 describe("invalidQuantityText (BH §14.6)", () => {
   it("packs: lists the packs", () => {
-    expect(invalidQuantityText(PACKS, en, "en")).toBe("Choose one of these quantities: 5, 10, 25.");
+    expect(invalidQuantityText(PACKS, en)).toBe("Choose one of these quantities: 5, 10, 25.");
   });
   it("range: names the bounds", () => {
-    expect(invalidQuantityText(RANGE, en, "en")).toBe("Enter a quantity from 2 to 50.");
+    expect(invalidQuantityText(RANGE, en)).toBe("Enter a quantity from 2 to 50.");
   });
   it("exactly N and one per order: names the one quantity, never a range from N to N", () => {
-    expect(invalidQuantityText(EXACT, en, "en")).toBe("This service sells 5 per order.");
-    expect(invalidQuantityText(SINGLE, en, "en")).toBe("This service sells 1 per order.");
-    expect(invalidQuantityText(EXACT, en, "en")).not.toMatch(/from 5 to 5/);
+    expect(invalidQuantityText(EXACT, en)).toBe("This service sells 5 per order.");
+    expect(invalidQuantityText(SINGLE, en)).toBe("This service sells 1 per order.");
+    expect(invalidQuantityText(EXACT, en)).not.toMatch(/from 5 to 5/);
   });
   it("is built from the rule after a re-read, not from the old one", () => {
-    expect(invalidQuantityText({ min: 20, max: 40, options: [20, 40] }, en, "en")).toBe("Choose one of these quantities: 20, 40.");
+    expect(invalidQuantityText({ min: 20, max: 40, options: [20, 40] }, en)).toBe("Choose one of these quantities: 20, 40.");
   });
 });
 
@@ -194,8 +194,8 @@ describe("the strings of common.quantity", () => {
     }
   });
   it("builds the subtotal label with the plural forms", () => {
-    expect(plural("en", 1, en.subtotal)).toBe("Subtotal (1 unit)");
-    expect(plural("en", 3, en.subtotal)).toBe("Subtotal (3 units)");
+    expect(plural(1, en.subtotal)).toBe("Subtotal (1 unit)");
+    expect(plural(3, en.subtotal)).toBe("Subtotal (3 units)");
   });
   it("uses the handoff's own wording (BH §14.6)", () => {
     expect(en.invalidRange).toBe("Enter a quantity from {min} to {max}.");

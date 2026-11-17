@@ -14,7 +14,7 @@ const rewriteOrigin = (process.env.GSM_API_REWRITE_ORIGIN || apiOrigin).replace(
 const nextConfig: NextConfig = {
   experimental: {
     agentFeedback: true,
-    // The root layout is `app/[lang]/layout.tsx`, so unmatched URLs need a global 404 page.
+    // The root layout is `app/en/layout.tsx`, so unmatched URLs need a global 404 page.
     globalNotFound: true,
   },
   cacheComponents: true,

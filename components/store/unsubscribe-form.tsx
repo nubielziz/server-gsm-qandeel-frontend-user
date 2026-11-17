@@ -9,9 +9,9 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import { pathOf } from "@/lib/api/query";
-import { localePath, type Locale } from "@/lib/i18n/config";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { NotificationsMessages } from "@/lib/i18n/messages/notifications";
+import { sitePath } from "@/lib/site-path";
 import { FormAlert } from "@/components/auth/form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "@/components/auth/form-errors";
 import { useFocusOnFeedback } from "@/components/auth/use-focus-on-feedback";
@@ -22,11 +22,10 @@ import { Button, ButtonLink } from "@/components/ui/button";
 const MAX_TOKEN_LENGTH = 100;
 
 export type UnsubscribeFormProps = {
-  locale: Locale;
   t: NotificationsMessages["unsubscribe"];
 };
 
-export function UnsubscribeForm({ locale, t }: UnsubscribeFormProps) {
+export function UnsubscribeForm({ t }: UnsubscribeFormProps) {
   const raw = useSearchParams().get("token")?.trim() ?? "";
   const token = raw.length > 0 && raw.length <= MAX_TOKEN_LENGTH ? raw : null;
   const errorText = useErrorText();
@@ -66,7 +65,7 @@ export function UnsubscribeForm({ locale, t }: UnsubscribeFormProps) {
   }
 
   const back = (
-    <ButtonLink href={localePath(locale)} variant="secondary" size="lg">
+    <ButtonLink href={sitePath()} variant="secondary" size="lg">
       {t.backHome}
     </ButtonLink>
   );

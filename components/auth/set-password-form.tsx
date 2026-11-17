@@ -7,9 +7,9 @@ import { useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
-import { localePath, type Locale } from "@/lib/i18n/config";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
+import { sitePath } from "@/lib/site-path";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -20,11 +20,10 @@ import { useFocusOnFeedback } from "./use-focus-on-feedback";
 
 export type SetPasswordFormProps = {
   surface: "customer" | "merchant";
-  locale: Locale;
   t: Pick<AuthMessages, "fields" | "shared" | "setPassword">;
 };
 
-export function SetPasswordForm({ surface, locale, t }: SetPasswordFormProps) {
+export function SetPasswordForm({ surface, t }: SetPasswordFormProps) {
   const token = useSearchParams().get("token");
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
@@ -36,8 +35,8 @@ export function SetPasswordForm({ surface, locale, t }: SetPasswordFormProps) {
 
   useFocusOnFeedback(feedback, form);
 
-  const forgot = `${localePath(locale, "/forgot-password")}?as=${surface}`;
-  const signIn = `${localePath(locale, "/sign-in")}?as=${surface}`;
+  const forgot = `${sitePath("/forgot-password")}?as=${surface}`;
+  const signIn = `${sitePath("/sign-in")}?as=${surface}`;
   const newLink = (
     <ButtonLink href={forgot} size="lg" block>
       {t.shared.requestNewLink}

@@ -6,7 +6,6 @@
 //   waiting appears when there are any. Amounts are USD.
 // Server component, no hooks: the page passes the translated labels.
 import type { ReactNode } from "react";
-import type { Locale } from "@/lib/i18n/config";
 import { Money } from "@/components/ui/money";
 import { StatCard } from "@/components/ui/stat-card";
 
@@ -31,7 +30,6 @@ export type WalletCardLabels = {
 };
 
 export type WalletBalanceCardsProps = {
-  locale: Locale;
   amounts: WalletAmounts;
   labels: WalletCardLabels;
   /** Shows the reserved card (merchant). Default: when `amounts.reserved` is given. */
@@ -50,7 +48,6 @@ export type WalletBalanceCardsProps = {
 const XL_COLUMNS: Record<number, string> = { 2: "xl:grid-cols-2", 3: "xl:grid-cols-3", 4: "xl:grid-cols-4" };
 
 export function WalletBalanceCards({
-  locale,
   amounts,
   labels,
   showReserved = amounts.reserved !== undefined,
@@ -60,7 +57,7 @@ export function WalletBalanceCards({
   pending,
 }: WalletBalanceCardsProps) {
   const count = 2 + (showReserved ? 1 : 0) + (showCreditLimit ? 1 : 0) + (pending ? 1 : 0);
-  const money = (amount: string) => <Money amount={amount} currency="USD" locale={locale} />;
+  const money = (amount: string) => <Money amount={amount} currency="USD" />;
   return (
     <div className={`grid gap-4 sm:grid-cols-2 ${XL_COLUMNS[Math.min(4, count)]}`}>
       <StatCard

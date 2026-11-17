@@ -5,14 +5,14 @@ import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/container";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { localePath } from "@/lib/i18n/config";
-import { getLocale, getMessages } from "@/lib/i18n/server";
+import { sitePath } from "@/lib/site-path";
 import { merchant } from "@/lib/i18n/messages/merchant";
 import { portal } from "@/lib/i18n/messages/portal";
 
 /** `title`: the page heading to show above the notice, for detail pages whose whole content is behind <Suspense>. */
-export async function PendingNotice({ title }: { title?: string }) {
-  const [locale, t, p] = await Promise.all([getLocale(), getMessages(merchant), getMessages(portal)]);
+export function PendingNotice({ title }: { title?: string }) {
+  const t = merchant;
+  const p = portal;
   const notice = (
     <Card>
       <EmptyState
@@ -21,10 +21,10 @@ export async function PendingNotice({ title }: { title?: string }) {
         description={p.pending.unavailable}
         action={
           <div className="flex flex-wrap justify-center gap-3">
-            <ButtonLink href={localePath(locale, "/merchant/settings")} variant="primary">
+            <ButtonLink href={sitePath("/merchant/settings")} variant="primary">
               {t.shared.openSettings}
             </ButtonLink>
-            <ButtonLink href={localePath(locale, "/merchant/settings/verification")} variant="secondary">
+            <ButtonLink href={sitePath("/merchant/settings/verification")} variant="secondary">
               {t.shared.completeVerification}
             </ButtonLink>
           </div>

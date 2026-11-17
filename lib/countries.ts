@@ -1,7 +1,7 @@
-// ISO 3166-1 alpha-2 countries with names in the page language (Intl.DisplayNames, no data files).
+// ISO 3166-1 alpha-2 countries with names in English (Intl.DisplayNames, no data files).
 // The API wants upper-case 2-letter codes (checkout `country` locks the tax; merchant sign-up and profile `country`).
 // Safe to import anywhere.
-import type { Locale } from "@/lib/i18n/config";
+import { INTL_LOCALE } from "@/lib/i18n/config";
 
 export const COUNTRY_CODES = [
   "AD","AE","AF","AG","AI","AL","AM","AO","AQ","AR","AS","AT","AU","AW","AX","AZ","BA","BB","BD","BE","BF","BG","BH",
@@ -20,27 +20,25 @@ export const COUNTRY_CODES = [
 export type CountryCode = (typeof COUNTRY_CODES)[number];
 export type CountryOption = { code: string; name: string };
 
-const lists = new Map<Locale, CountryOption[]>();
+let list: CountryOption[] | undefined;
 
-/** All countries as `{ code, name }`, sorted by name in the page language. */
-export function countryOptions(locale: Locale): CountryOption[] {
-  let list = lists.get(locale);
+/** All countries as `{ code, name }`, sorted by name in English. */
+export function countryOptions(): CountryOption[] {
   if (!list) {
-    const names = new Intl.DisplayNames([locale], { type: "region" });
-    const collator = new Intl.Collator(locale);
+    const names = new Intl.DisplayNames([INTL_LOCALE], { type: "region" });
+    const collator = new Intl.Collator(INTL_LOCALE);
     list = COUNTRY_CODES.map((code) => ({ code, name: names.of(code) ?? code })).sort((a, b) =>
       collator.compare(a.name, b.name),
     );
-    lists.set(locale, list);
   }
   return list;
 }
 
 /** One country's name in English ("JO" → "Jordan"); the code itself when unknown or empty. */
-export function countryName(code: string, locale: Locale): string {
+export function countryName(code: string): string {
   if (!code) return "";
   try {
-    return new Intl.DisplayNames([locale], { type: "region" }).of(code.toUpperCase()) ?? code;
+    return new Intl.DisplayNames([INTL_LOCALE], { type: "region" }).of(code.toUpperCase()) ?? code;
   } catch {
     return code;
   }

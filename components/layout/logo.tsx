@@ -2,8 +2,7 @@
 // added it; until then a text monogram ("GSM" in a near-black rounded square). Never an SVG drawing.
 import Image from "next/image";
 import Link from "next/link";
-import { localePath } from "@/lib/i18n/config";
-import { getLocale, getMessages } from "@/lib/i18n/server";
+import { sitePath } from "@/lib/site-path";
 import { common } from "@/lib/i18n/messages/common";
 import { siteImage } from "@/lib/site-images";
 import { cn } from "@/lib/cn";
@@ -15,7 +14,7 @@ export type LogoProps = {
   tagline?: boolean;
   /** `inverse` for dark surfaces (header on the rail, footer). */
   tone?: "default" | "inverse";
-  /** Where it links; defaults to the shop home in the current language. */
+  /** Where it links; defaults to the shop home (`/en`). */
   href?: string;
   className?: string;
 };
@@ -48,13 +47,13 @@ function Mark({ tone, size }: { tone: "default" | "inverse"; size: number }) {
   );
 }
 
-/** The site logo as a link to the shop home. Server component (reads the language from the route). */
-export async function Logo({ variant = "full", tagline, tone = "default", href, className }: LogoProps) {
-  const [locale, t] = await Promise.all([getLocale(), getMessages(common)]);
+/** The site logo as a link to the shop home. Server component. */
+export function Logo({ variant = "full", tagline, tone = "default", href, className }: LogoProps) {
+  const t = common;
   const inverse = tone === "inverse";
   return (
     <Link
-      href={href ?? localePath(locale)}
+      href={href ?? sitePath()}
       aria-label={t.brand.logoAlt}
       className={cn(
         "inline-flex min-h-11 shrink-0 items-center rounded-control",

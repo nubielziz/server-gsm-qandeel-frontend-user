@@ -14,7 +14,6 @@ import { api, forgetCsrf } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { TopUpDetail } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
 import { ltr } from "@/lib/merchant/format";
@@ -54,11 +53,10 @@ export type TopUpReturnPollerProps = {
   id: string;
   /** The top-up's own page. */
   href: string;
-  locale: Locale;
   labels: TopUpsMessages["poller"];
 };
 
-export function TopUpReturnPoller({ id, href, locale, labels: t }: TopUpReturnPollerProps) {
+export function TopUpReturnPoller({ id, href, labels: t }: TopUpReturnPollerProps) {
   const router = useRouter();
   const [state, setState] = useState<PollState>({ phase: "waiting" });
 
@@ -108,7 +106,7 @@ export function TopUpReturnPoller({ id, href, locale, labels: t }: TopUpReturnPo
     };
   }, [id, router]);
 
-  const money = (amount: string) => ltr(formatMoney(amount, "USD", locale));
+  const money = (amount: string) => ltr(formatMoney(amount, "USD"));
   const view: Record<Phase, { tone: AlertTone; title: string; text: string; busy?: boolean }> = {
     waiting: { tone: "info", title: t.waiting, text: t.waitingText, busy: true },
     in_review: { tone: "info", title: t.inReview, text: t.inReviewText },

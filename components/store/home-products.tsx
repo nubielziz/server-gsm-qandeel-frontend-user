@@ -7,7 +7,7 @@
 import { ArrowRight } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { pageHref } from "@/components/ui/pagination";
-import { localePath } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 import { plural } from "@/lib/i18n/define";
 import { formatNumber } from "@/lib/format";
 import type { StoreMessages } from "@/lib/i18n/messages/store";
@@ -24,13 +24,13 @@ export async function HomeProducts({ searchParams }: { searchParams: Promise<Sea
   const data = await loadServiceList(searchParams, CONFIG);
   // Nothing is listed in this language: the featured section already says so.
   if (data.list.catalogSize === 0) return null;
-  const { locale, t } = data;
+  const { t } = data;
   return (
     <section id={ALL_SERVICES_ID} aria-labelledby={HEADING_ID} className="grid scroll-mt-6 gap-4">
       <SectionHeading
         t={t.home.products}
-        total={plural(locale, data.list.catalogSize, t.catalog.results, formatNumber(data.list.catalogSize, locale))}
-        catalogHref={pageHref(localePath(locale, "/services"), data.state, 1)}
+        total={plural(data.list.catalogSize, t.catalog.results, formatNumber(data.list.catalogSize))}
+        catalogHref={pageHref(sitePath("/services"), data.state, 1)}
       />
       <ServiceList data={data} config={CONFIG} />
     </section>

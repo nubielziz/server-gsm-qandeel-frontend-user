@@ -13,7 +13,6 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { formatNumber } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { bellMotion } from "@/lib/notifications/bell-motion";
 import { notificationHref, type NotificationSurface } from "@/lib/notifications/link";
@@ -25,7 +24,6 @@ import { toast } from "@/components/ui/toast";
 
 export type NotificationStreamProps = {
   surface: NotificationSurface;
-  locale: Locale;
   /** The notifications page of this area, language-prefixed: no toast on it, and where a toast without a link leads. */
   href: string;
   /** `view` is the toast's link; `many` has a `{count}` placeholder. */
@@ -34,12 +32,12 @@ export type NotificationStreamProps = {
 
 const TOAST_MS = 6_000;
 
-export function NotificationStream({ surface, locale, href, labels }: NotificationStreamProps) {
+export function NotificationStream({ surface, href, labels }: NotificationStreamProps) {
   const pathname = usePathname();
   // The handlers below outlive a render: they read the latest props from here instead of restarting the stream.
-  const latest = useRef({ pathname, locale, href, labels });
+  const latest = useRef({ pathname, href, labels });
   useEffect(() => {
-    latest.current = { pathname, locale, href, labels };
+    latest.current = { pathname, href, labels };
   });
 
   useEffect(() => {
@@ -50,19 +48,19 @@ export function NotificationStream({ surface, locale, href, labels }: Notificati
         clearTimeout: (handle) => window.clearTimeout(handle as number),
       },
       showOne(item) {
-        const { locale: pageLocale, href: listHref, labels: texts } = latest.current;
+        const { href: listHref, labels: texts } = latest.current;
         toast({
           title: item.title,
           description: toastDescription(item.body) || undefined,
           tone: "info",
           duration: TOAST_MS,
-          action: { label: texts.view, href: notificationHref(item.link, pageLocale, surface) ?? listHref },
+          action: { label: texts.view, href: notificationHref(item.link, surface) ?? listHref },
         });
       },
       showMany(count) {
-        const { locale: pageLocale, href: listHref, labels: texts } = latest.current;
+        const { href: listHref, labels: texts } = latest.current;
         toast({
-          title: fmt(texts.many, { count: formatNumber(count, pageLocale) }),
+          title: fmt(texts.many, { count: formatNumber(count) }),
           tone: "info",
           duration: TOAST_MS,
           action: { label: texts.view, href: listHref },

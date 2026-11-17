@@ -27,9 +27,9 @@ import { Input } from "@/components/ui/input";
 import { Money } from "@/components/ui/money";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
-import { localePath, type Locale } from "@/lib/i18n/config";
 import type { StoreMessages } from "@/lib/i18n/messages/store";
 import { siteImage } from "@/lib/site-images";
+import { sitePath } from "@/lib/site-path";
 import { BannerArt, OutlineTag, linkArrow as arrow, litSurface } from "./banner";
 import { ServiceCardMiniSkeleton } from "./service-card";
 import { Logo, logoFile } from "./service-art";
@@ -60,12 +60,12 @@ export function GuestPoint({ guestCheckout, t }: { guestCheckout: boolean; t: Ho
 }
 
 /** "$0.79 Starting from": the lowest listed price in the visitor's currency (the page streams it). */
-export function HeroPrice({ amount, currency, locale, decimals, label }: { amount: string; currency: string; locale: Locale; decimals: number; label: string }) {
+export function HeroPrice({ amount, currency, decimals, label }: { amount: string; currency: string; decimals: number; label: string }) {
   return (
     <p className="flex items-baseline gap-2.5">
       {/* The amount shows first, like the mockup; it is still read as "Starting from $0.79". */}
       <span className="text-small font-medium text-on-inverse-muted order-2">{label}</span>
-      <Money amount={amount} currency={currency} locale={locale} decimals={decimals} className="text-stat text-on-inverse" />
+      <Money amount={amount} currency={currency} decimals={decimals} className="text-stat text-on-inverse" />
     </p>
   );
 }
@@ -79,7 +79,7 @@ export function HeroPriceSpace() {
   );
 }
 
-export function HomeHero({ locale, t, thirdPoint, price }: { locale: Locale; t: Home; thirdPoint: ReactNode; price: ReactNode }) {
+export function HomeHero({ t, thirdPoint, price }: { t: Home; thirdPoint: ReactNode; price: ReactNode }) {
   return (
     <Card tone="inverse" className={cn("relative overflow-hidden lg:min-h-[25.5rem]", litSurface("home-hero.jpg", "inverse"))}>
       {/* Eager instead of a preload: the largest image depends on the screen (this one from md up, the promo below it),
@@ -106,7 +106,7 @@ export function HomeHero({ locale, t, thirdPoint, price }: { locale: Locale; t: 
         </ul>
         <div className="grid justify-items-start gap-4">
           {price}
-          <ButtonLink href={localePath(locale, "/services")} variant="inverse" endIcon={arrow}>
+          <ButtonLink href={sitePath("/services")} variant="inverse" endIcon={arrow}>
             {t.hero.cta}
           </ButtonLink>
         </div>
@@ -116,7 +116,7 @@ export function HomeHero({ locale, t, thirdPoint, price }: { locale: Locale; t: 
 }
 
 /** Quick IMEI check: a GET form to the IMEI check page (the page validates and checks). */
-export function QuickImeiCard({ locale, t }: { locale: Locale; t: Home }) {
+export function QuickImeiCard({ t }: { t: Home }) {
   return (
     <Card className="sheen-surface justify-center p-5 sm:p-6">
       <div className="flex items-start gap-3">
@@ -128,7 +128,7 @@ export function QuickImeiCard({ locale, t }: { locale: Locale; t: Home }) {
           <p className="text-small text-ink-muted">{t.quick.text}</p>
         </div>
       </div>
-      <Form action={localePath(locale, "/imei-check")} className="mt-4">
+      <Form action={sitePath("/imei-check")} className="mt-4">
         <Input
           name="imei"
           label={t.quick.label}
@@ -151,7 +151,7 @@ export function QuickImeiCard({ locale, t }: { locale: Locale; t: Home }) {
 }
 
 /** Dark promo card: where to track an order. */
-export function TrackPromoCard({ locale, t }: { locale: Locale; t: Home }) {
+export function TrackPromoCard({ t }: { t: Home }) {
   return (
     <Card tone="inverse" className={cn("relative flex-1 overflow-hidden", litSurface("home-promo.jpg", "inverse"))}>
       {/* Above the fold on phones: load it at once and first (plan P4.2), not when lazy loading reaches it. */}
@@ -168,7 +168,7 @@ export function TrackPromoCard({ locale, t }: { locale: Locale; t: Home }) {
         <p className="text-micro uppercase text-on-inverse-muted">{t.promo.eyebrow}</p>
         <h2 className="text-heading text-on-inverse">{t.promo.title}</h2>
         <p className="max-w-[18rem] text-small text-on-inverse-muted">{t.promo.text}</p>
-        <ButtonLink href={localePath(locale, "/track")} variant="inverse" size="sm" className="mt-1.5" endIcon={arrow}>
+        <ButtonLink href={sitePath("/track")} variant="inverse" size="sm" className="mt-1.5" endIcon={arrow}>
           {t.promo.cta}
         </ButtonLink>
       </div>
@@ -216,8 +216,8 @@ function TileMark({ tile }: { tile: CatalogTile }) {
  * A strip of tiles (mockup: the category row): the brands and carriers with the most services, then the whole catalog.
  * Each tile opens the catalog filtered by it. Scrolls sideways on small screens.
  */
-export function CatalogTiles({ tiles, all, locale, label }: { tiles: CatalogTile[]; all: { name: string; count: string }; locale: Locale; label: string }) {
-  const services = localePath(locale, "/services");
+export function CatalogTiles({ tiles, all, label }: { tiles: CatalogTile[]; all: { name: string; count: string }; label: string }) {
+  const services = sitePath("/services");
   return (
     // `min-w-0`: as a grid item the strip must scroll inside the page, not widen it. `reveal`: it fades and rises in as
     // it scrolls into view on screens where it starts below the fold (globals.css).
@@ -364,11 +364,11 @@ type Banner = {
 };
 
 /** Three banners to the other parts of the site: merchants, help center, support. */
-export function DestinationBanners({ locale, t }: { locale: Locale; t: Home["explore"] }) {
+export function DestinationBanners({ t }: { t: Home["explore"] }) {
   const banners: Banner[] = [
-    { key: "merchants", tone: "inverse", file: "home-merchants.jpg", icon: Store, href: localePath(locale, "/merchant/register") },
-    { key: "help", tone: "light", file: "home-help.jpg", icon: LifeBuoy, href: localePath(locale, "/help") },
-    { key: "support", tone: "light", file: "home-support.jpg", icon: Headset, href: localePath(locale, "/support") },
+    { key: "merchants", tone: "inverse", file: "home-merchants.jpg", icon: Store, href: sitePath("/merchant/register") },
+    { key: "help", tone: "light", file: "home-help.jpg", icon: LifeBuoy, href: sitePath("/help") },
+    { key: "support", tone: "light", file: "home-support.jpg", icon: Headset, href: sitePath("/support") },
   ];
   return (
     <ul className="reveal-grid grid gap-4 lg:grid-cols-3">

@@ -14,8 +14,7 @@
 // GET form). The phone copy carries `autofocus`, so the row's popover focuses it inside
 // the tap (a phone then opens its keyboard).
 import { Headset, LayoutGrid, ScanSearch, Store, PackageSearch, LifeBuoy } from "lucide-react";
-import { localePath } from "@/lib/i18n/config";
-import { getLocale, getMessages } from "@/lib/i18n/server";
+import { sitePath } from "@/lib/site-path";
 import { common } from "@/lib/i18n/messages/common";
 import { search as searchMessages } from "@/lib/i18n/messages/search";
 import { SearchInput } from "@/components/ui/search-input";
@@ -41,9 +40,10 @@ const drawerLinkClasses =
 
 /** The shop header. Render it in the (store) layout; it needs no props. */
 export async function StoreHeader() {
-  const [locale, t, s] = await Promise.all([getLocale(), getMessages(common), getMessages(searchMessages)]);
+  const t = common;
+  const s = searchMessages;
   const categories = await loadMenuCategories();
-  const p = (path: string) => localePath(locale, path);
+  const p = (path: string) => sitePath(path);
 
   // The combobox's texts (it is a Client Component: it gets only the strings it shows).
   const labels: SearchComboboxLabels = {
@@ -94,7 +94,6 @@ export async function StoreHeader() {
       </NavLink>
       <CategoryMenu
         categories={categories}
-        locale={locale}
         label={t.nav.allCategories}
         listLabel={t.nav.categories}
         triggerClassName={navLinkClasses}
@@ -127,7 +126,7 @@ export async function StoreHeader() {
           <LayoutGrid aria-hidden="true" />
           {t.nav.allServices}
         </NavLink>
-        <CategoryDrawerList categories={categories} locale={locale} label={t.nav.categories} summaryClassName={drawerLinkClasses} />
+        <CategoryDrawerList categories={categories} label={t.nav.categories} summaryClassName={drawerLinkClasses} />
         <NavLink href={p("/imei-check")} className={drawerLinkClasses}>
           <ScanSearch aria-hidden="true" />
           {t.nav.imeiCheck}

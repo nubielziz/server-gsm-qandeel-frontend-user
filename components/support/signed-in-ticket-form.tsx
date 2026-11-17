@@ -9,10 +9,10 @@ import { useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { ClientTicket, MyTicketCreated, SignedInTicketInput, Ticket } from "@/lib/api/types";
-import { localePath, type Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
+import { sitePath } from "@/lib/site-path";
 import { FormAlert } from "@/components/auth/form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "@/components/auth/form-errors";
 import { useFocusOnFeedback } from "@/components/auth/use-focus-on-feedback";
@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/input";
 
 export type SignedInTicketFormProps = {
-  locale: Locale;
   area: "customer" | "merchant";
   t: Pick<SupportMessages, "form" | "newForm">;
   /** The person's orders for the picker, already named for their area (`SF-12 · Service · Nov 9, 2026`). */
@@ -33,7 +32,7 @@ const CATEGORIES: readonly Ticket["category"][] = ["refund", "delay", "failed_un
 const SUBJECT_MAX = 150;
 const MESSAGE_MAX = 4000;
 
-export function SignedInTicketForm({ locale, area, t, orders, defaultOrderId = null }: SignedInTicketFormProps) {
+export function SignedInTicketForm({ area, t, orders, defaultOrderId = null }: SignedInTicketFormProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
@@ -74,11 +73,11 @@ export function SignedInTicketForm({ locale, area, t, orders, defaultOrderId = n
       if (area === "customer") {
         const ticket = await api.post<MyTicketCreated>("/store/v1/me/tickets", body);
         leaving = true;
-        router.push(localePath(locale, `/support/tickets/${encodeURIComponent(ticket.token)}`));
+        router.push(sitePath(`/support/tickets/${encodeURIComponent(ticket.token)}`));
       } else {
         const ticket = await api.post<ClientTicket>("/client/tickets", body);
         leaving = true;
-        router.push(localePath(locale, `/merchant/support/${ticket.id}`));
+        router.push(sitePath(`/merchant/support/${ticket.id}`));
       }
     } catch (error) {
       setFeedback(

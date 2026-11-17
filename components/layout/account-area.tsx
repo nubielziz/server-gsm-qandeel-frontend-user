@@ -10,8 +10,7 @@ import { apiSessionGet } from "@/lib/api/server";
 import { getCustomer, getMerchant, MERCHANT_CSRF_COOKIE, STORE_CSRF_COOKIE } from "@/lib/api/session";
 import type { CustomerWallet, MerchantWallet } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
-import { localePath } from "@/lib/i18n/config";
-import { getLocale, getMessages } from "@/lib/i18n/server";
+import { sitePath } from "@/lib/site-path";
 import { common } from "@/lib/i18n/messages/common";
 import { settle, type Settled } from "@/lib/merchant/load";
 import { walletCapabilities } from "@/lib/wallet/view";
@@ -61,17 +60,16 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
   // by itself when its surface has no session cookie, and dropped below when the session turns out signed out (401) or the
   // merchant is pending. Personal reads stay no-store and per request. The compact shop header of a checkout (avatar only)
   // never reads the customer's wallet.
-  const [locale, t, merchant, customer, merchantWallet, customerRead] = await Promise.all([
-    getLocale(),
-    getMessages(common),
+  const [merchant, customer, merchantWallet, customerRead] = await Promise.all([
     getMerchant().catch(() => null),
     getCustomer().catch(() => null),
     getWallet(),
     compact ? null : readCustomerWallet(),
   ]);
+  const t = common;
 
   if (!merchant && !customer) {
-    const signIn = localePath(locale, "/sign-in");
+    const signIn = sitePath("/sign-in");
     return (
       <>
         {/* Phones: an icon-only button keeps the header on one line. */}
@@ -116,21 +114,21 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
       )}
       {wallet ? (
         <Link
-          href={localePath(locale, "/merchant/wallet")}
+          href={sitePath("/merchant/wallet")}
           aria-label={`${t.header.wallet}: ${wallet.available} USD`}
           className="btn-motion btn-lift-soft hidden h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold hover:border-ink sm:inline-flex"
         >
           <Wallet aria-hidden="true" className="size-[18px]" />
-          <Money amount={wallet.available} currency="USD" locale={locale} />
+          <Money amount={wallet.available} currency="USD" />
         </Link>
       ) : customerWallet && customerShows ? (
         <Link
-          href={localePath(locale, "/account/wallet")}
-          aria-label={`${t.header.storeBalance}: ${formatMoney(customerWallet.available, "USD", locale)}`}
+          href={sitePath("/account/wallet")}
+          aria-label={`${t.header.storeBalance}: ${formatMoney(customerWallet.available, "USD")}`}
           className="btn-motion btn-lift-soft hidden h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold hover:border-ink sm:inline-flex"
         >
           <Wallet aria-hidden="true" className="size-[18px]" />
-          <Money amount={customerWallet.available} currency="USD" locale={locale} />
+          <Money amount={customerWallet.available} currency="USD" />
         </Link>
       ) : null}
       <Menu
@@ -150,20 +148,20 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
         </MenuLabel>
         <MenuSeparator />
         {merchant ? (
-          <MenuItem href={localePath(locale, "/merchant")} icon={<LayoutDashboard aria-hidden="true" />}>
+          <MenuItem href={sitePath("/merchant")} icon={<LayoutDashboard aria-hidden="true" />}>
             {t.header.merchantPortal}
           </MenuItem>
         ) : null}
         {customer ? (
           <>
-            <MenuItem href={localePath(locale, "/account")} icon={<UserRound aria-hidden="true" />}>
+            <MenuItem href={sitePath("/account")} icon={<UserRound aria-hidden="true" />}>
               {t.header.myAccount}
             </MenuItem>
-            <MenuItem href={localePath(locale, "/account/orders")} icon={<ClipboardList aria-hidden="true" />}>
+            <MenuItem href={sitePath("/account/orders")} icon={<ClipboardList aria-hidden="true" />}>
               {t.header.myOrders}
             </MenuItem>
             {customerShows ? (
-              <MenuItem href={localePath(locale, "/account/wallet")} icon={<Wallet aria-hidden="true" />}>
+              <MenuItem href={sitePath("/account/wallet")} icon={<Wallet aria-hidden="true" />}>
                 {t.header.myWallet}
               </MenuItem>
             ) : null}

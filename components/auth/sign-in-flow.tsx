@@ -19,9 +19,9 @@ import { Mail, Store } from "lucide-react";
 import { api } from "@/lib/api/browser";
 import { ApiError, isApiError } from "@/lib/api/errors";
 import type { MerchantPasswordChangeResult, SmartSignInResult } from "@/lib/api/types";
-import { localePath, type Locale } from "@/lib/i18n/config";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
+import { sitePath } from "@/lib/site-path";
 import { Turnstile } from "@/components/turnstile";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Divider } from "@/components/ui/divider";
@@ -39,7 +39,6 @@ import { useTurnstile } from "./use-turnstile";
 type Step = "password" | "magic" | "totp" | "customer-new-password" | "merchant-new-password" | "link";
 
 export type SignInFlowProps = {
-  locale: Locale;
   t: Pick<AuthMessages, "fields" | "shared" | "signIn">;
 };
 
@@ -52,7 +51,7 @@ function StepHeading({ title, text }: { title: string; text: string }) {
   );
 }
 
-export function SignInFlow({ locale, t }: SignInFlowProps) {
+export function SignInFlow({ t }: SignInFlowProps) {
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get("token");
@@ -67,7 +66,7 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
 
   /** Signs in: go to the target, then refresh so the server parts see the session. */
   function finish(area: SignInKind) {
-    router.replace(targetAfterSignIn(area, params.get("next"), locale));
+    router.replace(targetAfterSignIn(area, params.get("next")));
     router.refresh();
   }
 
@@ -99,7 +98,7 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
     return (
       <CustomerLinkConfirm
         token={token}
-        target={targetAfterSignIn("customer", params.get("next"), locale)}
+        target={targetAfterSignIn("customer", params.get("next"))}
         strings={{ ...t.signIn.link, requestNewLink: t.shared.requestNewLink }}
         onRequestNewLink={() => setStep("magic")}
       />
@@ -157,7 +156,6 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
       <div className="grid gap-6">
         <StepHeading title={t.signIn.magic.title} text={t.signIn.magic.text} />
         <MagicLinkForm
-          locale={locale}
           defaultEmail={email}
           strings={{
             email: t.fields.email,
@@ -188,10 +186,9 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
   return (
     <div className="grid gap-6">
       <PasswordStep
-        locale={locale}
         t={t}
         notice={notice}
-        forgotHref={`${localePath(locale, "/forgot-password")}${asQuery}`}
+        forgotHref={`${sitePath("/forgot-password")}${asQuery}`}
         email={email}
         setEmail={setEmail}
         password={password}
@@ -212,13 +209,13 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
         >
           {t.signIn.magicLinkCustomers}
         </Button>
-        <ButtonLink href={localePath(locale, "/merchant/register")} variant="secondary" size="md" block startIcon={<Store aria-hidden="true" />}>
+        <ButtonLink href={sitePath("/merchant/register")} variant="secondary" size="md" block startIcon={<Store aria-hidden="true" />}>
           {t.signIn.applyMerchant}
         </ButtonLink>
       </div>
       <p className="text-center text-body text-ink-muted">
         {t.signIn.noAccount}{" "}
-        <Link href={`${localePath(locale, "/sign-up")}${asQuery}`} className={authLinkClass}>
+        <Link href={`${sitePath("/sign-up")}${asQuery}`} className={authLinkClass}>
           {t.signIn.createAccount}
         </Link>
       </p>
@@ -227,7 +224,6 @@ export function SignInFlow({ locale, t }: SignInFlowProps) {
 }
 
 type PasswordStepProps = {
-  locale: Locale;
   t: SignInFlowProps["t"];
   /** A sentence to show at once (the session of a later step expired). */
   notice: string | null;

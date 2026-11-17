@@ -1,11 +1,11 @@
 "use client";
-// "Track an order": takes the whole tracking link or only its code and opens `/<lang>/track/<token>`.
+// "Track an order": takes the whole tracking link or only its code and opens `/en/track/<token>`.
 import { useId, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { PackageSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 
 /** The token out of a pasted link (`…/track/<token>?x`) or a bare code; null when it does not look like one (16-128 URL-safe characters). */
 export function parseTrackingToken(input: string): string | null {
@@ -17,11 +17,10 @@ export function parseTrackingToken(input: string): string | null {
 }
 
 export type TrackFormProps = {
-  locale: Locale;
   labels: { label: string; hint: string; placeholder: string; submit: string; invalid: string };
 };
 
-export function TrackForm({ locale, labels }: TrackFormProps) {
+export function TrackForm({ labels }: TrackFormProps) {
   const router = useRouter();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string>();
@@ -35,7 +34,7 @@ export function TrackForm({ locale, labels }: TrackFormProps) {
       document.getElementById(id)?.focus();
       return;
     }
-    router.push(localePath(locale, `/track/${encodeURIComponent(token)}`));
+    router.push(sitePath(`/track/${encodeURIComponent(token)}`));
   }
 
   return (

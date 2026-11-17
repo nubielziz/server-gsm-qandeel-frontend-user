@@ -6,7 +6,7 @@ This is the public website (merchants + customers) of the GSM project. The plan 
 `/home/saifi/gsm-project/STOREFRONT-HANDOFF.md` and `STOREFRONT-BACKEND-HANDOFF.md` (cite their § numbers); the
 build plan is `IMPLEMENTATION-PLAN.md`; status is in `PROGRESS.md`.
 Next.js 16.4 differs from your training data: read the matching guide in `node_modules/next/dist/docs/` before writing
-Next code (caching = `01-app/01-getting-started/08-caching.md`, `use cache`, `next/root-params`, `proxy.ts`).
+Next code (caching = `01-app/01-getting-started/08-caching.md`, `use cache`, `proxy.ts`).
 
 ## Owner's rules (handoff §1.6)
 - Code, comments, docs and commit messages in English. The owner writes short Jordanian Arabic: answer the same way.
@@ -28,8 +28,9 @@ isolated, demo-seeded backend on :3100 (own DB `gsm_storefront`, Redis DB 5, buc
 Mailpit http://localhost:8025); the owner's API on :3000 and its data are never touched.
 
 ## Architecture
-- **Routes:** everything under `app/[lang]/` (only `en` exists: decision 039, 2026-11-16; the cleanup wave of feature 30
-  renames the folder to `app/en`; root layout `app/[lang]/layout.tsx` sets `lang="en" dir="ltr"`).
+- **Routes:** everything under `app/en/` (English is the only language, decision 039, 2026-11-16: a plain folder, no dynamic
+  segment, no `params.lang`; the root layout `app/en/layout.tsx` sets `lang="en" dir="ltr"`, and `app/global-not-found.tsx`
+  answers a URL that matches no route).
   `proxy.ts` redirects paths that do not start with `/en` to the same path under `/en` (email links like
   `/sign-in?token=`, `/merchant/set-password?token=`), reading no cookie or `Accept-Language`; `next.config.ts` answers
   every old `/ar…` address with a 308 to the same path under `/en`.
@@ -48,10 +49,10 @@ Mailpit http://localhost:8025); the owner's API on :3000 and its data are never 
   - Types: `lib/api/types.ts` (aliases of the generated `lib/api/schema.gen.ts`; JSDoc there = the API contract).
   - Lists: `listQuery()` (`lib/api/query.ts`); totals from `x-total-count`; unknown query params → 422, send none.
 - **Language (decision 039): English only.** No language field, parameter, selector, translation or right-to-left layout
-  code: no request sends a `locale` (the API takes none; an unknown query key is a 422). Server code still calls
-  `getLocale()` (always `en`) / `getMessages(namespace)` (`lib/i18n/server.ts`) until the cleanup wave of feature 30
-  removes them; Client Components get the strings they need as props. Messages: one `defineMessages({ en })` namespace per
-  area in `lib/i18n/messages/<area>.ts`. Links: `localePath(locale, '/path')` (becomes `sitePath(path)`). Never derive
+  code: no request sends a `locale` (the API takes none; an unknown query key is a 422). Messages: one plain object per
+  area, `export const store = { … }` in `lib/i18n/messages/<area>.ts`; a Server Component imports the namespace and reads it
+  (`const t = store`), a Client Component gets the strings it needs as props; `fmt` and `plural` are in
+  `lib/i18n/define.ts`. Links: `sitePath('/path')` (`lib/site-path.ts`, the one place that knows `/en`). Never derive
   business rules from mockup placeholder text.
   **Arabic text that people or suppliers type is data and must keep working** (group C): `dir="auto"` on text people type,
   `<bdi>` around values of the API, `dir="ltr"` on codes and numbers, Arabic-Indic and Persian digits typed in quantity,
@@ -65,7 +66,7 @@ Mailpit http://localhost:8025); the owner's API on :3000 and its data are never 
 - **Turnstile:** `components/turnstile.tsx` on the store routes, the one-form sign-in (`POST /client/auth/sign-in`) and
   merchant forgot and login (sent always; the backend enforces it once `TURNSTILE_MERCHANT_AUTH` is on); reset after
   every submit (tokens are single-use).
-- **Merchant application:** `/[lang]/merchant/register` is not a form (since 2026-11-16): it sends the visitor to the
+- **Merchant application:** `/en/merchant/register` is not a form (since 2026-11-16): it sends the visitor to the
   team's WhatsApp number (`NEXT_PUBLIC_MERCHANT_WHATSAPP`, `lib/contact/whatsapp.ts`); staff create the merchant in the
   admin console. The site never calls `POST /client/auth/register`.
 - **Helpers added by the backend-handoff waves (2026-11-13/15):** `lib/api/store-query.ts` (store list filters, sorts,

@@ -1,20 +1,20 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import ErrorPage from "@/app/[lang]/error";
+import ErrorPage from "@/app/en/error";
 import { ErrorTextProvider } from "./error-text";
 import { common } from "./messages/common";
 import { errors } from "./messages/errors";
 
 const draw = (error: unknown) =>
   renderToStaticMarkup(
-    <ErrorTextProvider messages={errors.en}>
+    <ErrorTextProvider messages={errors}>
       <ErrorPage error={error} reset={() => {}} />
     </ErrorTextProvider>,
   );
 
 describe("the error page", () => {
-  const t = common.en;
+  const t = common;
 
   it("shows its title, message, buttons and brand from the provided texts, and leads home to /en", () => {
     const html = draw(new Error("boom"));
@@ -35,12 +35,12 @@ describe("the error page", () => {
   });
 
   it("has seven texts, none empty", () => {
-    expect(Object.keys(errors.en.page)).toHaveLength(7);
-    for (const text of Object.values(errors.en.page)) expect(text).not.toBe("");
+    expect(Object.keys(errors.page)).toHaveLength(7);
+    for (const text of Object.values(errors.page)) expect(text).not.toBe("");
   });
 
   it("does not import the `common` namespace (it would put it back into the chunk of most routes)", () => {
-    const source = readFileSync(new URL("../../app/[lang]/error.tsx", import.meta.url), "utf8");
+    const source = readFileSync(new URL("../../app/en/error.tsx", import.meta.url), "utf8");
     expect(source).not.toMatch(/from\s+["'][^"']*messages\/common["']/);
   });
 });

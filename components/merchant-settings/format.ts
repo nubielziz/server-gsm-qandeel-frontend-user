@@ -2,21 +2,20 @@
 // Dates are shown in UTC with a label: the server renders the pages and does not know the visitor's time zone, and
 // a fixed zone keeps server and browser output identical (no hydration mismatch).
 import { formatDate } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 
 /** "Nov 9, 2026, 6:22 PM UTC" */
-export function utcDateTime(iso: string, locale: Locale, utcLabel: string): string {
-  return `${formatDate(iso, locale, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} ${utcLabel}`;
+export function utcDateTime(iso: string, utcLabel: string): string {
+  return `${formatDate(iso, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} ${utcLabel}`;
 }
 
 /** "Nov 9, 2026" (the calendar day in UTC). */
-export function utcDate(iso: string, locale: Locale): string {
-  return formatDate(iso, locale, { dateStyle: "medium", timeZone: "UTC" });
+export function utcDate(iso: string): string {
+  return formatDate(iso, { dateStyle: "medium", timeZone: "UTC" });
 }
 
 /** "March 2025" (month and year in UTC). */
-export function utcMonth(iso: string, locale: Locale): string {
-  return formatDate(iso, locale, { month: "long", year: "numeric", timeZone: "UTC" });
+export function utcMonth(iso: string): string {
+  return formatDate(iso, { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
 /** "50.0000" → "50", "12.5000" → "12.5": the stored 4-decimal money string as a person would type it. */

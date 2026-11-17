@@ -14,7 +14,6 @@ import Link from "next/link";
 import { Bell as BellIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { unreadText, type NotificationSurface } from "@/lib/notifications/link";
 import { unreadStore } from "@/lib/notifications/unread-store";
@@ -25,7 +24,6 @@ import { useBellMotion, useTitleBadge } from "./use-bell-motion";
 
 export type BellProps = {
   surface: NotificationSurface;
-  locale: Locale;
   /** The notifications page of this area, language-prefixed. */
   href: string;
   /** The unread count the server just read; null when it could not. */
@@ -34,7 +32,7 @@ export type BellProps = {
   labels: { bell: string; bellNone: string };
 };
 
-export function Bell({ surface, locale, href, initialCount, labels }: BellProps) {
+export function Bell({ surface, href, initialCount, labels }: BellProps) {
   const subscribe = useCallback((listener: () => void) => unreadStore.subscribe(surface, listener), [surface]);
   const polled = useSyncExternalStore(
     subscribe,
@@ -47,7 +45,7 @@ export function Bell({ surface, locale, href, initialCount, labels }: BellProps)
   }, [surface, initialCount]);
 
   const count = polled ?? initialCount ?? 0;
-  const text = unreadText(count, locale);
+  const text = unreadText(count);
   const { view, onAnimationEnd, settle } = useBellMotion(surface, count, text);
   const iconRef = useRef<SVGSVGElement>(null);
   // The swing is played on the same icon element each time (lib/notifications/bell-ring.ts): never a remount.

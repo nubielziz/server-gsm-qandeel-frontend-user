@@ -1,18 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/errors";
-import { intlLocaleOf, localePath } from "./config";
-import { defineMessages, fmt, plural } from "./define";
+import { INTL_LOCALE } from "./config";
+import { fmt, plural } from "./define";
 import { errorText } from "./error-text-core";
 import { errors } from "./messages/errors";
 
-describe("locale paths", () => {
-  it("prefixes a path with /en", () => {
-    expect(localePath("en", "/services")).toBe("/en/services");
-    expect(localePath("en", "help")).toBe("/en/help");
-    expect(localePath("en")).toBe("/en");
-  });
+describe("Intl locale", () => {
   it("formats in US English", () => {
-    expect(intlLocaleOf("en")).toBe("en-US");
+    expect(INTL_LOCALE).toBe("en-US");
   });
 });
 
@@ -22,26 +17,22 @@ describe("messages", () => {
   });
   it("picks the English plural form, and `zero` for a count of 0 when there is one", () => {
     const forms = { one: "{count} service", other: "{count} services" };
-    expect(plural("en", 1, forms)).toBe("1 service");
-    expect(plural("en", 3, forms)).toBe("3 services");
-    expect(plural("en", 0, forms)).toBe("0 services");
-    expect(plural("en", 0, { zero: "No services", ...forms })).toBe("No services");
-    expect(plural("en", 1200, forms, "1,200")).toBe("1,200 services");
-  });
-  it("defineMessages returns the English block", () => {
-    const ns = defineMessages({ en: { a: "A", b: { c: "C" } } });
-    expect(ns.en.b.c).toBe("C");
+    expect(plural(1, forms)).toBe("1 service");
+    expect(plural(3, forms)).toBe("3 services");
+    expect(plural(0, forms)).toBe("0 services");
+    expect(plural(0, { zero: "No services", ...forms })).toBe("No services");
+    expect(plural(1200, forms, "1,200")).toBe("1,200 services");
   });
 });
 
 describe("error texts", () => {
-  const en = errorText(errors.en);
+  const en = errorText(errors);
   const problem = (code: string, extra: { status?: number; retryAfter?: number } = {}) =>
     new ApiError({ status: extra.status ?? 409, code, retryAfter: extra.retryAfter });
 
   it("translates the wallet codes (no generic fallback)", () => {
     for (const code of ["WALLET_FROZEN", "WALLET_DISABLED"]) {
-      expect(en.message(problem(code))).not.toBe(errors.en.codes.fallback);
+      expect(en.message(problem(code))).not.toBe(errors.codes.fallback);
     }
     expect(en.message(problem("WALLET_FROZEN"))).not.toBe(en.message(problem("WALLET_DISABLED")));
     expect(en.message(problem("WALLET_FROZEN"))).toMatch(/on hold/);
@@ -58,7 +49,7 @@ describe("error texts", () => {
   it("translates the top-up and upload field codes", () => {
     for (const code of ["fee", "daily_count", "daily_amount", "max_balance", "type"]) {
       const field = { field: code === "type" ? "file" : "amount", code, message: "English from the API" };
-      expect(en.field(field), code).not.toBe(errors.en.fields.fallback);
+      expect(en.field(field), code).not.toBe(errors.fields.fallback);
     }
     const error = new ApiError({
       status: 422,
@@ -82,7 +73,7 @@ describe("error texts", () => {
   });
 
   it("adds no wait text without a Retry-After or on another code", () => {
-    expect(en.message(problem("RATE_LIMITED", { status: 429 }))).toBe(errors.en.codes.RATE_LIMITED);
-    expect(en.message(problem("CONFLICT", { retryAfter: 900 }))).toBe(errors.en.codes.CONFLICT);
+    expect(en.message(problem("RATE_LIMITED", { status: 429 }))).toBe(errors.codes.RATE_LIMITED);
+    expect(en.message(problem("CONFLICT", { retryAfter: 900 }))).toBe(errors.codes.CONFLICT);
   });
 });

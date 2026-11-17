@@ -64,14 +64,14 @@ describe("priceNotes: what goes under the unit price", () => {
 
 describe("serviceCardLabels", () => {
   it("carries the In stock badge text, from the shop namespace", () => {
-    const en = serviceCardLabels(store.en, common.en);
+    const en = serviceCardLabels(store, common);
     expect(en.inStock).toBe("In stock");
-    expect(en.types.imei).toBe(common.en.serviceType.imei);
+    expect(en.types.imei).toBe(common.serviceType.imei);
     expect(en.delivery).toContain("{time}");
   });
 
   it("never uses the words the owner decided against on any service string", () => {
-    const text = JSON.stringify([store.en.card, store.en.service, store.en.quickView]);
+    const text = JSON.stringify([store.card, store.service, store.quickView]);
     expect(text).not.toMatch(/pre-?order|out of stock|sold out|left in stock/i);
   });
 });

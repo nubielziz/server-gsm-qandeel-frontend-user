@@ -9,7 +9,6 @@ import { apiSessionList } from "@/lib/api/server";
 import { listQuery } from "@/lib/api/query";
 import { formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
-import { getLocale, getMessages } from "@/lib/i18n/server";
 import { portal } from "@/lib/i18n/messages/portal";
 import { UNREAD_CAP, type NotificationSurface } from "@/lib/notifications/link";
 import { TICKET_LIST_API, UNREAD_SCAN, unreadNumbers } from "@/lib/support/unread-tickets";
@@ -54,14 +53,15 @@ export const readUnreadTickets = cache(async (surface: NotificationSurface): Pro
   }
 });
 
-/** "99+" at the cap, else the number in the page's language (the same rule as the bell's). */
-function countText(count: number, locale: Parameters<typeof formatNumber>[1]): string {
-  return count >= UNREAD_CAP ? `${UNREAD_CAP - 1}+` : formatNumber(count, locale);
+/** "99+" at the cap, else the number formatted (the same rule as the bell's). */
+function countText(count: number): string {
+  return count >= UNREAD_CAP ? `${UNREAD_CAP - 1}+` : formatNumber(count);
 }
 
 async function NotificationsBadgeRead({ surface }: { surface: NotificationSurface }) {
-  const [locale, t, count] = await Promise.all([getLocale(), getMessages(portal), readUnreadCount(surface)]);
-  return <NavUnreadBadge surface={surface} locale={locale} initialCount={count} suffix={t.navBadges.unread} />;
+  const count = await readUnreadCount(surface);
+  const t = portal;
+  return <NavUnreadBadge surface={surface} initialCount={count} suffix={t.navBadges.unread} />;
 }
 
 /** The unread count on the Notifications item: live through the bell's store. */
@@ -74,7 +74,8 @@ export function NotificationsNavBadge({ surface }: { surface: NotificationSurfac
 }
 
 async function SupportDotRead({ surface }: { surface: NotificationSurface }) {
-  const [t, initial] = await Promise.all([getMessages(portal), readUnreadTickets(surface)]);
+  const initial = await readUnreadTickets(surface);
+  const t = portal;
   return <NavSupportDot surface={surface} initial={initial} label={t.navBadges.newReply} />;
 }
 
@@ -88,9 +89,10 @@ export function SupportNavBadge({ surface }: { surface: NotificationSurface }) {
 }
 
 async function OrdersBadgeRead({ surface }: { surface: NotificationSurface }) {
-  const [locale, t, count] = await Promise.all([getLocale(), getMessages(portal), readOrdersInProgress(surface)]);
+  const count = await readOrdersInProgress(surface);
+  const t = portal;
   if (!count) return null;
-  const text = countText(count, locale);
+  const text = countText(count);
   return (
     <>
       <span aria-hidden="true" dir="ltr" className={`${NAV_BADGE} nav-badge-count num`}>

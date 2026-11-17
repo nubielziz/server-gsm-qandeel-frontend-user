@@ -1,5 +1,5 @@
 "use client";
-// The page the payment gateway sends the buyer back to (`/<lang>/checkout/return?token=<checkout token>`): one URL for
+// The page the payment gateway sends the buyer back to (`/en/checkout/return?token=<checkout token>`): one URL for
 // success AND cancel (handoff §8.3 trap 8). It polls the checkout until it is paid and has a tracking token, every
 // 3 seconds (the token routes allow 30 requests a minute per IP), honours Retry-After on 429 and stops after two minutes.
 // A paid checkout shows the tracking link prominently: no email carries it, so it must be saved here.
@@ -16,7 +16,7 @@ import { isAbortError, isApiError } from "@/lib/api/errors";
 import type { CheckoutSession } from "@/lib/api/types";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 import type { CheckoutMessages } from "@/lib/i18n/messages/checkout";
 
 const POLL_MS = 3000;
@@ -26,11 +26,10 @@ type Phase = "waiting" | "paid" | "timeout" | "notfound";
 
 export type ReturnPollerProps = {
   token: string;
-  locale: Locale;
   labels: CheckoutMessages["payment"];
 };
 
-export function ReturnPoller({ token, locale, labels }: ReturnPollerProps) {
+export function ReturnPoller({ token, labels }: ReturnPollerProps) {
   const errorText = useErrorText();
   const [phase, setPhase] = useState<Phase>("waiting");
   const [attempt, setAttempt] = useState(0);
@@ -88,7 +87,7 @@ export function ReturnPoller({ token, locale, labels }: ReturnPollerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, attempt]);
 
-  const p = (path: string) => localePath(locale, path);
+  const p = (path: string) => sitePath(path);
   const checkoutHref = p(`/checkout/${encodeURIComponent(token)}`);
 
   if (!token) {

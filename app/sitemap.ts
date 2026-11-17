@@ -6,11 +6,10 @@ import type { MetadataRoute } from "next";
 import { getStoreConfig, listContentPages, listHelpArticles } from "@/lib/api/public";
 import type { StorePageListItem } from "@/lib/api/types";
 import { allListedServices } from "@/lib/catalog";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 
 const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:5175").replace(/\/+$/, "");
-const locale: Locale = "en";
-const url = (path = "/") => `${site}${localePath(locale, path)}`;
+const url = (path = "/") => `${site}${sitePath(path)}`;
 
 type Entry = MetadataRoute.Sitemap[number];
 

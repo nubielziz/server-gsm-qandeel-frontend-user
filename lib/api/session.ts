@@ -10,7 +10,7 @@ import { redirect } from "next/navigation";
 import { isApiError } from "./errors";
 import { apiSessionGet } from "./server";
 import type { MerchantMe, StoreMe } from "./types";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 
 export const MERCHANT_CSRF_COOKIE = "csrf_token_client";
 export const STORE_CSRF_COOKIE = "csrf_token_store";
@@ -45,22 +45,22 @@ export const getCustomer = cache(async (): Promise<StoreMe | null> => {
   }
 });
 
-function signInPath(locale: Locale, as: "merchant" | "customer", next?: string): string {
+function signInPath(as: "merchant" | "customer", next?: string): string {
   const params = new URLSearchParams({ as });
   if (next && next.startsWith("/") && !next.startsWith("//")) params.set("next", next);
-  return `${localePath(locale, "/sign-in")}?${params.toString()}`;
+  return `${sitePath("/sign-in")}?${params.toString()}`;
 }
 
 /** The signed-in merchant, or a redirect to the sign-in page (merchant tab) that comes back to `next`. */
-export async function requireMerchant(locale: Locale, next?: string): Promise<MerchantMe> {
+export async function requireMerchant(next?: string): Promise<MerchantMe> {
   const me = await getMerchant();
-  if (!me) redirect(signInPath(locale, "merchant", next));
+  if (!me) redirect(signInPath("merchant", next));
   return me;
 }
 
 /** The signed-in customer, or a redirect to the sign-in page (customer tab) that comes back to `next`. */
-export async function requireCustomer(locale: Locale, next?: string): Promise<StoreMe> {
+export async function requireCustomer(next?: string): Promise<StoreMe> {
   const me = await getCustomer();
-  if (!me) redirect(signInPath(locale, "customer", next));
+  if (!me) redirect(signInPath("customer", next));
   return me;
 }

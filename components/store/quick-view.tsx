@@ -1,4 +1,4 @@
-// The quick view of a service, shown in a dialog over the page (app/[lang]/(store)/@modal/(.)quick-view/[slug]): its
+// The quick view of a service, shown in a dialog over the page (app/en/(store)/@modal/(.)quick-view/[slug]): its
 // title, a body (art, type and chips, summary, price in the visitor's currency with "per unit", "From" and the packs,
 // availability, delivery and quantity rules, description and requirements) and the actions (Buy now, full details).
 // Each part reads the route params, so each streams in behind its own <Suspense>; the service read is cached and shared
@@ -13,10 +13,9 @@ import { Markdown } from "@/components/ui/markdown";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { StoreServiceDetail } from "@/lib/api/types";
 import { countryName } from "@/lib/countries";
-import { localePath } from "@/lib/i18n/config";
 import { common } from "@/lib/i18n/messages/common";
 import { store } from "@/lib/i18n/messages/store";
-import { getLocale, getMessages } from "@/lib/i18n/server";
+import { sitePath } from "@/lib/site-path";
 import { demoteHeadings } from "./markdown-source";
 import { resolveService } from "./resolve-service";
 import { ServiceArt } from "./service-art";
@@ -29,7 +28,7 @@ type Params = Promise<{ slug: string }>;
  * texts and links do not depend on the visitor. The price comes from `ServicePrice`.
  */
 async function load(params: Params) {
-  const [{ slug }, locale] = await Promise.all([params, getLocale()]);
+  const { slug } = await params;
   const resolved = await resolveService(slug);
   let service: StoreServiceDetail | null = resolved.kind === "found" ? resolved.service : null;
   // An old address of the service (decision 039): its page under the current slug; none when it has no page on sale.
@@ -37,28 +36,31 @@ async function load(params: Params) {
     const own = await resolveService(resolved.slug);
     service = own.kind === "found" ? own.service : null;
   }
-  return { locale, service };
+  return { service };
 }
 
 /** The dialog's title: the service name. */
 export async function QuickViewTitle({ params }: { params: Params }) {
-  const [{ service }, t] = await Promise.all([load(params), getMessages(store)]);
+  const { service } = await load(params);
+  const t = store;
   return <>{service ? service.title : t.quickView.missingTitle}</>;
 }
 
 export async function QuickViewBody({ params }: { params: Params }) {
-  const [{ locale, service }, t, c] = await Promise.all([load(params), getMessages(store), getMessages(common)]);
+  const { service } = await load(params);
+  const t = store;
+  const c = common;
   if (!service) return <p className="text-body text-ink-muted">{t.quickView.missingText}</p>;
 
-  const chips = [service.brand, service.network, service.country ? countryName(service.country, locale) : ""].filter(Boolean);
-  const place = [service.network, service.country ? countryName(service.country, locale) : ""].filter(Boolean).join(" · ");
+  const chips = [service.brand, service.network, service.country ? countryName(service.country) : ""].filter(Boolean);
+  const place = [service.network, service.country ? countryName(service.country) : ""].filter(Boolean).join(" · ");
   const description = service.descriptionMd.trim();
   const requirements = service.requirementsMd.trim();
   const facts = [
-    ...serviceFacts(service, locale, t, c),
+    ...serviceFacts(service, t, c),
     ...(place ? [{ key: "place", icon: MapPin, label: t.quickView.place, value: <bdi>{place}</bdi> }] : []),
   ];
-  const hint = serviceStockHint(service, locale, c);
+  const hint = serviceStockHint(service, c);
 
   return (
     <div className="grid gap-6">
@@ -85,7 +87,7 @@ export async function QuickViewBody({ params }: { params: Params }) {
           <div>
             <p className="text-small font-semibold text-ink-muted">{t.service.priceLabel}</p>
             <div className="mt-1">
-              <Suspense fallback={<PriceBlock pending rule={service.quantity} locale={locale} q={c.quantity} t={t.service} />}>
+              <Suspense fallback={<PriceBlock pending rule={service.quantity} q={c.quantity} t={t.service} />}>
                 <ServicePrice slug={service.slug} />
               </Suspense>
             </div>
@@ -132,21 +134,22 @@ export async function QuickViewBody({ params }: { params: Params }) {
 
 /** The footer: the service page and Buy now (file services are ordered through support), or the catalog. */
 export async function QuickViewActions({ params }: { params: Params }) {
-  const [{ locale, service }, t] = await Promise.all([load(params), getMessages(store)]);
+  const { service } = await load(params);
+  const t = store;
   if (!service) {
-    return <ButtonLink href={localePath(locale, "/services")}>{t.quickView.browse}</ButtonLink>;
+    return <ButtonLink href={sitePath("/services")}>{t.quickView.browse}</ButtonLink>;
   }
   const slug = encodeURIComponent(service.slug);
   return (
     <>
-      <ButtonLink href={localePath(locale, `/services/${slug}`)} variant="secondary" endIcon={<ArrowRight aria-hidden="true" />}>
+      <ButtonLink href={sitePath(`/services/${slug}`)} variant="secondary" endIcon={<ArrowRight aria-hidden="true" />}>
         {t.quickView.details}
       </ButtonLink>
       {service.type === "file" ? (
-        <ButtonLink href={localePath(locale, "/support")}>{t.service.fileCta}</ButtonLink>
+        <ButtonLink href={sitePath("/support")}>{t.service.fileCta}</ButtonLink>
       ) : (
         // prefetch: the checkout's service summary and form come with the prefetch (plan P3.1).
-        <ButtonLink href={`${localePath(locale, "/checkout")}?service=${slug}`} prefetch startIcon={<ShoppingCart aria-hidden="true" />}>
+        <ButtonLink href={`${sitePath("/checkout")}?service=${slug}`} prefetch startIcon={<ShoppingCart aria-hidden="true" />}>
           {t.service.buyNow}
         </ButtonLink>
       )}

@@ -21,12 +21,12 @@ describe("money math on 4-decimal strings", () => {
 
 describe("formatMoney", () => {
   it("formats from the exact string with the currency's decimals", () => {
-    expect(formatMoney("12.4900", "USD", "en", 2)).toBe("$12.49");
-    expect(formatMoney("1234.5000", "USD", "en", 2)).toBe("$1,234.50");
-    expect(formatMoney("100.0000", "JOD", "en", 3)).toContain("100.000");
+    expect(formatMoney("12.4900", "USD", 2)).toBe("$12.49");
+    expect(formatMoney("1234.5000", "USD", 2)).toBe("$1,234.50");
+    expect(formatMoney("100.0000", "JOD", 3)).toContain("100.000");
   });
   it("falls back to plain text for an unknown currency code", () => {
-    expect(formatMoney("5.0000", "NOT-A-CODE", "en")).toBe("5.0000 NOT-A-CODE");
+    expect(formatMoney("5.0000", "NOT-A-CODE")).toBe("5.0000 NOT-A-CODE");
   });
 });
 

@@ -9,7 +9,9 @@
 > **Superseded in part, 2026-11-16 (owner's decision, backend decision 039, feature 30): English is the only language of the
 > system.** Everything below about Arabic, `/ar`, two languages, `defineMessages({ en, ar })`, the language switcher, the saved
 > language, `hreflang`, right-to-left layout, the "Arabic page" acceptance lines and the `locale` parameters is history: do not
-> rebuild it. Every old `/ar/…` address answers a permanent redirect to `/en/…`. What stays is Arabic text that people or
+> rebuild it. The cleanup wave (S6 to S9) also removed `getLocale()`, `getMessages()`, `localePath(locale, …)` (now `sitePath(path)`)
+> and the `next/root-params` read, and renamed the folder `app/[lang]` to `app/en`: a file path below that names `app/[lang]`
+> means `app/en` today. Every old `/ar/…` address answers a permanent redirect to `/en/…`. What stays is Arabic text that people or
 > suppliers type (group C: `dir="auto"`, `<bdi>`, Arabic-digit parsing). The rules now are in `CLAUDE.md` ("Language") and the
 > status in `PROGRESS.md` ("English only").
 

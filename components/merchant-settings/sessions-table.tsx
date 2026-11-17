@@ -1,7 +1,7 @@
 // Active sessions (GET /client/sessions, newest activity first): device summary, IP, last active, signed in, and the
 // end-session action. Rendered on the server (dates in UTC, no hydration drift); only the buttons are client code.
 import { Laptop, Smartphone } from "lucide-react";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 import type { MerchantSession } from "@/lib/api/types";
 import type { MerchantSettingsMessages } from "@/lib/i18n/messages/merchant-settings";
 import { Badge } from "@/components/ui/badge";
@@ -14,13 +14,12 @@ import { describeUserAgent } from "./user-agent";
 
 type Props = {
   sessions: MerchantSession[];
-  locale: Locale;
   t: MerchantSettingsMessages["security"]["sessions"];
   utc: string;
 };
 
-export function SessionsTable({ sessions, locale, t, utc }: Props) {
-  const signInHref = `${localePath(locale, "/sign-in")}?as=merchant`;
+export function SessionsTable({ sessions, t, utc }: Props) {
+  const signInHref = `${sitePath("/sign-in")}?as=merchant`;
   const rows = [...sessions].sort((a, b) => Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt));
   return (
     <Card id="sessions" as="section">
@@ -65,8 +64,8 @@ export function SessionsTable({ sessions, locale, t, utc }: Props) {
                         {s.ip || "—"}
                       </span>
                     </TableCell>
-                    <TableCell label={t.lastActive}>{utcDateTime(s.lastSeenAt, locale, utc)}</TableCell>
-                    <TableCell label={t.signedIn}>{utcDateTime(s.createdAt, locale, utc)}</TableCell>
+                    <TableCell label={t.lastActive}>{utcDateTime(s.lastSeenAt, utc)}</TableCell>
+                    <TableCell label={t.signedIn}>{utcDateTime(s.createdAt, utc)}</TableCell>
                     <TableCell className="md:text-end">
                       <SessionActions
                         id={s.id}

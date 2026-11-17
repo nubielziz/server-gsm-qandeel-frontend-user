@@ -5,8 +5,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Layers, Store, Zap } from "lucide-react";
-import { localePath } from "@/lib/i18n/config";
-import { getLocale, getMessages } from "@/lib/i18n/server";
+import { sitePath } from "@/lib/site-path";
 import { common } from "@/lib/i18n/messages/common";
 import { ImageSlot } from "@/components/ui/image-slot";
 import { ChromeProviders } from "./chrome-providers";
@@ -19,8 +18,8 @@ export type AuthShellProps = {
 };
 
 /** The sign-in / sign-up page frame. Static: no session reads. */
-export async function AuthShell({ children }: AuthShellProps) {
-  const [locale, t] = await Promise.all([getLocale(), getMessages(common)]);
+export function AuthShell({ children }: AuthShellProps) {
+  const t = common;
   const features = [
     { icon: <Layers aria-hidden="true" />, title: t.auth.featureServicesTitle, text: t.auth.featureServicesText },
     { icon: <Zap aria-hidden="true" />, title: t.auth.featureTrackingTitle, text: t.auth.featureTrackingText },
@@ -74,11 +73,11 @@ export async function AuthShell({ children }: AuthShellProps) {
             <div className="w-full max-w-[28rem]">{children}</div>
           </main>
           <footer className="flex flex-wrap items-center justify-center gap-x-4 px-gutter pb-8 text-small text-ink-muted">
-            <Link href={localePath(locale, "/pages/terms")} className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">
+            <Link href={sitePath("/pages/terms")} className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">
               {t.auth.terms}
             </Link>
             <span aria-hidden="true" className="h-4 w-px bg-line-strong" />
-            <Link href={localePath(locale, "/pages/privacy")} className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">
+            <Link href={sitePath("/pages/privacy")} className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">
               {t.auth.privacy}
             </Link>
           </footer>

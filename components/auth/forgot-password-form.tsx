@@ -9,10 +9,10 @@ import { useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { Mail, Store, UserRound } from "lucide-react";
 import { api } from "@/lib/api/browser";
-import { localePath, type Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
+import { sitePath } from "@/lib/site-path";
 import { Turnstile } from "@/components/turnstile";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,10 @@ import { useFocusOnFeedback } from "./use-focus-on-feedback";
 import { useTurnstile } from "./use-turnstile";
 
 export type ForgotPasswordFormProps = {
-  locale: Locale;
   t: Pick<AuthMessages, "surfaces" | "fields" | "shared" | "forgot">;
 };
 
-export function ForgotPasswordForm({ locale, t }: ForgotPasswordFormProps) {
+export function ForgotPasswordForm({ t }: ForgotPasswordFormProps) {
   const params = useSearchParams();
   const errorText = useErrorText();
   const ts = useTurnstile();
@@ -69,7 +68,7 @@ export function ForgotPasswordForm({ locale, t }: ForgotPasswordFormProps) {
     }
   }
 
-  const signIn = localePath(locale, "/sign-in");
+  const signIn = sitePath("/sign-in");
 
   if (sentTo) {
     return (

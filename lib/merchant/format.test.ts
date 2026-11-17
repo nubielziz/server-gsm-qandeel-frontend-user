@@ -3,10 +3,10 @@ import { formatMinutes, humanizeKind, isHttpUrl, labelOf, ltr } from "./format";
 
 describe("formatMinutes", () => {
   it("splits minutes into days, hours and minutes", () => {
-    expect(formatMinutes(5, "en")).toBe("5 min");
-    expect(formatMinutes(60, "en")).toBe("1 hr");
-    expect(formatMinutes(90, "en")).toBe("1 hr 30 min");
-    expect(formatMinutes(2880, "en")).toBe("2 days");
+    expect(formatMinutes(5)).toBe("5 min");
+    expect(formatMinutes(60)).toBe("1 hr");
+    expect(formatMinutes(90)).toBe("1 hr 30 min");
+    expect(formatMinutes(2880)).toBe("2 days");
   });
 });
 

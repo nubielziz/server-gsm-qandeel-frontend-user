@@ -22,7 +22,7 @@ import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { cn } from "@/lib/cn";
 import { countryName } from "@/lib/countries";
 import { fmt } from "@/lib/i18n/define";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 import { deliveryTime } from "@/lib/store/delivery";
 import type { ServiceType, StoreServiceCard } from "@/lib/api/types";
 import { BdiText } from "./bdi-text";
@@ -45,7 +45,6 @@ export type ServiceCardLabels = {
 
 export type ServiceCardProps = {
   service: StoreServiceCard;
-  locale: Locale;
   /** Display decimals of the visitor's currency (`getCurrency().decimals`). */
   decimals: number;
   labels: ServiceCardLabels;
@@ -83,26 +82,25 @@ const frame =
 const BODY_BLOCK =
   "sm:min-h-[calc(2*var(--text-subheading)*var(--text-subheading--line-height)+var(--text-small)*var(--text-small--line-height)+2rem)]";
 
-const links = (service: StoreServiceCard, locale: Locale) => ({
-  href: localePath(locale, `/services/${encodeURIComponent(service.slug)}`),
-  orderHref: `${localePath(locale, "/checkout")}?service=${encodeURIComponent(service.slug)}`,
+const links = (service: StoreServiceCard) => ({
+  href: sitePath(`/services/${encodeURIComponent(service.slug)}`),
+  orderHref: `${sitePath("/checkout")}?service=${encodeURIComponent(service.slug)}`,
 });
 
 /**
  * The quick view link: opens the service in a dialog over the current page (an intercepted route, see
- * app/[lang]/(store)/@modal); opened directly it is the service page. Keeps the scroll position. The first cards of a
+ * app/en/(store)/@modal); opened directly it is the service page. Keeps the scroll position. The first cards of a
  * list prefetch the dialog's title, body and actions like their title link (`cardPrefetch`, plan P3.3).
  */
 function QuickViewLink({
   service,
-  locale,
   labels,
   index,
   className,
-}: Pick<ServiceCardProps, "service" | "locale" | "labels" | "index"> & { className?: string }) {
+}: Pick<ServiceCardProps, "service" | "labels" | "index"> & { className?: string }) {
   return (
     <IconButtonLink
-      href={localePath(locale, `/quick-view/${encodeURIComponent(service.slug)}`)}
+      href={sitePath(`/quick-view/${encodeURIComponent(service.slug)}`)}
       label={fmt(labels.quickView, { title: service.title })}
       size="sm"
       scroll={false}
@@ -143,15 +141,15 @@ function InStock({ service, labels }: Pick<ServiceCardProps, "service" | "labels
   );
 }
 
-export function ServiceCard({ service, locale, decimals, labels, priority, index }: ServiceCardProps) {
-  const { href, orderHref } = links(service, locale);
-  const place = [service.network, service.country ? countryName(service.country, locale) : ""].filter(Boolean).join(" · ");
-  const time = deliveryTime(service, locale).text;
+export function ServiceCard({ service, decimals, labels, priority, index }: ServiceCardProps) {
+  const { href, orderHref } = links(service);
+  const place = [service.network, service.country ? countryName(service.country) : ""].filter(Boolean).join(" · ");
+  const time = deliveryTime(service).text;
   return (
     <article className={cn(frame, "p-4")}>
       <div className="flex h-12 items-center gap-3">
         <ServiceMark type={service.type} imageUrl={service.imageUrl} brand={service.brand} priority={priority} />
-        <QuickViewLink service={service} locale={locale} labels={labels} index={index} className="-me-2 self-start" />
+        <QuickViewLink service={service} labels={labels} index={index} className="-me-2 self-start" />
       </div>
       <div className="mt-3.5 flex h-[1.375rem] items-center gap-2 overflow-hidden">
         <Badge shape="tag" caps>
@@ -188,7 +186,6 @@ export function ServiceCard({ service, locale, decimals, labels, priority, index
         <Money
           amount={service.price.gross}
           currency={service.price.currency}
-          locale={locale}
           decimals={decimals}
           className="min-w-0 text-heading font-bold text-ink"
         />
@@ -251,14 +248,14 @@ export function ServiceGridSkeleton({ count = 8, className }: { count?: number; 
  * The dense card: art, brand, a 2-line title, a 2-line summary, the delivery time (and the "In stock" mark), the price
  * and a square order link.
  */
-export function ServiceCardMini({ service, locale, decimals, labels, index }: Omit<ServiceCardProps, "priority">) {
-  const { href, orderHref } = links(service, locale);
-  const time = deliveryTime(service, locale).text;
+export function ServiceCardMini({ service, decimals, labels, index }: Omit<ServiceCardProps, "priority">) {
+  const { href, orderHref } = links(service);
+  const time = deliveryTime(service).text;
   return (
     <article className={cn(frame, "p-3.5")}>
       <div className="flex h-10 items-center gap-2.5">
         <ServiceMark type={service.type} imageUrl={service.imageUrl} brand={service.brand} size="sm" />
-        <QuickViewLink service={service} locale={locale} labels={labels} index={index} className="-me-2 -mt-1 self-start" />
+        <QuickViewLink service={service} labels={labels} index={index} className="-me-2 -mt-1 self-start" />
       </div>
       <h3 className="mt-3 text-small font-bold text-ink">
         <Link
@@ -280,7 +277,6 @@ export function ServiceCardMini({ service, locale, decimals, labels, index }: Om
         <Money
           amount={service.price.gross}
           currency={service.price.currency}
-          locale={locale}
           decimals={decimals}
           className="min-w-0 text-body font-bold text-ink"
         />

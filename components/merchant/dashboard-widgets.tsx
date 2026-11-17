@@ -15,15 +15,15 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 import type { MerchantDashboard } from "@/lib/api/types";
 import { formatDate, formatNumber } from "@/lib/format";
-import { localePath, type Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { statusLabel, type CommonMessages } from "@/lib/i18n/messages/common";
 import type { MerchantMessages } from "@/lib/i18n/messages/merchant";
+import { sitePath } from "@/lib/site-path";
 
-type Props = { data: MerchantDashboard; locale: Locale; t: MerchantMessages; c: CommonMessages };
+type Props = { data: MerchantDashboard; t: MerchantMessages; c: CommonMessages };
 
 /** The dark balance card: available balance big, the three figures behind it, and the two ways on. */
-export function BalanceCard({ data, locale, t }: Props) {
+export function BalanceCard({ data, t }: Props) {
   const b = t.dashboard.balance;
   const w = data.wallet;
   const line = "flex items-baseline justify-between gap-4 text-body";
@@ -32,7 +32,7 @@ export function BalanceCard({ data, locale, t }: Props) {
       tone="inverse"
       icon={<Wallet aria-hidden="true" />}
       label={b.title}
-      value={<Money amount={w.available} currency="USD" locale={locale} />}
+      value={<Money amount={w.available} currency="USD" />}
       hint={b.walletName}
       className="h-full"
     >
@@ -40,28 +40,28 @@ export function BalanceCard({ data, locale, t }: Props) {
         <div className={line}>
           <dt className="text-on-inverse-muted">{b.balance}</dt>
           <dd className="num font-semibold">
-            <Money amount={w.balance} currency="USD" locale={locale} />
+            <Money amount={w.balance} currency="USD" />
           </dd>
         </div>
         <div className={line}>
           <dt className="text-on-inverse-muted">{b.reserved}</dt>
           <dd className="num font-semibold">
-            <Money amount={w.reserved} currency="USD" locale={locale} />
+            <Money amount={w.reserved} currency="USD" />
           </dd>
         </div>
         <div className={line}>
           <dt className="text-on-inverse-muted">{b.creditLimit}</dt>
           <dd className="num font-semibold">
-            <Money amount={w.creditLimit} currency="USD" locale={locale} />
+            <Money amount={w.creditLimit} currency="USD" />
           </dd>
         </div>
       </dl>
       <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
-        <ButtonLink href={localePath(locale, "/merchant/wallet/top-up")} variant="inverse">
+        <ButtonLink href={sitePath("/merchant/wallet/top-up")} variant="inverse">
           {b.addFunds}
         </ButtonLink>
         <Link
-          href={localePath(locale, "/merchant/wallet")}
+          href={sitePath("/merchant/wallet")}
           className="touch-target inline-flex min-h-11 items-center gap-1 rounded-badge font-semibold text-on-inverse underline underline-offset-4 hover:no-underline"
         >
           {b.viewTransactions}
@@ -73,12 +73,12 @@ export function BalanceCard({ data, locale, t }: Props) {
 }
 
 /** Total, processing, completed and pending (with the rejected count) as four stat cards linking to the filtered orders. */
-export function OrderStats({ data, locale, t }: Props) {
+export function OrderStats({ data, t }: Props) {
   const s = t.dashboard.stats;
   const { counts } = data;
   const total = counts.pending + counts.processing + counts.completed + counts.rejected;
-  const orders = localePath(locale, "/merchant/orders");
-  const n = (value: number) => formatNumber(value, locale);
+  const orders = sitePath("/merchant/orders");
+  const n = (value: number) => formatNumber(value);
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <StatCard label={s.total} value={n(total)} hint={s.totalHint} icon={<Package aria-hidden="true" />} href={orders} />
@@ -103,7 +103,7 @@ const SEGMENTS = [
 ] as const;
 
 /** A stacked bar of the four statuses with the numbers beside it (the bar alone says nothing to a screen reader). */
-export function StatusSummary({ data, locale, t, c }: Props) {
+export function StatusSummary({ data, t, c }: Props) {
   const { counts } = data;
   const total = counts.pending + counts.processing + counts.completed + counts.rejected;
   return (
@@ -121,7 +121,7 @@ export function StatusSummary({ data, locale, t, c }: Props) {
                   <span aria-hidden="true" className={`mt-1.5 size-2.5 shrink-0 rounded-[3px] ${s.swatch}`} />
                   <span>
                     <span className="block text-small text-ink-subtle">{statusLabel(c, "order", s.key)}</span>
-                    <span className="num block text-subheading text-ink">{formatNumber(counts[s.key], locale)}</span>
+                    <span className="num block text-subheading text-ink">{formatNumber(counts[s.key])}</span>
                   </span>
                 </li>
               ))}
@@ -134,7 +134,7 @@ export function StatusSummary({ data, locale, t, c }: Props) {
 }
 
 /** A search box that starts an order: it goes to the catalog with `?q=`. */
-export function QuickOrder({ locale, t }: Omit<Props, "data" | "c">) {
+export function QuickOrder({ t }: Omit<Props, "data" | "c">) {
   const q = t.dashboard.quick;
   return (
     <Card>
@@ -148,13 +148,13 @@ export function QuickOrder({ locale, t }: Omit<Props, "data" | "c">) {
             <p className="text-body text-ink-muted">{q.text}</p>
           </div>
         </div>
-        <SearchInput action={localePath(locale, "/merchant/services")} label={q.label} placeholder={q.placeholder} submitLabel={q.submit} />
+        <SearchInput action={sitePath("/merchant/services")} label={q.label} placeholder={q.placeholder} submitLabel={q.submit} />
       </CardBody>
     </Card>
   );
 }
 
-export function RecentOrders({ data, locale, t, c }: Props) {
+export function RecentOrders({ data, t, c }: Props) {
   const r = t.dashboard.recent;
   const rows = data.latestOrders;
   return (
@@ -162,7 +162,7 @@ export function RecentOrders({ data, locale, t, c }: Props) {
       <CardHeader
         title={r.title}
         actions={
-          <ButtonLink href={localePath(locale, "/merchant/orders")} variant="ghost" size="sm" endIcon={<ChevronRight aria-hidden="true" />}>
+          <ButtonLink href={sitePath("/merchant/orders")} variant="ghost" size="sm" endIcon={<ChevronRight aria-hidden="true" />}>
             {r.viewAll}
           </ButtonLink>
         }
@@ -173,7 +173,7 @@ export function RecentOrders({ data, locale, t, c }: Props) {
           icon={<ClipboardList aria-hidden="true" />}
           title={r.emptyTitle}
           description={r.emptyText}
-          action={<ButtonLink href={localePath(locale, "/merchant/services")}>{r.emptyAction}</ButtonLink>}
+          action={<ButtonLink href={sitePath("/merchant/services")}>{r.emptyAction}</ButtonLink>}
         />
       ) : (
         <div className="mt-4">
@@ -181,13 +181,13 @@ export function RecentOrders({ data, locale, t, c }: Props) {
             className="md:hidden"
             rows={rows.map((o) => ({
               key: o.id,
-              href: localePath(locale, `/merchant/orders/${o.id}`),
+              href: sitePath(`/merchant/orders/${o.id}`),
               label: fmt(r.open, { id: o.id }),
               title: <span className="num">#{o.id}</span>,
               badge: <StatusBadge kind="order" status={o.status} label={statusLabel(c, "order", o.status)} />,
               subtitle: o.service.name,
-              details: [formatDate(o.createdAt, locale), o.imei ? <bdi key="i" dir="ltr" className="num break-all">{o.imei}</bdi> : null].filter(Boolean),
-              amount: <Money amount={o.totalPrice} currency={o.currency} locale={locale} />,
+              details: [formatDate(o.createdAt), o.imei ? <bdi key="i" dir="ltr" className="num break-all">{o.imei}</bdi> : null].filter(Boolean),
+              amount: <Money amount={o.totalPrice} currency={o.currency} />,
             }))}
           />
           <div className="hidden md:block">
@@ -206,7 +206,7 @@ export function RecentOrders({ data, locale, t, c }: Props) {
               {rows.map((o) => (
                 <TableRow key={o.id}>
                   <TableCell>
-                    <Link href={localePath(locale, `/merchant/orders/${o.id}`)} aria-label={fmt(r.open, { id: o.id })} className="num font-semibold text-ink hover:underline">
+                    <Link href={sitePath(`/merchant/orders/${o.id}`)} aria-label={fmt(r.open, { id: o.id })} className="num font-semibold text-ink hover:underline">
                       #{o.id}
                     </Link>
                   </TableCell>
@@ -223,13 +223,13 @@ export function RecentOrders({ data, locale, t, c }: Props) {
                     )}
                   </TableCell>
                   <TableCell numeric label={r.columns.price} className="font-semibold">
-                    <Money amount={o.totalPrice} currency={o.currency} locale={locale} />
+                    <Money amount={o.totalPrice} currency={o.currency} />
                   </TableCell>
                   <TableCell label={r.columns.status}>
                     <StatusBadge kind="order" status={o.status} label={statusLabel(c, "order", o.status)} />
                   </TableCell>
                   <TableCell label={r.columns.date}>
-                    <span className="whitespace-nowrap text-ink-muted">{formatDate(o.createdAt, locale)}</span>
+                    <span className="whitespace-nowrap text-ink-muted">{formatDate(o.createdAt)}</span>
                   </TableCell>
                 </TableRow>
               ))}
@@ -243,7 +243,7 @@ export function RecentOrders({ data, locale, t, c }: Props) {
 }
 
 /** Services from the latest orders (newest first, each once) with "Order again". No price: it may have changed. */
-export function RecentlyOrdered({ data, locale, t, c }: Props) {
+export function RecentlyOrdered({ data, t, c }: Props) {
   const a = t.dashboard.again;
   const seen = new Set<number>();
   const services = data.latestOrders.filter((o) => (seen.has(o.service.id) ? false : (seen.add(o.service.id), true)));
@@ -261,10 +261,10 @@ export function RecentlyOrdered({ data, locale, t, c }: Props) {
                   <span className="font-semibold text-ink">{o.service.name}</span>
                   <span className="flex flex-wrap items-center gap-2 text-small text-ink-subtle">
                     <TypeBadge type={o.service.type} t={c} />
-                    {fmt(a.orderedOn, { date: formatDate(o.createdAt, locale) })}
+                    {fmt(a.orderedOn, { date: formatDate(o.createdAt) })}
                   </span>
                 </div>
-                <ButtonLink href={localePath(locale, `/merchant/services/${o.service.id}`)} size="sm" variant="secondary">
+                <ButtonLink href={sitePath(`/merchant/services/${o.service.id}`)} size="sm" variant="secondary">
                   {a.orderAgain}
                 </ButtonLink>
               </li>
@@ -276,7 +276,7 @@ export function RecentlyOrdered({ data, locale, t, c }: Props) {
   );
 }
 
-export function HelpCard({ locale, t }: Omit<Props, "data" | "c">) {
+export function HelpCard({ t }: Omit<Props, "data" | "c">) {
   const h = t.dashboard.help;
   return (
     <Card>
@@ -290,7 +290,7 @@ export function HelpCard({ locale, t }: Omit<Props, "data" | "c">) {
             <p className="text-body text-ink-muted">{h.text}</p>
           </div>
         </div>
-        <ButtonLink href={localePath(locale, "/help")} variant="secondary">
+        <ButtonLink href={sitePath("/help")} variant="secondary">
           {h.action}
         </ButtonLink>
       </div>

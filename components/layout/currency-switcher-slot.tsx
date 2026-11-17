@@ -3,14 +3,14 @@
 import { Suspense } from "react";
 import { getStoreConfig } from "@/lib/api/public";
 import { getCurrency } from "@/lib/currency";
-import { getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CurrencySwitcher } from "./currency-switcher";
 
 async function loadCurrencies() {
   try {
-    const [config, current, t] = await Promise.all([getStoreConfig(), getCurrency(), getMessages(common)]);
+    const [config, current] = await Promise.all([getStoreConfig(), getCurrency()]);
+    const t = common;
     return { currencies: config.currencies.map((c) => ({ code: c.code, name: c.name })), current: current.code, label: t.header.currency };
   } catch {
     // The API is unreachable: the header still renders, just without the switcher.

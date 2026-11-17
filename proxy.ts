@@ -7,7 +7,7 @@
 //    so /account… and the merchant portal redirect to sign-in at once. This is only a fast path: every page still
 //    asks the API who is signed in (lib/api/session.ts), which is the real check.
 import { NextResponse, type NextRequest } from "next/server";
-import { localePath } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 
 // Merchant pages that must stay public (email links and sign-up), relative to /en/merchant.
 const PUBLIC_MERCHANT_PAGES = new Set(["/register", "/set-password", "/verify-email"]);
@@ -15,7 +15,7 @@ const PUBLIC_MERCHANT_PAGES = new Set(["/register", "/set-password", "/verify-em
 function signInRedirect(request: NextRequest, as: "merchant" | "customer"): NextResponse {
   const url = request.nextUrl.clone();
   const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;
-  url.pathname = localePath("en", "/sign-in");
+  url.pathname = sitePath("/sign-in");
   url.search = new URLSearchParams({ as, next }).toString();
   return NextResponse.redirect(url);
 }
@@ -26,7 +26,7 @@ export function proxy(request: NextRequest) {
 
   if (segments[1] !== "en") {
     const url = request.nextUrl.clone();
-    url.pathname = localePath("en", pathname);
+    url.pathname = sitePath(pathname);
     return NextResponse.redirect(url);
   }
 

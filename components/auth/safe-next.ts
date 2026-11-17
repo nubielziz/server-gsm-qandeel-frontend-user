@@ -3,7 +3,7 @@
 // characters) falls back to a fixed default. An old Arabic address (`/ar/…`: a bookmark, a sign-in redirect from before
 // English only, decision 039) is read as the same path under `/en`, where `/ar/…` now redirects anyway.
 // Safe to import anywhere.
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 
 const SITE_PATH = /^\/en(?:[/?#]|$)/;
 const UNSAFE = /[\\\u0000-\u001f\u007f]/;
@@ -45,14 +45,14 @@ function resolvedPath(path: string): string | null {
 
 /**
  * Where a visitor lands once signed in (plan D3):
- * - a `next` under `/<lang>/merchant` is honoured only for a merchant;
- * - a `next` under `/<lang>/account` only for a customer;
+ * - a `next` under `/en/merchant` is honoured only for a merchant;
+ * - a `next` under `/en/account` only for a customer;
  * - any other safe same-site path for both;
- * - otherwise the home of the kind (`/<lang>/merchant`, `/<lang>/account`).
+ * - otherwise the home of the kind (`/en/merchant`, `/en/account`).
  * This stops a loop when a customer signs in on a link that came from the portal (and the other way round).
  */
-export function targetAfterSignIn(kind: SignInKind, next: string | null | undefined, locale: Locale): string {
-  const home = localePath(locale, kind === "merchant" ? "/merchant" : "/account");
+export function targetAfterSignIn(kind: SignInKind, next: string | null | undefined): string {
+  const home = sitePath(kind === "merchant" ? "/merchant" : "/account");
   const target = safeNext(next, home);
   if (target === home) return home;
   // Resolved, a path can land under `/ar` again (`/en/../ar/merchant`): the browser would follow the 308 into `/en`.

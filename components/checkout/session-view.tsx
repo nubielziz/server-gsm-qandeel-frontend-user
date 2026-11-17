@@ -3,7 +3,7 @@
 // (the store balance first when the customer can use it, then the gateways the session offers) and "Pay". Flow
 // (handoff §5.8):
 // - gateway: POST …/consents (when something is new) → POST …/pay with one Idempotency-Key per attempt → send the browser
-//   to the gateway's `paymentUrl`; the gateway sends it back to `/<lang>/checkout/return?token=<token>`;
+//   to the gateway's `paymentUrl`; the gateway sends it back to `/en/checkout/return?token=<token>`;
 // - store balance (plan F30): POST …/consents → POST …/balance-payment with NO body, NO Content-Type and its own
 //   Idempotency-Key (never one a `/pay` call used) → 201 means the order exists at once (no webhook): go to tracking.
 //   A 401 or a 403 never signs anyone out here; the page says what to do instead.
@@ -26,7 +26,7 @@ import type { BalancePaymentResult, CheckoutSession, PayResult } from "@/lib/api
 import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
 import { fmt, plural } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 import type { CheckoutMessages } from "@/lib/i18n/messages/checkout";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
 import { BALANCE_MAX_TRIES, balanceOption, balanceWaitMs, canPayFromBalance, showsBalanceChoice, type BalanceWallet } from "./balance-option";
@@ -38,7 +38,6 @@ type Purpose = CheckoutSession["consent"]["required"][number];
 
 export type SessionViewProps = {
   session: CheckoutSession;
-  locale: Locale;
   labels: Labels;
   /** `common.quantity`: the plural "Subtotal (N units)" label. */
   quantityLabels: CommonMessages["quantity"];
@@ -77,10 +76,10 @@ function fill(template: string, values: Record<string, ReactNode>): ReactNode {
   });
 }
 
-export function SessionView({ session, locale, labels, quantityLabels, typeLabel, decimals, restartHref, countryName, balance }: SessionViewProps) {
+export function SessionView({ session, labels, quantityLabels, typeLabel, decimals, restartHref, countryName, balance }: SessionViewProps) {
   const router = useRouter();
   const errorText = useErrorText();
-  const p = (path: string) => localePath(locale, path);
+  const p = (path: string) => sitePath(path);
 
   const required = session.consent.required;
   const alreadyGranted = new Set<Purpose>(session.consent.granted);
@@ -140,7 +139,7 @@ export function SessionView({ session, locale, labels, quantityLabels, typeLabel
   }, [error]);
 
   const display = session.amounts.display;
-  const money = (amount: string) => <Money amount={amount} currency={session.currency} locale={locale} decimals={decimals} />;
+  const money = (amount: string) => <Money amount={amount} currency={session.currency} decimals={decimals} />;
   const taxApplies = /[1-9]/.test(display.tax);
 
   // ── Paid / expired
@@ -226,7 +225,7 @@ export function SessionView({ session, locale, labels, quantityLabels, typeLabel
     if (failure.code === "ACCOUNT_SUSPENDED") return { error: { message: labels.errors.suspended, reference, support: true } };
     if (failure.code === "GATEWAY_ERROR") return { error: { message: labels.errors.gateway, reference } };
     if (failure.code === "MAINTENANCE") {
-      const until = typeof failure.extensions.expectedEndAt === "string" ? formatDateTime(failure.extensions.expectedEndAt, locale) : "";
+      const until = typeof failure.extensions.expectedEndAt === "string" ? formatDateTime(failure.extensions.expectedEndAt) : "";
       return { error: { message: `${labels.errors.maintenance}${until ? ` ${fmt(labels.errors.maintenanceUntil, { time: until })}` : ""}`, reference } };
     }
     return { error: { message: errorText.message(failure), reference } };
@@ -378,7 +377,7 @@ export function SessionView({ session, locale, labels, quantityLabels, typeLabel
 
   // The line under "Available": why the choice is off, or what it takes from the balance when the checkout is not in USD.
   // One node (or null), so the card draws no empty block.
-  const usd = (amount: string) => <Money amount={amount} currency="USD" locale={locale} />;
+  const usd = (amount: string) => <Money amount={amount} currency="USD" />;
   let balanceNote: ReactNode = null;
   if (option.kind === "frozen") balanceNote = labels.balance.frozen;
   else if (option.kind === "insufficient") balanceNote = fill(labels.balance.insufficient, { available: usd(option.available), total: usd(option.total) });
@@ -401,7 +400,7 @@ export function SessionView({ session, locale, labels, quantityLabels, typeLabel
           <CardBody>
             <DescriptionList>
               <DescriptionItem label={labels.order.quantity}>
-                <span className="num">{formatNumber(session.quantity, locale)}</span>
+                <span className="num">{formatNumber(session.quantity)}</span>
               </DescriptionItem>
               {session.imei ? (
                 <DescriptionItem label={labels.order.imei}>
@@ -534,11 +533,11 @@ export function SessionView({ session, locale, labels, quantityLabels, typeLabel
           </p>
           <DescriptionList>
             {/* The session's own totals: the net of all units, then the tax worked once on it. */}
-            <DescriptionItem label={plural(locale, session.quantity, quantityLabels.subtotal, formatNumber(session.quantity, locale))}>
+            <DescriptionItem label={plural(session.quantity, quantityLabels.subtotal, formatNumber(session.quantity))}>
               {money(display.net)}
             </DescriptionItem>
             <DescriptionItem
-              label={taxApplies ? fmt(labels.summary.tax, { rate: formatPercent(session.taxRate, locale) }) : labels.summary.taxNone}
+              label={taxApplies ? fmt(labels.summary.tax, { rate: formatPercent(session.taxRate) }) : labels.summary.taxNone}
             >
               {taxApplies ? money(display.tax) : money("0.0000")}
             </DescriptionItem>
@@ -594,7 +593,7 @@ export function SessionView({ session, locale, labels, quantityLabels, typeLabel
               ? viaBalance
                 ? labels.balance.paying
                 : labels.summary.paying
-              : slot(labels.summary.pay, "amount", <Money amount={display.gross} currency={session.currency} locale={locale} decimals={decimals} />)}
+              : slot(labels.summary.pay, "amount", <Money amount={display.gross} currency={session.currency} decimals={decimals} />)}
           </Button>
           {/* The provider-page line is false for a balance payment: no provider page opens. */}
           {viaBalance ? null : (

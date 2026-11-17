@@ -41,14 +41,13 @@ import {
 import { countryName } from "@/lib/countries";
 import { getCurrency } from "@/lib/currency";
 import { formatMoney, formatNumber } from "@/lib/format";
-import { localePath } from "@/lib/i18n/config";
 import { fmt, plural } from "@/lib/i18n/define";
 import { common } from "@/lib/i18n/messages/common";
 import { search as searchMessages } from "@/lib/i18n/messages/search";
 import { store } from "@/lib/i18n/messages/store";
-import { getLocale, getMessages } from "@/lib/i18n/server";
 import { resultsHref } from "@/lib/search/options";
 import { popularSearches } from "@/lib/search/popular";
+import { sitePath } from "@/lib/site-path";
 import { ActiveFilters, type FilterChip } from "./active-filters";
 import { serviceCardLabels } from "./card-labels";
 import { LazyListFilters, ListFilters, type FilterGroup, type ListFiltersProps } from "./list-filters";
@@ -113,13 +112,10 @@ function clamp(n: number, bounds: { min: number; max: number }): number {
 /** Reads the URL, the API and the catalog and prepares everything the list shows (and `catalogSize`, 0 for an empty catalog). */
 export async function loadServiceList(searchParams: Promise<SearchParams>, config: ServiceListConfig) {
   const params = await searchParams;
-  const [locale, t, c, s, currency] = await Promise.all([
-    getLocale(),
-    getMessages(store),
-    getMessages(common),
-    getMessages(searchMessages),
-    getCurrency(),
-  ]);
+  const currency = await getCurrency();
+  const t = store;
+  const c = common;
+  const s = searchMessages;
   const input = readInput(params);
   // A text search is answered by the search engine: "Best match" is its default sort and "Featured" goes.
   const searching = searchesEngine(input.q);
@@ -141,15 +137,15 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
     max: filter.max === null ? undefined : String(filter.max),
     sort: sort === defaultSort(searching) ? undefined : sort,
   };
-  const base = localePath(locale, config.path || undefined);
+  const base = sitePath(config.path || undefined);
   const href = (change: Partial<ListState>) => pageHref(base, { ...state, ...change }, 1) + config.hash;
   // Isolated left-to-right (LRI … PDI) inside the chip's sentence, so "15 US$" keeps its order.
-  const money = (n: number) => `⁦${formatMoney(String(n), currency.code, locale, 0)}⁩`;
+  const money = (n: number) => `⁦${formatMoney(String(n), currency.code, 0)}⁩`;
   const label = (key: FacetKey, value: string) =>
-    key === "type" ? (c.serviceType[value as ServiceType] ?? value) : key === "country" ? countryName(value, locale) : value;
+    key === "type" ? (c.serviceType[value as ServiceType] ?? value) : key === "country" ? countryName(value) : value;
 
   // The numbers beside the options; hidden while the database answers a search instead of the engine (no facets).
-  const counted = (n: number) => (list.counts ? `(${formatNumber(n, locale)})` : "");
+  const counted = (n: number) => (list.counts ? `(${formatNumber(n)})` : "");
   const group = (key: FacetKey, title: string): FilterGroup => ({
     name: key,
     label: title,
@@ -216,7 +212,6 @@ export async function loadServiceList(searchParams: Promise<SearchParams>, confi
   };
 
   return {
-    locale,
     t,
     c,
     currency,
@@ -260,11 +255,11 @@ export type ServiceListData = Awaited<ReturnType<typeof loadServiceList>>;
  * catalog), chips, count, cards or the empty state, page links.
  */
 export function ServiceList({ data, config }: { data: ServiceListData; config: ServiceListConfig }) {
-  const { locale, t, c, s, currency, sort, sorts, list, state, base, chips, top, groups, price, keep, popular } = data;
+  const { t, c, s, currency, sort, sorts, list, state, base, chips, top, groups, price, keep, popular } = data;
   const { search } = list;
   // The search route serves 50 pages at most: the page links stop there (the count still says the whole total).
   const pagingTotal = search ? Math.min(list.total, SEARCH_MAX_PAGE * config.perPage) : list.total;
-  const count = (n: number) => plural(locale, n, t.catalog.results, formatNumber(n, locale));
+  const count = (n: number) => plural(n, t.catalog.results, formatNumber(n));
   const filtered = chips.length > 0;
   const clear = { label: t.catalog.clear, href: base + config.hash };
   const cardLabels = serviceCardLabels(t, c);
@@ -280,7 +275,6 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
     top,
     price,
     groups,
-    locale,
     labels: {
       priceRange: t.home.products.priceRange,
       minPrice: t.home.products.minPrice,
@@ -299,7 +293,7 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
       {t.catalog.filters}
       {filtered ? (
         <Badge tone="inverse" className="num px-1.5 py-0.5">
-          {formatNumber(chips.length, locale)}
+          {formatNumber(chips.length)}
         </Badge>
       ) : null}
     </>
@@ -316,7 +310,7 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
       {filtersLabel}
     </DialogTrigger>
   ) : (
-    <ButtonLink href={pageHref(localePath(locale, "/services"), state, 1)} variant="secondary" startIcon={<SlidersHorizontal aria-hidden="true" />}>
+    <ButtonLink href={pageHref(sitePath("/services"), state, 1)} variant="secondary" startIcon={<SlidersHorizontal aria-hidden="true" />}>
       {filtersLabel}
     </ButtonLink>
   );
@@ -358,9 +352,9 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
               <span className="text-ink-subtle">
                 {" · "}
                 {fmt(t.catalog.showing, {
-                  from: formatNumber(start + 1, locale),
-                  to: formatNumber(start + list.rows.length, locale),
-                  total: formatNumber(list.total, locale),
+                  from: formatNumber(start + 1),
+                  to: formatNumber(start + list.rows.length),
+                  total: formatNumber(list.total),
                 })}
               </span>
             ) : null}
@@ -375,14 +369,13 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
                   <ServiceCard
                     key={service.id}
                     service={service}
-                    locale={locale}
                     decimals={currency.decimals}
                     labels={cardLabels}
                     priority={i === 0 && list.page === 1}
                     index={i}
                   />
                 ) : (
-                  <ServiceCardMini key={service.id} service={service} locale={locale} decimals={currency.decimals} labels={cardLabels} index={i} />
+                  <ServiceCardMini key={service.id} service={service} decimals={currency.decimals} labels={cardLabels} index={i} />
                 ),
               )}
             </div>
@@ -401,7 +394,7 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
                           {popular.map((term) => (
                             <li key={term}>
                               <Link
-                                href={resultsHref(localePath(locale, "/services"), term)}
+                                href={resultsHref(sitePath("/services"), term)}
                                 prefetch={false}
                                 className="inline-flex min-h-11 items-center rounded-full border border-line-strong px-4 text-small font-medium text-ink transition-colors hover:border-ink"
                               >
@@ -463,7 +456,7 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
  * that a price sort covers only the best 1000 matches.
  */
 function SearchNotes({ data, config }: { data: ServiceListData; config: ServiceListConfig }) {
-  const { s, locale, list, state, base, sort } = data;
+  const { s, list, state, base, sort } = data;
   const { search } = list;
   if (!search) return null;
   const [before, after = ""] = s.didYouMean.split("{q}");
@@ -481,7 +474,7 @@ function SearchNotes({ data, config }: { data: ServiceListData; config: ServiceL
     search.imei ? (
       <p key="imei">
         <Link
-          href={`${localePath(locale, "/imei-check")}?${new URLSearchParams({ imei: search.imei }).toString()}`}
+          href={`${sitePath("/imei-check")}?${new URLSearchParams({ imei: search.imei }).toString()}`}
           className="inline-flex min-h-11 items-center gap-2 text-body font-semibold text-ink underline underline-offset-4"
         >
           <ScanSearch aria-hidden="true" className="size-4" />

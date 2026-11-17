@@ -78,9 +78,9 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
   sign-in (`lib/merchant/signup-locale.ts`). *(The register form and the saved language were removed on 2026-11-16: see
   "Merchant application on WhatsApp".)*
 - **F11 notifications:** bell with the unread count (99+) in both areas' headers, polled at most once a minute while the
-  tab is visible; `/[lang]/account/notifications` and `/[lang]/merchant/notifications` (All / Unread, mark one, mark all
+  tab is visible; `/en/account/notifications` and `/en/merchant/notifications` (All / Unread, mark one, mark all
   with `upToId`, links prefixed with the language and checked by `notificationHref`, text rendered as text, `lang`/`dir`
-  per item). **`/[lang]/unsubscribe?token=`**: a confirm button (never automatic) → "no more marketing emails" or "link
+  per item). **`/en/unsubscribe?token=`**: a confirm button (never automatic) → "no more marketing emails" or "link
   not valid" (fixes the 404 of the marketing mails' visible link).
 - **F12 catalog:** the list asks the API (type, real categories with counts, "In stock only", price range, brand,
   carrier, country, sorts Featured / Best sellers / New arrivals / price ↑↓ / A–Z); option counts still worked out over
@@ -103,7 +103,7 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
   modes); a quantity the rule no longer allows falls back to the default with a notice; summary "Price per unit /
   Subtotal (N units) / Estimated total"; the review page shows the session's own totals; restart, resume and the expired
   link keep `&quantity=`.
-- **F21 customer wallet:** `/[lang]/account/wallet` (balance cards, statement with a date range, the on-hold state without
+- **F21 customer wallet:** `/en/account/wallet` (balance cards, statement with a date range, the on-hold state without
   the staff reason, disabled and negative states); the balance pill in the account and shop headers and a Wallet menu
   item; the wallet read is `no-store` inside `<Suspense>`; the merchant wallet page uses the same components.
 - **F22 merchant account:** the profile edits the address, the tax id and the email language; "Resend verification email"
@@ -163,7 +163,7 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
    closed; the open backend limitations of plan §8 plus three top-up notes found in W3).
 
 ## Merchant application on WhatsApp (2026-11-16, owner's request)
-- **What changed:** `/[lang]/merchant/register` (same URL, still static and `noindex`) is no longer a form and sends
+- **What changed:** `/en/merchant/register` (same URL, still static and `noindex`) is no longer a form and sends
   nothing. It says that merchant accounts are opened by the team, lists three steps and offers "Chat on WhatsApp"
   (a `wa.me` link in a new tab with a prefilled message in the page's language) and the number as selectable text. Staff
   then create the merchant in the admin console, which sends the set-password link; the backend and the console did not
@@ -200,7 +200,7 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
   (one Google font remains: Inter), the `html:lang(ar)` CSS, the 37 `rtl:` variants, `:root[dir="rtl"]` and the
   `--inline-dir` variable, the mirrored banner art and the three reads of the computed direction (`segmented-control`,
   `menu`, `ghost-text`) are gone. No request carries `locale` (`lib/api/no-locale.test.ts`); the stream parser accepts an
-  item without one. `lib/api/schema.gen.ts` is regenerated from the backend contract (the lead does it again at L2).
+  item without one. `lib/api/schema.gen.ts` is generated from the final backend contract (125 operations, no language union).
 - **Kept (group C, Arabic text as data):** `dir="auto"` on text people type, `<bdi>` around API values, `dir="ltr"` on codes
   and numbers, Arabic-Indic and Persian digits typed in quantity, amount, IMEI and order boxes (written as code points),
   the input-method guard of the ticket reply box (`lib/support/send-key.ts`), initials of a name in any script, the
@@ -208,11 +208,25 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
 - **Guard:** `scripts/check-english-only.mjs` (the same file in the backend, the console and here) runs in `npm run lint`,
   with `scripts/english-only.config.json` (roots, an allowlist of group C tests and old-address code, and `keep` entries for
   the files that protect user text). It fails on Arabic script, the `ar` locale, `rtl:` variants and `dir="rtl"` outside
-  the allowlist. `npm run lint` is red on `lib/api/schema.gen.ts` (its `"en" | "ar"` unions) until the lead regenerates
-  it from the final backend contract.
-- **Still to do (cleanup wave S6 to S9, no URL, text or behaviour change):** drop the constant `locale` argument and prop
-  everywhere, `localePath` → `sitePath`, `getLocale()` and `getMessages()` go, and `app/[lang]` is renamed `app/en`.
-  The lead runs `next build` and the full e2e.
+  the allowlist.
+- **Cleanup wave (S6 to S9, no URL, text or behaviour change):** the constant `locale` argument and prop are gone from
+  `lib`, `components` and `app`, `localePath` is `sitePath(path)` (`lib/site-path.ts`), `getLocale()`, `getMessages()` and
+  `defineMessages` are gone (a message namespace is a plain object), and the folder `app/[lang]` was renamed `app/en` (a plain folder; its
+  `layout.tsx` is the root layout). Reviewed by Opus (pass, no finding).
+- **Merged 2026-11-17.** Feature 30 as `73534db` (with the backend `f354855` and the console `b24098b`; the demo database
+  `gsm_storefront` and the owner's `gsm` were migrated the same morning, after a backup). Checks on `main`: `npm run check`
+  green (937 unit tests, build), full e2e in dev mode against the isolated API 650 passed, 59 skipped, 1 failed under load
+  and passing alone. The cleanup wave is its own `refactor` commit: `npm run check` green (937 tests, build with `app/en`),
+  full e2e 650 passed, 59 skipped, 1 failed under load and passing alone (`support-live.spec.ts:167`).
+- **e2e in dev mode (for whoever runs it next):** `go()` waits for the first form control only, and since the header has a
+  search box that is the header's. A spec that types into a form lower on the page right after `go()` or `page.reload()`
+  must call `hydrated(page)` first (`e2e/helpers.ts`; `merchant-account.spec.ts` does). `go()` itself must not wait for
+  every control: `top-ups.spec.ts:415` reads the server-rendered notice before the page's effects run. Under machine load
+  `merchant.spec.ts:144` and `support-live.spec.ts:167` failed once each and passed alone. The main checkout's
+  `.env.development.local` points at the owner's API (:3000), so its e2e needs `GSM_API_ORIGIN=http://localhost:3100`.
+- **`../STOREFRONT-HANDOFF.md` was found empty on 2026-11-17** (saved empty on 2026-11-15) and was restored from the last
+  copy that could be found (the text of 2026-11-09), under a banner; `../STOREFRONT-BACKEND-HANDOFF.md` section 18 is the
+  English-only handoff and wins wherever they differ.
 
 ## Wiring (changed 2026-11-09, late evening, at the owner's request)
 - **Dev site (`npm run dev`, :5175) → the isolated demo API (:3100) since 2026-11-10**, at the owner's request (to
@@ -261,8 +275,8 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
   lists, each option a link with the count it would leave (`facetOptions`, worked out over the cached catalog, the
   same rules as the API: other filters + search), search box, sort, 8 dense cards per page, chips, pages. State in the
   home URL (`/en?brand=Apple&page=2#all-services`): works without JavaScript; the home's canonical is `/en`, `/ar`.
-- **Quick View**: an eye link on every card (`/[lang]/quick-view/<slug>`) is intercepted in the store layout's `@modal`
-  slot (`app/[lang]/(store)/@modal/(.)quick-view/[slug]`) and opens a large Modal over the page: type, chips, summary,
+- **Quick View**: an eye link on every card (`/en/quick-view/<slug>`) is intercepted in the store layout's `@modal`
+  slot (`app/en/(store)/@modal/(.)quick-view/[slug]`) and opens a large Modal over the page: type, chips, summary,
   price (visitor currency), delivery, quantity, carrier/country, description, requirements, "View full details" and
   "Buy now". Esc / backdrop / X go back in history. Opened directly, the URL is the service page (noindex, canonical
   `/services/<slug>`). The frame shows only while the URL is a quick view (`usePathname` in its own `<Suspense>`), so a
@@ -317,7 +331,7 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
 - Picture per service: none in the API or from the suppliers (their synced fields have no image), so cards show
   the type's picture: `docs/BACKEND-NEEDS.md` §7.
 - Checked: typecheck, ESLint, 78 unit tests, `e2e/store.spec.ts` 45 passed + 1 skipped, `next build` OK (171 pages,
-  `/[lang]` and `/[lang]/services` ◐), screenshots `/services` en/ar 1440 and 390 px, no overflow.
+  `/en` and `/en/services` ◐), screenshots `/services` en/ar 1440 and 390 px, no overflow.
 
 ## Site images added (2026-11-10, uncommitted)
 - The owner added 9 images (`home-*` ×5, `service-*` ×4). They were PNG data named `.jpg`: converted to real JPEG

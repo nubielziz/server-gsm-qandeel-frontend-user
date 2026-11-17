@@ -104,7 +104,7 @@ function BrandLogo({ name }: { name: string }) {
 
 function ServiceRow({ service, labels }: { service: SuggestService; labels: SuggestionListLabels }) {
   const parts = highlightParts(service.title, service.titleHighlight);
-  const price = formatMoney(service.price.gross, service.price.currency, "en");
+  const price = formatMoney(service.price.gross, service.price.currency);
   return (
     <>
       <ServicePicture service={service} />

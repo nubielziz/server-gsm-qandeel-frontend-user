@@ -1,7 +1,6 @@
 // Order progress as a vertical timeline. The API's `message` is English only, so the label comes from the event `type`.
 import { CircleCheck, CircleX, CreditCard, PackageCheck, RefreshCcw, RotateCcw, type LucideIcon } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import type { TrackedOrder } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 
@@ -28,11 +27,9 @@ const tones: Record<TrackedOrder["timeline"][number]["type"], string> = {
 export function OrderTimeline({
   events,
   labels,
-  locale,
 }: {
   events: TrackedOrder["timeline"];
   labels: Record<TrackedOrder["timeline"][number]["type"], string>;
-  locale: Locale;
 }) {
   return (
     <ol className="grid">
@@ -47,7 +44,7 @@ export function OrderTimeline({
             </span>
             <div className="min-w-0 pt-1">
               <p className="text-body font-semibold text-ink">{labels[event.type] ?? event.message}</p>
-              <p className="text-small text-ink-subtle">{formatDateTime(event.createdAt, locale)}</p>
+              <p className="text-small text-ink-subtle">{formatDateTime(event.createdAt)}</p>
             </div>
           </li>
         );

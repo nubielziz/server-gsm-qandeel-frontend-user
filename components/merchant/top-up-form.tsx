@@ -9,7 +9,6 @@ import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { InvoiceCreated, PaymentMethod } from "@/lib/api/types";
 import { compareMoney, formatMoney, formatPercent, subtractMoney } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { MerchantMessages } from "@/lib/i18n/messages/merchant";
@@ -34,12 +33,10 @@ function isZero(money: string): boolean {
 
 export function TopUpForm({
   methods,
-  locale,
   invoiceBase,
   labels,
 }: {
   methods: PaymentMethod[];
-  locale: Locale;
   /** `/en/merchant/invoices` */
   invoiceBase: string;
   labels: MerchantMessages["topUp"];
@@ -64,8 +61,8 @@ export function TopUpForm({
   function amountProblem(): string | undefined {
     if (amountText.trim() === "") return t.amountInvalid;
     if (!amount) return t.amountInvalid;
-    if (method && !isZero(method.minAmount) && compareMoney(amount, method.minAmount) < 0) return fmt(t.amountBelow, { min: ltr(formatMoney(method.minAmount, method.currency, locale)) });
-    if (method && !isZero(method.maxAmount) && compareMoney(amount, method.maxAmount) > 0) return fmt(t.amountAbove, { max: ltr(formatMoney(method.maxAmount, method.currency, locale)) });
+    if (method && !isZero(method.minAmount) && compareMoney(amount, method.minAmount) < 0) return fmt(t.amountBelow, { min: ltr(formatMoney(method.minAmount, method.currency)) });
+    if (method && !isZero(method.maxAmount) && compareMoney(amount, method.maxAmount) > 0) return fmt(t.amountAbove, { max: ltr(formatMoney(method.maxAmount, method.currency)) });
     return undefined;
   }
   const localAmountError = amountProblem();
@@ -76,15 +73,15 @@ export function TopUpForm({
   function feeText(m: PaymentMethod): string {
     const percent = !isZero(m.feePercent);
     const fixed = !isZero(m.feeFixed);
-    if (percent && fixed) return fmt(t.feeBoth, { percent: ltr(formatPercent(m.feePercent, locale)), fixed: ltr(formatMoney(m.feeFixed, m.currency, locale)) });
-    if (percent) return fmt(t.feePercent, { percent: ltr(formatPercent(m.feePercent, locale)) });
-    if (fixed) return fmt(t.feeFixed, { fixed: ltr(formatMoney(m.feeFixed, m.currency, locale)) });
+    if (percent && fixed) return fmt(t.feeBoth, { percent: ltr(formatPercent(m.feePercent)), fixed: ltr(formatMoney(m.feeFixed, m.currency)) });
+    if (percent) return fmt(t.feePercent, { percent: ltr(formatPercent(m.feePercent)) });
+    if (fixed) return fmt(t.feeFixed, { fixed: ltr(formatMoney(m.feeFixed, m.currency)) });
     return t.feeNone;
   }
 
   function limitText(m: PaymentMethod): string {
-    const min = isZero(m.minAmount) ? null : ltr(formatMoney(m.minAmount, m.currency, locale));
-    const max = isZero(m.maxAmount) ? null : ltr(formatMoney(m.maxAmount, m.currency, locale));
+    const min = isZero(m.minAmount) ? null : ltr(formatMoney(m.minAmount, m.currency));
+    const max = isZero(m.maxAmount) ? null : ltr(formatMoney(m.maxAmount, m.currency));
     if (min && max) return fmt(t.limits, { min, max });
     if (min) return fmt(t.limitMin, { min });
     if (max) return fmt(t.limitMax, { max });
@@ -215,10 +212,10 @@ export function TopUpForm({
           <CardHeader title={t.previewTitle} />
           <CardBody className="grid gap-4">
             <DescriptionList>
-              <DescriptionItem label={t.previewAmount}>{amount && !localAmountError ? <Money amount={amount} currency="USD" locale={locale} /> : "—"}</DescriptionItem>
-              <DescriptionItem label={t.previewFee}>{fee && !localAmountError ? <Money amount={fee} currency="USD" locale={locale} /> : "—"}</DescriptionItem>
+              <DescriptionItem label={t.previewAmount}>{amount && !localAmountError ? <Money amount={amount} currency="USD" /> : "—"}</DescriptionItem>
+              <DescriptionItem label={t.previewFee}>{fee && !localAmountError ? <Money amount={fee} currency="USD" /> : "—"}</DescriptionItem>
               <DescriptionItem label={t.previewNet} emphasis>
-                {net && !localAmountError ? <Money amount={net} currency="USD" locale={locale} /> : "—"}
+                {net && !localAmountError ? <Money amount={net} currency="USD" /> : "—"}
               </DescriptionItem>
             </DescriptionList>
             <Button type="submit" size="lg" block loading={submitting} aria-label={submitting ? (status === "redirecting" ? t.redirecting : t.creating) : undefined}>

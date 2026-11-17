@@ -8,10 +8,10 @@ import { Mail } from "lucide-react";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { TicketCreated } from "@/lib/api/types";
-import { localePath, type Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
+import { sitePath } from "@/lib/site-path";
 import { FormAlert } from "@/components/auth/form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "@/components/auth/form-errors";
 import { useFocusOnFeedback } from "@/components/auth/use-focus-on-feedback";
@@ -23,7 +23,6 @@ import { Input, Select, Textarea } from "@/components/ui/input";
 import { useUiText } from "@/components/ui/ui-text";
 
 export type NewTicketFormProps = {
-  locale: Locale;
   t: Pick<SupportMessages, "form" | "sent">;
   /** Prefill for a signed-in customer (email, name) and from `?order=`. */
   defaults: { email: string; name: string; order: string; signedIn: boolean };
@@ -45,7 +44,7 @@ export function trackingTokenFrom(input: string): string {
   }
 }
 
-export function NewTicketForm({ locale, t, defaults }: NewTicketFormProps) {
+export function NewTicketForm({ t, defaults }: NewTicketFormProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const ui = useUiText();
@@ -105,7 +104,7 @@ export function NewTicketForm({ locale, t, defaults }: NewTicketFormProps) {
       );
       if (ticket.token) {
         leaving = true;
-        router.push(localePath(locale, `/support/tickets/${encodeURIComponent(ticket.token)}`));
+        router.push(sitePath(`/support/tickets/${encodeURIComponent(ticket.token)}`));
       } else {
         setCreated({ number: ticket.number, email: values.email.trim() });
       }

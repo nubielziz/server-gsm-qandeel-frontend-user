@@ -1,7 +1,7 @@
 "use client";
 // Opening a checkout (mockup "Secure Checkout"): service information with the "Service requirements" drawer, the buyer's
 // details (email, country → tax, currency), the order summary with an indicative price, Turnstile and
-// "Continue to payment" → POST /store/v1/checkout-sessions → /<lang>/checkout/<token>. The amounts on this page are
+// "Continue to payment" → POST /store/v1/checkout-sessions → /en/checkout/<token>. The amounts on this page are
 // indicative: the session locks price, tax and exchange rate for 30 minutes on the next page (handoff §5.8).
 // The quantity rule of the service (a range, packs, exactly N) is state, not a constant: it starts from the server-rendered
 // service and is replaced by every re-read of the service (currency, country, region, a server refusal) (plan D17).
@@ -23,7 +23,7 @@ import type { CheckoutSession, CheckoutSessionInput, StoreConfig, StoreServiceDe
 import { formatDateTime, formatNumber, formatPercent, isValidImei, normalizeImei } from "@/lib/format";
 import { fmt, plural } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 import type { CheckoutMessages } from "@/lib/i18n/messages/checkout";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
 import {
@@ -43,7 +43,6 @@ import { focusQuantityControl, INVALID_SELECTOR, QuantityControl } from "./quant
 type Labels = CheckoutMessages["start"];
 
 export type CheckoutFormProps = {
-  locale: Locale;
   labels: Labels;
   /** `common.quantity`: the rule texts, the plural "Subtotal (N units)" and "per unit". */
   quantityLabels: CommonMessages["quantity"];
@@ -110,7 +109,6 @@ function maskImei(imei: string): string {
 }
 
 export function CheckoutForm({
-  locale,
   labels,
   quantityLabels,
   deliveryLabels,
@@ -254,7 +252,7 @@ export function CheckoutForm({
     }
     // One per order and exactly N have no control: the rule decides the quantity.
     if (controlled && (typedQuantity === null || !isAllowedQuantity(rule, typedQuantity))) {
-      found.quantity = invalidQuantityText(rule, quantityLabels, locale);
+      found.quantity = invalidQuantityText(rule, quantityLabels);
     }
     return found;
   }
@@ -295,7 +293,7 @@ export function CheckoutForm({
       return { fields: {}, form: { message: labels.errors.suspended, reference, support: true } };
     }
     if (error.code === "MAINTENANCE") {
-      const until = typeof error.extensions.expectedEndAt === "string" ? formatDateTime(error.extensions.expectedEndAt, locale) : "";
+      const until = typeof error.extensions.expectedEndAt === "string" ? formatDateTime(error.extensions.expectedEndAt) : "";
       return {
         fields: {},
         form: { message: `${labels.errors.maintenance}${until ? ` ${fmt(labels.errors.maintenanceUntil, { time: until })}` : ""}`, reference },
@@ -323,7 +321,7 @@ export function CheckoutForm({
     } catch {
       // keep the rule we have
     }
-    return invalidQuantityText(current, quantityLabels, locale);
+    return invalidQuantityText(current, quantityLabels);
   }
 
   async function onSubmit(event: FormEvent) {
@@ -356,7 +354,7 @@ export function CheckoutForm({
     setBusy(true);
     try {
       const session = await api.post<CheckoutSession>("/store/v1/checkout-sessions", body, { turnstileToken: token });
-      router.push(localePath(locale, `/checkout/${encodeURIComponent(session.token)}`));
+      router.push(sitePath(`/checkout/${encodeURIComponent(session.token)}`));
       return; // stay busy while the next page opens
     } catch (error) {
       const { fields: fieldsOut, form: formOut } = describe(error);
@@ -423,9 +421,9 @@ export function CheckoutForm({
 
   const unitDecimals = decimals;
   const showTotals = qtyNumber > 1;
-  const deliveryText = deliveryLine(live, locale, deliveryLabels);
-  const ruleText = quantityRuleText(rule, quantityLabels, locale);
-  const stockNote = stockHint({ ...live, quantity: rule }, locale, deliveryLabels);
+  const deliveryText = deliveryLine(live, deliveryLabels);
+  const ruleText = quantityRuleText(rule, quantityLabels);
+  const stockNote = stockHint({ ...live, quantity: rule }, deliveryLabels);
   const net = multiplyMoney(price.net, qtyNumber);
   const tax = multiplyMoney(price.tax, qtyNumber);
   const gross = multiplyMoney(price.gross, qtyNumber);
@@ -494,7 +492,7 @@ export function CheckoutForm({
                   {controlled ? (
                     <div className="flex justify-between gap-4">
                       <dt className="text-ink-subtle">{labels.info.quantity}</dt>
-                      <dd className="num font-semibold text-ink">{formatNumber(qtyNumber, locale)}</dd>
+                      <dd className="num font-semibold text-ink">{formatNumber(qtyNumber)}</dd>
                     </div>
                   ) : null}
                 </dl>
@@ -580,7 +578,7 @@ export function CheckoutForm({
             <div className="flex items-start justify-between gap-4 border-b border-line pb-4">
               <div className="min-w-0">
                 <p className="text-body font-semibold text-ink">{service.title}</p>
-                <p className="text-small text-ink-subtle">{fmt(labels.summary.quantity, { count: formatNumber(qtyNumber, locale) })}</p>
+                <p className="text-small text-ink-subtle">{fmt(labels.summary.quantity, { count: formatNumber(qtyNumber) })}</p>
               </div>
             </div>
 
@@ -600,14 +598,14 @@ export function CheckoutForm({
               <div className="flex items-baseline justify-between gap-4">
                 <dt className="text-body text-ink-muted">{showTotals ? labels.summary.priceEach : labels.summary.price}</dt>
                 <dd className="text-body font-medium text-ink">
-                  <Money amount={price.net} currency={price.currency} locale={locale} decimals={unitDecimals} />
+                  <Money amount={price.net} currency={price.currency} decimals={unitDecimals} />
                 </dd>
               </div>
               {showTotals ? (
                 <div className="flex items-baseline justify-between gap-4">
-                  <dt className="text-body text-ink-muted">{plural(locale, qtyNumber, quantityLabels.subtotal, formatNumber(qtyNumber, locale))}</dt>
+                  <dt className="text-body text-ink-muted">{plural(qtyNumber, quantityLabels.subtotal, formatNumber(qtyNumber))}</dt>
                   <dd className="text-body font-medium text-ink">
-                    <Money amount={net} currency={price.currency} locale={locale} decimals={unitDecimals} />
+                    <Money amount={net} currency={price.currency} decimals={unitDecimals} />
                   </dd>
                 </div>
               ) : null}
@@ -615,10 +613,10 @@ export function CheckoutForm({
                 taxApplies ? (
                   <div className="flex items-baseline justify-between gap-4">
                     <dt className="text-body text-ink-muted">
-                      {fmt(labels.summary.tax, { rate: formatPercent(price.taxRate || taxRate?.ratePercent || "0", locale) })}
+                      {fmt(labels.summary.tax, { rate: formatPercent(price.taxRate || taxRate?.ratePercent || "0") })}
                     </dt>
                     <dd className="text-body font-medium text-ink">
-                      <Money amount={tax} currency={price.currency} locale={locale} decimals={unitDecimals} />
+                      <Money amount={tax} currency={price.currency} decimals={unitDecimals} />
                     </dd>
                   </div>
                 ) : (
@@ -630,7 +628,7 @@ export function CheckoutForm({
               <div className="flex items-baseline justify-between gap-4 rounded-control bg-surface-muted px-3 py-3">
                 <dt className="text-heading font-bold text-ink">{showTotals ? labels.summary.estimate : labels.summary.total}</dt>
                 <dd className="text-heading font-extrabold text-ink">
-                  <Money amount={taxKnown ? gross : net} currency={price.currency} locale={locale} decimals={unitDecimals} />
+                  <Money amount={taxKnown ? gross : net} currency={price.currency} decimals={unitDecimals} />
                 </dd>
               </div>
             </dl>
@@ -703,7 +701,7 @@ export function CheckoutForm({
                 <p className="text-small text-ink-subtle">{typeLabel}</p>
               </div>
               <div className="shrink-0 text-end">
-                <Money amount={price.net} currency={price.currency} locale={locale} decimals={unitDecimals} className="text-body font-bold text-ink" />
+                <Money amount={price.net} currency={price.currency} decimals={unitDecimals} className="text-body font-bold text-ink" />
                 {mode.kind !== "single" ? <p className="text-small text-ink-subtle">{quantityLabels.perUnit}</p> : null}
               </div>
             </div>
@@ -775,7 +773,6 @@ export function CheckoutForm({
 
             <QuantityControl
               rule={rule}
-              locale={locale}
               value={quantity}
               onChange={changeQuantity}
               error={errors.quantity}

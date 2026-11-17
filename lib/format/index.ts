@@ -1,47 +1,47 @@
 // Display formatting. Money arrives as a 4-decimal string ("12.4900"): it is formatted from the
 // string (Intl accepts exact decimal strings) and summed with integer math, never as floats. Safe to import anywhere.
-import { intlLocaleOf, type Locale } from "@/lib/i18n/config";
+import { INTL_LOCALE } from "@/lib/i18n/config";
 
 type Num = number | `${number}` | string;
 
 const cache = new Map<string, Intl.NumberFormat | Intl.DateTimeFormat>();
-function nf(locale: Locale, options: Intl.NumberFormatOptions): Intl.NumberFormat {
-  const id = `n|${locale}|${JSON.stringify(options)}`;
+function nf(options: Intl.NumberFormatOptions): Intl.NumberFormat {
+  const id = `n|${JSON.stringify(options)}`;
   let f = cache.get(id) as Intl.NumberFormat | undefined;
-  if (!f) cache.set(id, (f = new Intl.NumberFormat(intlLocaleOf(locale), options)));
+  if (!f) cache.set(id, (f = new Intl.NumberFormat(INTL_LOCALE, options)));
   return f;
 }
-function df(locale: Locale, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
-  const id = `d|${locale}|${JSON.stringify(options)}`;
+function df(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const id = `d|${JSON.stringify(options)}`;
   let f = cache.get(id) as Intl.DateTimeFormat | undefined;
-  if (!f) cache.set(id, (f = new Intl.DateTimeFormat(intlLocaleOf(locale), options)));
+  if (!f) cache.set(id, (f = new Intl.DateTimeFormat(INTL_LOCALE, options)));
   return f;
 }
 
 /**
- * `formatMoney("12.4900", "USD", "en")` → "$12.49". `decimals` comes from `/store/v1/config` currencies (0–4);
+ * `formatMoney("12.4900", "USD")` → "$12.49". `decimals` comes from `/store/v1/config` currencies (0–4);
  * without it the currency's usual digits are used. Rounds half away from zero.
  */
-export function formatMoney(amount: string, currency: string, locale: Locale, decimals?: number): string {
+export function formatMoney(amount: string, currency: string, decimals?: number): string {
   const options: Intl.NumberFormatOptions = { style: "currency", currency, currencyDisplay: "narrowSymbol" };
   if (decimals !== undefined) {
     options.minimumFractionDigits = decimals;
     options.maximumFractionDigits = decimals;
   }
   try {
-    return nf(locale, options).format(amount as Intl.StringNumericLiteral);
+    return nf(options).format(amount as Intl.StringNumericLiteral);
   } catch {
     return `${amount} ${currency}`;
   }
 }
 
-export function formatNumber(value: Num, locale: Locale, options: Intl.NumberFormatOptions = {}): string {
-  return nf(locale, options).format(value as Intl.StringNumericLiteral);
+export function formatNumber(value: Num, options: Intl.NumberFormatOptions = {}): string {
+  return nf(options).format(value as Intl.StringNumericLiteral);
 }
 
 /** "15.0000" (a percent as a decimal string) → "15%". */
-export function formatPercent(percent: string, locale: Locale, maxDigits = 2): string {
-  return `${nf(locale, { maximumFractionDigits: maxDigits }).format(percent as Intl.StringNumericLiteral)}%`;
+export function formatPercent(percent: string, maxDigits = 2): string {
+  return `${nf({ maximumFractionDigits: maxDigits }).format(percent as Intl.StringNumericLiteral)}%`;
 }
 
 /**
@@ -51,14 +51,14 @@ export function formatPercent(percent: string, locale: Locale, maxDigits = 2): s
  */
 export const DISPLAY_TIME_ZONE = process.env.NEXT_PUBLIC_TIME_ZONE || "UTC";
 
-export function formatDate(iso: string, locale: Locale, options: Intl.DateTimeFormatOptions = { dateStyle: "medium" }): string {
+export function formatDate(iso: string, options: Intl.DateTimeFormatOptions = { dateStyle: "medium" }): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : df(locale, { timeZone: DISPLAY_TIME_ZONE, ...options }).format(d);
+  return Number.isNaN(d.getTime()) ? iso : df({ timeZone: DISPLAY_TIME_ZONE, ...options }).format(d);
 }
 
 /** Date and time with the zone named ("Nov 9, 2026, 5:45 PM UTC"), so a time is never ambiguous. */
-export function formatDateTime(iso: string, locale: Locale): string {
-  return formatDate(iso, locale, {
+export function formatDateTime(iso: string): string {
+  return formatDate(iso, {
     year: "numeric",
     month: "short",
     day: "numeric",

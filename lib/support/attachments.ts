@@ -2,7 +2,6 @@
 // a message. The server checks the content too; this only spares a doomed upload and says why. Files are never shown
 // inline: a message lists them as download links. Safe to import anywhere.
 import { formatNumber } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 
 export const MAX_ATTACHMENTS = 5;
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
@@ -30,11 +29,11 @@ export function attachmentProblem(file: { name: string; type: string; size: numb
   return null;
 }
 
-/** "340 KB", "1.2 MB" in the page's language (1 KB = 1024 bytes, as the 5 MB limit is). */
-export function formatFileSize(bytes: number, locale: Locale): string {
-  if (bytes < 1024) return formatNumber(bytes, locale, { style: "unit", unit: "byte", unitDisplay: "short" });
-  if (bytes < 1024 * 1024) return formatNumber(Math.round(bytes / 1024), locale, { style: "unit", unit: "kilobyte", unitDisplay: "short" });
-  return formatNumber(Math.round((bytes / (1024 * 1024)) * 10) / 10, locale, {
+/** "340 KB", "1.2 MB" (1 KB = 1024 bytes, as the 5 MB limit is). */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return formatNumber(bytes, { style: "unit", unit: "byte", unitDisplay: "short" });
+  if (bytes < 1024 * 1024) return formatNumber(Math.round(bytes / 1024), { style: "unit", unit: "kilobyte", unitDisplay: "short" });
+  return formatNumber(Math.round((bytes / (1024 * 1024)) * 10) / 10, {
     style: "unit",
     unit: "megabyte",
     unitDisplay: "short",

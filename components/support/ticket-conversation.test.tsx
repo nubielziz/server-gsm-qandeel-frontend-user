@@ -34,13 +34,12 @@ const source = (overrides: Partial<TicketSource> = {}): TicketSource => ({
 });
 
 function render(options: { source?: TicketSource; access?: TicketAccess; newTicketHref?: string } = {}) {
-  const t = support.en.ticket;
+  const t = support.ticket;
   return renderToStaticMarkup(
-    <ErrorTextProvider messages={errors.en}>
+    <ErrorTextProvider messages={errors}>
       <TicketLive number="T-1042" access={options.access ?? { kind: "token", token: "tok" }} source={options.source ?? source()}>
         <LiveTicketStatus labels={statuses} />
         <TicketConversation
-          locale="en"
           newTicketHref={options.newTicketHref ?? "/en/support"}
           t={{ conversation: t.conversation, you: t.you, team: t.team, sentAt: t.sentAt, reply: t.reply, csat: t.csat, chat: t.chat, closed: t.closed }}
         />
@@ -210,7 +209,7 @@ describe("LiveTicketFacts", () => {
     const open = renderToStaticMarkup(
       <TicketLive number="T-1" access={{ kind: "token", token: "t" }} source={source()}>
         <dl>
-          <LiveTicketFacts locale="en" labels={labels} statuses={statuses} />
+          <LiveTicketFacts labels={labels} statuses={statuses} />
         </dl>
       </TicketLive>,
     );
@@ -220,7 +219,7 @@ describe("LiveTicketFacts", () => {
     const resolved = renderToStaticMarkup(
       <TicketLive number="T-1" access={{ kind: "token", token: "t" }} source={source({ status: "resolved", resolvedAt: "2026-11-15T10:08:00.000Z" })}>
         <dl>
-          <LiveTicketFacts locale="en" labels={labels} statuses={statuses} />
+          <LiveTicketFacts labels={labels} statuses={statuses} />
         </dl>
       </TicketLive>,
     );

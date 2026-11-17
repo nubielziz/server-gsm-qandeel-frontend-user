@@ -9,7 +9,6 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 import type { TopUp } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 
 export type TopUpsTableLabels = {
@@ -24,13 +23,12 @@ export type TopUpsTableLabels = {
 
 export type TopUpsTableProps = {
   rows: TopUp[];
-  locale: Locale;
   /** `/en/account/wallet/top-ups`: a row's link is `${hrefBase}/${id}`. */
   hrefBase: string;
   labels: TopUpsTableLabels;
 };
 
-export function TopUpsTable({ rows, locale, hrefBase, labels }: TopUpsTableProps) {
+export function TopUpsTable({ rows, hrefBase, labels }: TopUpsTableProps) {
   const col = labels.columns;
   return (
     <Table compact caption={labels.caption}>
@@ -58,7 +56,7 @@ export function TopUpsTable({ rows, locale, hrefBase, labels }: TopUpsTableProps
               </Link>
             </TableCell>
             <TableCell phone="meta" label={col.date}>
-              <span className="whitespace-nowrap text-ink-muted max-md:text-ink-subtle">{formatDate(row.createdAt, locale)}</span>
+              <span className="whitespace-nowrap text-ink-muted max-md:text-ink-subtle">{formatDate(row.createdAt)}</span>
             </TableCell>
             <TableCell phone="subtitle" label={col.method}>
               <span dir="auto" className="text-ink-muted max-md:text-ink">
@@ -66,7 +64,7 @@ export function TopUpsTable({ rows, locale, hrefBase, labels }: TopUpsTableProps
               </span>
             </TableCell>
             <TableCell numeric phone="amount" label={col.amount}>
-              <Money amount={row.amount} currency="USD" locale={locale} className="font-semibold" />
+              <Money amount={row.amount} currency="USD" className="font-semibold" />
             </TableCell>
             <TableCell phone="badge" label={col.status}>
               <StatusBadge kind="topUp" status={row.status} label={labels.statuses[row.status]} />

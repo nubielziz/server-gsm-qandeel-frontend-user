@@ -141,7 +141,7 @@ export async function getLegacySlug(kind: LegacySlugKind, slug: string): Promise
 
 /**
  * The site path (no language prefix) an old page or help address leads to now (`/` or `/help`), or null when the address
- * was never retired. The caller sends the reader on with `permanentRedirect(localePath(locale, path))`.
+ * was never retired. The caller sends the reader on with `permanentRedirect(sitePath(path))`.
  */
 export async function legacyPath(kind: "page" | "help", slug: string): Promise<string | null> {
   return (await getLegacySlug(kind, slug))?.path ?? null;

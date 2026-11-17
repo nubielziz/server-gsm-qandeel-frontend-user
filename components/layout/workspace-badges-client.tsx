@@ -9,7 +9,6 @@
 //   again on a client navigation). It pops in when it appears after the first paint, never on a first load.
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { cn } from "@/lib/cn";
 import { unreadText, type NotificationSurface } from "@/lib/notifications/link";
@@ -21,7 +20,6 @@ import { NAV_BADGE } from "./nav-badge";
 
 export type NavUnreadBadgeProps = {
   surface: NotificationSurface;
-  locale: Locale;
   /** The unread count the server just read (the same request read as the bell's); null when it could not. */
   initialCount: number | null;
   /** The name suffix with a `{count}` placeholder (", {count} unread"). */
@@ -29,7 +27,7 @@ export type NavUnreadBadgeProps = {
 };
 
 /** The unread count on the Notifications item: the bell's number, live. Nothing at zero. */
-export function NavUnreadBadge({ surface, locale, initialCount, suffix }: NavUnreadBadgeProps) {
+export function NavUnreadBadge({ surface, initialCount, suffix }: NavUnreadBadgeProps) {
   const subscribe = useCallback((listener: () => void) => unreadStore.subscribe(surface, listener), [surface]);
   const polled = useSyncExternalStore(
     subscribe,
@@ -41,7 +39,7 @@ export function NavUnreadBadge({ surface, locale, initialCount, suffix }: NavUnr
     if (initialCount !== null) unreadStore.reconcile(surface, initialCount);
   }, [surface, initialCount]);
   const count = polled ?? initialCount ?? 0;
-  const text = unreadText(count, locale);
+  const text = unreadText(count);
   const { view, onAnimationEnd } = useBellMotion(surface, count, text);
   if (count <= 0) return null;
   return (

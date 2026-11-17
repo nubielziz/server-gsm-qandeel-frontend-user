@@ -2,9 +2,8 @@
 // none) and no social links (none supplied).
 import Link from "next/link";
 import { cacheLife } from "next/cache";
-import { localePath } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 import { fmt } from "@/lib/i18n/define";
-import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { Container } from "./container";
 import { Logo } from "./logo";
@@ -21,8 +20,9 @@ async function CopyrightYear(): Promise<string> {
 
 /** The dark site footer. */
 export async function StoreFooter() {
-  const [locale, t, year] = await Promise.all([getLocale(), getMessages(common), CopyrightYear()]);
-  const p = (path: string) => localePath(locale, path);
+  const year = await CopyrightYear();
+  const t = common;
+  const p = (path: string) => sitePath(path);
   const columns = [
     {
       title: t.footer.shop,

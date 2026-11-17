@@ -12,8 +12,7 @@ import { apiSessionList } from "@/lib/api/server";
 import type { NotificationItem } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
-import { localePath } from "@/lib/i18n/config";
-import { getLocale, getMessages } from "@/lib/i18n/server";
+import { sitePath } from "@/lib/site-path";
 import { notifications } from "@/lib/i18n/messages/notifications";
 import { first, type SearchParams } from "@/lib/merchant/lists";
 import {
@@ -50,11 +49,12 @@ export function NotificationListSkeleton() {
 }
 
 export async function NotificationList({ surface, searchParams }: { surface: NotificationSurface; searchParams: Promise<SearchParams> }) {
-  const [sp, locale, t, unreadTotal] = await Promise.all([searchParams, getLocale(), getMessages(notifications), readUnreadCount(surface)]);
+  const [sp, unreadTotal] = await Promise.all([searchParams, readUnreadCount(surface)]);
+  const t = notifications;
   const unreadOnly = first(sp.unread) === "1";
   const page = parsePage(sp.page);
   const { start, end } = pageRange(page, PAGE_SIZE);
-  const basePath = localePath(locale, NOTIFICATIONS_PAGE[surface]);
+  const basePath = sitePath(NOTIFICATIONS_PAGE[surface]);
   const filters = unreadOnly ? { unread: "1" } : {};
 
   let rows: { data: NotificationItem[]; total: number };
@@ -81,7 +81,7 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
       key: "unread",
       label: t.tabUnread,
       href: pageHref(basePath, { unread: "1" }, 1),
-      count: unreadTotal !== null && unreadTotal > 0 ? unreadText(unreadTotal, locale) : undefined,
+      count: unreadTotal !== null && unreadTotal > 0 ? unreadText(unreadTotal) : undefined,
     },
   ];
 
@@ -100,7 +100,6 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
         {showMarkAll ? (
           <MarkAllRead
             surface={surface}
-            locale={locale}
             upToId={newestId}
             labels={{ markAllRead: t.markAllRead, markedAll: t.markedAll, markedNone: t.markedNone }}
           />
@@ -129,7 +128,7 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
                 {data.map((item) => {
                   const unread = item.readAt === null;
                   const titleId = `notification-${item.id}-title`;
-                  const href = notificationHref(item.link, locale, surface);
+                  const href = notificationHref(item.link, surface);
                   const category = Object.hasOwn(categoryLabels, item.category) ? categoryLabels[item.category] : undefined;
                   return (
                     <li
@@ -164,7 +163,7 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
                               <span aria-hidden="true">·</span>
                             </>
                           ) : null}
-                          <time dateTime={item.createdAt}>{formatDateTime(item.createdAt, locale)}</time>
+                          <time dateTime={item.createdAt}>{formatDateTime(item.createdAt)}</time>
                         </p>
                       </div>
                       {href || unread ? (

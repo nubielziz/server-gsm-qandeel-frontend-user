@@ -27,9 +27,9 @@ vi.mock("@/lib/api/public", async (importOriginal) => {
   };
 });
 
-import ServicePage, { generateMetadata as serviceMetadata } from "@/app/[lang]/(store)/services/[slug]/page";
-import ContentPage, { generateMetadata as pageMetadata } from "@/app/[lang]/(store)/pages/[slug]/page";
-import HelpArticlePage, { generateMetadata as helpMetadata } from "@/app/[lang]/(store)/help/[slug]/page";
+import ServicePage, { generateMetadata as serviceMetadata } from "@/app/en/(store)/services/[slug]/page";
+import ContentPage, { generateMetadata as pageMetadata } from "@/app/en/(store)/pages/[slug]/page";
+import HelpArticlePage, { generateMetadata as helpMetadata } from "@/app/en/(store)/help/[slug]/page";
 
 const SERVICE = { id: 1, slug: "icloud-clean-lost-check", title: "iCloud check", summary: "", seoTitle: "", seoDescription: "" } as unknown as StoreServiceDetail;
 
@@ -45,7 +45,7 @@ beforeEach(() => {
   reads.legacy.set("help:7-old-article", { path: "/help", slug: null });
 });
 
-const props = (slug: string) => ({ params: Promise.resolve({ lang: "en", slug }), searchParams: Promise.resolve({}) }) as never;
+const props = (slug: string) => ({ params: Promise.resolve({ slug }), searchParams: Promise.resolve({}) }) as never;
 
 /** The first element of the tree (without rendering components) whose component has this name. */
 function findElement(node: ReactNode, name: string): ReactElement<Record<string, unknown>> | null {

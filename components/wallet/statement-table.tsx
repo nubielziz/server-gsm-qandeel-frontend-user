@@ -7,7 +7,6 @@ import { SignedMoney } from "@/components/merchant/signed-money";
 import { Money } from "@/components/ui/money";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 import { formatDateTime } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { labelOf } from "@/lib/merchant/format";
 import type { StatementRow } from "@/lib/wallet/view";
 
@@ -23,11 +22,10 @@ export type StatementTableLabels = {
 
 export type StatementTableProps = {
   rows: StatementRow[];
-  locale: Locale;
   labels: StatementTableLabels;
 };
 
-export function StatementTable({ rows, locale, labels }: StatementTableProps) {
+export function StatementTable({ rows, labels }: StatementTableProps) {
   const col = labels.columns;
   return (
     <Table compact caption={labels.caption}>
@@ -44,7 +42,7 @@ export function StatementTable({ rows, locale, labels }: StatementTableProps) {
         {rows.map((row) => (
           <TableRow key={row.id}>
             <TableCell phone="meta">
-              <span className="whitespace-nowrap text-ink-muted max-md:text-ink-subtle">{formatDateTime(row.createdAt, locale)}</span>
+              <span className="whitespace-nowrap text-ink-muted max-md:text-ink-subtle">{formatDateTime(row.createdAt)}</span>
             </TableCell>
             <TableCell phone="title" label={col.kind}>
               <span className="font-medium max-md:font-semibold">{labelOf(labels.kinds, row.kind)}</span>
@@ -55,10 +53,10 @@ export function StatementTable({ rows, locale, labels }: StatementTableProps) {
               </span>
             </TableCell>
             <TableCell numeric phone="amount" label={col.amount}>
-              <SignedMoney amount={row.amount} locale={locale} />
+              <SignedMoney amount={row.amount} />
             </TableCell>
             <TableCell numeric phone="meta-labeled" label={col.balanceAfter}>
-              <Money amount={row.balanceAfter} currency="USD" locale={locale} />
+              <Money amount={row.balanceAfter} currency="USD" />
             </TableCell>
           </TableRow>
         ))}

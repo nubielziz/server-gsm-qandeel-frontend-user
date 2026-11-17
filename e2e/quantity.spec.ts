@@ -75,7 +75,7 @@ function dollars(amount: string, quantity = 1): string {
  * is reloaded until the quantity rule text shows (a rule the global setup just wrote may still be cached).
  */
 async function openCheckout(page: Page, path: string, options: { rule?: string } = {}) {
-  const t = checkout.en.start;
+  const t = checkout.start;
   if (options.rule) {
     const rule = options.rule;
     await expect(async () => {
@@ -90,18 +90,18 @@ async function openCheckout(page: Page, path: string, options: { rule?: string }
 
 /** Opens the "Service requirements" drawer. */
 async function openDrawer(page: Page): Promise<Locator> {
-  await page.getByRole("button", { name: checkout.en.start.info.enter }).first().click();
+  await page.getByRole("button", { name: checkout.start.info.enter }).first().click();
   const drawer = page.getByRole("dialog");
   await expect(drawer).toBeVisible();
   return drawer;
 }
 
 async function saveDrawer(drawer: Locator) {
-  await drawer.getByRole("button", { name: checkout.en.start.drawer.save }).click();
+  await drawer.getByRole("button", { name: checkout.start.drawer.save }).click();
 }
 
 async function fillBuyer(page: Page) {
-  const t = checkout.en.start;
+  const t = checkout.start;
   await page.getByLabel(t.you.email).fill("e2e-qty-buyer@example.com");
   await page.getByLabel(t.you.country).selectOption("DE");
 }
@@ -374,7 +374,7 @@ test.describe("a refused quantity", () => {
     const { stocked } = fixtures();
     const row = await apiService(request, stocked.slug);
     expect(row.availability).toBe("in_stock");
-    const t = checkout.en.start;
+    const t = checkout.start;
 
     const changed: Rule = { min: 20, max: 40, options: [20, 40] };
     let rule: Rule | null = null;

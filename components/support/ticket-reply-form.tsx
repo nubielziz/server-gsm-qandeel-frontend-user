@@ -12,7 +12,6 @@ import { FileText, Paperclip, Send, X } from "lucide-react";
 import { isApiError } from "@/lib/api/errors";
 import type { TicketMessage } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
@@ -43,7 +42,6 @@ import { toast } from "@/components/ui/toast";
 
 export type TicketReplyFormProps = {
   adapter: Pick<TicketAdapter, "send" | "upload" | "typing">;
-  locale: Locale;
   t: SupportMessages["ticket"]["reply"];
   /** Shown above the box: "We are waiting for your reply." */
   hint?: string;
@@ -62,7 +60,7 @@ const refusedAsClosed = (error: unknown) => isApiError(error) && error.code === 
 
 const BODY_MAX = 4000;
 
-export function TicketReplyForm({ adapter, locale, t, hint, initialBody = "", onSent, onDraft, onClosed }: TicketReplyFormProps) {
+export function TicketReplyForm({ adapter, t, hint, initialBody = "", onSent, onDraft, onClosed }: TicketReplyFormProps) {
   const errorText = useErrorText();
   const hintId = useId();
   const form = useRef<HTMLFormElement>(null);
@@ -216,7 +214,7 @@ export function TicketReplyForm({ adapter, locale, t, hint, initialBody = "", on
                     {chip.error}
                   </span>
                 ) : (
-                  <span className="num block text-ink-subtle">{chip.status === "uploading" ? t.uploading : formatFileSize(chip.size, locale)}</span>
+                  <span className="num block text-ink-subtle">{chip.status === "uploading" ? t.uploading : formatFileSize(chip.size)}</span>
                 )}
               </span>
               <IconButton

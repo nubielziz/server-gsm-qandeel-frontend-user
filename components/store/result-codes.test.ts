@@ -59,13 +59,13 @@ describe("splitCodes: when a result is a list of codes", () => {
 
 describe("ResultCodes: the markup of the tracking result", () => {
   const labels: ResultCodesLabels = {
-    title: store.en.track.codesTitle,
-    copyAll: store.en.track.copyAll,
-    copyCode: store.en.track.copyCode,
+    title: store.track.codesTitle,
+    copyAll: store.track.copyAll,
+    copyCode: store.track.copyCode,
     copy: "Copy",
     copied: "Copied",
   };
-  const render = (code: string) => renderToStaticMarkup(createElement(ResultCodes, { code, locale: "en", labels }));
+  const render = (code: string) => renderToStaticMarkup(createElement(ResultCodes, { code, labels }));
   const count = (html: string, pattern: RegExp) => (html.match(pattern) ?? []).length;
 
   it("five codes: a heading, a list of five, a Copy button each and Copy all", () => {

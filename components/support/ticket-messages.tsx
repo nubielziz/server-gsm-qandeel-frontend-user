@@ -6,7 +6,6 @@
 // new tab, never an inline preview): the API answers the link with a 302 to a short-lived address.
 import { FileText } from "lucide-react";
 import { formatDate } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
 import { formatFileSize } from "@/lib/support/attachments";
@@ -16,7 +15,6 @@ import { Avatar } from "@/components/ui/avatar";
 
 export type TicketMessagesProps = {
   messages: readonly ConversationMessage[];
-  locale: Locale;
   t: Pick<SupportMessages["ticket"], "conversation" | "you" | "team" | "sentAt"> & {
     chat: Pick<SupportMessages["ticket"]["chat"], "sent" | "seen" | "attachments" | "opensNewTab">;
   };
@@ -26,7 +24,7 @@ export type TicketMessagesProps = {
   receipt: { messageId: number; seen: boolean } | null;
 };
 
-export function TicketMessages({ messages, locale, t, fileHref, receipt }: TicketMessagesProps) {
+export function TicketMessages({ messages, t, fileHref, receipt }: TicketMessagesProps) {
   return (
     <ol role="log" aria-label={t.conversation} aria-live="polite" className="grid gap-4">
       {messages.map((message, index) => {
@@ -40,7 +38,7 @@ export function TicketMessages({ messages, locale, t, fileHref, receipt }: Ticke
             {showDay ? (
               <p className="flex items-center gap-4 text-small text-ink-subtle">
                 <span aria-hidden="true" className="h-px flex-1 bg-line" />
-                <time dateTime={message.createdAt}>{formatDate(message.createdAt, locale, { dateStyle: "long" })}</time>
+                <time dateTime={message.createdAt}>{formatDate(message.createdAt, { dateStyle: "long" })}</time>
                 <span aria-hidden="true" className="h-px flex-1 bg-line" />
               </p>
             ) : null}
@@ -68,7 +66,7 @@ export function TicketMessages({ messages, locale, t, fileHref, receipt }: Ticke
                           >
                             <FileText aria-hidden="true" className="size-4 shrink-0" />
                             <bdi className="min-w-0 truncate">{file.filename}</bdi>
-                            <span className="num shrink-0 font-normal text-ink-subtle">{formatFileSize(file.size, locale)}</span>
+                            <span className="num shrink-0 font-normal text-ink-subtle">{formatFileSize(file.size)}</span>
                             <span className="sr-only">{t.chat.opensNewTab}</span>
                           </a>
                         </li>
@@ -77,7 +75,7 @@ export function TicketMessages({ messages, locale, t, fileHref, receipt }: Ticke
                   ) : null}
                 </div>
                 <p className={cn("mt-1 text-caption text-ink-subtle", mine && "text-end")}>
-                  {fmt(t.sentAt, { who, time: formatDate(message.createdAt, locale, { timeStyle: "short" }) })}
+                  {fmt(t.sentAt, { who, time: formatDate(message.createdAt, { timeStyle: "short" }) })}
                   {receiptText ? ` · ${receiptText}` : null}
                 </p>
               </div>

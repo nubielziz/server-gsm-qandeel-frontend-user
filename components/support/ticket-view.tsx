@@ -7,7 +7,6 @@
 import Link from "next/link";
 import type { Ticket } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { statusLabel, type CommonMessages } from "@/lib/i18n/messages/common";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
@@ -29,7 +28,6 @@ import { DescriptionItem, DescriptionList } from "@/components/ui/description-li
 export type TicketViewTicket = Omit<Ticket, "canRate" | "csatScore"> & Partial<Pick<Ticket, "canRate" | "csatScore">>;
 
 export type TicketViewProps = {
-  locale: Locale;
   t: SupportMessages;
   c: CommonMessages;
   ticket: TicketViewTicket;
@@ -43,7 +41,7 @@ export type TicketViewProps = {
 
 const STATUSES: readonly TicketStatus[] = ["new", "open", "pending", "resolved"];
 
-export function TicketView({ locale, t, c, ticket, access, breadcrumbs, order, newTicketHref }: TicketViewProps) {
+export function TicketView({ t, c, ticket, access, breadcrumbs, order, newTicketHref }: TicketViewProps) {
   const i = t.ticket.info;
   const category = t.ticket.categories[ticket.category];
   const statuses = Object.fromEntries(STATUSES.map((status) => [status, statusLabel(c, "ticket", status)])) as Record<TicketStatus, string>;
@@ -73,7 +71,6 @@ export function TicketView({ locale, t, c, ticket, access, breadcrumbs, order, n
             <CardHeader title={<span id="conversation">{t.ticket.conversation}</span>} />
             <CardBody className="grid gap-6">
               <TicketConversation
-                locale={locale}
                 newTicketHref={newTicketHref}
                 t={{
                   conversation: t.ticket.conversation,
@@ -108,8 +105,8 @@ export function TicketView({ locale, t, c, ticket, access, breadcrumbs, order, n
                     )}
                   </DescriptionItem>
                 ) : null}
-                <DescriptionItem label={i.created}>{formatDateTime(ticket.createdAt, locale)}</DescriptionItem>
-                <LiveTicketFacts locale={locale} labels={{ updated: i.updated, resolved: i.resolved, status: i.status }} statuses={statuses} />
+                <DescriptionItem label={i.created}>{formatDateTime(ticket.createdAt)}</DescriptionItem>
+                <LiveTicketFacts labels={{ updated: i.updated, resolved: i.resolved, status: i.status }} statuses={statuses} />
               </DescriptionList>
             </CardBody>
           </Card>

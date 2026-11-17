@@ -8,7 +8,6 @@ import { Download, Trash2 } from "lucide-react";
 import { api } from "@/lib/api/browser";
 import type { DataRequest } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AccountMessages } from "@/lib/i18n/messages/account";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
@@ -22,13 +21,12 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { toast } from "@/components/ui/toast";
 
 export type PrivacyRequestsProps = {
-  locale: Locale;
   t: AccountMessages["settings"]["privacy"];
   /** `common` messages that the request status label needs. */
   requestStatus: CommonMessages["status"]["request"];
 };
 
-export function PrivacyRequests({ locale, t, requestStatus }: PrivacyRequestsProps) {
+export function PrivacyRequests({ t, requestStatus }: PrivacyRequestsProps) {
   const errorText = useErrorText();
   const [busy, setBusy] = useState<"export" | "erasure" | null>(null);
   const [request, setRequest] = useState<DataRequest | null>(null);
@@ -97,8 +95,8 @@ export function PrivacyRequests({ locale, t, requestStatus }: PrivacyRequestsPro
             <DescriptionItem label={t.status}>
               <StatusBadge kind="request" status={request.status} label={statusText(request.status)} />
             </DescriptionItem>
-            <DescriptionItem label={t.requestedOn}>{formatDate(request.requestedAt, locale)}</DescriptionItem>
-            <DescriptionItem label={t.dueBy}>{formatDate(request.dueAt, locale)}</DescriptionItem>
+            <DescriptionItem label={t.requestedOn}>{formatDate(request.requestedAt)}</DescriptionItem>
+            <DescriptionItem label={t.dueBy}>{formatDate(request.dueAt)}</DescriptionItem>
           </DescriptionList>
         </Alert>
       ) : null}

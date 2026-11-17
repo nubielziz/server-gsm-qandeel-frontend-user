@@ -1,9 +1,9 @@
 // Small display helpers for the merchant pages. Safe to import anywhere.
-import { intlLocaleOf, type Locale } from "@/lib/i18n/config";
+import { INTL_LOCALE } from "@/lib/i18n/config";
 
 /** `90` → "1 hr, 30 min". Used for the services' delivery target (`slaMinutes`). */
-export function formatMinutes(minutes: number, locale: Locale): string {
-  const tag = intlLocaleOf(locale);
+export function formatMinutes(minutes: number): string {
+  const tag = INTL_LOCALE;
   const parts: [number, "day" | "hour" | "minute"][] = [
     [Math.floor(minutes / 1440), "day"],
     [Math.floor((minutes % 1440) / 60), "hour"],

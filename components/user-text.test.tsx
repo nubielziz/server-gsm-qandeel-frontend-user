@@ -24,11 +24,10 @@ const message = (id: number, from: "you" | "support", text: string, attachments:
 });
 
 function render(messages: ConversationMessage[]) {
-  const t = support.en.ticket;
+  const t = support.ticket;
   return renderToStaticMarkup(
     <TicketMessages
       messages={messages}
-      locale="en"
       t={{ conversation: t.conversation, you: t.you, team: t.team, sentAt: t.sentAt, chat: t.chat }}
       fileHref={(id) => `/store/v1/tickets/tok/files/${id}`}
       receipt={null}

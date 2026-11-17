@@ -13,7 +13,6 @@ import type { NotificationPreferences } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
-import type { Locale } from "@/lib/i18n/config";
 import type { MerchantSettingsMessages } from "@/lib/i18n/messages/merchant-settings";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -60,13 +59,12 @@ export function changedEventRows(order: string[], working: EventMap, base: Event
 }
 
 type Props = {
-  locale: Locale;
   initial: NotificationPreferences;
   t: MerchantSettingsMessages["notifications"];
   fieldTexts: MerchantSettingsMessages["fieldErrors"];
 };
 
-export function NotificationsForm({ locale, initial, t, fieldTexts }: Props) {
+export function NotificationsForm({ initial, t, fieldTexts }: Props) {
   const errorText = useErrorText();
   const formRef = useRef<HTMLFormElement>(null);
   const [order] = useState(() => initial.events.map((e) => ({ event: e.event, label: e.label })));
@@ -139,7 +137,6 @@ export function NotificationsForm({ locale, initial, t, fieldTexts }: Props) {
   return (
     <div className="grid gap-4">
       <TelegramCard
-        locale={locale}
         linked={linked}
         t={t}
         onLinkedChange={setLinked}
@@ -259,12 +256,10 @@ export function NotificationsForm({ locale, initial, t, fieldTexts }: Props) {
 }
 
 function TelegramCard({
-  locale,
   linked,
   t,
   onLinkedChange,
 }: {
-  locale: Locale;
   linked: boolean;
   t: MerchantSettingsMessages["notifications"];
   onLinkedChange: (linked: boolean) => void;
@@ -320,7 +315,7 @@ function TelegramCard({
         {unavailable ? <Alert tone="info">{t.unavailable}</Alert> : null}
         {link ? (
           <Alert tone="info" action={<ButtonLink href={link.url} external variant="secondary" size="sm">{t.linkOpen}</ButtonLink>}>
-            {fmt(t.linkReady, { time: formatDate(link.expiresAt, locale, { timeStyle: "short" }) })}
+            {fmt(t.linkReady, { time: formatDate(link.expiresAt, { timeStyle: "short" }) })}
           </Alert>
         ) : null}
         {linked ? (

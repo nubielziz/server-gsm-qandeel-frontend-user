@@ -1,10 +1,9 @@
 // Pagination: link-based page navigation with the total. The page lives in the URL (`?page=3`), so it works without
-// JavaScript and can be shared. Server component (reads the language from the route).
+// JavaScript and can be shared. Server component.
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatNumber } from "@/lib/format";
 import { fmt, plural } from "@/lib/i18n/define";
-import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { cn } from "@/lib/cn";
 
@@ -57,12 +56,12 @@ export type PaginationProps = {
 const itemClasses = "btn-motion inline-flex size-11 items-center justify-center rounded-control text-body font-semibold num";
 
 /** "{total} results", "Page X of Y" and previous / numbered / next links (phones show only previous / next). With one page only the total shows. */
-export async function Pagination({ total, pageSize, page, basePath, searchParams, pageParam = "page", hash = "", className }: PaginationProps) {
-  const [locale, t] = await Promise.all([getLocale(), getMessages(common)]);
+export function Pagination({ total, pageSize, page, basePath, searchParams, pageParam = "page", hash = "", className }: PaginationProps) {
+  const t = common;
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const current = Math.min(Math.max(1, Math.floor(page) || 1), pages);
   const href = (n: number) => pageHref(basePath, searchParams, n, pageParam) + hash;
-  const totalText = plural(locale, total, t.pagination.results, formatNumber(total, locale));
+  const totalText = plural(total, t.pagination.results, formatNumber(total));
 
   return (
     <div className={cn("flex flex-wrap items-center justify-between gap-x-6 gap-y-3", className)}>
@@ -71,7 +70,7 @@ export async function Pagination({ total, pageSize, page, basePath, searchParams
         {pages > 1 ? (
           <>
             <span aria-hidden="true"> · </span>
-            <span>{fmt(t.pagination.page, { page: formatNumber(current, locale), pages: formatNumber(pages, locale) })}</span>
+            <span>{fmt(t.pagination.page, { page: formatNumber(current), pages: formatNumber(pages) })}</span>
           </>
         ) : null}
       </p>
@@ -98,11 +97,11 @@ export async function Pagination({ total, pageSize, page, basePath, searchParams
                 <li key={n} className="hidden sm:block">
                   <Link
                     href={href(n)}
-                    aria-label={fmt(t.pagination.goTo, { page: formatNumber(n, locale) })}
+                    aria-label={fmt(t.pagination.goTo, { page: formatNumber(n) })}
                     aria-current={n === current ? "page" : undefined}
                     className={cn(itemClasses, n === current ? "bg-inverse text-on-inverse" : "text-ink hover:bg-surface-sunken")}
                   >
-                    {formatNumber(n, locale)}
+                    {formatNumber(n)}
                   </Link>
                 </li>
               ),

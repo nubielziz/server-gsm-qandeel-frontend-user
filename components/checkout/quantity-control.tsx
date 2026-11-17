@@ -9,7 +9,6 @@ import { Input, Select } from "@/components/ui/input";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-card";
 import { formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
-import type { Locale } from "@/lib/i18n/config";
 import { quantityMode, quantityRuleText, type QuantityMessages, type QuantityRule } from "@/lib/quantity";
 
 /** More packs than this are a select, not radio buttons. */
@@ -23,7 +22,6 @@ const ROOT_SELECTOR = "[data-quantity-control]";
 
 export type QuantityControlProps = {
   rule: QuantityRule;
-  locale: Locale;
   /** The text of the number box, or the chosen pack (`"10"`). Empty: nothing chosen yet. */
   value: string;
   onChange: (value: string) => void;
@@ -41,10 +39,10 @@ export type QuantityControlProps = {
   stockHint?: string | null;
 };
 
-export function QuantityControl({ rule, locale, value, onChange, error, label, hint, placeholder, quantityLabels, stockHint }: QuantityControlProps) {
+export function QuantityControl({ rule, value, onChange, error, label, hint, placeholder, quantityLabels, stockHint }: QuantityControlProps) {
   const id = useId().replace(/:/g, "");
   const mode = quantityMode(rule);
-  const ruleText = quantityRuleText(rule, quantityLabels, locale);
+  const ruleText = quantityRuleText(rule, quantityLabels);
   const hintNode = (
     <>
       <span className="block">{fmt(hint, { rule: ruleText })}</span>
@@ -91,7 +89,7 @@ export function QuantityControl({ rule, locale, value, onChange, error, label, h
             value={value}
             onChange={(event) => onChange(event.target.value)}
             placeholder={placeholder}
-            options={mode.options.map((n) => ({ value: String(n), label: formatNumber(n, locale) }))}
+            options={mode.options.map((n) => ({ value: String(n), label: formatNumber(n) }))}
             required
           />
         </div>
@@ -107,7 +105,7 @@ export function QuantityControl({ rule, locale, value, onChange, error, label, h
               value={String(n)}
               checked={value === String(n)}
               onChange={() => onChange(String(n))}
-              title={<span className="num">{formatNumber(n, locale)}</span>}
+              title={<span className="num">{formatNumber(n)}</span>}
             />
           ))}
         </RadioGroup>

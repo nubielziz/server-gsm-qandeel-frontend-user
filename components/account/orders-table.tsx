@@ -6,8 +6,7 @@ import { ArrowUpRight } from "lucide-react";
 import type { CustomerOrder } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
-import { localePath } from "@/lib/i18n/config";
-import { getLocale, getMessages } from "@/lib/i18n/server";
+import { sitePath } from "@/lib/site-path";
 import { account } from "@/lib/i18n/messages/account";
 import { common, statusLabel } from "@/lib/i18n/messages/common";
 import { ButtonLink } from "@/components/ui/button";
@@ -26,8 +25,9 @@ export function orderLabel(id: number): string {
   return `SF-${id}`;
 }
 
-export async function OrdersTable({ orders, compact }: OrdersTableProps) {
-  const [locale, t, c] = await Promise.all([getLocale(), getMessages(account), getMessages(common)]);
+export function OrdersTable({ orders, compact }: OrdersTableProps) {
+  const t = account;
+  const c = common;
   const col = t.orders.columns;
 
   // Explicit roles: below 768px the stacked table is `display: block`, which drops the native table semantics.
@@ -70,10 +70,10 @@ export async function OrdersTable({ orders, compact }: OrdersTableProps) {
               )}
               <TableCell role="cell" label={col.amount} numeric>
                 <div className="text-end">
-                  <Money amount={order.totalPrice} currency="USD" locale={locale} className="font-semibold text-ink" />
+                  <Money amount={order.totalPrice} currency="USD" className="font-semibold text-ink" />
                   {hasVat ? (
                     <span className="block text-caption text-ink-subtle">
-                      {t.orders.vat} <Money amount={order.taxAmount} currency="USD" locale={locale} className="text-caption" />
+                      {t.orders.vat} <Money amount={order.taxAmount} currency="USD" className="text-caption" />
                     </span>
                   ) : null}
                   {order.currency !== "USD" ? (
@@ -85,12 +85,12 @@ export async function OrdersTable({ orders, compact }: OrdersTableProps) {
                 <StatusBadge kind="order" status={order.status} label={statusLabel(c, "order", order.status)} />
               </TableCell>
               <TableCell role="cell" label={col.date} className="whitespace-nowrap text-ink-muted">
-                {formatDate(order.createdAt, locale)}
+                {formatDate(order.createdAt)}
               </TableCell>
               <TableCell role="cell" className="md:text-end">
                 {order.trackingToken ? (
                   <ButtonLink
-                    href={localePath(locale, `/track/${encodeURIComponent(order.trackingToken)}`)}
+                    href={sitePath(`/track/${encodeURIComponent(order.trackingToken)}`)}
                     variant="secondary"
                     size="sm"
                     endIcon={<ArrowUpRight aria-hidden="true" />}

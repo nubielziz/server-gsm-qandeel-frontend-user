@@ -15,7 +15,6 @@ import { api, forgetCsrf } from "@/lib/api/browser";
 import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { TopUpDetail, TopUpMethod } from "@/lib/api/types";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
@@ -54,14 +53,13 @@ export type TopUpFormProps = {
   limits: TopUpLimits;
   /** The balance is on hold: an online method would be refused (a bank transfer still works), so it is not offered. */
   frozen: boolean;
-  locale: Locale;
   /** `/en/account/wallet/top-ups`: the page of a new top-up is `${detailBase}/${id}`. */
   detailBase: string;
   labels: TopUpsMessages["form"];
   errors: TopUpsMessages["errors"];
 };
 
-export function TopUpForm({ methods, limits, frozen, locale, detailBase, labels: t, errors }: TopUpFormProps) {
+export function TopUpForm({ methods, limits, frozen, detailBase, labels: t, errors }: TopUpFormProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const [keys] = useState(() => createIdempotencyKeys());
@@ -81,7 +79,7 @@ export function TopUpForm({ methods, limits, frozen, locale, detailBase, labels:
   const method = methods.find((m) => m.id === methodId) ?? null;
   const amount = parseAmountInput(amountText);
   const problem = topUpAmountProblem({ amount, method, limits });
-  const textContext = { t: errors, locale, method, limits };
+  const textContext = { t: errors, method, limits };
   const localAmountError = problem ? amountProblemText(problem, textContext) : undefined;
   const ready = Boolean(amount && method && !problem);
   const fee = ready && amount && method ? estimateTopUpFee(amount, method) : null;
@@ -91,14 +89,14 @@ export function TopUpForm({ methods, limits, frozen, locale, detailBase, labels:
   const methodError = fieldErrors.gatewayId ?? (submitted && !method ? t.chooseMethod : undefined);
   const chosen = effectiveLimits(method, limits);
 
-  const usd = (value: string) => ltr(formatMoney(value, "USD", locale));
+  const usd = (value: string) => ltr(formatMoney(value, "USD"));
 
   function feeText(m: TopUpMethod): string {
     const percent = !isNoLimit(m.feePercent);
     const fixed = !isNoLimit(m.feeFixed);
     const fixedText = usd(m.feeFixed);
-    if (percent && fixed) return fmt(t.feeBoth, { percent: ltr(formatPercent(m.feePercent, locale)), fixed: fixedText });
-    if (percent) return fmt(t.feePercent, { percent: ltr(formatPercent(m.feePercent, locale)) });
+    if (percent && fixed) return fmt(t.feeBoth, { percent: ltr(formatPercent(m.feePercent)), fixed: fixedText });
+    if (percent) return fmt(t.feePercent, { percent: ltr(formatPercent(m.feePercent)) });
     if (fixed) return fmt(t.feeFixed, { fixed: fixedText });
     return t.feeNone;
   }
@@ -169,7 +167,7 @@ export function TopUpForm({ methods, limits, frozen, locale, detailBase, labels:
         router.refresh();
         return;
       }
-      const result = topUpErrorText(error, { action: "create", generic: errorText, t: errors, locale, method, limits });
+      const result = topUpErrorText(error, { action: "create", generic: errorText, t: errors, method, limits });
       if (result.forgetKey) keys.reset();
       if (result.field === "amount" || result.field === "gatewayId") {
         const field = result.field;
@@ -235,7 +233,7 @@ export function TopUpForm({ methods, limits, frozen, locale, detailBase, labels:
                       <span className="grid gap-0.5 text-small text-ink-subtle">
                         <span>{feeText(m)}</span>
                         <span>{limitText(own.min, own.max)}</span>
-                        {m.holdHours > 0 ? <span>{fmt(t.hold, { hours: formatNumber(m.holdHours, locale) })}</span> : null}
+                        {m.holdHours > 0 ? <span>{fmt(t.hold, { hours: formatNumber(m.holdHours) })}</span> : null}
                         {unavailable ? <span className="font-medium text-warning-ink">{t.frozenMethod}</span> : null}
                       </span>
                     </RadioCard>
@@ -275,11 +273,11 @@ export function TopUpForm({ methods, limits, frozen, locale, detailBase, labels:
             <DescriptionList>
               <DescriptionItem label={t.limitPerTopUp}>{perTopUpText(chosen.min, chosen.max)}</DescriptionItem>
               <DescriptionItem label={t.limitRoom}>
-                <Money amount={limits.room} currency="USD" locale={locale} />
+                <Money amount={limits.room} currency="USD" />
               </DescriptionItem>
-              <DescriptionItem label={t.limitCount}>{formatNumber(limits.topUpsLeftToday, locale)}</DescriptionItem>
+              <DescriptionItem label={t.limitCount}>{formatNumber(limits.topUpsLeftToday)}</DescriptionItem>
               <DescriptionItem label={t.limitAmount}>
-                <Money amount={limits.amountLeftToday} currency="USD" locale={locale} />
+                <Money amount={limits.amountLeftToday} currency="USD" />
               </DescriptionItem>
             </DescriptionList>
           </CardBody>
@@ -292,11 +290,11 @@ export function TopUpForm({ methods, limits, frozen, locale, detailBase, labels:
           <CardBody className="grid gap-4">
             <DescriptionList>
               <DescriptionItem label={t.summaryAmount}>
-                {ready && amount ? <Money amount={amount} currency="USD" locale={locale} /> : "—"}
+                {ready && amount ? <Money amount={amount} currency="USD" /> : "—"}
               </DescriptionItem>
-              <DescriptionItem label={t.summaryFee}>{fee ? <Money amount={fee} currency="USD" locale={locale} /> : "—"}</DescriptionItem>
+              <DescriptionItem label={t.summaryFee}>{fee ? <Money amount={fee} currency="USD" /> : "—"}</DescriptionItem>
               <DescriptionItem label={t.summaryNet} emphasis>
-                {net ? <Money amount={net} currency="USD" locale={locale} /> : "—"}
+                {net ? <Money amount={net} currency="USD" /> : "—"}
               </DescriptionItem>
             </DescriptionList>
             <Button

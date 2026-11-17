@@ -18,8 +18,7 @@
 import { Suspense, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { localePath } from "@/lib/i18n/config";
-import { getLocale, getMessages } from "@/lib/i18n/server";
+import { sitePath } from "@/lib/site-path";
 import { common } from "@/lib/i18n/messages/common";
 import { Avatar } from "@/components/ui/avatar";
 import { Menu } from "@/components/ui/menu";
@@ -175,7 +174,7 @@ function UserTriggerFallback({ roleLabel }: { roleLabel: string }) {
 }
 
 /** The rail, the header card, the main column and the phone drawer. Server component, static (no session read). */
-export async function WorkspaceShell({
+export function WorkspaceShell({
   nav,
   footerNav,
   tabs,
@@ -189,8 +188,8 @@ export async function WorkspaceShell({
   search,
   children,
 }: WorkspaceShellProps) {
-  const [locale, t] = await Promise.all([getLocale(), getMessages(common)]);
-  const home = homeHref ?? localePath(locale);
+  const t = common;
+  const home = homeHref ?? sitePath();
   // The heading only names the page: no badges in its props (each would be rendered for nothing).
   const all = [...nav, ...(footerNav ?? [])].map((item) => ({ ...item, badge: undefined }));
   const headingProps = { areaLabel, areaHref: home, breadcrumbLabel: t.workspace.breadcrumbLabel };

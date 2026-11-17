@@ -125,7 +125,7 @@ describe("storeServicesQuery", () => {
   });
 
   it("keeps the arguments the existing call sites send", () => {
-    // app/[lang]/(store)/page.tsx and lib/catalog.ts
+    // app/en/(store)/page.tsx and lib/catalog.ts
     expect(storeServicesQuery({ currency: "JOD", featured: true, start: 0, end: 8 })).toStrictEqual({
       _start: 0,
       _end: 8,

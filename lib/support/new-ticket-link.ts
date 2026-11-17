@@ -4,15 +4,15 @@
 // - A signed-in customer (the token page opened from "My tickets" or while signed in): `/account/tickets/new?order=<id>`.
 // - A merchant: `/merchant/support/new?order=<id>`.
 // The two signed-in forms preselect the order in their picker (`orderParam`). Safe to import anywhere.
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 
 /** Who is writing: decides which new-ticket form opens. */
 export type TicketSurface = "guest" | "customer" | "merchant";
 
 /** The new-ticket form for `surface`, with the closed ticket's order when the form can take it. */
-export function newTicketHref(locale: Locale, surface: TicketSurface, orderId: number | null): string {
-  if (surface === "guest") return localePath(locale, "/support");
-  const path = localePath(locale, surface === "customer" ? "/account/tickets/new" : "/merchant/support/new");
+export function newTicketHref(surface: TicketSurface, orderId: number | null): string {
+  if (surface === "guest") return sitePath("/support");
+  const path = sitePath(surface === "customer" ? "/account/tickets/new" : "/merchant/support/new");
   return orderId !== null && Number.isSafeInteger(orderId) && orderId > 0 ? `${path}?order=${orderId}` : path;
 }
 

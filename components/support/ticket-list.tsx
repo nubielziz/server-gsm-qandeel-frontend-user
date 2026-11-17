@@ -7,7 +7,6 @@
 import Link from "next/link";
 import type { Ticket } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { statusLabel, type CommonMessages } from "@/lib/i18n/messages/common";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
@@ -30,12 +29,11 @@ export type TicketListRow = {
 
 export type TicketListProps = {
   rows: readonly TicketListRow[];
-  locale: Locale;
   t: Pick<SupportMessages, "list"> & { ticket: Pick<SupportMessages["ticket"], "categories"> };
   c: CommonMessages;
 };
 
-export function TicketList({ rows, locale, t, c }: TicketListProps) {
+export function TicketList({ rows, t, c }: TicketListProps) {
   const col = t.list.columns;
   return (
     <Table compact caption={t.list.caption}>
@@ -77,7 +75,7 @@ export function TicketList({ rows, locale, t, c }: TicketListProps) {
                 <StatusBadge kind="ticket" status={row.status} label={statusLabel(c, "ticket", row.status)} />
               </TableCell>
               <TableCell phone="meta" label={col.activity}>
-                <span className="block text-ink-muted max-md:text-ink-subtle">{formatDate(row.lastMessageAt ?? row.updatedAt, locale, { dateStyle: "medium", timeStyle: "short" })}</span>
+                <span className="block text-ink-muted max-md:text-ink-subtle">{formatDate(row.lastMessageAt ?? row.updatedAt, { dateStyle: "medium", timeStyle: "short" })}</span>
                 <span className="block text-caption text-ink-subtle">{who}</span>
               </TableCell>
             </TableRow>

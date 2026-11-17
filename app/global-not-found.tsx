@@ -1,4 +1,4 @@
-// 404 for URLs that match no route at all (the root layout sits under [lang], so it cannot render these).
+// 404 for URLs that match no route at all (the root layout sits under app/en, so it cannot render these).
 // Rare in practice: proxy.ts sends every path that does not start with /en to /en first.
 import type { Metadata } from "next";
 import Link from "next/link";

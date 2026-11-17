@@ -2,7 +2,7 @@
 // before a request can reach the site, and next.config.ts rewrites the same two prefixes to the API in dev and under
 // `next start`. A page of the site at one of those paths could never be served, so no folder of `app/` may define one.
 // Plan A14 / F02: the first URL segment of the site is never `client` or `store`, and no folder directly under
-// `app/[lang]` (route groups, parallel slots and intercepting prefixes looked through) is named `client` or `store`.
+// `app/en` (route groups, parallel slots and intercepting prefixes looked through) is named `client` or `store`.
 import { readdirSync } from "node:fs";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +17,7 @@ const RESERVED = new Set(["client", "store"]);
  * The URL segment a folder adds, or null when it adds none.
  * - `(group)`, `@slot` and `_private` add no segment;
  * - an intercepting folder `(.)x`, `(..)x`, `(...)x` or `(..)(..)x` adds `x`;
- * - everything else (`orders`, `[lang]`, `[...slug]`) adds its own name.
+ * - everything else (`orders`, `en`, `[slug]`, `[...slug]`) adds its own name.
  */
 function urlSegmentOf(folder: string): string | null {
   const intercepted = /^(?:\(\.{1,3}\))+(.+)$/.exec(folder);
@@ -39,7 +39,7 @@ function folderPaths(root: string, parts: string[] = []): string[][] {
 
 /**
  * The folders that would put a site page under a prefix the API owns. A folder counts when its own URL path is exactly
- * `/client`, `/store`, `/[lang]/client` or `/[lang]/store` (a deeper page lives inside one of those folders, which is
+ * `/client`, `/store`, `/en/client` or `/en/store` (a deeper page lives inside one of those folders, which is
  * reported itself).
  */
 function reservedFolders(folders: string[][]): string[] {
@@ -51,7 +51,7 @@ function reservedFolders(folders: string[][]): string[] {
         .slice(0, -1)
         .map(urlSegmentOf)
         .filter((s): s is string => s !== null);
-      return parents.length === 0 || (parents.length === 1 && parents[0] === "[lang]");
+      return parents.length === 0 || (parents.length === 1 && parents[0] === "en");
     })
     .map((path) => path.join("/"));
 }
@@ -59,16 +59,16 @@ function reservedFolders(folders: string[][]): string[] {
 const folder = (path: string) => path.split("/");
 
 describe("the site defines no page under the API's prefixes", () => {
-  it("has no folder in app/ at /client, /store, /<lang>/client or /<lang>/store", () => {
+  it("has no folder in app/ at /client, /store, /en/client or /en/store", () => {
     expect(reservedFolders(folderPaths(APP_DIR))).toEqual([]);
   });
 
   it("walks the real app folder (the guard is not vacuous)", () => {
     const folders = folderPaths(APP_DIR).map((path) => path.join(sep));
-    expect(folders).toContain("[lang]");
+    expect(folders).toContain("en");
     // `(store)` is a route group: looked through, never a `/store` segment.
-    expect(folders).toContain(join("[lang]", "(store)"));
-    expect(folders).toContain(join("[lang]", "(portal)", "merchant"));
+    expect(folders).toContain(join("en", "(store)"));
+    expect(folders).toContain(join("en", "(portal)", "merchant"));
   });
 });
 
@@ -87,33 +87,33 @@ describe("reservedFolders", () => {
     ]);
   });
 
-  it("flags a folder directly under [lang], also behind route groups", () => {
+  it("flags a folder directly under en, also behind route groups", () => {
     expect(
       reservedFolders([
-        folder("[lang]/client"),
-        folder("[lang]/store"),
-        folder("[lang]/(store)/store"),
-        folder("[lang]/(portal)/(deep)/client"),
-        folder("[lang]/(store)/@modal/(.)store"),
+        folder("en/client"),
+        folder("en/store"),
+        folder("en/(store)/store"),
+        folder("en/(portal)/(deep)/client"),
+        folder("en/(store)/@modal/(.)store"),
       ]),
     ).toEqual([
-      "[lang]/client",
-      "[lang]/store",
-      "[lang]/(store)/store",
-      "[lang]/(portal)/(deep)/client",
-      "[lang]/(store)/@modal/(.)store",
+      "en/client",
+      "en/store",
+      "en/(store)/store",
+      "en/(portal)/(deep)/client",
+      "en/(store)/@modal/(.)store",
     ]);
   });
 
   it("accepts the real shape of the site", () => {
     expect(
       reservedFolders([
-        folder("[lang]"),
-        folder("[lang]/(store)"),
-        folder("[lang]/(store)/services"),
-        folder("[lang]/(store)/@modal/(.)quick-view"),
-        folder("[lang]/(portal)/merchant"),
-        folder("[lang]/account/orders"),
+        folder("en"),
+        folder("en/(store)"),
+        folder("en/(store)/services"),
+        folder("en/(store)/@modal/(.)quick-view"),
+        folder("en/(portal)/merchant"),
+        folder("en/account/orders"),
       ]),
     ).toEqual([]);
   });
@@ -124,9 +124,9 @@ describe("reservedFolders", () => {
         folder("clients"),
         folder("stores"),
         folder("_client"),
-        folder("[lang]/_store"),
-        folder("[lang]/merchant/store"),
-        folder("[lang]/(portal)/merchant/client"),
+        folder("en/_store"),
+        folder("en/merchant/store"),
+        folder("en/(portal)/merchant/client"),
         folder("[client]"),
       ]),
     ).toEqual([]);

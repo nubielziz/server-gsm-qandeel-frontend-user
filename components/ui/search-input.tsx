@@ -8,7 +8,7 @@ import { Search } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 export type SearchInputProps = {
-  /** Where the form goes (GET), already language-prefixed, e.g. `localePath(locale, "/services")`. */
+  /** Where the form goes (GET), already prefixed, e.g. `sitePath("/services")`. */
   action: string;
   /** Accessible name of the field (also its visible label when `showLabel`). */
   label: string;
@@ -34,7 +34,7 @@ export type SearchInputProps = {
   autoFocus?: boolean;
 };
 
-/** A GET search form: `<SearchInput action={localePath(locale, "/services")} label="Search services" submitLabel="Search" />`. */
+/** A GET search form: `<SearchInput action={sitePath("/services")} label="Search services" submitLabel="Search" />`. */
 export function SearchInput({
   action,
   label,

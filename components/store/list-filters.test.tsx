@@ -8,7 +8,6 @@ const props: ListFiltersProps = {
   top: [{ name: "stock", label: "Availability", options: [{ value: "1", label: "In stock only", count: "(3)", selected: false }] }],
   price: null,
   groups: [],
-  locale: "en",
   labels: { priceRange: "Price", minPrice: "Minimum price", maxPrice: "Maximum price", showMore: "Show {count} more", showLess: "Show less", apply: "Show results", clear: "Clear all" },
   clearHref: null,
 };

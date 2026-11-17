@@ -12,7 +12,6 @@ import { api, forgetCsrf } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import { pathOf } from "@/lib/api/query";
 import { formatNumber } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import { isSignedOutError } from "@/lib/merchant/signed-out";
@@ -120,14 +119,13 @@ export function NotificationActions({ id, surface, unread, href, leavesList, tit
 
 export type MarkAllReadProps = {
   surface: NotificationSurface;
-  locale: Locale;
   /** The newest id on screen: an item that arrived after the page was drawn stays unread. */
   upToId: number;
   labels: { markAllRead: string; markedAll: string; markedNone: string };
 };
 
 /** "Mark all as read": everything up to the newest item the visitor can see. */
-export function MarkAllRead({ surface, locale, upToId, labels }: MarkAllReadProps) {
+export function MarkAllRead({ surface, upToId, labels }: MarkAllReadProps) {
   const router = useRouter();
   const fail = useFailureHandler(surface);
   const [busy, setBusy] = useState(false);
@@ -138,7 +136,7 @@ export function MarkAllRead({ surface, locale, upToId, labels }: MarkAllReadProp
     setBusy(true);
     try {
       const result = await api.post<ReadAllResult | undefined>(`${NOTIFICATION_API[surface]}/read-all`, { upToId });
-      toast.success(result?.updated ? fmt(labels.markedAll, { count: formatNumber(result.updated, locale) }) : labels.markedNone);
+      toast.success(result?.updated ? fmt(labels.markedAll, { count: formatNumber(result.updated) }) : labels.markedNone);
     } catch (error) {
       if (!fail(error)) {
         setBusy(false);

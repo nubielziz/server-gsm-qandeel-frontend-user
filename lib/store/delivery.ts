@@ -1,8 +1,7 @@
 // How a store service says when it is delivered (BH §14.4, §14.5). The API gives two things per page: `etaText`, a
-// staff note already in the page's language (may be `''`), and `deliveryMinutes`, which the site formats per language.
+// staff note (may be `''`), and `deliveryMinutes`, which the site formats.
 // `deliveryTime` (English, or the supplier's own words) is for old clients and is not used here. Pure, safe to import
 // anywhere. Never says "Pre-order" or "Out of stock", and never shows a stock number.
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
 import { formatMinutes } from "@/lib/merchant/format";
@@ -18,16 +17,16 @@ export type DeliveryFields = { etaText?: string | null; deliveryMinutes?: number
 export type DeliveryTime = { text: string; isNote: boolean };
 
 /**
- * The delivery time of a service: the trimmed `etaText` when it is not empty, else `deliveryMinutes` formatted in the
- * page's language ("1 hr 30 min"). With neither (no note, no positive number of minutes) `text` is `''`, so a caller
+ * The delivery time of a service: the trimmed `etaText` when it is not empty, else `deliveryMinutes` formatted
+ * ("1 hr 30 min"). With neither (no note, no positive number of minutes) `text` is `''`, so a caller
  * can hide the row.
  */
-export function deliveryTime(service: DeliveryFields, locale: Locale): DeliveryTime {
+export function deliveryTime(service: DeliveryFields): DeliveryTime {
   const note = service.etaText?.trim();
   if (note) return { text: note, isNote: true };
   const minutes = service.deliveryMinutes;
   if (typeof minutes === "number" && Number.isFinite(minutes) && minutes > 0) {
-    return { text: formatMinutes(Math.round(minutes), locale), isNote: false };
+    return { text: formatMinutes(Math.round(minutes)), isNote: false };
   }
   return { text: "", isNote: false };
 }
@@ -36,8 +35,8 @@ export function deliveryTime(service: DeliveryFields, locale: Locale): DeliveryT
  * The delivery line: the staff note as written, else "Delivered within 1 hr 30 min". `''` when the
  * service has no delivery information. `t` is `common.delivery`.
  */
-export function deliveryLine(service: DeliveryFields, locale: Locale, t: DeliveryMessages): string {
-  const { text, isNote } = deliveryTime(service, locale);
+export function deliveryLine(service: DeliveryFields, t: DeliveryMessages): string {
+  const { text, isNote } = deliveryTime(service);
   if (!text) return "";
   return isNote ? text : fmt(t.within, { time: text });
 }
@@ -50,13 +49,12 @@ export function deliveryLine(service: DeliveryFields, locale: Locale, t: Deliver
  */
 export function stockHint(
   service: DeliveryFields & { availability: "in_stock" | "on_request"; quantity: QuantityRule },
-  locale: Locale,
   t: DeliveryMessages,
 ): string | null {
   if (service.availability !== "in_stock") return null;
   const kind = quantityMode(service.quantity).kind;
   if (kind !== "range" && kind !== "packs") return null;
-  const { text, isNote } = deliveryTime(service, locale);
+  const { text, isNote } = deliveryTime(service);
   if (!text) return null;
   return isNote ? fmt(t.whileStockNote, { note: text }) : fmt(t.whileStock, { time: text });
 }

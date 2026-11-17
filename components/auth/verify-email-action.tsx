@@ -8,9 +8,9 @@ import { useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
-import { localePath, type Locale } from "@/lib/i18n/config";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
+import { sitePath } from "@/lib/site-path";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { CustomerLinkConfirm } from "./customer-link-confirm";
@@ -21,14 +21,13 @@ import { safeNext } from "./safe-next";
 
 export type VerifyEmailActionProps = {
   surface: "customer" | "merchant";
-  locale: Locale;
   t: Pick<AuthMessages, "shared" | "signIn" | "verifyEmail">;
 };
 
-export function VerifyEmailAction({ surface, locale, t }: VerifyEmailActionProps) {
+export function VerifyEmailAction({ surface, t }: VerifyEmailActionProps) {
   const params = useSearchParams();
   const token = params.get("token");
-  const signIn = `${localePath(locale, "/sign-in")}?as=${surface}`;
+  const signIn = `${sitePath("/sign-in")}?as=${surface}`;
   const signInLink = (
     <ButtonLink href={signIn} size="lg" block>
       {t.shared.signIn}
@@ -41,7 +40,7 @@ export function VerifyEmailAction({ surface, locale, t }: VerifyEmailActionProps
     return (
       <CustomerLinkConfirm
         token={token}
-        target={safeNext(params.get("next"), localePath(locale, "/account"))}
+        target={safeNext(params.get("next"), sitePath("/account"))}
         requestNewHref={signIn}
         strings={{
           text: t.verifyEmail.customerText,

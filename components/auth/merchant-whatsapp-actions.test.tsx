@@ -4,7 +4,7 @@ import { whatsAppLink } from "@/lib/contact/whatsapp";
 import { auth } from "@/lib/i18n/messages/auth";
 import { MerchantWhatsAppActions } from "./merchant-whatsapp-actions";
 
-const en = auth.en.register;
+const en = auth.register;
 const href = whatsAppLink("12025550100", en.message);
 
 describe("MerchantWhatsAppActions", () => {

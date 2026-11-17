@@ -12,7 +12,7 @@ import type { Collection, CollectionKind } from "@/lib/catalog-facets";
 import { cn } from "@/lib/cn";
 import { countryName } from "@/lib/countries";
 import { fmt } from "@/lib/i18n/define";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 import type { StoreMessages } from "@/lib/i18n/messages/store";
 import { siteImage } from "@/lib/site-images";
 import { BannerArt, OutlineTag, linkArrow, litSurface, type BannerTone } from "./banner";
@@ -40,7 +40,6 @@ const third = (i: number, total: number) => total === 3 && i === 2 && "md:max-lg
 
 export type CollectionBannersProps = {
   collections: Collection[];
-  locale: Locale;
   /** Display decimals of the visitor's currency. */
   decimals: number;
   t: StoreMessages["home"]["collections"];
@@ -48,8 +47,8 @@ export type CollectionBannersProps = {
   countText: (count: number) => string;
 };
 
-export function CollectionBanners({ collections, locale, decimals, t, countText }: CollectionBannersProps) {
-  const services = localePath(locale, "/services");
+export function CollectionBanners({ collections, decimals, t, countText }: CollectionBannersProps) {
+  const services = sitePath("/services");
   return (
     // reveal-grid: the banners fade and rise in as they scroll into view, one after the other (globals.css).
     <ul className={cn(GRID, "reveal-grid", collections.length === 3 && "lg:grid-cols-3")}>
@@ -60,7 +59,7 @@ export function CollectionBanners({ collections, locale, decimals, t, countText 
         // only the first card without an image takes the dark surface.
         const tone: BannerTone = i === 0 && !hasArt ? "inverse" : "light";
         const inverse = tone === "inverse";
-        const name = collection.kind === "country" ? countryName(collection.value, locale) : collection.value;
+        const name = collection.kind === "country" ? countryName(collection.value) : collection.value;
         const Icon = kindIcons[collection.kind];
         // Logos are made for light backgrounds: the dark card keeps the icon.
         const logoFolder = collection.kind === "brand" ? "brands" : collection.kind === "network" ? "carriers" : null;
@@ -96,7 +95,6 @@ export function CollectionBanners({ collections, locale, decimals, t, countText 
                   <Money
                     amount={collection.from.gross}
                     currency={collection.from.currency}
-                    locale={locale}
                     decimals={decimals}
                     className={cn("font-semibold", inverse ? "text-on-inverse" : "text-ink")}
                   />

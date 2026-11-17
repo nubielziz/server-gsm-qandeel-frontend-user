@@ -1,7 +1,7 @@
 "use client";
 // A full merchant session can still carry `mustChangePassword` (staff gave a temporary password; BH §5.3, plan D5). That
 // merchant must choose a new password before anything else:
-// - on any other portal page the route is replaced with `/<lang>/merchant/settings/security#must-change-password` (the
+// - on any other portal page the route is replaced with `/en/merchant/settings/security#must-change-password` (the
 //   warning itself, so it is scrolled into view above the settings header), and the page's own content is not drawn
 //   meanwhile (the layout still renders it on the server, the browser just does not show it);
 // - on the security page the form is there and a warning above it says why.
@@ -47,7 +47,7 @@ export function mustChangeDecision({ mustChange, pathname, securityPath }: { mus
 type Props = {
   /** `me.mustChangePassword` of the signed-in merchant. */
   mustChange: boolean;
-  /** `/<lang>/merchant/settings/security` */
+  /** `/en/merchant/settings/security` */
   securityPath: string;
   title: string;
   text: string;

@@ -14,7 +14,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DialogLink } from "@/components/ui/dialog";
 import { RangeSlider } from "@/components/ui/range-slider";
 import { formatMoney } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 
 export type FilterOption = {
@@ -62,7 +61,6 @@ export type ListFiltersProps = {
   price: PriceFilter | null;
   /** The lists under the price range (service type, brand, carrier, country). */
   groups: FilterGroup[];
-  locale: Locale;
   labels: ListFiltersLabels;
   /** Where "Clear all" goes; null when nothing is filtered. */
   clearHref: string | null;
@@ -74,7 +72,7 @@ const legendClasses = "mb-1.5 text-small font-bold text-ink";
 
 const keyOf = (group: FilterGroup, option: FilterOption) => `${group.name}\u0000${option.value}`;
 
-export function ListFilters({ action, keep, top, price, groups, locale, labels, clearHref }: ListFiltersProps) {
+export function ListFilters({ action, keep, top, price, groups, labels, clearHref }: ListFiltersProps) {
   const router = useRouter();
   const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
@@ -170,7 +168,7 @@ export function ListFilters({ action, keep, top, price, groups, locale, labels, 
             value={price.value}
             names={["min", "max"]}
             labels={[labels.minPrice, labels.maxPrice]}
-            format={(n) => formatMoney(String(n), price.currency, locale, 0)}
+            format={(n) => formatMoney(String(n), price.currency, 0)}
             onCommit={() => formRef.current?.requestSubmit()}
             className="mt-2.5"
           />

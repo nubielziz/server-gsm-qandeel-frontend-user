@@ -2,7 +2,7 @@
 // the active item, on phones a row of pill tabs that scrolls sideways. One list, two looks, so there are no
 // duplicate links. NavLink marks the current page with aria-current.
 import { Bell, BadgeCheck, ShieldCheck, User } from "lucide-react";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 import { NavLink } from "@/components/layout/nav-link";
 import { Card } from "@/components/ui/card";
 
@@ -24,7 +24,7 @@ const itemClasses =
   "[&_svg]:size-[18px] [&_svg]:shrink-0 " +
   "lg:before:absolute lg:before:inset-y-1.5 lg:before:start-0 lg:before:w-1 lg:before:rounded-e-full lg:before:bg-transparent lg:aria-[current=page]:before:bg-inverse";
 
-export function SettingsNav({ locale, labels }: { locale: Locale; labels: SettingsNavLabels }) {
+export function SettingsNav({ labels }: { labels: SettingsNavLabels }) {
   const items = [
     { href: "/merchant/settings", label: labels.profile, icon: <User aria-hidden="true" />, match: "exact" as const },
     { href: "/merchant/settings/security", label: labels.security, icon: <ShieldCheck aria-hidden="true" /> },
@@ -38,7 +38,7 @@ export function SettingsNav({ locale, labels }: { locale: Locale; labels: Settin
         <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
           {items.map((item) => (
             <li key={item.href} className="max-lg:shrink-0">
-              <NavLink href={localePath(locale, item.href)} match={item.match} className={itemClasses}>
+              <NavLink href={sitePath(item.href)} match={item.match} className={itemClasses}>
                 {item.icon}
                 {item.label}
               </NavLink>

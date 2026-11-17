@@ -4,7 +4,6 @@
 import { Clock } from "lucide-react";
 import type { ApiError } from "@/lib/api/errors";
 import { errorText } from "@/lib/i18n/error-text-core";
-import { getLocale, getMessages } from "@/lib/i18n/server";
 import { common } from "@/lib/i18n/messages/common";
 import { errors } from "@/lib/i18n/messages/errors";
 import { ButtonLink } from "./button";
@@ -14,14 +13,14 @@ import { ErrorState } from "./error-state";
 export type BusyStateProps = {
   /** The 429 ApiError (its Retry-After is shown). */
   error: ApiError;
-  /** Where "Try again" goes: the same page, language-prefixed. */
+  /** Where "Try again" goes: the same page (its `/en` address). */
   retryHref: string;
 };
 
 /** "Too many requests, try again in N s" with a retry link, inside a card. */
-export async function BusyState({ error, retryHref }: BusyStateProps) {
-  const [locale, c] = await Promise.all([getLocale(), getMessages(common)]);
-  const t = errorText(errors[locale]);
+export function BusyState({ error, retryHref }: BusyStateProps) {
+  const c = common;
+  const t = errorText(errors);
   return (
     <Card className="mx-auto max-w-xl">
       <ErrorState

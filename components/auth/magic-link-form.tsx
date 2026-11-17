@@ -7,7 +7,6 @@ import { Mail } from "lucide-react";
 import { api } from "@/lib/api/browser";
 import { useErrorText } from "@/lib/i18n/error-text";
 import { fmt } from "@/lib/i18n/define";
-import type { Locale } from "@/lib/i18n/config";
 import { Turnstile } from "@/components/turnstile";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,7 +17,6 @@ import { useFocusOnFeedback } from "./use-focus-on-feedback";
 import { useTurnstile } from "./use-turnstile";
 
 export type MagicLinkFormProps = {
-  locale: Locale;
   strings: {
     email: string;
     emailPlaceholder: string;

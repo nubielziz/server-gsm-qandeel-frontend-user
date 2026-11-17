@@ -5,7 +5,7 @@ import { ChevronRight, Headphones, Laptop, Lock, ShieldCheck } from "lucide-reac
 import { requireMerchant } from "@/lib/api/session";
 import { formatPercent } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 import { common, statusLabel } from "@/lib/i18n/messages/common";
 import { merchantSettings } from "@/lib/i18n/messages/merchant-settings";
 import { Avatar } from "@/components/ui/avatar";
@@ -16,10 +16,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { utcMonth } from "./format";
 
-export async function AccountSummary({ locale }: { locale: Locale }) {
-  const me = await requireMerchant(locale);
-  const t = merchantSettings[locale];
-  const c = common[locale];
+export async function AccountSummary() {
+  const me = await requireMerchant();
+  const t = merchantSettings;
+  const c = common;
   return (
     <Card>
       <CardHeader title={t.layout.summary.title} titleAs="h2" divided />
@@ -36,11 +36,11 @@ export async function AccountSummary({ locale }: { locale: Locale }) {
           </div>
         </div>
         <DescriptionList className="mt-4">
-          <DescriptionItem label={t.layout.summary.memberSince}>{utcMonth(me.createdAt, locale)}</DescriptionItem>
+          <DescriptionItem label={t.layout.summary.memberSince}>{utcMonth(me.createdAt)}</DescriptionItem>
           <DescriptionItem label={t.layout.summary.group}>
             <span dir="auto">{me.group.name}</span>
             <span className="block text-small font-normal text-ink-subtle">
-              {fmt(t.layout.summary.discount, { percent: formatPercent(me.group.discountPercent, locale) })}
+              {fmt(t.layout.summary.discount, { percent: formatPercent(me.group.discountPercent) })}
             </span>
           </DescriptionItem>
           <DescriptionItem label={t.layout.summary.status}>
@@ -52,10 +52,10 @@ export async function AccountSummary({ locale }: { locale: Locale }) {
   );
 }
 
-export async function SecurityShortcuts({ locale }: { locale: Locale }) {
-  const me = await requireMerchant(locale);
-  const t = merchantSettings[locale].layout.quick;
-  const base = localePath(locale, "/merchant/settings/security");
+export async function SecurityShortcuts() {
+  const me = await requireMerchant();
+  const t = merchantSettings.layout.quick;
+  const base = sitePath("/merchant/settings/security");
   const rowClasses =
     "flex min-h-11 items-center gap-3 rounded-control px-1 py-1.5 text-body font-medium text-ink transition-colors hover:bg-surface-muted [&_svg]:size-5 [&_svg]:shrink-0";
   return (
@@ -98,8 +98,8 @@ export async function SecurityShortcuts({ locale }: { locale: Locale }) {
   );
 }
 
-export function HelpCard({ locale }: { locale: Locale }) {
-  const t = merchantSettings[locale].layout.help;
+export function HelpCard() {
+  const t = merchantSettings.layout.help;
   return (
     <Card tone="muted" className="gap-3 p-5 sm:p-6">
       <div className="flex items-center gap-3">
@@ -107,7 +107,7 @@ export function HelpCard({ locale }: { locale: Locale }) {
         <h2 className="text-heading text-ink">{t.title}</h2>
       </div>
       <p className="text-body text-ink-muted">{t.text}</p>
-      <ButtonLink href={localePath(locale, "/help")} variant="secondary" block>
+      <ButtonLink href={sitePath("/help")} variant="secondary" block>
         {t.action}
       </ButtonLink>
     </Card>

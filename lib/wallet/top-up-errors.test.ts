@@ -142,7 +142,7 @@ describe("topUpAmountProblem", () => {
 });
 
 describe("amountProblemText", () => {
-  const en = { t: topUps.en.errors, locale: "en" as const, method: CLIQ, limits: LIMITS };
+  const en = { t: topUps.errors, method: CLIQ, limits: LIMITS };
 
   it("names the limit (amounts isolated left-to-right)", () => {
     expect(amountProblemText("min", en)).toBe("The smallest top-up is ⁦$5.00⁩.");
@@ -150,24 +150,24 @@ describe("amountProblemText", () => {
   });
 
   it("leaves a limit it does not know out of the sentence", () => {
-    expect(amountProblemText("min", { t: topUps.en.errors, locale: "en" })).toBe(topUps.en.errors.minUnknown);
-    expect(amountProblemText("max", { t: topUps.en.errors, locale: "en" })).toBe(topUps.en.errors.maxUnknown);
+    expect(amountProblemText("min", { t: topUps.errors })).toBe(topUps.errors.minUnknown);
+    expect(amountProblemText("max", { t: topUps.errors })).toBe(topUps.errors.maxUnknown);
   });
 
   it("says how much room or how much of the day is left, or that there is none", () => {
     expect(amountProblemText("max_balance", { ...en, limits: { ...LIMITS, room: "75.0000" } })).toBe(
       "This would take your balance over the most it can hold. You can add up to ⁦$75.00⁩ more.",
     );
-    expect(amountProblemText("max_balance", { ...en, limits: { ...LIMITS, room: "0.0000" } })).toBe(topUps.en.errors.maxBalanceFull);
-    expect(amountProblemText("max_balance", { t: topUps.en.errors, locale: "en" })).toBe(topUps.en.errors.maxBalance);
+    expect(amountProblemText("max_balance", { ...en, limits: { ...LIMITS, room: "0.0000" } })).toBe(topUps.errors.maxBalanceFull);
+    expect(amountProblemText("max_balance", { t: topUps.errors })).toBe(topUps.errors.maxBalance);
     expect(amountProblemText("daily_amount", { ...en, limits: { ...LIMITS, amountLeftToday: "40.0000" } })).toContain("$40.00");
-    expect(amountProblemText("daily_amount", { ...en, limits: { ...LIMITS, amountLeftToday: "0.0000" } })).toBe(topUps.en.errors.dailyAmount);
+    expect(amountProblemText("daily_amount", { ...en, limits: { ...LIMITS, amountLeftToday: "0.0000" } })).toBe(topUps.errors.dailyAmount);
   });
 
   it("has a text for the rest", () => {
-    expect(amountProblemText("fee", en)).toBe(topUps.en.errors.fee);
-    expect(amountProblemText("daily_count", en)).toBe(topUps.en.errors.dailyCount);
-    for (const code of ["invalid", "format", "range"] as const) expect(amountProblemText(code, en)).toBe(topUps.en.errors.format);
+    expect(amountProblemText("fee", en)).toBe(topUps.errors.fee);
+    expect(amountProblemText("daily_count", en)).toBe(topUps.errors.dailyCount);
+    for (const code of ["invalid", "format", "range"] as const) expect(amountProblemText(code, en)).toBe(topUps.errors.format);
   });
 });
 
@@ -180,9 +180,8 @@ describe("topUpErrorText: every row of the plan's table", () => {
   const text = (error: unknown, action: TopUpAction) =>
     topUpErrorText(error, {
       action,
-      locale: "en",
-      t: topUps.en.errors,
-      generic: errorText(errors.en),
+      t: topUps.errors,
+      generic: errorText(errors),
       method: CLIQ,
       limits: LIMITS,
     });
@@ -193,11 +192,11 @@ describe("topUpErrorText: every row of the plan's table", () => {
   });
 
   it("422 amount fee: the fee would use up the amount", () => {
-    expect(text(unprocessable(field("amount", "fee")), "create")).toEqual({ field: "amount", text: topUps.en.errors.fee });
+    expect(text(unprocessable(field("amount", "fee")), "create")).toEqual({ field: "amount", text: topUps.errors.fee });
   });
 
   it("422 amount daily_count and daily_amount: the daily limit", () => {
-    expect(text(unprocessable(field("amount", "daily_count")), "create")).toEqual({ field: "amount", text: topUps.en.errors.dailyCount });
+    expect(text(unprocessable(field("amount", "daily_count")), "create")).toEqual({ field: "amount", text: topUps.errors.dailyCount });
     expect(text(unprocessable(field("amount", "daily_amount")), "create").text).toContain("up to ⁦$1,000.00⁩ today");
   });
 
@@ -209,25 +208,25 @@ describe("topUpErrorText: every row of the plan's table", () => {
   });
 
   it("422 amount format and range: enter a valid amount", () => {
-    expect(text(unprocessable(field("amount", "format")), "create")).toEqual({ field: "amount", text: topUps.en.errors.format });
-    expect(text(unprocessable(field("amount", "range")), "create")).toEqual({ field: "amount", text: topUps.en.errors.format });
+    expect(text(unprocessable(field("amount", "format")), "create")).toEqual({ field: "amount", text: topUps.errors.format });
+    expect(text(unprocessable(field("amount", "range")), "create")).toEqual({ field: "amount", text: topUps.errors.format });
   });
 
   it("422 gatewayId unavailable: choose another method", () => {
-    expect(text(unprocessable(field("gatewayId", "unavailable")), "create")).toEqual({ field: "gatewayId", text: topUps.en.errors.gatewayUnavailable });
+    expect(text(unprocessable(field("gatewayId", "unavailable")), "create")).toEqual({ field: "gatewayId", text: topUps.errors.gatewayUnavailable });
   });
 
   it("422 fileId invalid: upload again", () => {
-    expect(text(unprocessable(field("fileId", "invalid")), "receipt")).toEqual({ field: "fileId", text: topUps.en.errors.fileInvalid });
+    expect(text(unprocessable(field("fileId", "invalid")), "receipt")).toEqual({ field: "fileId", text: topUps.errors.fileInvalid });
   });
 
   it("422 reference taken: this reference was already used", () => {
-    expect(text(unprocessable(field("reference", "taken")), "receipt")).toEqual({ field: "reference", text: topUps.en.errors.referenceTaken });
+    expect(text(unprocessable(field("reference", "taken")), "receipt")).toEqual({ field: "reference", text: topUps.errors.referenceTaken });
   });
 
   it("422 file type and empty: the file texts", () => {
-    expect(text(unprocessable(field("file", "type")), "upload")).toEqual({ field: "file", text: topUps.en.errors.fileType });
-    expect(text(unprocessable(field("file", "empty")), "upload")).toEqual({ field: "file", text: topUps.en.errors.fileEmpty });
+    expect(text(unprocessable(field("file", "type")), "upload")).toEqual({ field: "file", text: topUps.errors.fileType });
+    expect(text(unprocessable(field("file", "empty")), "upload")).toEqual({ field: "file", text: topUps.errors.fileEmpty });
   });
 
   it("413: the file is larger than 5 MB", () => {
@@ -245,35 +244,35 @@ describe("topUpErrorText: every row of the plan's table", () => {
   });
 
   it("409 WALLET_DISABLED: by code", () => {
-    expect(text(problem(409, "WALLET_DISABLED"), "create")).toEqual({ text: errors.en.codes.WALLET_DISABLED });
+    expect(text(problem(409, "WALLET_DISABLED"), "create")).toEqual({ text: errors.codes.WALLET_DISABLED });
   });
 
   it("409 WALLET_FROZEN: by code, plus a bank transfer still works", () => {
-    expect(text(problem(409, "WALLET_FROZEN"), "create")).toEqual({ text: `${errors.en.codes.WALLET_FROZEN} A bank transfer still works.` });
+    expect(text(problem(409, "WALLET_FROZEN"), "create")).toEqual({ text: `${errors.codes.WALLET_FROZEN} A bank transfer still works.` });
   });
 
   it("409 idempotency codes: by code, and a reused key is forgotten", () => {
-    expect(text(problem(409, "IDEMPOTENCY_IN_PROGRESS"), "create")).toEqual({ text: errors.en.codes.IDEMPOTENCY_IN_PROGRESS });
-    expect(text(problem(409, "IDEMPOTENCY_KEY_REUSED"), "create")).toEqual({ text: errors.en.codes.IDEMPOTENCY_KEY_REUSED, forgetKey: true });
+    expect(text(problem(409, "IDEMPOTENCY_IN_PROGRESS"), "create")).toEqual({ text: errors.codes.IDEMPOTENCY_IN_PROGRESS });
+    expect(text(problem(409, "IDEMPOTENCY_KEY_REUSED"), "create")).toEqual({ text: errors.codes.IDEMPOTENCY_KEY_REUSED, forgetKey: true });
   });
 
   it("429: the wait", () => {
-    expect(text(problem(429, "RATE_LIMITED", 42), "create").text).toBe(`${errors.en.codes.RATE_LIMITED} Try again in 42 s.`);
-    expect(text(problem(429, "RATE_LIMITED", 600), "create").text).toBe(`${errors.en.codes.RATE_LIMITED} Try again in about 10 min.`);
-    expect(text(problem(429, "RATE_LIMITED"), "create").text).toBe(errors.en.codes.RATE_LIMITED);
+    expect(text(problem(429, "RATE_LIMITED", 42), "create").text).toBe(`${errors.codes.RATE_LIMITED} Try again in 42 s.`);
+    expect(text(problem(429, "RATE_LIMITED", 600), "create").text).toBe(`${errors.codes.RATE_LIMITED} Try again in about 10 min.`);
+    expect(text(problem(429, "RATE_LIMITED"), "create").text).toBe(errors.codes.RATE_LIMITED);
   });
 
   it("502 GATEWAY_ERROR: by code", () => {
-    expect(text(problem(502, "GATEWAY_ERROR"), "create")).toEqual({ text: errors.en.codes.GATEWAY_ERROR });
+    expect(text(problem(502, "GATEWAY_ERROR"), "create")).toEqual({ text: errors.codes.GATEWAY_ERROR });
   });
 
   it("anything else: the generic text of its code, never the API's English", () => {
-    expect(text(problem(500, "INTERNAL_ERROR"), "create").text).toBe(errors.en.codes.INTERNAL_ERROR);
-    expect(text(problem(403, "CSRF_FAILED"), "cancel").text).toBe(errors.en.codes.CSRF_FAILED);
-    expect(text(new ApiError({ status: 0, code: "NETWORK_ERROR" }), "create").text).toBe(errors.en.codes.NETWORK_ERROR);
-    expect(text(new Error("boom"), "create").text).toBe(errors.en.codes.fallback);
+    expect(text(problem(500, "INTERNAL_ERROR"), "create").text).toBe(errors.codes.INTERNAL_ERROR);
+    expect(text(problem(403, "CSRF_FAILED"), "cancel").text).toBe(errors.codes.CSRF_FAILED);
+    expect(text(new ApiError({ status: 0, code: "NETWORK_ERROR" }), "create").text).toBe(errors.codes.NETWORK_ERROR);
+    expect(text(new Error("boom"), "create").text).toBe(errors.codes.fallback);
     // A 422 on a field the form has no input for (a missing Idempotency-Key) is the whole-form text.
-    expect(text(unprocessable(field("idempotency-key", "invalid_type")), "create")).toEqual({ text: errors.en.codes.VALIDATION_FAILED });
+    expect(text(unprocessable(field("idempotency-key", "invalid_type")), "create")).toEqual({ text: errors.codes.VALIDATION_FAILED });
   });
 
   it("reads the first field error it can place", () => {

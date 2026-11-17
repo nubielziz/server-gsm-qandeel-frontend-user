@@ -72,7 +72,7 @@ export function IconButton({
 export type IconButtonLinkProps = Omit<ComponentProps<typeof Link>, "aria-label" | "children" | "className" | "href"> & {
   /** Accessible name and tooltip (e.g. "Order AT&T Unlock"). Required. */
   label: string;
-  /** In-site path, already language-prefixed with `localePath`. */
+  /** In-site path, already prefixed with `sitePath`. */
   href: string;
   /** The icon: a lucide element. */
   children: ReactNode;

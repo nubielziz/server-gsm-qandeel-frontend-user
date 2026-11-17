@@ -8,7 +8,7 @@
 //   2. one pack, or min === max → "exact N": no control;
 //   3. N is 1                 → "single" (the default of a new service);
 //   4. otherwise              → a range: a whole number from min to max.
-import { intlLocaleOf, type Locale } from "@/lib/i18n/config";
+import { INTL_LOCALE } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
 import { mulMoney } from "@/lib/merchant/money-math";
@@ -120,30 +120,30 @@ export function fromMerchantRule(service: { minQty: number; maxQty: number; qtyO
   return { min: service.minQty, max: service.maxQty, options: service.qtyOptions };
 }
 
-function formatCount(n: number, locale: Locale): string {
-  return new Intl.NumberFormat(intlLocaleOf(locale)).format(n);
+function formatCount(n: number): string {
+  return new Intl.NumberFormat(INTL_LOCALE).format(n);
 }
 
 /** "5, 10, 25". */
-function formatList(values: readonly number[], locale: Locale): string {
-  return values.map((n) => formatCount(n, locale)).join(", ");
+function formatList(values: readonly number[]): string {
+  return values.map((n) => formatCount(n)).join(", ");
 }
 
 /**
  * The rule as a short line: "1 per order", "5 per order", "2 to 50 per order", "Packs of 5, 10, 25".
  * `t` is `common.quantity`.
  */
-export function quantityRuleText(rule: QuantityRule, t: QuantityMessages, locale: Locale): string {
+export function quantityRuleText(rule: QuantityRule, t: QuantityMessages): string {
   const mode = quantityMode(rule);
   switch (mode.kind) {
     case "single":
       return t.one;
     case "exact":
-      return fmt(t.exact, { count: formatCount(mode.value, locale) });
+      return fmt(t.exact, { count: formatCount(mode.value) });
     case "range":
-      return fmt(t.range, { min: formatCount(mode.min, locale), max: formatCount(mode.max, locale) });
+      return fmt(t.range, { min: formatCount(mode.min), max: formatCount(mode.max) });
     case "packs":
-      return fmt(t.packs, { options: formatList(mode.options, locale) });
+      return fmt(t.packs, { options: formatList(mode.options) });
   }
 }
 
@@ -152,17 +152,17 @@ export function quantityRuleText(rule: QuantityRule, t: QuantityMessages, locale
  * (`invalid_quantity`, `too_small`, `too_big`, `invalid_type`): the pack list, the range, or the one quantity the
  * service sells. `t` is `common.quantity`. The server's own message is English only and is never shown.
  */
-export function invalidQuantityText(rule: QuantityRule, t: QuantityMessages, locale: Locale): string {
+export function invalidQuantityText(rule: QuantityRule, t: QuantityMessages): string {
   const mode = quantityMode(rule);
   switch (mode.kind) {
     case "single":
-      return fmt(t.invalidExact, { count: formatCount(1, locale) });
+      return fmt(t.invalidExact, { count: formatCount(1) });
     case "exact":
-      return fmt(t.invalidExact, { count: formatCount(mode.value, locale) });
+      return fmt(t.invalidExact, { count: formatCount(mode.value) });
     case "range":
-      return fmt(t.invalidRange, { min: formatCount(mode.min, locale), max: formatCount(mode.max, locale) });
+      return fmt(t.invalidRange, { min: formatCount(mode.min), max: formatCount(mode.max) });
     case "packs":
-      return fmt(t.invalidPacks, { options: formatList(mode.options, locale) });
+      return fmt(t.invalidPacks, { options: formatList(mode.options) });
   }
 }
 

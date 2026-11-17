@@ -6,7 +6,6 @@
 import { isApiError, type FieldError } from "@/lib/api/errors";
 import type { CustomerWallet, TopUpMethod } from "@/lib/api/types";
 import { compareMoney, formatMoney, subtractMoney } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import type { ErrorText } from "@/lib/i18n/error-text-core";
 import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
@@ -112,18 +111,17 @@ export function topUpAmountProblem(input: { amount: string | null; method: Metho
 
 // ── What a refusal says ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/** What the text builders know about the form: its language, the method chosen and the wallet's limits. */
+/** What the text builders know about the form: its texts, the method chosen and the wallet's limits. */
 export type TopUpTextContext = {
-  /** `topUps[locale].errors`. */
+  /** `topUps.errors`. */
   t: TopUpsMessages["errors"];
-  locale: Locale;
   method?: MethodLimits | null;
   limits?: TopUpLimits;
 };
 
 const NO_LIMITS = { minTopUp: "0.0000", maxTopUp: "0.0000" };
 
-const usd = (amount: string, locale: Locale) => ltr(formatMoney(amount, "USD", locale));
+const usd = (amount: string) => ltr(formatMoney(amount, "USD"));
 
 /**
  * The sentence for an amount problem, from the form's own check or from the API's `422` on `amount` (`min`, `max`,
@@ -131,22 +129,22 @@ const usd = (amount: string, locale: Locale) => ltr(formatMoney(amount, "USD", l
  * the sentence instead of being guessed.
  */
 export function amountProblemText(code: AmountProblem | "format" | "range", context: TopUpTextContext): string {
-  const { t, locale, method, limits } = context;
+  const { t, method, limits } = context;
   const { min, max } = effectiveLimits(method, limits ?? NO_LIMITS);
   switch (code) {
     case "min":
-      return min ? fmt(t.min, { min: usd(min, locale) }) : t.minUnknown;
+      return min ? fmt(t.min, { min: usd(min) }) : t.minUnknown;
     case "max":
-      return max ? fmt(t.max, { max: usd(max, locale) }) : t.maxUnknown;
+      return max ? fmt(t.max, { max: usd(max) }) : t.maxUnknown;
     case "fee":
       return t.fee;
     case "daily_count":
       return t.dailyCount;
     case "daily_amount":
-      return limits && !isNoLimit(limits.amountLeftToday) ? fmt(t.dailyAmountLeft, { left: usd(limits.amountLeftToday, locale) }) : t.dailyAmount;
+      return limits && !isNoLimit(limits.amountLeftToday) ? fmt(t.dailyAmountLeft, { left: usd(limits.amountLeftToday) }) : t.dailyAmount;
     case "max_balance":
       if (!limits) return t.maxBalance;
-      return isNoLimit(limits.room) ? t.maxBalanceFull : fmt(t.maxBalanceRoom, { room: usd(limits.room, locale) });
+      return isNoLimit(limits.room) ? t.maxBalanceFull : fmt(t.maxBalanceRoom, { room: usd(limits.room) });
     default:
       // invalid, format and range: no positive amount with at most four decimals.
       return t.format;

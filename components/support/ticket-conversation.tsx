@@ -43,7 +43,6 @@ import {
 } from "react";
 import { ArrowDown, Lock } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
-import type { Locale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/define";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
 import { createConnectionStore, type ConnectionStore } from "@/lib/support/connection";
@@ -221,19 +220,17 @@ export function LiveTicketStatus({ labels }: { labels: Record<TicketStatus, stri
 
 /** The rows of the information list that change with the ticket: last update, resolved (once it is), status. */
 export function LiveTicketFacts({
-  locale,
   labels,
   statuses,
 }: {
-  locale: Locale;
   labels: { updated: string; resolved: string; status: string };
   statuses: Record<TicketStatus, string>;
 }) {
   const { state } = useTicketLive();
   return (
     <>
-      <DescriptionItem label={labels.updated}>{formatDateTime(state.updatedAt, locale)}</DescriptionItem>
-      {state.resolvedAt ? <DescriptionItem label={labels.resolved}>{formatDateTime(state.resolvedAt, locale)}</DescriptionItem> : null}
+      <DescriptionItem label={labels.updated}>{formatDateTime(state.updatedAt)}</DescriptionItem>
+      {state.resolvedAt ? <DescriptionItem label={labels.resolved}>{formatDateTime(state.resolvedAt)}</DescriptionItem> : null}
       <DescriptionItem label={labels.status}>
         <StatusBadge kind="ticket" status={state.status} label={statuses[state.status]} />
       </DescriptionItem>
@@ -265,14 +262,13 @@ const noSubscribe = () => () => undefined;
 const canObserve = () => typeof IntersectionObserver !== "undefined";
 
 export type TicketConversationProps = {
-  locale: Locale;
   t: TicketConversationTexts;
   /** "Open a new ticket" of the closed notice: the new-ticket form of the surface (lib/support/new-ticket-link.ts). */
   newTicketHref: string;
 };
 
 /** The messages, the typing and connection line, the rating (customers) and the reply form, or the closed notice. */
-export function TicketConversation({ locale, t, newTicketHref }: TicketConversationProps) {
+export function TicketConversation({ t, newTicketHref }: TicketConversationProps) {
   const { access, adapter, state, dispatch, connection, refresh } = useTicketLive();
   const end = useRef<HTMLDivElement>(null);
   const markedUpTo = useRef(0);
@@ -365,7 +361,6 @@ export function TicketConversation({ locale, t, newTicketHref }: TicketConversat
       <div>
         <TicketMessages
           messages={state.messages}
-          locale={locale}
           t={t}
           fileHref={adapter.fileHref}
           receipt={receiptOf(state)}
@@ -426,7 +421,6 @@ export function TicketConversation({ locale, t, newTicketHref }: TicketConversat
         {closed ? null : (
           <TicketReplyForm
             adapter={adapter}
-            locale={locale}
             t={t.reply}
             hint={hint}
             initialBody={nextArea.restore}

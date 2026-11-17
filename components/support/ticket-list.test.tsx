@@ -18,7 +18,7 @@ const row = (number: string, extra: Partial<TicketListRow> = {}): TicketListRow 
   ...extra,
 });
 
-const render = (rows: TicketListRow[]) => renderToStaticMarkup(<TicketList rows={rows} locale="en" t={support.en} c={common.en} />);
+const render = (rows: TicketListRow[]) => renderToStaticMarkup(<TicketList rows={rows} t={support} c={common} />);
 
 describe("TicketList: one markup for every screen", () => {
   it("is a single table with one row per ticket (no second, phone-only list)", () => {

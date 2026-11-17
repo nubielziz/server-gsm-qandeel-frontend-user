@@ -1,4 +1,4 @@
-// Translates ApiErrors by code. Pure and safe anywhere: Server Components call `errorText(errors[locale])`;
+// Translates ApiErrors by code. Pure and safe anywhere: Server Components call `errorText(errors)`;
 // Client Components use `useErrorText()` (lib/i18n/error-text.tsx), which wraps this with the provided messages.
 import { isApiError, type ApiError, type FieldError } from "@/lib/api/errors";
 import type { ErrorMessages } from "./messages/errors";
@@ -15,7 +15,7 @@ export type ErrorText = {
   reference(error: unknown): string | undefined;
 };
 
-/** The translator for one language's error texts (`errors[locale]`). */
+/** The translator for the site's error texts (`errors`, lib/i18n/messages/errors.ts). */
 export function errorText(t: ErrorMessages): ErrorText {
   const codes = t.codes as Record<string, string>;
   const fieldTexts = t.fields as Record<string, string>;

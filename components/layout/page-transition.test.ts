@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const APP = path.join(__dirname, "../../app/[lang]");
+const APP = path.join(__dirname, "../../app/en");
 const STORE = path.join(APP, "(store)");
 /** Not shop pages: the quick view dialog (its page under the slot), the design kit and the quick view page (it re-exports the service page). */
 const SKIP = [/^@modal\//, /^ui-kit\//, /^quick-view\//];

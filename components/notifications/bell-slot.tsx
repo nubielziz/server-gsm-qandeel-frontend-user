@@ -6,8 +6,7 @@
 import { cache } from "react";
 import { apiSessionGet } from "@/lib/api/server";
 import type { UnreadCount } from "@/lib/api/types";
-import { localePath } from "@/lib/i18n/config";
-import { getLocale, getMessages } from "@/lib/i18n/server";
+import { sitePath } from "@/lib/site-path";
 import { notifications } from "@/lib/i18n/messages/notifications";
 import { NOTIFICATION_API, NOTIFICATIONS_PAGE, type NotificationSurface } from "@/lib/notifications/link";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,12 +32,13 @@ export function BellSkeleton() {
 }
 
 export async function BellSlot({ surface }: { surface: NotificationSurface }) {
-  const [locale, t, initialCount] = await Promise.all([getLocale(), getMessages(notifications), readUnreadCount(surface)]);
-  const href = localePath(locale, NOTIFICATIONS_PAGE[surface]);
+  const initialCount = await readUnreadCount(surface);
+  const t = notifications;
+  const href = sitePath(NOTIFICATIONS_PAGE[surface]);
   return (
     <>
-      <Bell surface={surface} locale={locale} href={href} initialCount={initialCount} labels={{ bell: t.bell, bellNone: t.bellNone }} />
-      <NotificationStream surface={surface} locale={locale} href={href} labels={{ view: t.live.view, many: t.live.many }} />
+      <Bell surface={surface} href={href} initialCount={initialCount} labels={{ bell: t.bell, bellNone: t.bellNone }} />
+      <NotificationStream surface={surface} href={href} labels={{ view: t.live.view, many: t.live.many }} />
     </>
   );
 }

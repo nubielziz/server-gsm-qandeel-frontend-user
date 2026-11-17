@@ -121,7 +121,7 @@ export function Button({
 
 export type ButtonLinkProps = Omit<ComponentProps<typeof Link>, "className" | "href"> &
   CommonProps & {
-    /** In-site path (already language-prefixed with `localePath`) or an absolute URL. */
+    /** In-site path (already prefixed with `sitePath`) or an absolute URL. */
     href: string;
     /** Opens an external URL in a new tab with `rel="noopener noreferrer"`. */
     external?: boolean;

@@ -11,7 +11,7 @@ import { listStoreCategories } from "@/lib/api/public";
 import type { StoreCategory } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import { formatNumber } from "@/lib/format";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { sitePath } from "@/lib/site-path";
 
 /** Width in px of the desktop panel: room for a long category name, its count and the padding. */
 const PANEL_WIDTH = 288;
@@ -34,28 +34,27 @@ export async function loadMenuCategories(): Promise<StoreCategory[]> {
 }
 
 /** The catalog filtered by one category: `/en/services?category=4-carrier-unlock`. */
-export function categoryHref(locale: Locale, category: Pick<StoreCategory, "slug">): string {
-  return `${localePath(locale, "/services")}?category=${encodeURIComponent(category.slug)}`;
+export function categoryHref(category: Pick<StoreCategory, "slug">): string {
+  return `${sitePath("/services")}?category=${encodeURIComponent(category.slug)}`;
 }
 
 /**
  * One row: the category name (isolated from the page's direction, since the names are the shop's own words) and its
  * service count in brackets, the same way the catalog sidebar writes it ("Apple (2)").
  */
-function CategoryRow({ category, locale }: { category: StoreCategory; locale: Locale }) {
+function CategoryRow({ category }: { category: StoreCategory }) {
   return (
     <>
       <span className="min-w-0 flex-1 truncate">
         <bdi>{category.name}</bdi>
       </span>
-      <span className="num shrink-0 text-small font-normal text-ink-subtle">({formatNumber(category.serviceCount, locale)})</span>
+      <span className="num shrink-0 text-small font-normal text-ink-subtle">({formatNumber(category.serviceCount)})</span>
     </>
   );
 }
 
 export type CategoryMenuProps = {
   categories: StoreCategory[];
-  locale: Locale;
   /** The trigger's text and accessible name ("All categories"). */
   label: string;
   /** The name of the list inside the panel ("Categories"). */
@@ -68,9 +67,9 @@ export type CategoryMenuProps = {
  * Desktop: the "All categories" button of the nav row. It opens a panel (native popover: Esc and a click outside close
  * it, Up and Down move between the rows) with one link per category. Nothing when there are no categories.
  *
- * @example <CategoryMenu categories={await loadMenuCategories()} locale={locale} label="All categories" listLabel="Categories" triggerClassName={…} />
+ * @example <CategoryMenu categories={await loadMenuCategories()} label="All categories" listLabel="Categories" triggerClassName={…} />
  */
-export function CategoryMenu({ categories, locale, label, listLabel, triggerClassName }: CategoryMenuProps) {
+export function CategoryMenu({ categories, label, listLabel, triggerClassName }: CategoryMenuProps) {
   if (categories.length === 0) return null;
   return (
     <Menu label={label} trigger={label} chevron align="start" width={PANEL_WIDTH} triggerClassName={cn(triggerClassName, "cursor-pointer aria-expanded:bg-surface-muted aria-expanded:text-ink")}>
@@ -78,8 +77,8 @@ export function CategoryMenu({ categories, locale, label, listLabel, triggerClas
         <ul>
           {categories.map((category) => (
             <li key={category.id}>
-              <MenuItem href={categoryHref(locale, category)}>
-                <CategoryRow category={category} locale={locale} />
+              <MenuItem href={categoryHref(category)}>
+                <CategoryRow category={category} />
               </MenuItem>
             </li>
           ))}
@@ -91,7 +90,6 @@ export function CategoryMenu({ categories, locale, label, listLabel, triggerClas
 
 export type CategoryDrawerListProps = {
   categories: StoreCategory[];
-  locale: Locale;
   /** The summary's text ("Categories"). */
   label: string;
   /** The look of the summary row: the drawer's link classes, so it sits among the links. */
@@ -103,7 +101,7 @@ export type CategoryDrawerListProps = {
  * summary opens and closes it from the keyboard; a click on a link goes to the page and the drawer closes itself.
  * Nothing when there are no categories.
  */
-export function CategoryDrawerList({ categories, locale, label, summaryClassName }: CategoryDrawerListProps) {
+export function CategoryDrawerList({ categories, label, summaryClassName }: CategoryDrawerListProps) {
   if (categories.length === 0) return null;
   return (
     <details className="group/categories">
@@ -115,8 +113,8 @@ export function CategoryDrawerList({ categories, locale, label, summaryClassName
       <ul className="mb-1 ms-6 mt-1 grid gap-0.5 border-s border-line ps-2">
         {categories.map((category) => (
           <li key={category.id}>
-            <Link href={categoryHref(locale, category)} className={drawerItemClasses}>
-              <CategoryRow category={category} locale={locale} />
+            <Link href={categoryHref(category)} className={drawerItemClasses}>
+              <CategoryRow category={category} />
             </Link>
           </li>
         ))}

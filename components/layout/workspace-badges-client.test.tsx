@@ -4,7 +4,7 @@ import { NavSupportDot, NavUnreadBadge } from "./workspace-badges-client";
 
 describe("NavUnreadBadge: the unread count on the Notifications item", () => {
   it("shows the server's count in the first paint, with the words for the link's name", () => {
-    const html = renderToStaticMarkup(<NavUnreadBadge surface="customer" locale="en" initialCount={3} suffix=", {count} unread" />);
+    const html = renderToStaticMarkup(<NavUnreadBadge surface="customer" initialCount={3} suffix=", {count} unread" />);
     expect(html).toMatch(/<span aria-hidden="true" dir="ltr" class="[^"]*nav-badge[^"]*nav-badge-alert[^"]*">/);
     expect(html).toContain(">3</span>");
     expect(html).toContain('<span class="sr-only">, 3 unread</span>');
@@ -13,11 +13,11 @@ describe("NavUnreadBadge: the unread count on the Notifications item", () => {
   });
 
   it("caps at 99+ like the bell, and shows nothing at zero or without a count", () => {
-    const capped = renderToStaticMarkup(<NavUnreadBadge surface="merchant" locale="en" initialCount={100} suffix=", {count} unread" />);
+    const capped = renderToStaticMarkup(<NavUnreadBadge surface="merchant" initialCount={100} suffix=", {count} unread" />);
     expect(capped).toContain(">99+</span>");
     expect(capped).toContain(", 99+ unread");
-    expect(renderToStaticMarkup(<NavUnreadBadge surface="merchant" locale="en" initialCount={0} suffix="x" />)).toBe("");
-    expect(renderToStaticMarkup(<NavUnreadBadge surface="merchant" locale="en" initialCount={null} suffix="x" />)).toBe("");
+    expect(renderToStaticMarkup(<NavUnreadBadge surface="merchant" initialCount={0} suffix="x" />)).toBe("");
+    expect(renderToStaticMarkup(<NavUnreadBadge surface="merchant" initialCount={null} suffix="x" />)).toBe("");
   });
 });
 
