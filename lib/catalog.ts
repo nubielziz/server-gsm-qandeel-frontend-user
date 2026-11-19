@@ -16,6 +16,7 @@ import {
   FACET_KEYS,
   clampPage,
   cleanText,
+  collectionFilter,
   facetOptions,
   facetOptionsFromCounts,
   fitPriceRange,
@@ -237,9 +238,34 @@ async function searchList({ catalog, categories, entries, applied, bounds, curre
   };
 }
 
-/** The featured collections, each with its lowest card price in `currency`. */
-export async function catalogCollections(currency: string): Promise<Collection[]> {
-  return pickCollections(await allListedServices(currency));
+/** How many services a featured collection's home card lists. */
+export const COLLECTION_PEEK = 3;
+
+/** A featured collection with the services its home card lists. */
+export type FeaturedCollection = Collection & {
+  /** Its best sellers (at most `COLLECTION_PEEK`): the API's `popular` sort filtered by the collection. */
+  top: StoreServiceCard[];
+};
+
+/**
+ * The featured collections, each with its lowest card price and its best sellers in `currency`. The groups and their
+ * counts come from the cached catalog; the best sellers from one small cached list read per collection, because the
+ * cards carry no sales number.
+ */
+export async function catalogCollections(currency: string): Promise<FeaturedCollection[]> {
+  const collections = pickCollections(await allListedServices(currency));
+  return Promise.all(
+    collections.map(async (collection) => {
+      const list = await listStoreServices({
+        currency,
+        ...collectionFilter(collection),
+        ...sortQuery("popular"),
+        start: 0,
+        end: COLLECTION_PEEK,
+      });
+      return { ...collection, top: list.data };
+    }),
+  );
 }
 
 /** The lowest listed price in `currency` (what its card shows: no tax), or null for an empty catalog. */

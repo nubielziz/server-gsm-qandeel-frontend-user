@@ -1,45 +1,47 @@
-// "Featured collections" of the home page (mockup): large banners for the brands, countries and carriers with the most
-// services (lib/catalog-facets.ts), each opening the catalog filtered by it. The catalog has no categories (handoff
-// §1.7), so these groups are what a collection can be. The art sits on the start side like the mockup: the owner's
-// optional files `collections/<kind>-<name>.jpg` (docs/IMAGE-PROMPTS.md), on light cards. Until one exists the card shows
-// its lit surface (dark for the first one) and an icon of its kind.
-import { Globe, Signal, Smartphone, type LucideIcon } from "lucide-react";
-import { ButtonLink } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+// "Featured collections" of the home page: the brands, countries and carriers with the most services
+// (lib/catalog-facets.ts), one card each. The brand tiles above already name the biggest groups, so a card shows what
+// is inside: its best sellers with their delivery time and price (lib/catalog.ts `catalogCollections`). The head and
+// the foot open the catalog filtered by the collection; each row opens its service page. The catalog has no
+// categories (handoff §1.7), so these groups are what a collection can be.
+import Link from "next/link";
+import { ArrowRight, Clock, Globe, Signal } from "lucide-react";
+import { initialsOf } from "@/components/ui/avatar";
 import { Money } from "@/components/ui/money";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Collection, CollectionKind } from "@/lib/catalog-facets";
+import type { StoreServiceCard } from "@/lib/api/types";
+import type { FeaturedCollection } from "@/lib/catalog";
+import type { Collection } from "@/lib/catalog-facets";
 import { cn } from "@/lib/cn";
 import { countryName } from "@/lib/countries";
 import { fmt } from "@/lib/i18n/define";
-import { sitePath } from "@/lib/site-path";
 import type { StoreMessages } from "@/lib/i18n/messages/store";
-import { siteImage } from "@/lib/site-images";
-import { BannerArt, OutlineTag, linkArrow, litSurface, type BannerTone } from "./banner";
-import { Logo, logoFile } from "./service-art";
-
-const kindIcons: Record<CollectionKind, LucideIcon> = { brand: Smartphone, country: Globe, network: Signal };
-
-/**
- * The art file of a collection: "Apple" → `collections/brand-apple.jpg`, "US" → `collections/country-us.jpg`,
- * "AT&T" → `collections/carrier-at-t.jpg`. Null when the name has no Latin letters or digits.
- */
-export function collectionArtFile(kind: CollectionKind, value: string): string | null {
-  const slug = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  if (!slug || slug.length > 40) return null;
-  return `collections/${kind === "network" ? "carrier" : kind}-${slug}.jpg`;
-}
+import { sitePath } from "@/lib/site-path";
+import { deliveryTime } from "@/lib/store/delivery";
+import { Logo, isSymbolLogo, logoFile } from "./service-art";
 
 /** The grid: two collections share the row; with three the last one spans both columns until the row fits three. */
 const GRID = "grid gap-4 md:grid-cols-2";
 const third = (i: number, total: number) => total === 3 && i === 2 && "md:max-lg:col-span-2";
 
-export type CollectionBannersProps = {
-  collections: Collection[];
+/**
+ * The card box: it rises 2px on hover like the service cards (service-card.tsx), and a 2px strip under it still counts
+ * as the card while it is up, so the pointer at its bottom edge does not make it bob. No `overflow-hidden`: it would
+ * clip that strip, so the foot rounds its own corners.
+ */
+const CARD =
+  "relative flex h-full min-w-0 flex-col rounded-card border border-line bg-surface shadow-card " +
+  "transition-[translate,border-color,box-shadow] duration-(--duration-base) ease-standard " +
+  "hover:-translate-y-0.5 hover:border-line-strong hover:shadow-lift " +
+  "hover:before:absolute hover:before:inset-x-0 hover:before:top-full hover:before:h-0.5";
+
+/** Paddings shared with the skeleton, so nothing moves when the cards arrive. */
+const HEAD = "flex items-center gap-3 p-4 sm:px-5";
+const LIST = "border-t border-line p-1.5 sm:px-2";
+const ROW = "flex items-center gap-3 rounded-control px-2.5 py-2";
+const FOOT = "mt-auto flex items-center justify-between gap-3 rounded-b-card border-t border-line px-4 py-3.5 sm:px-5";
+
+export type CollectionCardsProps = {
+  collections: FeaturedCollection[];
   /** Display decimals of the visitor's currency. */
   decimals: number;
   t: StoreMessages["home"]["collections"];
@@ -47,70 +49,73 @@ export type CollectionBannersProps = {
   countText: (count: number) => string;
 };
 
-export function CollectionBanners({ collections, decimals, t, countText }: CollectionBannersProps) {
+export function CollectionCards({ collections, decimals, t, countText }: CollectionCardsProps) {
   const services = sitePath("/services");
   return (
-    // reveal-grid: the banners fade and rise in as they scroll into view, one after the other (globals.css).
+    // reveal-grid: the cards fade and rise in as they scroll into view, one after the other (globals.css).
     <ul className={cn(GRID, "reveal-grid", collections.length === 3 && "lg:grid-cols-3")}>
       {collections.map((collection, i) => {
-        const file = collectionArtFile(collection.kind, collection.value);
-        const hasArt = file !== null && siteImage(file) !== null;
-        // Which collection comes first depends on the catalog, so the images are made for light cards (docs/IMAGE-PROMPTS.md):
-        // only the first card without an image takes the dark surface.
-        const tone: BannerTone = i === 0 && !hasArt ? "inverse" : "light";
-        const inverse = tone === "inverse";
         const name = collection.kind === "country" ? countryName(collection.value) : collection.value;
-        const Icon = kindIcons[collection.kind];
-        // Logos are made for light backgrounds: the dark card keeps the icon.
-        const logoFolder = collection.kind === "brand" ? "brands" : collection.kind === "network" ? "carriers" : null;
+        const href = `${services}?${collection.kind}=${encodeURIComponent(collection.value)}`;
+        const count = countText(collection.count);
         return (
           <li key={`${collection.kind}:${collection.value}`} className={cn(third(i, collections.length))}>
-            <Card tone={inverse ? "inverse" : "default"} radius="card" className={cn("relative h-full min-h-52 overflow-hidden", litSurface(file, tone))}>
-              {file ? (
-                <BannerArt
-                  file={file}
-                  alt=""
-                  sizes="(min-width: 1024px) 15rem, (min-width: 768px) 24vw, 48vw"
-                  tone={tone}
-                  side="start"
-                  className="w-[48%]"
-                />
-              ) : null}
-              <div className={cn("relative flex flex-1 flex-col items-start justify-center gap-2.5 p-5 sm:p-6", hasArt && "ms-auto w-[62%]")}>
-                <div className="flex w-full items-center justify-between gap-3">
-                  <OutlineTag tone={tone}>{t.kinds[collection.kind]}</OutlineTag>
-                  {hasArt ? null : logoFolder && !inverse && logoFile(logoFolder, collection.value) ? (
-                    <Logo folder={logoFolder} name={collection.value} alt="" />
-                  ) : (
-                    <Icon aria-hidden="true" className={cn("size-5", inverse ? "text-on-inverse-muted" : "text-ink-subtle")} />
-                  )}
+            <div className={CARD}>
+              <Link href={href} aria-label={fmt(t.ctaLabel, { name })} className={cn(HEAD, "group/head rounded-t-card")}>
+                <CollectionMark collection={collection} />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <h3 className="truncate text-subheading font-bold text-ink">
+                    <bdi>{name}</bdi>
+                  </h3>
+                  <p className="text-small text-ink-muted">
+                    {t.kinds[collection.kind]}
+                    <span aria-hidden="true"> · </span>
+                    <span className="num">{count}</span>
+                    <span aria-hidden="true"> · </span>
+                    {t.from}{" "}
+                    <Money
+                      amount={collection.from.gross}
+                      currency={collection.from.currency}
+                      decimals={decimals}
+                      className="font-semibold text-ink"
+                    />
+                  </p>
                 </div>
-                <h3 className={cn("mt-1 text-heading", inverse ? "text-on-inverse" : "text-ink")}>
-                  <bdi>{name}</bdi>
-                </h3>
-                <p className={cn("text-small", inverse ? "text-on-inverse-muted" : "text-ink-muted")}>
-                  <span className="num">{countText(collection.count)}</span>
-                  <span aria-hidden="true"> · </span>
-                  {t.from}{" "}
-                  <Money
-                    amount={collection.from.gross}
-                    currency={collection.from.currency}
-                    decimals={decimals}
-                    className={cn("font-semibold", inverse ? "text-on-inverse" : "text-ink")}
-                  />
-                </p>
-                <ButtonLink
-                  href={`${services}?${collection.kind}=${encodeURIComponent(collection.value)}`}
-                  variant={inverse ? "inverse" : "secondary"}
-                  size="sm"
-                  className="mt-2"
-                  endIcon={linkArrow}
-                  aria-label={fmt(t.ctaLabel, { name })}
+                <span
+                  aria-hidden="true"
+                  className={
+                    "grid size-9 shrink-0 place-items-center rounded-full border border-line-strong text-ink transition-colors " +
+                    "duration-(--duration-base) ease-standard group-hover/head:border-inverse group-hover/head:bg-inverse " +
+                    "group-hover/head:text-on-inverse [&_svg]:size-4"
+                  }
                 >
-                  {t.cta}
-                </ButtonLink>
-              </div>
-            </Card>
+                  <ArrowRight />
+                </span>
+              </Link>
+              {collection.top.length > 0 ? (
+                <ul className={LIST}>
+                  {collection.top.map((service) => (
+                    <li key={service.id}>
+                      <ServiceRow service={service} decimals={decimals} />
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <Link
+                href={href}
+                aria-label={fmt(t.viewAllLabel, { services: count, name })}
+                className={cn(
+                  FOOT,
+                  "group/foot text-small font-semibold text-ink transition-colors duration-(--duration-base) ease-standard hover:bg-surface-muted",
+                )}
+              >
+                <span className="num">{fmt(t.viewAll, { services: count })}</span>
+                <ArrowRight
+                  aria-hidden="true"
+                  className="size-4 shrink-0 transition-transform duration-(--duration-base) ease-standard group-hover/foot:translate-x-0.5"
+                />
+              </Link>
+            </div>
           </li>
         );
       })}
@@ -118,12 +123,109 @@ export function CollectionBanners({ collections, decimals, t, countText }: Colle
   );
 }
 
-/** Three banner-sized blocks while the catalog loads. */
-export function CollectionBannersSkeleton() {
+/**
+ * One best seller: its title (typed by staff or a supplier, so `dir="auto"`), its delivery time and its price. The
+ * second line keeps its height without a delivery time, so the rows of the cards stay level.
+ */
+function ServiceRow({ service, decimals }: { service: StoreServiceCard; decimals: number }) {
+  const time = deliveryTime(service).text;
+  return (
+    <Link
+      href={sitePath(`/services/${encodeURIComponent(service.slug)}`)}
+      className={cn(ROW, "transition-colors duration-(--duration-fast) ease-standard hover:bg-surface-muted")}
+    >
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span dir="auto" className="truncate text-small font-medium text-ink">
+          {service.title}
+        </span>
+        <span className="flex h-[1lh] items-center gap-1 text-caption text-ink-subtle">
+          {time ? (
+            <>
+              <Clock aria-hidden="true" className="size-3 shrink-0" />
+              <bdi className="truncate">{time}</bdi>
+            </>
+          ) : null}
+        </span>
+      </span>
+      <Money
+        amount={service.price.gross}
+        currency={service.price.currency}
+        decimals={decimals}
+        className="num shrink-0 text-small font-bold text-ink"
+      />
+    </Link>
+  );
+}
+
+/**
+ * The mark of a collection: the brand's or carrier's logo when there is a file (docs/LOGOS.md): a symbol in a circle, a
+ * word mark in a pill. Else a brand's initials, the globe of a country or the signal of a carrier. The name is written
+ * beside it, so it is decorative.
+ */
+function CollectionMark({ collection }: { collection: Collection }) {
+  const folder = collection.kind === "brand" ? "brands" : collection.kind === "network" ? "carriers" : null;
+  if (folder && logoFile(folder, collection.value)) {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn(
+          "grid h-10 shrink-0 place-items-center rounded-full border border-line bg-surface",
+          isSymbolLogo(folder, collection.value) ? "w-10" : "px-3",
+        )}
+      >
+        <Logo folder={folder} name={collection.value} alt="" size="sm" />
+      </span>
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-sunken text-small font-bold text-ink [&_svg]:size-[18px]"
+    >
+      {collection.kind === "country" ? <Globe /> : collection.kind === "network" ? <Signal /> : initialsOf(collection.value)}
+    </span>
+  );
+}
+
+/** Three cards of the same size while the catalog loads: the head, three rows and the foot. */
+export function CollectionCardsSkeleton() {
   return (
     <div aria-hidden="true" className={cn(GRID, "lg:grid-cols-3")}>
       {[0, 1, 2].map((i) => (
-        <Skeleton key={i} className={cn("h-52 rounded-card", third(i, 3))} />
+        <div key={i} className={cn("flex flex-col rounded-card border border-line bg-surface shadow-card", third(i, 3))}>
+          <div className={HEAD}>
+            <Skeleton className="size-10 shrink-0 rounded-full" />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="text-subheading">
+                <Skeleton className="h-[1lh] w-28" />
+              </div>
+              <div className="text-small">
+                <Skeleton className="h-[1lh] w-44 max-w-full" />
+              </div>
+            </div>
+            <Skeleton className="size-9 shrink-0 rounded-full" />
+          </div>
+          <div className={LIST}>
+            {[0, 1, 2].map((row) => (
+              <div key={row} className={ROW}>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <div className="text-small">
+                    <Skeleton className="h-[1lh] w-4/5" />
+                  </div>
+                  <div className="text-caption">
+                    <Skeleton className="h-[1lh] w-16" />
+                  </div>
+                </div>
+                <div className="text-small">
+                  <Skeleton className="h-[1lh] w-12" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className={cn(FOOT, "text-small")}>
+            <Skeleton className="h-[1lh] w-36" />
+          </div>
+        </div>
       ))}
     </div>
   );

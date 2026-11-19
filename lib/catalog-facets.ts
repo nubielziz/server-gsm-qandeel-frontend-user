@@ -383,6 +383,18 @@ export type CollectionOptions = {
   min?: number;
 };
 
+/** The list filter of a collection (`{ brand }`, `{ country }` or `{ network }`): what its catalog link sets too. */
+export function collectionFilter(collection: Pick<Collection, "kind" | "value">): Pick<ServiceListArgs, CollectionKind> {
+  switch (collection.kind) {
+    case "brand":
+      return { brand: collection.value };
+    case "country":
+      return { country: collection.value };
+    case "network":
+      return { network: collection.value };
+  }
+}
+
 /** The featured collections: the brands, countries and carriers with the most services, each with its lowest price. */
 export function pickCollections(rows: StoreServiceCard[], { limit = 3, perKind = 2, min = 2 }: CollectionOptions = {}): Collection[] {
   const groups = new Map<string, Collection>();

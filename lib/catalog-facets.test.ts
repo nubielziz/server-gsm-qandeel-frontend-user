@@ -9,6 +9,7 @@ import {
   categoryId,
   clampPage,
   cleanText,
+  collectionFilter,
   facetOptions,
   filterRows,
   fitPriceRange,
@@ -391,5 +392,13 @@ describe("pickCollections", () => {
 
   it("returns nothing when no group has two services", () => {
     expect(pickCollections([card({ brand: "Apple" }), card({ brand: "Samsung" })])).toEqual([]);
+  });
+});
+
+describe("collectionFilter", () => {
+  it("filters the list by the collection's own field, like its catalog link", () => {
+    expect(collectionFilter({ kind: "brand", value: "Apple" })).toEqual({ brand: "Apple" });
+    expect(collectionFilter({ kind: "country", value: "US" })).toEqual({ country: "US" });
+    expect(collectionFilter({ kind: "network", value: "AT&T" })).toEqual({ network: "AT&T" });
   });
 });

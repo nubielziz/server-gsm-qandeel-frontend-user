@@ -33,7 +33,7 @@ import {
   TrackPromoCard,
   type CatalogTile,
 } from "@/components/store/home-parts";
-import { CollectionBanners, CollectionBannersSkeleton } from "@/components/store/home-collections";
+import { CollectionCards, CollectionCardsSkeleton } from "@/components/store/home-collections";
 import { HomeProducts, HomeProductsSkeleton } from "@/components/store/home-products";
 import { ServiceCard, ServiceCardMini, ServiceGridSkeleton } from "@/components/store/service-card";
 import { getStoreConfig, listStoreServices } from "@/lib/api/public";
@@ -202,7 +202,10 @@ function FeaturedSkeleton({ title }: { title: string }) {
   );
 }
 
-/** The featured collections (brands, countries, carriers with the most services) priced in the visitor's currency; none below two. */
+/**
+ * The featured collections (brands, countries, carriers with the most services), each with its best sellers, priced in
+ * the visitor's currency; none below two.
+ */
 async function Collections() {
   const currency = await getCurrency();
   const t = store;
@@ -210,7 +213,7 @@ async function Collections() {
   if (collections.length < 2) return null;
   return (
     <Section reveal headingId="home-collections" title={t.home.collections.title}>
-      <CollectionBanners
+      <CollectionCards
         collections={collections}
         decimals={currency.decimals}
         t={t.home.collections}
@@ -223,7 +226,7 @@ async function Collections() {
 function CollectionsSkeleton({ title }: { title: string }) {
   return (
     <Section reveal headingId="home-collections" title={title}>
-      <CollectionBannersSkeleton />
+      <CollectionCardsSkeleton />
     </Section>
   );
 }

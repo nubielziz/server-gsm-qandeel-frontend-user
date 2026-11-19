@@ -35,15 +35,10 @@ RGB lighting, coloured smoke, colour cast, text, letters, numbers, logo, brand m
 | `og-default.jpg` | 1200 × 630 | Preview image when a page is shared on social media |
 | `app/favicon.ico` (NOT in public/images), with `app/icon.png` and `app/apple-icon.png` | ICO with 16, 32 and 48 px; 192 × 192; 180 × 180 | Browser tab icon and the touch icon: the IMEI-HUB mark on a square, made from the owner's logo (docs/LOGOS.md) |
 | `brands/<name>.png`, `carriers/<name>.png` | transparent PNG, ~96 px high, cropped to the logo | Brand and carrier logos on tiles, cards and the service page. 86 are in place; how to add one, naming, sources and trademarks: `docs/LOGOS.md` (then run `npm run logos`) |
-| `collections/<kind>-<name>.jpg` (optional) | 1200 × 900 | Left side of a "Featured collections" banner on the home page. The site picks the brands, countries and carriers with the most services, so add the ones your catalog has: `<kind>` = `brand`, `country` or `carrier`; `<name>` = the brand or carrier name, or the 2-letter country code, lower-cased, every space or symbol → `-` (e.g. `brand-apple.jpg`, `brand-samsung.jpg`, `country-us.jpg`, `country-gb.jpg`, `carrier-at-t.jpg`) |
 
 The five `home-*.jpg` images sit on the right side of their card and fade into it on the left, where the text is. Keep
 the subject in the right half and the left half empty, in the card's colour (near-black `#111111` for the dark cards,
 white for the light ones). Until a file exists its card shows a plain lit surface instead.
-
-The `collections/*.jpg` images are the other way round: they sit on the LEFT side of a light card and fade into it on
-the right, where the text is. Keep the subject in the left half and the right half empty and white. A card with an
-image is always light (only a card without one may be dark).
 
 ## Prompts
 
@@ -140,19 +135,6 @@ Black lying at a three-quarter angle with a dark-grey screen; above the screen f
 document card with a simple white chip icon and a thin white progress bar, casting a soft white glow onto the screen
 (a firmware file being installed); minimal and clean, soft shadow, seamless light-grey background (`#ededef`). White,
 grey, black and clear glass only.
-
-### collections/<kind>-<name>.jpg (one per collection)
-Template: "Bright minimalist studio shot: [SUBJECT] on the left side of the frame, soft shadow, pure white seamless
-background, the right half white and empty for text. No text, no logos." Subjects that fit:
-- `brand-apple.jpg`: two premium smartphones with rounded edges and a triple camera, one standing, one lying, silver
-  and graphite finish (a generic phone: no Apple logo).
-- `brand-samsung.jpg`: a slim flagship smartphone with a tall screen and a vertical row of three cameras, phantom
-  black finish (no Samsung logo).
-- `brand-xiaomi.jpg` and other brands: a modern smartphone in that brand's typical colour, three-quarter view.
-- `country-us.jpg`, `country-gb.jpg`, `country-fr.jpg` …: a smartphone with a softly glowing SIM card tray pulled out,
-  beside a small paper map fragment of that country (no flags, no text).
-- `carrier-<name>.jpg`: a smartphone with a nano SIM card and a SIM eject pin on the desk, a thin white glow on
-  the screen.
 
 ### og-default.jpg
 1.91:1. Wide dark banner: two Samsung Galaxy S26 Ultra (a tall 6.9-inch slab phone: flat display with thin even bezels

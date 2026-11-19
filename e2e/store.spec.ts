@@ -54,16 +54,20 @@ test.describe("home", () => {
     await expect(page).toHaveURL(/\/en\/imei-check\?imei=490154203237518/);
   });
 
-  test("featured collections are the biggest brands and countries and open the filtered catalog", async ({ page }) => {
+  test("featured collections are the biggest brands and countries, list their best sellers and open the filtered catalog", async ({ page }) => {
     await page.goto("/en");
     const collections = page.getByRole("region", { name: "Featured collections" });
-    await expect(collections.getByRole("listitem")).toHaveCount(3);
+    await expect(collections.getByRole("link", { name: /^Explore collection: / })).toHaveCount(3);
     await expect(collections.getByRole("link", { name: "Explore collection: Apple" })).toHaveAttribute("href", "/en/services?brand=Apple");
     await expect(collections.getByRole("link", { name: "Explore collection: United States" })).toHaveAttribute(
       "href",
       "/en/services?country=US",
     );
-    await expect(collections.getByText("8 services")).toBeVisible();
+    // The count follows the demo catalog (other specs add services), so only its shape is checked.
+    await expect(collections.getByRole("link", { name: /^View all \d+ services of Apple$/ })).toHaveAttribute("href", "/en/services?brand=Apple");
+    // The Apple card lists its three best sellers, each opening its service page.
+    const apple = collections.getByRole("listitem").filter({ has: page.getByRole("heading", { name: "Apple", exact: true }) });
+    await expect(apple.locator('a[href^="/en/services/"]')).toHaveCount(3);
   });
 
   test("all services: 8 per page, chips and search; the state is in the home URL; Filters opens the catalog", async ({ page, request, isMobile }) => {

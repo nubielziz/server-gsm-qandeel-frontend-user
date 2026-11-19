@@ -15,7 +15,7 @@ vi.mock("next/cache", () => ({ cacheLife: () => {}, cacheTag: () => {} }));
 vi.mock("@/lib/api/public", () => ({ listStoreServices: api.listStoreServices, listStoreCategories: api.listStoreCategories }));
 vi.mock("@/lib/api/visitor", () => ({ searchStore: api.searchStore }));
 
-import { catalogList } from "./catalog";
+import { COLLECTION_PEEK, catalogCollections, catalogList } from "./catalog";
 
 function card(id: number, gross: string): StoreServiceCard {
   return {
@@ -123,5 +123,34 @@ describe("catalogList: the price slider of a search page", () => {
     api.searchStore.mockImplementation(async () => searchBody({ engine: "fallback", facets: null, priceRange: null }));
     const list = await catalogList("USD", input({ q: "samsung" }), "relevance", 1, 24);
     expect(list.bounds).toEqual({ min: 5, max: 50 });
+  });
+});
+
+describe("catalogCollections", () => {
+  it("adds each collection's best sellers: the popular sort filtered by the collection, one short page", async () => {
+    const rows = [
+      { ...card(1, "5.0000"), brand: "Apple", country: "US" },
+      { ...card(2, "9.0000"), brand: "Apple", country: "US" },
+      { ...card(3, "7.0000"), brand: "Apple", network: "AT&T" },
+      { ...card(4, "3.0000"), brand: "Samsung", network: "AT&T" },
+    ];
+    const top = [rows[2], rows[0]];
+    api.listStoreServices.mockImplementation(async (args: ServiceListArgs) =>
+      args.sort === "popular" ? { data: top, total: top.length } : { data: rows, total: rows.length },
+    );
+
+    const collections = await catalogCollections("EUR");
+
+    expect(collections.map((c) => [c.kind, c.value, c.count, c.top.map((row) => row.id)])).toEqual([
+      ["brand", "Apple", 3, [3, 1]],
+      ["country", "US", 2, [3, 1]],
+      ["network", "AT&T", 2, [3, 1]],
+    ]);
+    const popular = api.listStoreServices.mock.calls.map((call) => call[0] as ServiceListArgs).filter((args) => args.sort === "popular");
+    expect(popular).toEqual([
+      { currency: "EUR", brand: "Apple", sort: "popular", order: "desc", start: 0, end: COLLECTION_PEEK },
+      { currency: "EUR", country: "US", sort: "popular", order: "desc", start: 0, end: COLLECTION_PEEK },
+      { currency: "EUR", network: "AT&T", sort: "popular", order: "desc", start: 0, end: COLLECTION_PEEK },
+    ]);
   });
 });

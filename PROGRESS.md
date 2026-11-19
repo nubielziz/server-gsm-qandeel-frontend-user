@@ -259,6 +259,23 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
   operations; typecheck; lint; 984 tests in 90 files; build). The whole e2e was the second run above, on the branch whose
   tree `main` now has.
 
+## Featured collections: best sellers in each card (2026-11-19, owner's request)
+The owner disliked the banner cards: three copies of the same tag, line and "Explore collection" button, one dark card
+for no reason, and the brand tiles above already name the biggest groups. Of five mockups the owner chose "Peek inside".
+- `CollectionCards` (`components/store/home-collections.tsx`): one card per collection. The head (mark, name, kind,
+  count, lowest price; link "Explore collection: X") and the foot ("View all N services") open the filtered catalog; in
+  between, its three best sellers (title, delivery time, price), each opening its service page. Mark: the logo in a
+  circle (symbol) or a pill (word mark), else a brand's initials, a country's globe or a carrier's signal. Same-size
+  skeleton.
+- `catalogCollections` (`lib/catalog.ts`) adds `top`: one cached `GET /store/v1/services?_sort=popular&_order=desc` of 3
+  rows (`COLLECTION_PEEK`) per collection, filtered by `collectionFilter` (`lib/catalog-facets.ts`); the cards carry no
+  sales number, so the catalog cannot rank them itself.
+- The optional `collections/<kind>-<name>.jpg` art is gone (`docs/IMAGE-PROMPTS.md`). Countries show a globe: the site
+  has no flag files.
+- **Checks:** typecheck, ESLint and the English-only guard; Vitest `lib/catalog.test.ts` and `lib/catalog-facets.test.ts`
+  (46 pass); e2e `store.spec.ts -g "featured collections"` (desktop and mobile) on a production build against :3100. The
+  whole `npm run check` and the whole e2e were not run.
+
 ## Wiring (changed 2026-11-09, late evening, at the owner's request)
 - **Dev site (`npm run dev`, :5175) → the isolated demo API (:3100) since 2026-11-10**, at the owner's request (to
   see the home page with data). `.env.development.local`: `GSM_API_ORIGIN=http://localhost:3100`; start the API with
@@ -300,8 +317,8 @@ Rebuilt after the mockup `screenshots/GSM Store E-Commerce Dashboard (1).png`, w
 The three mockup parts that were missing, adapted to the API (no categories, stock, cart or favourites, handoff §1.7):
 - **Featured collections** (`components/store/home-collections.tsx`): the brands, countries and carriers with the most
   services (2+ each, at most 2 of a kind, 3 in all; `pickCollections` in `lib/catalog-facets.ts`), each with its count
-  and lowest price, opening `/services?brand=…|country=…|network=…`. Art: optional `collections/<kind>-<name>.jpg` on
-  the start side (`docs/IMAGE-PROMPTS.md`); a card with art is light, else the first one is dark. Hidden below 2.
+  and lowest price, opening `/services?brand=…|country=…|network=…`. Hidden below 2. (Since 2026-11-19 each card lists
+  its best sellers instead of art: "Featured collections: best sellers in each card".)
 - **All services** (`components/store/home-products.tsx`): sidebar (drawer on phones) with brand / carrier / country
   lists, each option a link with the count it would leave (`facetOptions`, worked out over the cached catalog, the
   same rules as the API: other filters + search), search box, sort, 8 dense cards per page, chips, pages. State in the

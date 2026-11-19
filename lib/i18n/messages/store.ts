@@ -65,8 +65,10 @@ export const store = {
         network: "Carrier",
       },
       from: "From",
-      cta: "Explore collection",
       ctaLabel: "Explore collection: {name}",
+      /** "View all 393 services" */
+      viewAll: "View all {services}",
+      viewAllLabel: "View all {services} of {name}",
     },
     products: {
       title: "All services",
