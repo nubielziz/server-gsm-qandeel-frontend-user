@@ -1,0 +1,70 @@
+# Continuous integration: the website's own checks on every push to main and on every pull request.
+# No job reads a secret, so a pull request from a fork runs the same jobs. The production server deploys a commit of main only
+# after this workflow succeeded for it (backend repository: deploy/cd/auto-deploy.sh, docs/OPERATIONS.md section 8).
+# Actions are pinned to a commit; the comment names the release that commit is.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Types, lint and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: npm
+      - name: Install the dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Types
+        run: npm run typecheck
+      - name: Lint and English only
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      # No build here: it reads the public catalog from a running API (docs/DEPLOY.md). The server builds the image when it deploys
+      # and keeps the previous one when that build fails. The browser tests need the isolated backend and run on a developer's machine.
+
+  # Shown, and not a reason to stop a deploy: lib/api/schema.gen.ts is generated from the backend's contract (npm run gen:api) and
+  # this job says when it is behind. Make it a required check once the file is generated again.
+  api-types:
+    name: API types match the backend's contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - name: Check out the website
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: storefront
+          persist-credentials: false
+      - name: Check out the backend next to it
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: nubielziz/server-gsm-qandeel-backend
+          path: backend
+          persist-credentials: false
+      - name: Install Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - name: Compare the generated types with the contract
+        working-directory: storefront
+        run: node scripts/gen-api-types.mjs --check
