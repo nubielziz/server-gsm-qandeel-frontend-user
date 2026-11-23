@@ -13,7 +13,7 @@
 // SearchEnhancer, which turns it into the search combobox on the first interaction (without JavaScript it stays a plain
 // GET form). The phone copy carries `autofocus`, so the row's popover focuses it inside
 // the tap (a phone then opens its keyboard).
-import { Headset, LayoutGrid, ScanSearch, Store, PackageSearch, LifeBuoy } from "lucide-react";
+import { Headset, LayoutGrid, Store, PackageSearch, LifeBuoy } from "lucide-react";
 import { sitePath } from "@/lib/site-path";
 import { common } from "@/lib/i18n/messages/common";
 import { search as searchMessages } from "@/lib/i18n/messages/search";
@@ -55,7 +55,6 @@ export async function StoreHeader() {
     clearRecent: s.clearRecent,
     popular: s.popular,
     fill: s.fill,
-    imei: s.imei,
     didYouMean: s.didYouMean,
     taxNote: s.taxNote,
     status: s.status,
@@ -78,7 +77,7 @@ export async function StoreHeader() {
       />
     );
     return (
-      <SearchEnhancer labels={labels} paths={{ results: p("/services"), imei: p("/imei-check") }}>
+      <SearchEnhancer labels={labels} paths={{ results: p("/services") }}>
         {field}
       </SearchEnhancer>
     );
@@ -98,9 +97,6 @@ export async function StoreHeader() {
         listLabel={t.nav.categories}
         triggerClassName={navLinkClasses}
       />
-      <NavLink href={p("/imei-check")} className={navLinkClasses}>
-        {t.nav.imeiCheck}
-      </NavLink>
       <NavLink href={p("/track")} className={navLinkClasses}>
         {t.nav.trackOrder}
       </NavLink>
@@ -127,10 +123,6 @@ export async function StoreHeader() {
           {t.nav.allServices}
         </NavLink>
         <CategoryDrawerList categories={categories} label={t.nav.categories} summaryClassName={drawerLinkClasses} />
-        <NavLink href={p("/imei-check")} className={drawerLinkClasses}>
-          <ScanSearch aria-hidden="true" />
-          {t.nav.imeiCheck}
-        </NavLink>
         <NavLink href={p("/track")} className={drawerLinkClasses}>
           <PackageSearch aria-hidden="true" />
           {t.nav.trackOrder}

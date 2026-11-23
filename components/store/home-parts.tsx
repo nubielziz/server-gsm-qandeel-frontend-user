@@ -1,17 +1,14 @@
-// Parts of the home page (mockup "E-Commerce"): dark hero, quick IMEI card, track promo, brand tiles, "how it works" and
-// the destination banners. They show only what the API can do: browse, check an IMEI, track an order, open a ticket,
+// Parts of the home page (mockup "E-Commerce"): dark hero, track promo, brand tiles, "how it works" and
+// the destination banners. They show only what the API can do: browse, track an order, open a ticket,
 // become a merchant. No cart, favourites, stock or order counts. Card art is the owner's files
 // (docs/IMAGE-PROMPTS.md); until a file exists the card keeps its plain lit surface.
-import Form from "next/form";
 import Link from "next/link";
 import {
-  ArrowRight,
   Headset,
   LayoutGrid,
   LifeBuoy,
   ListOrdered,
   PackageSearch,
-  ScanSearch,
   ShieldCheck,
   Signal,
   Store,
@@ -22,8 +19,6 @@ import type { ReactNode } from "react";
 import { initialsOf } from "@/components/ui/avatar";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { IconButton } from "@/components/ui/icon-button";
-import { Input } from "@/components/ui/input";
 import { Money } from "@/components/ui/money";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
@@ -35,14 +30,6 @@ import { ServiceCardMiniSkeleton } from "./service-card";
 import { Logo, logoFile } from "./service-art";
 
 type Home = StoreMessages["home"];
-
-/** The quick check's submit arrow: it leans 3px towards the end of the line while its `group` button is hovered, like a button's end icon. */
-const submitArrow = (
-  <ArrowRight
-    aria-hidden="true"
-    className="transition-[translate] duration-(--duration-base) ease-standard group-hover:translate-x-[3px]"
-  />
-);
 
 /** One feature point of the hero (an icon and a short text). */
 export function HeroPoint({ icon, text }: { icon: ReactNode; text: string }) {
@@ -111,41 +98,6 @@ export function HomeHero({ t, thirdPoint, price }: { t: Home; thirdPoint: ReactN
           </ButtonLink>
         </div>
       </div>
-    </Card>
-  );
-}
-
-/** Quick IMEI check: a GET form to the IMEI check page (the page validates and checks). */
-export function QuickImeiCard({ t }: { t: Home }) {
-  return (
-    <Card className="sheen-surface justify-center p-5 sm:p-6">
-      <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-control bg-inverse text-on-inverse">
-          <ScanSearch aria-hidden="true" className="size-5" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-heading text-ink">{t.quick.title}</h2>
-          <p className="text-small text-ink-muted">{t.quick.text}</p>
-        </div>
-      </div>
-      <Form action={sitePath("/imei-check")} className="mt-4">
-        <Input
-          name="imei"
-          label={t.quick.label}
-          labelHidden
-          hint={t.quick.hint}
-          placeholder={t.quick.placeholder}
-          inputMode="numeric"
-          autoComplete="off"
-          maxLength={24}
-          required
-          trailing={
-            <IconButton type="submit" variant="primary" size="sm" label={t.quick.submit} className="group">
-              {submitArrow}
-            </IconButton>
-          }
-        />
-      </Form>
     </Card>
   );
 }

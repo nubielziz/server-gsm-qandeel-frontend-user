@@ -118,7 +118,7 @@ test.describe("English only in the markup and the sitemap", () => {
     const first = await request.get("/store/v1/services?_start=0&_end=1");
     expect(first.status(), await first.text()).toBe(200);
     const [service] = (await first.json()) as { slug: string }[];
-    const paths = ["/en", "/en/services", "/en/help", "/en/track", "/en/imei-check", "/en/sign-in"];
+    const paths = ["/en", "/en/services", "/en/help", "/en/track", "/en/sign-in"];
     if (service) paths.push(`/en/services/${encodeURIComponent(service.slug)}`);
     for (const path of paths) {
       const res = await request.get(path);

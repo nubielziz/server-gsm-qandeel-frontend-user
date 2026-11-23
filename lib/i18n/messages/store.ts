@@ -1,4 +1,4 @@
-// Strings of the public shop: home, catalog, service page, IMEI check, help center, content pages and order tracking.
+// Strings of the public shop: home, catalog, service page, help center, content pages and order tracking.
 // Server Components import them; Client Components get the pieces they need as props. Shared strings (status labels,
 // service types, actions) live in ./common.ts.
 
@@ -17,13 +17,16 @@ export const store = {
       from: "Starting from",
       artAlt: "Smartphones",
     },
-    quick: {
-      title: "Quick IMEI check",
-      text: "Identify a device and verify its IMEI for free.",
-      label: "IMEI number",
-      placeholder: "Enter the 15-digit IMEI",
-      submit: "Check IMEI",
-      hint: "Dial *#06# on the device to see its IMEI.",
+    balance: {
+      title: "Your balance",
+      text: "Available in your wallet",
+      addFunds: "Add funds",
+      openWallet: "Open wallet",
+      signedOutText: "Sign in to see your wallet balance and add funds.",
+      signIn: "Sign in",
+      noWalletText: "There is no wallet balance to show for this account.",
+      myAccount: "My account",
+      merchantPortal: "Merchant portal",
     },
     promo: {
       eyebrow: "Already ordered?",
@@ -203,40 +206,6 @@ export const store = {
     merchantManage: "View in the merchant portal",
     notFoundTitle: "Service not found",
     loading: "Loading the service",
-  },
-
-  imei: {
-    title: "IMEI check",
-    description: "Identify a device and verify that its IMEI is well formed. Free, no account needed.",
-    metaDescription: "Free IMEI check: verify an IMEI number and identify the device model.",
-    label: "IMEI number",
-    hint: "15 digits. Dial *#06# on the device to see it. Spaces and dashes are ignored.",
-    placeholder: "490154203237518",
-    submit: "Check IMEI",
-    checking: "Checking…",
-    errorLength: "An IMEI has 15 digits.",
-    errorChecksum: "This IMEI is not valid: its last digit does not match the rest.",
-    turnstileWaiting: "Waiting for the security check…",
-    resultTitle: "Result",
-    resultFor: "IMEI {imei}",
-    device: "Device",
-    brand: "Brand",
-    model: "Model",
-    marketingName: "Marketing name",
-    releaseYear: "Release year",
-    tac: "TAC (first 8 digits)",
-    tacKnown: "Known device",
-    tacUnknown: "Device not in our catalog",
-    checksum: "Check digit",
-    checksumValid: "Valid",
-    checkedAt: "Checked",
-    statusTitle: "Blacklist and lock status",
-    statusUnknown: "Not available yet",
-    statusNote:
-      "This free check confirms that the IMEI is well formed and identifies the device. It does not look up blacklist, carrier lock or iCloud status yet. Order one of our IMEI services for a full report.",
-    statusCta: "Browse IMEI services",
-    unknownDeviceNote: "We do not know this device model yet. The IMEI itself is valid.",
-    another: "Check another IMEI",
   },
 
   help: {

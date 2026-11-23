@@ -1,20 +1,7 @@
-// Public store: home, catalog filters, service page, IMEI check, order tracking.
-// Real browser → Next → the isolated demo backend (:3100). The Cloudflare script is replaced by a stub that hands out the
-// backend's dev token, so the tests do not depend on the internet.
+// Public store: home, catalog filters, service page, order tracking.
+// Real browser → Next → the isolated demo backend (:3100).
 import { expect, test } from "./fixtures";
-import { type APIRequestContext, type Page } from "@playwright/test";
-
-/** The token the backend's dev Turnstile verifier accepts (handoff §3.10). */
-const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
-
-async function stubTurnstile(page: Page) {
-  await page.route("https://challenges.cloudflare.com/**", (route) =>
-    route.fulfill({
-      contentType: "application/javascript",
-      body: `(function(){var o={};window.turnstile={render:function(e,c){var id="w"+Math.random();o[id]=c;setTimeout(function(){c.callback("${DEV_TOKEN}")},30);return id},reset:function(id){var c=o[id];if(c)setTimeout(function(){c.callback("${DEV_TOKEN}")},30)},remove:function(id){delete o[id]}}})();`,
-    }),
-  );
-}
+import { type APIRequestContext } from "@playwright/test";
 
 type ApiCategory = { id: number; slug: string; name: string; serviceCount: number };
 
@@ -30,7 +17,7 @@ const categoryCheckbox = (category: ApiCategory) =>
   new RegExp(`^${category.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\(${category.serviceCount}\\)`);
 
 test.describe("home", () => {
-  test("shows featured services priced in USD, brand and carrier tiles and the quick IMEI form", async ({ page }) => {
+  test("shows featured services priced in USD, brand and carrier tiles and the balance box", async ({ page }) => {
     await page.goto("/en");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("IMEI checks");
     const featured = page.getByRole("region", { name: "Featured services" });
@@ -48,10 +35,9 @@ test.describe("home", () => {
     const bestSellers = page.getByRole("region", { name: "Best sellers" });
     await expect(bestSellers.getByRole("article")).toHaveCount(4);
 
-    // The quick check hands the number to the IMEI page.
-    await page.getByLabel("IMEI number").first().fill("490154203237518");
-    await page.getByRole("button", { name: "Check IMEI" }).first().click();
-    await expect(page).toHaveURL(/\/en\/imei-check\?imei=490154203237518/);
+    // The balance box of a visitor who is not signed in leads to the sign-in page.
+    await expect(page.getByRole("heading", { level: 2, name: "Your balance" })).toBeVisible();
+    await expect(page.locator("main").getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/en/sign-in");
   });
 
   test("featured collections are the biggest brands and countries, list their best sellers and open the filtered catalog", async ({ page }) => {
@@ -236,39 +222,10 @@ test.describe("service page", () => {
   });
 });
 
-test.describe("IMEI check", () => {
-  test("checks a valid IMEI and says honestly that blacklist and lock status are not available yet", async ({ page }) => {
-    await stubTurnstile(page);
-    await page.goto("/en/imei-check");
-    await expect(page.getByRole("button", { name: "Check IMEI" })).toBeEnabled(); // hydrated, security check answered
-    await page.getByLabel("IMEI number").fill("490154203237518");
-    const request = page.waitForRequest((r) => r.url().endsWith("/store/v1/imei/check") && r.method() === "POST");
-    await page.getByRole("button", { name: "Check IMEI" }).click();
-    expect((await request).headers()["x-turnstile-token"]).toBe(DEV_TOKEN);
-    await expect(page.getByRole("heading", { name: "Result" })).toBeVisible();
-    await expect(page.getByText("Not available yet")).toBeVisible();
-    await expect(page.getByText(/does not look up blacklist/)).toBeVisible();
-    await expect(page.getByText("Valid", { exact: false }).first()).toBeVisible();
-  });
-
-  test("a prefilled IMEI from the home page is checked automatically", async ({ page }) => {
-    await stubTurnstile(page);
-    await page.goto("/en/imei-check?imei=490154203237518");
-    await expect(page.getByRole("heading", { name: "Result" })).toBeVisible();
-  });
-
-  test("an IMEI with a wrong check digit is refused before any request", async ({ page }) => {
-    await stubTurnstile(page);
-    let called = false;
-    page.on("request", (r) => {
-      if (r.url().endsWith("/store/v1/imei/check")) called = true;
-    });
-    await page.goto("/en/imei-check");
-    await expect(page.getByRole("button", { name: "Check IMEI" })).toBeEnabled();
-    await page.getByLabel("IMEI number").fill("490154203237519");
-    await page.getByRole("button", { name: "Check IMEI" }).click();
-    await expect(page.getByText("last digit does not match")).toBeVisible();
-    expect(called).toBe(false);
+test.describe("the free IMEI check (removed on 2026-11-23)", () => {
+  test("its old address is not a page any more", async ({ request }) => {
+    const res = await request.get("/en/imei-check");
+    expect(res.status()).toBe(404);
   });
 });
 

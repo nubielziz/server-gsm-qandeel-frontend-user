@@ -419,6 +419,20 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
 - **Agent usage:** one workflow (read-only): 3 agents (transport audit, content audit, flow recipes) + 8 verifiers; stopped before
   further verify batches under the owner's new limits (≤ 3 agent calls per feature). 5 findings confirmed, 3 refuted.
 
+## Home: the balance box takes the place of the free IMEI check (2026-11-23, owner's request)
+- **Removed for good:** the quick IMEI card of the home page, the page `/en/imei-check` (it answers 404 now), its links in the
+  header, the phone drawer and the footer, its sitemap entry, and the "Check IMEI …" option of the search box and of the results
+  page (an IMEI typed in the search offers nothing: the API runs no search for one). The site no longer calls
+  `POST /store/v1/imei/check`; the backend keeps that route (it is a rule of its own map).
+- **In its place:** `components/store/home-balance.tsx` (drawn by `home-balance-view.tsx`, decided by `lib/wallet/home-balance.ts`):
+  the available wallet balance of the signed-in visitor (the merchant's when a merchant is signed in and approved, else the
+  customer's when the wallet shows) with "Add funds" and "Open wallet"; a visitor who is not signed in gets "Sign in". It shares
+  the header's reads (`readMerchantWallet`, `readCustomerWallet`), so it costs no API call of its own.
+- **Also fixed:** a long service name in a "Featured collections" card widened the whole home page on phones (the card is a grid
+  item and had no `min-w-0`).
+- **Checks:** typecheck, lint, 997 unit tests, a production build; the home page looked at in a browser at 1440 and 390 px (no
+  sideways scroll at 390 and 360 px). The e2e specs were changed to match but not run.
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.

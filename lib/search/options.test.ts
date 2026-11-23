@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SuggestBody, SuggestFilter, SuggestService } from "@/lib/api/types";
 import { buildGroups, completionParts, filterHref, flatten, optionCounts, optionHref, resultsHref, type SearchPaths } from "./options";
 
-const PATHS: SearchPaths = { results: "/en/services", imei: "/en/imei-check" };
+const PATHS: SearchPaths = { results: "/en/services" };
 
 function service(id: number, slug: string): SuggestService {
   return {
@@ -71,10 +71,9 @@ describe("buildGroups: the sections of the list", () => {
     expect(groups).toEqual([]);
   });
 
-  it("an IMEI: one option, Check IMEI, and nothing else", () => {
+  it("an IMEI: no option (the API runs no search for one)", () => {
     const groups = buildGroups({ value: "3569 3803 5643 809", answer: body(), ghost: "", recent: [], coarse: false });
-    expect(groups).toEqual([{ key: "imei", options: [{ kind: "imei", imei: "356938035643809" }] }]);
-    expect(optionHref(groups[0].options[0], "", PATHS)).toBe("/en/imei-check?imei=356938035643809");
+    expect(groups).toEqual([]);
   });
 
   it("Did you mean only when it adds something", () => {

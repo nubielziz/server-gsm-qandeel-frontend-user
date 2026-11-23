@@ -1,14 +1,14 @@
 // The options of the header combobox, worked out from what was typed, the last suggest answer and the recent searches
 // (backend plan 29 §7 "Combobox"). One flat order for the keyboard, cut into labelled groups for the eye:
-// - text typed: "Check IMEI …" when the text is an IMEI; Suggestions (the ghost's whole phrase first, then the API's
+// - text typed: nothing when the text is an IMEI (the API runs no search for one); Suggestions (the ghost's whole phrase first, then the API's
 //   completions, then "Did you mean …?" when it adds something); Services; Filters (ready chips);
 // - an empty box: Recent searches (with "Clear recent searches" as their last option) and Popular searches.
 // Phones get fewer rows (3 suggestions, 4 services, 2 filters). Pure: no DOM, safe to import anywhere (unit-tested).
 import type { SuggestBody, SuggestFilter, SuggestService } from "@/lib/api/types";
 import { imeiFromQuery, normaliseQuery } from "./terms";
 
-/** Where the options lead, already language-prefixed (`/en/services`, `/en/imei-check`). */
-export type SearchPaths = { results: string; imei: string };
+/** Where the options lead, already language-prefixed (`/en/services`). */
+export type SearchPaths = { results: string };
 
 export type SearchOption =
   /** A phrase that completes the text (the ghost's phrase or an API completion): fills the box or searches it. */
@@ -20,10 +20,9 @@ export type SearchOption =
   | { kind: "recent"; text: string }
   | { kind: "popular"; text: string }
   /** The last option of Recent searches: forgets them. */
-  | { kind: "clearRecent" }
-  | { kind: "imei"; imei: string };
+  | { kind: "clearRecent" };
 
-export type OptionGroupKey = "imei" | "suggestions" | "services" | "filters" | "recent" | "popular";
+export type OptionGroupKey = "suggestions" | "services" | "filters" | "recent" | "popular";
 export type OptionGroup = { key: OptionGroupKey; options: SearchOption[] };
 
 /** How many rows each section shows: a phone (coarse pointer) gets fewer. */
@@ -75,12 +74,8 @@ export function buildGroups({ value, answer, answerFor, ghost, recent, coarse }:
     return groups;
   }
 
-  const imei = imeiFromQuery(value);
-  if (imei) {
-    // An IMEI runs no search (the API answers `intent: 'imei'` and nothing else): one way on, the IMEI check.
-    push("imei", [{ kind: "imei", imei }]);
-    return groups;
-  }
+  // An IMEI runs no search (the API answers `intent: 'imei'` and nothing else), so the list stays empty.
+  if (imeiFromQuery(value)) return groups;
 
   const phrases: SearchOption[] = [];
   const taken = new Set<string>([typed]);
@@ -153,8 +148,6 @@ export function optionHref(option: SearchOption, value: string, paths: SearchPat
       return `${paths.results}/${encodeURIComponent(option.service.slug)}`;
     case "filter":
       return filterHref(paths.results, value, option.filter);
-    case "imei":
-      return `${paths.imei}?${new URLSearchParams({ imei: option.imei }).toString()}`;
     case "clearRecent":
       return null;
   }

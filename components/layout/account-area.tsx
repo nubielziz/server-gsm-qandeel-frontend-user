@@ -27,8 +27,9 @@ import { SignOutButton } from "./sign-out-button";
  * The merchant's wallet (`GET /client/wallet`), or null when it cannot be shown (pending approval, signed out, error). Once
  * per request. No merchant session can exist without the readable CSRF cookie: the call is skipped for everyone else, so a
  * visitor who is signed out (or a customer) costs no API call, which lets the header start this read together with `me`.
+ * The home page's balance box asks too (components/store/home-balance.tsx): one read for both.
  */
-const getWallet = cache(async (): Promise<MerchantWallet | null> => {
+export const readMerchantWallet = cache(async (): Promise<MerchantWallet | null> => {
   if (!(await cookies()).has(MERCHANT_CSRF_COOKIE)) return null;
   try {
     return await apiSessionGet<MerchantWallet>("/client/wallet");
@@ -63,7 +64,7 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
   const [merchant, customer, merchantWallet, customerRead] = await Promise.all([
     getMerchant().catch(() => null),
     getCustomer().catch(() => null),
-    getWallet(),
+    readMerchantWallet(),
     compact ? null : readCustomerWallet(),
   ]);
   const t = common;

@@ -23,7 +23,6 @@ const LABELS: SuggestionListLabels = {
   clearRecent: "Clear recent searches",
   popular: "Popular searches",
   fill: "Fill in {text}",
-  imei: "Check IMEI {imei}",
   didYouMean: "Did you mean {q}?",
   taxNote: "Prices before tax",
   country: "Country: {name}",
@@ -69,7 +68,7 @@ function draw(active: number | null, coarse = false) {
       active={active}
       optionId={(i) => `s1-option-${i}`}
       value="sams"
-      paths={{ results: "/en/services", imei: "/en/imei-check" }}
+      paths={{ results: "/en/services" }}
       labels={LABELS}
       coarse={coarse}
       onPick={() => {}}

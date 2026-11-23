@@ -8,7 +8,7 @@
 // - The list (a `popover="manual"` panel under the form, `.popover-menu` timing) shows Suggestions (the ghost's phrase,
 //   completions, "Did you mean"), Services (picture, highlighted title, brand logo, availability, price before tax in
 //   the visitor's `gsm_currency`), Filters (ready chips), or on an empty box Recent and Popular searches; an IMEI offers
-//   "Check IMEI". Options: lib/search/options.ts. Keyboard: lib/search/keyboard.ts (no option active until Down/Up).
+//   nothing. Options: lib/search/options.ts. Keyboard: lib/search/keyboard.ts (no option active until Down/Up).
 // - The ghost (components/search/ghost-text.tsx) completes the text in grey; Tab or Right accepts it.
 // - A polite live region says "6 suggestions, 4 services" 500 ms after the last answer.
 // - The first service of an answer that stays for 300 ms is prefetched; nothing else is.

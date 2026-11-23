@@ -133,16 +133,6 @@ test.describe("header combobox", () => {
     await expect(async () => expect(await services.count()).toBeGreaterThan(1)).toPass();
   });
 
-  test("an IMEI offers Check IMEI and nothing else", async ({ page, isMobile }) => {
-    await go(page, "/en");
-    const box = await headerSearch(page, isMobile);
-    await typeQuery(page, box, "3569 3803 5643 809");
-    const options = listbox(page).getByRole("option");
-    await expect(options).toHaveCount(1);
-    await expect(options.first()).toHaveText(/Check IMEI 356938035643809/);
-    await expect(options.first()).toHaveAttribute("href", "/en/imei-check?imei=356938035643809");
-  });
-
   test("an empty box offers recent searches (kept in this browser) and Clear recent searches", async ({ page, isMobile }) => {
     await go(page, "/en");
     let box = await headerSearch(page, isMobile);
@@ -312,12 +302,9 @@ test.describe("results page", () => {
     }
   });
 
-  test("an IMEI search offers Check IMEI", async ({ page }) => {
+  test("an IMEI search offers no IMEI check (the free check is gone)", async ({ page }) => {
     await page.goto("/en/services?q=356938035643809");
-    await expect(page.locator("main").getByRole("link", { name: "Check IMEI 356938035643809" })).toHaveAttribute(
-      "href",
-      "/en/imei-check?imei=356938035643809",
-    );
+    await expect(page.locator("main").getByRole("link", { name: /Check IMEI/ })).toHaveCount(0);
   });
 
   test("nothing found: the empty state names the search and offers Clear filters", async ({ page }) => {

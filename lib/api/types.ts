@@ -29,7 +29,6 @@ export type LegacySlugKind = S.GetStoreV1LegacySlugsByKindBySlugParams["kind"];
  * `/services/<slug>`, `/services`, `/` or `/help`); `slug` is the service's page on sale now, else null.
  */
 export type LegacySlug = S.GetStoreV1LegacySlugsByKindBySlugResponse;
-export type ImeiCheckResult = S.PostStoreV1ImeiCheckResponse;
 export type CheckoutSession = S.GetStoreV1CheckoutSessionsByTokenResponse;
 export type CheckoutSessionInput = S.PostStoreV1CheckoutSessionsBody;
 export type ConsentsInput = S.PostStoreV1CheckoutSessionsByTokenConsentsBody;

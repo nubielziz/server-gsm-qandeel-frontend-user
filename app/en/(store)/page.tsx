@@ -1,10 +1,12 @@
-// Shop home (mockup "E-Commerce", adapted to the API): dark hero with the quick IMEI check and the track promo, the brand
+// Shop home (mockup "E-Commerce", adapted to the API): dark hero with the visitor's balance box and the track promo, the brand
 // tiles, featured services, "how it works" beside the best sellers (a dense row of the API's `popular` sort), the
 // featured collections, the new arrivals (a dense row of its `listedAt` sort), the list of all services (filters, search,
 // sort, pages: its state is in the home URL) and banners to the rest of the site. A section whose list is empty is left out.
-// The hero, quick check, promo, steps and banners are static. Everything that reads the catalog (language-specific
+// The hero, promo, steps and banners are static. Everything that reads the catalog (language-specific
 // cached reads), the visitor's currency cookie or the URL's query streams in behind <Suspense> with skeletons of the
 // same size; the merchant banner is a small Client Component (no server read).
+// The balance box (components/store/home-balance.tsx) reads the visitor's sessions and wallet: personal, never cached, also
+// behind <Suspense>.
 // Motion: the hero row never animates (LCP). The blocks below it fade and rise in as they scroll into view (CSS
 // scroll-driven `.reveal` / `.reveal-grid`, globals.css); a client navigation to the page plays the shop's page enter.
 import { Suspense, type ReactNode } from "react";
@@ -29,10 +31,10 @@ import {
   HowItWorks,
   MiniGrid,
   MiniGridSkeleton,
-  QuickImeiCard,
   TrackPromoCard,
   type CatalogTile,
 } from "@/components/store/home-parts";
+import { HomeBalance, HomeBalanceSkeleton } from "@/components/store/home-balance";
 import { CollectionCards, CollectionCardsSkeleton } from "@/components/store/home-collections";
 import { HomeProducts, HomeProductsSkeleton } from "@/components/store/home-products";
 import { ServiceCard, ServiceCardMini, ServiceGridSkeleton } from "@/components/store/service-card";
@@ -80,7 +82,9 @@ export default function HomePage(props: PageProps<"/en">) {
             }
           />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 lg:grid-rows-[auto_1fr]">
-            <QuickImeiCard t={t.home} />
+            <Suspense fallback={<HomeBalanceSkeleton />}>
+              <HomeBalance />
+            </Suspense>
             <TrackPromoCard t={t.home} />
           </div>
         </div>

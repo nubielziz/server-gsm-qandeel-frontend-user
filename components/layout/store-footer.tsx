@@ -28,7 +28,6 @@ export async function StoreFooter() {
       title: t.footer.shop,
       links: [
         { href: p("/services"), label: t.nav.allServices },
-        { href: p("/imei-check"), label: t.nav.imeiCheck },
         { href: p("/track"), label: t.nav.trackOrder },
       ],
     },

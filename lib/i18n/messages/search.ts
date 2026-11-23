@@ -11,7 +11,6 @@ export const search = {
   popular: "Popular searches",
   /** The phone's fill arrow beside a completion (read by no screen reader: the option itself says the phrase). */
   fill: "Fill in {text}",
-  imei: "Check IMEI {imei}",
   didYouMean: "Did you mean {q}?",
   fallback: "Simple search is in use right now",
   taxNote: "Prices before tax",

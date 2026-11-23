@@ -15,7 +15,7 @@
 // "Check IMEI" link for an IMEI, an empty state with popular searches, a quiet note while the database answers instead
 // of the engine (counts hidden then), and a note when a price sort covers only the best 1000 matches.
 import Link from "next/link";
-import { Info, PackageSearch, ScanSearch, SlidersHorizontal } from "lucide-react";
+import { Info, PackageSearch, SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -452,7 +452,7 @@ export function ServiceList({ data, config }: { data: ServiceListData; config: S
 
 /**
  * What a search-engine page says above its cards: "Did you mean …?" (a link to the corrected search, the filters kept),
- * "Check IMEI …" when the text is an IMEI, a quiet note while the database answers instead of the engine, and the note
+ * a quiet note while the database answers instead of the engine, and the note
  * that a price sort covers only the best 1000 matches.
  */
 function SearchNotes({ data, config }: { data: ServiceListData; config: ServiceListConfig }) {
@@ -469,17 +469,6 @@ function SearchNotes({ data, config }: { data: ServiceListData; config: ServiceL
           {search.didYouMean}
         </Link>
         {after}
-      </p>
-    ) : null,
-    search.imei ? (
-      <p key="imei">
-        <Link
-          href={`${sitePath("/imei-check")}?${new URLSearchParams({ imei: search.imei }).toString()}`}
-          className="inline-flex min-h-11 items-center gap-2 text-body font-semibold text-ink underline underline-offset-4"
-        >
-          <ScanSearch aria-hidden="true" className="size-4" />
-          {fmt(s.imei, { imei: search.imei })}
-        </Link>
       </p>
     ) : null,
     search.engine === "fallback" ? (

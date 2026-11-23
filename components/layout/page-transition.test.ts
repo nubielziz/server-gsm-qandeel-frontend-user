@@ -28,7 +28,7 @@ describe("PageTransition: every shop page plays the page enter on a client navig
   it("finds the shop's pages", () => {
     expect(list).toContain("page.tsx");
     expect(list).toContain("services/page.tsx");
-    expect(list.length).toBeGreaterThanOrEqual(12);
+    expect(list.length).toBeGreaterThanOrEqual(11);
   });
 
   for (const rel of list) {

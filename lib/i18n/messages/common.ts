@@ -17,7 +17,6 @@ export const common = {
     label: "Main navigation",
     home: "Home",
     allServices: "All services",
-    imeiCheck: "IMEI check",
     trackOrder: "Track an order",
     help: "Help center",
     support: "Support",

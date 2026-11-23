@@ -7,8 +7,8 @@
 // interactive content inside an option would be hidden from assistive technology), which puts the phrase in the box.
 import Link from "next/link";
 import { getImageProps } from "next/image";
-import { Fragment, type MouseEvent } from "react";
-import { ArrowUpLeft, Clock, ScanSearch, Search, SpellCheck, TrendingUp, X } from "lucide-react";
+import type { MouseEvent } from "react";
+import { ArrowUpLeft, Clock, Search, SpellCheck, TrendingUp, X } from "lucide-react";
 import type { SuggestFilter, SuggestService } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
@@ -30,8 +30,6 @@ export type SuggestionListLabels = {
   popular: string;
   /** "Fill in {text}" (the fill arrow's tooltip). */
   fill: string;
-  /** "Check IMEI {imei}" */
-  imei: string;
   /** "Did you mean {q}?" */
   didYouMean: string;
   taxNote: string;
@@ -65,7 +63,6 @@ export type SuggestionListProps = {
 };
 
 const GROUP_LABELS = {
-  imei: null,
   suggestions: "suggestions",
   services: "services",
   filters: "filters",
@@ -177,13 +174,6 @@ function OptionBody({ option, value, labels }: { option: SearchOption; value: st
           </span>
         </>
       );
-    case "imei":
-      return (
-        <>
-          <ScanSearch aria-hidden="true" className="size-4 shrink-0 text-ink-subtle" />
-          <span className="min-w-0 flex-1 truncate font-medium">{fmt(labels.imei, { imei: option.imei })}</span>
-        </>
-      );
     case "clearRecent":
       return (
         <>
@@ -196,7 +186,7 @@ function OptionBody({ option, value, labels }: { option: SearchOption; value: st
   }
 }
 
-/** The listbox: labelled groups of options (no group heading for the single IMEI option). */
+/** The listbox: labelled groups of options. */
 export function SuggestionList({ id, groups, active, optionId, value, paths, labels, coarse, onPick, onFill }: SuggestionListProps) {
   // Where each group's options start in the flat order (the arrows walk all groups as one list).
   const starts: number[] = [];
@@ -245,8 +235,6 @@ export function SuggestionList({ id, groups, active, optionId, value, paths, lab
             </div>
           );
         });
-        // The IMEI option stands alone: a group of one needs no heading.
-        if (!name) return <Fragment key={group.key}>{options}</Fragment>;
         return (
           <div key={group.key} role="group" aria-labelledby={headingId} className="grid">
             <div id={headingId} role="presentation" className="px-2.5 pb-1 pt-2 text-caption font-semibold uppercase tracking-wide text-ink-subtle">

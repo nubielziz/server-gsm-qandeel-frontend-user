@@ -69,7 +69,7 @@ export function luhnDigit(digits: string): number {
 
 /**
  * The IMEI a search text holds, or null: after removing spaces, dashes, dots and slashes, 15 digits with a valid Luhn
- * check, or 16 digits (an IMEISV: its first 14 digits and their check digit). What "Check IMEI …" opens (§5.2).
+ * check, or 16 digits (an IMEISV: its first 14 digits and their check digit).
  */
 export function imeiFromQuery(text: string): string | null {
   const digits = normalizeImei(text.replace(/[./]/g, ""));

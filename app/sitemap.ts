@@ -29,7 +29,7 @@ async function allContentPages(): Promise<StorePageListItem[]> {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: Entry[] = [];
 
-  for (const path of ["/", "/services", "/imei-check", "/help", "/track"]) {
+  for (const path of ["/", "/services", "/help", "/track"]) {
     entries.push({
       url: url(path),
       changeFrequency: path === "/" || path === "/services" ? "daily" : "monthly",
