@@ -20,6 +20,8 @@ import { deliveryTime } from "@/lib/store/delivery";
 import { Logo, isSymbolLogo, logoFile } from "./service-art";
 
 /** The grid: two collections share the row; with three the last one spans both columns until the row fits three. */
+// Each card is a grid item with `min-w-0`: a long service name (one line, cut with an ellipsis) must not widen the column,
+// or the whole page scrolls sideways on a phone.
 const GRID = "grid gap-4 md:grid-cols-2";
 const third = (i: number, total: number) => total === 3 && i === 2 && "md:max-lg:col-span-2";
 
@@ -59,7 +61,7 @@ export function CollectionCards({ collections, decimals, t, countText }: Collect
         const href = `${services}?${collection.kind}=${encodeURIComponent(collection.value)}`;
         const count = countText(collection.count);
         return (
-          <li key={`${collection.kind}:${collection.value}`} className={cn(third(i, collections.length))}>
+          <li key={`${collection.kind}:${collection.value}`} className={cn("min-w-0", third(i, collections.length))}>
             <div className={CARD}>
               <Link href={href} aria-label={fmt(t.ctaLabel, { name })} className={cn(HEAD, "group/head rounded-t-card")}>
                 <CollectionMark collection={collection} />
