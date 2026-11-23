@@ -247,7 +247,7 @@ export type GetClientCommissionsResponse = Array<{
   basisAmount: Money;
   /** Exact decimal number as a string. */
   percent: Decimal;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** `basisAmount x percent / 100`, 4 decimals, capped so that the commissions of one order never exceed its margin (revenue minus cost; decision 049). */
   amount: Money;
   status: "accrued" | "approved" | "reversed";
   approvedAt: IsoDateTime | null;
@@ -263,7 +263,7 @@ export type GetClientDashboardResponse = {
     balance: Money;
     /** Held for open orders. */
     reserved: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     creditLimit: Money;
     /** Spendable now: balance plus credit limit. */
     available: Money;
@@ -285,9 +285,9 @@ export type GetClientDashboardResponse = {
     quantity: number;
     /** Free-form JSON object. */
     inputs: JsonObject;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     unitPrice: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     totalPrice: Money;
     /** `USD`. */
     currency: string;
@@ -382,17 +382,17 @@ export type GetClientInvoicesResponse = Array<{
   number: string;
   kind: "topup" | "manual" | "statement";
   status: "open" | "paid" | "void";
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   amount: Money;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   fee: Money;
   /** What the wallet is credited when the invoice is paid. */
   netAmount: Money;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   taxAmount: Money;
   /** Exact decimal number as a string. */
   taxRate: Decimal;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   total: Money;
   currency: string;
   description: string | null;
@@ -424,17 +424,17 @@ export type PostClientInvoicesResponse = {
     number: string;
     kind: "topup" | "manual" | "statement";
     status: "open" | "paid" | "void";
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     amount: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     fee: Money;
     /** What the wallet is credited when the invoice is paid. */
     netAmount: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     taxAmount: Money;
     /** Exact decimal number as a string. */
     taxRate: Decimal;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     total: Money;
     currency: string;
     description: string | null;
@@ -467,17 +467,17 @@ export type GetClientInvoicesByIdResponse = {
     number: string;
     kind: "topup" | "manual" | "statement";
     status: "open" | "paid" | "void";
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     amount: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     fee: Money;
     /** What the wallet is credited when the invoice is paid. */
     netAmount: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     taxAmount: Money;
     /** Exact decimal number as a string. */
     taxRate: Decimal;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     total: Money;
     currency: string;
     description: string | null;
@@ -496,9 +496,9 @@ export type GetClientInvoicesByIdResponse = {
   payments: Array<{
     /** Numeric record id. */
     id: Id;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     amount: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     feeAmount: Money;
     currency: string;
     status: "pending" | "approved" | "rejected";
@@ -532,9 +532,9 @@ export type PostClientInvoicesByIdReceiptBody = {
 export type PostClientInvoicesByIdReceiptResponse = {
   /** Numeric record id. */
   id: Id;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   amount: Money;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   feeAmount: Money;
   currency: string;
   status: "pending" | "approved" | "rejected";
@@ -754,9 +754,9 @@ export type GetClientOrdersResponse = Array<{
   quantity: number;
   /** Free-form JSON object. */
   inputs: JsonObject;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   unitPrice: Money;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   totalPrice: Money;
   /** `USD`. */
   currency: string;
@@ -813,9 +813,9 @@ export type PostClientOrdersResponse = {
     quantity: number;
     /** Free-form JSON object. */
     inputs: JsonObject;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     unitPrice: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     totalPrice: Money;
     /** `USD`. */
     currency: string;
@@ -864,9 +864,9 @@ export type GetClientOrdersByIdResponse = {
   quantity: number;
   /** Free-form JSON object. */
   inputs: JsonObject;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   unitPrice: Money;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   totalPrice: Money;
   /** `USD`. */
   currency: string;
@@ -944,7 +944,7 @@ export type GetClientPaymentMethodsResponse = Array<{
   methodType: "bank" | "card" | "usdt" | "wise";
   /** Exact decimal number as a string. */
   feePercent: Decimal;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   feeFixed: Money;
   /** `0.0000` = no minimum. */
   minAmount: Money;
@@ -1629,6 +1629,10 @@ export type PostStoreV1AuthVerifyResponse = {
   hasPassword: boolean;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
+  /** True when this browser asked for the link (it carries the cookie of `POST /store/v1/auth/magic-link`); false for a link asked for in another browser or sent by the shop: the shop then shows whose account was opened (`maskedEmail`). */
+  requestedHere: boolean;
+  /** The address of the account the link opened, masked (`da•••@example.com`). */
+  maskedEmail: string;
 };
 
 // ── GET /store/v1/categories — List the storefront categories
@@ -1652,9 +1656,9 @@ export type PostStoreV1CheckoutSessionsBody = {
   serviceId: Id;
   /** Where the receipt and the tracking link go; with no account the email is the identity of a guest customer. */
   email: string;
-  /** The buyer's country: the tax of its window is locked on the session. */
+  /** The buyer's country: the tax of its window is locked on the session. While the shop has a tax window in force, it must be a country that has one (the `taxRates` of `GET /store/v1/config`). */
   country: string;
-  /** The buyer's region, for the countries that tax by region. */
+  /** The buyer's region, for the countries that tax by region: while the `country` has a regional window in force (a `taxRates` row of `GET /store/v1/config` with a `region`), it must be one of those regions, in any case. */
   region?: string;
   /** The currency to pay in (one `GET /store/v1/config` lists). Default: USD. */
   currency?: string;
@@ -1708,18 +1712,18 @@ export type PostStoreV1CheckoutSessionsResponse = {
   amounts: {
     /** What the session stores, in USD. */
     usd: {
-      /** Decimal string with exactly 4 fraction digits. */
+      /** Decimal string with exactly 4 fraction digits, 0 or more. */
       net: Money;
-      /** Decimal string with exactly 4 fraction digits. */
+      /** Decimal string with exactly 4 fraction digits, 0 or more. */
       tax: Money;
       /** `net` plus `tax`. */
       gross: Money;
     };
     /** The same in the buyer's currency: the gross is what is charged. */
     display: {
-      /** Decimal string with exactly 4 fraction digits. */
+      /** Decimal string with exactly 4 fraction digits, 0 or more. */
       net: Money;
-      /** Decimal string with exactly 4 fraction digits. */
+      /** Decimal string with exactly 4 fraction digits, 0 or more. */
       tax: Money;
       /** `net` plus `tax`. */
       gross: Money;
@@ -1785,18 +1789,18 @@ export type GetStoreV1CheckoutSessionsByTokenResponse = {
   amounts: {
     /** What the session stores, in USD. */
     usd: {
-      /** Decimal string with exactly 4 fraction digits. */
+      /** Decimal string with exactly 4 fraction digits, 0 or more. */
       net: Money;
-      /** Decimal string with exactly 4 fraction digits. */
+      /** Decimal string with exactly 4 fraction digits, 0 or more. */
       tax: Money;
       /** `net` plus `tax`. */
       gross: Money;
     };
     /** The same in the buyer's currency: the gross is what is charged. */
     display: {
-      /** Decimal string with exactly 4 fraction digits. */
+      /** Decimal string with exactly 4 fraction digits, 0 or more. */
       net: Money;
-      /** Decimal string with exactly 4 fraction digits. */
+      /** Decimal string with exactly 4 fraction digits, 0 or more. */
       tax: Money;
       /** `net` plus `tax`. */
       gross: Money;
@@ -1901,7 +1905,7 @@ export type PostStoreV1CheckoutSessionsByTokenPayParams = {
 export type PostStoreV1CheckoutSessionsByTokenPayBody = {
   /** The `code` of a payment method of the checkout. */
   gateway: string;
-  /** Where the gateway sends the buyer back to after the hosted page (the shop). */
+  /** Where the gateway sends the buyer back to: an address of this shop (the origin of STORE_BASE_URL or PORTAL_BASE_URL, or one of SHOP_ORIGINS), else 422 on returnUrl (not_shop). */
   returnUrl: string;
 };
 /** 201 */
@@ -1923,7 +1927,7 @@ export type PostStoreV1CheckoutSessionsByTokenPayResponse = {
     name: string;
     supports3ds: boolean;
   };
-  /** The gateway's hosted page: send the buyer there. */
+  /** The gateway's hosted page, always an https address: send the buyer there. A card page closes 30 minutes after the checkout's price lock ends. */
   paymentUrl: string;
 };
 
@@ -2416,11 +2420,11 @@ export type GetStoreV1MeWalletResponse = {
     amount: Money;
   };
   limits: {
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     minTopUp: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     maxTopUp: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     maxBalance: Money;
     /** How much more top-ups may add: maxBalance minus the balance and the pending top-ups, never below zero. */
     room: Money;
@@ -2460,7 +2464,7 @@ export type GetStoreV1MeWalletStatementResponse = Array<{
   orderId: Id | null;
   /** Signed from the customer side: a top-up is positive, a payment negative. */
   amount: Money;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits; may be negative. */
   balanceAfter: Money;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
@@ -2488,7 +2492,7 @@ export type GetStoreV1MeWalletTopUpMethodsResponse = Array<{
   methodType: "bank" | "card" | "usdt" | "wise";
   /** Exact decimal number as a string. */
   feePercent: Decimal;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   feeFixed: Money;
   /** `0.0000` = no minimum. */
   minAmount: Money;
@@ -2524,7 +2528,7 @@ export type GetStoreV1MeWalletTopUpsResponse = Array<{
   status: "awaiting_payment" | "in_review" | "credited" | "rejected" | "cancelled";
   /** What the customer pays (USD). */
   amount: Money;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   fee: Money;
   /** What the balance receives: amount minus fee. */
   netAmount: Money;
@@ -2564,7 +2568,7 @@ export type PostStoreV1MeWalletTopUpsResponse = {
   status: "awaiting_payment" | "in_review" | "credited" | "rejected" | "cancelled";
   /** What the customer pays (USD). */
   amount: Money;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   fee: Money;
   /** What the balance receives: amount minus fee. */
   netAmount: Money;
@@ -2606,7 +2610,7 @@ export type GetStoreV1MeWalletTopUpsByIdResponse = {
   status: "awaiting_payment" | "in_review" | "credited" | "rejected" | "cancelled";
   /** What the customer pays (USD). */
   amount: Money;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   fee: Money;
   /** What the balance receives: amount minus fee. */
   netAmount: Money;
@@ -2648,7 +2652,7 @@ export type PostStoreV1MeWalletTopUpsByIdCancelResponse = {
   status: "awaiting_payment" | "in_review" | "credited" | "rejected" | "cancelled";
   /** What the customer pays (USD). */
   amount: Money;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   fee: Money;
   /** What the balance receives: amount minus fee. */
   netAmount: Money;
@@ -2695,7 +2699,7 @@ export type PostStoreV1MeWalletTopUpsByIdReceiptResponse = {
   status: "awaiting_payment" | "in_review" | "credited" | "rejected" | "cancelled";
   /** What the customer pays (USD). */
   amount: Money;
-  /** Decimal string with exactly 4 fraction digits. */
+  /** Decimal string with exactly 4 fraction digits, 0 or more. */
   fee: Money;
   /** What the balance receives: amount minus fee. */
   netAmount: Money;
@@ -2911,7 +2915,7 @@ export type GetStoreV1SearchResponse = {
       fxRate: Decimal;
       /** The price before tax. */
       net: Money;
-      /** Decimal string with exactly 4 fraction digits. */
+      /** Decimal string with exactly 4 fraction digits, 0 or more. */
       tax: Money;
       /** What the buyer pays: net plus tax. */
       gross: Money;
@@ -2954,9 +2958,9 @@ export type GetStoreV1SearchResponse = {
   } | null;
   /** The lowest and highest `price.gross` of the matches, page 1 only and only when at most 1000 matched. */
   priceRange: {
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     min: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     max: Money;
   } | null;
   didYouMean: string | null;
@@ -3002,9 +3006,9 @@ export type GetStoreV1SearchSuggestResponse = {
     availability: "in_stock" | "on_request";
     price: {
       currency: string;
-      /** Decimal string with exactly 4 fraction digits. */
+      /** Decimal string with exactly 4 fraction digits, 0 or more. */
       net: Money;
-      /** Decimal string with exactly 4 fraction digits. */
+      /** Decimal string with exactly 4 fraction digits, 0 or more. */
       gross: Money;
     };
   }>;
@@ -3102,7 +3106,7 @@ export type GetStoreV1ServicesResponse = Array<{
     fxRate: Decimal;
     /** The price before tax. */
     net: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     tax: Money;
     /** What the buyer pays: net plus tax. */
     gross: Money;
@@ -3167,7 +3171,7 @@ export type GetStoreV1ServicesBySlugResponse = {
     fxRate: Decimal;
     /** The price before tax. */
     net: Money;
-    /** Decimal string with exactly 4 fraction digits. */
+    /** Decimal string with exactly 4 fraction digits, 0 or more. */
     tax: Money;
     /** What the buyer pays: net plus tax. */
     gross: Money;
