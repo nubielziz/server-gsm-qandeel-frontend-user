@@ -1,5 +1,6 @@
-// StoreFooter (dark, like the mockup): brand and description, link columns, copyright. No newsletter form (the API has
-// none) and no social links (none supplied).
+// StoreFooter (dark, like the mockup): brand and description, link columns, the payment methods the shop takes (a fixed
+// list, components/layout/payment-marks.tsx), copyright. No newsletter form (the API has none) and no social links (none
+// supplied).
 import Link from "next/link";
 import { cacheLife } from "next/cache";
 import { sitePath } from "@/lib/site-path";
@@ -7,6 +8,7 @@ import { fmt } from "@/lib/i18n/define";
 import { common } from "@/lib/i18n/messages/common";
 import { Container } from "./container";
 import { Logo } from "./logo";
+import { PaymentMarks } from "./payment-marks";
 
 const linkClasses =
   "inline-flex min-h-11 items-center rounded-badge text-body text-on-inverse-muted transition-colors hover:text-on-inverse";
@@ -82,6 +84,7 @@ export async function StoreFooter() {
             </nav>
           ))}
         </div>
+        <PaymentMarks t={{ title: t.footer.payments, groups: t.footer.paymentGroups }} />
         <div className="mt-10 border-t border-inverse-raised pt-6">
           <p className="text-small text-on-inverse-muted">{fmt(t.footer.rights, { year })}</p>
         </div>

@@ -442,6 +442,16 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
 - **Checks:** typecheck, lint, 1000 unit tests, a production build; looked at in a browser at 1440 and 390 px (it stays in
   its corner while the page scrolls; no sideways scroll).
 
+## Footer: the payment methods the shop takes (2026-11-23, owner's request)
+- `components/layout/payment-marks.tsx` in the footer of every shop page: the owner's list of 23 methods in three groups (cards and
+  bank transfers, exchange pay, crypto and Web3 wallets), each a logo on a light tile with its name. **Static on purpose** (the
+  owner's word): the list is `lib/payments/accepted-methods.ts` and nothing is read from the API, so it does not follow what the
+  checkout offers.
+- 19 logo files in `public/images/payment-marks/` (sources and terms in `docs/LOGOS.md`). Bank transfers and Express Wallet show
+  an icon; opBNB shows the BNB Chain mark.
+- **Checks:** typecheck, lint, 1003 unit tests, a production build; the footer looked at in a browser at 1440 and 390 px (all
+  logos load, no sideways scroll).
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.

@@ -145,6 +145,38 @@ transfer and Crypto transfer have no file: they show the bank and the coin icon.
 | `payments/nowpayments.png` | the NOWPayments GitHub organisation picture (`https://github.com/NowPaymentsIO.png`), fetched 2026-11-17 | trademark of its owner |
 | `payments/vodafone_cash.png` | Simple Icons `vodafone` (the Vodafone speech mark, `#E60000`), fetched 2026-11-17 | CC0-1.0 icon data; trademark of its owner |
 
+## Footer payment marks (19)
+
+The marks of the payment methods the footer names (`components/layout/payment-marks.tsx`; the fixed list is
+`lib/payments/accepted-methods.ts`, the owner's, 2026-11-23) are in `public/images/payment-marks/`. Each is 128 x 128 pixels with
+a clear margin and is drawn at one fixed size on a light tile, so `npm run logos` does not list them. Bank transfers and Express
+Wallet have no file: they show the bank and the wallet icon. opBNB shows the BNB Chain mark (it is a network of BNB Chain).
+A test (`components/layout/payment-marks.test.tsx`) fails when the list names a file that is missing, or the folder holds a
+file the list does not use. Visa and Mastercard publish rules for showing their marks where their cards are taken: follow
+them. All fetched 2026-11-23.
+
+| File | Source | Terms |
+|---|---|---|
+| `payment-marks/arbitrum.png` | Web3 Icons `networks/branded/arbitrum-one` (`@web3icons/core` 4.0.61) | MIT package; trademark of its owner |
+| `payment-marks/base.png` | Web3 Icons `networks/branded/base` (`@web3icons/core` 4.0.61) | MIT package; trademark of its owner |
+| `payment-marks/binance.png` | the drawing of `payments/binance_pay.png` (Simple Icons `binance`, `#F0B90B`) | CC0-1.0 icon data; trademark of its owner |
+| `payment-marks/bitcoin.png` | Simple Icons `bitcoin` (Bitcoin, `#F7931A`), v16.37.0 | CC0-1.0 icon data; trademark of its owner |
+| `payment-marks/bnb-chain.png` | Simple Icons `bnbchain` (BNB Chain, `#F0B90B`), v16.37.0 | CC0-1.0 icon data; trademark of its owner |
+| `payment-marks/ethereum.png` | Simple Icons `ethereum` (Ethereum, `#3C3C3D`), v16.37.0 | CC0-1.0 icon data; trademark of its owner |
+| `payment-marks/gate-io.png` | Web3 Icons `exchanges/branded/gate-io` (`@web3icons/core` 4.0.61) | MIT package; trademark of its owner |
+| `payment-marks/mastercard.png` | Wikimedia Commons [Mastercard-logo.svg](https://commons.wikimedia.org/wiki/File:Mastercard-logo.svg) | Public domain; trademark of its owner |
+| `payment-marks/metamask.png` | Web3 Icons `wallets/branded/metamask` (`@web3icons/core` 4.0.61) | MIT package; trademark of its owner |
+| `payment-marks/optimism.png` | Simple Icons `optimism` (Optimism, `#FF0420`), v16.37.0 | CC0-1.0 icon data; trademark of its owner |
+| `payment-marks/polygon.png` | Simple Icons `polygon` (Polygon, `#7B3FE4`), v16.37.0 | CC0-1.0 icon data; trademark of its owner |
+| `payment-marks/solana.png` | Simple Icons `solana` (Solana, `#9945FF`), v16.37.0 | CC0-1.0 icon data; trademark of its owner |
+| `payment-marks/tron.png` | Web3 Icons `networks/branded/tron` (`@web3icons/core` 4.0.61) | MIT package; trademark of its owner |
+| `payment-marks/tronlink.png` | the TronLink GitHub organisation picture (`https://github.com/TronLink.png`) | trademark of its owner |
+| `payment-marks/trust-wallet.png` | Web3 Icons `wallets/branded/trust` (`@web3icons/core` 4.0.61) | MIT package; trademark of its owner |
+| `payment-marks/usdc.png` | Web3 Icons `tokens/branded/USDC` (`@web3icons/core` 4.0.61) | MIT package; trademark of its owner |
+| `payment-marks/usdt.png` | Simple Icons `tether` (Tether, `#50AF95`), v16.37.0 | CC0-1.0 icon data; trademark of its owner |
+| `payment-marks/visa.png` | Simple Icons `visa` (Visa, `#1A1F71`), v16.37.0 | CC0-1.0 icon data; trademark of its owner |
+| `payment-marks/walletconnect.png` | Simple Icons `walletconnect` (WalletConnect, `#3B99FC`), v16.37.0 | CC0-1.0 icon data; trademark of its owner |
+
 ## The IMEI-HUB logo
 
 The site's own logo is the owner's (`IH Orbit IMEI-HUB Logo.png`, supplied 2026-11-17), cut into files by a script that only

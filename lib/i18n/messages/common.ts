@@ -63,6 +63,12 @@ export const common = {
     portal: "Merchant portal",
     becomeMerchant: "Become a merchant",
     rights: "© {year} IMEI-HUB. All rights reserved.",
+    payments: "Payment methods",
+    paymentGroups: {
+      cards: "Cards and bank transfers",
+      exchanges: "Exchange pay",
+      crypto: "Crypto and Web3 wallets",
+    },
   },
   checkoutHeader: {
     backToStore: "Back to store",
