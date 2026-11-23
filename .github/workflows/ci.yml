@@ -42,13 +42,12 @@ jobs:
       # No build here: it reads the public catalog from a running API (docs/DEPLOY.md). The server builds the image when it deploys
       # and keeps the previous one when that build fails. The browser tests need the isolated backend and run on a developer's machine.
 
-  # Shown, and not a reason to stop a deploy: lib/api/schema.gen.ts is generated from the backend's contract (npm run gen:api) and
-  # this job says when it is behind. Make it a required check once the file is generated again.
+  # lib/api/schema.gen.ts is generated from the backend's contract (npm run gen:api). This job fails when the file is behind, so a
+  # change of the contract enters the website on purpose: generate the file again, and the type check shows what the change touches.
   api-types:
     name: API types match the backend's contract
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - name: Check out the website
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
