@@ -28,6 +28,10 @@ export const store = {
       myAccount: "My account",
       merchantPortal: "Merchant portal",
     },
+    whatsapp: {
+      label: "Chat with us on WhatsApp",
+      opensNewTab: "opens WhatsApp in a new tab",
+    },
     promo: {
       eyebrow: "Already ordered?",
       title: "Track your order",

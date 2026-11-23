@@ -2,6 +2,7 @@
 // points a visitor to a WhatsApp number where a team member completes the steps, and staff then create the account in the
 // admin console. The number is a BUILD-TIME value, `NEXT_PUBLIC_MERCHANT_WHATSAPP` (see .env.example); unset, empty or
 // malformed means "not configured" and the page falls back to the support page, never to a broken `wa.me` link.
+// The home page's floating WhatsApp button (owner, 2026-11-23) opens a chat with the same number: the site has one.
 // Pure functions, safe to import anywhere (Server and Client Components, tests).
 
 /** An international number has at most 15 digits (E.164) and, with a country code, at least 8 in practice. */
@@ -52,6 +53,11 @@ export function merchantWhatsApp(): { digits: string; display: string } | null {
 /** The `wa.me` link that opens a chat with `digits` and the message already typed (the visitor still presses send). */
 export function whatsAppLink(digits: string, text: string): string {
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+}
+
+/** The `wa.me` link that opens a chat with `digits` and nothing typed (the home page's floating button). */
+export function whatsAppChatLink(digits: string): string {
+  return `https://wa.me/${digits}`;
 }
 
 /**

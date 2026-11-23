@@ -6,7 +6,7 @@
 // cached reads), the visitor's currency cookie or the URL's query streams in behind <Suspense> with skeletons of the
 // same size; the merchant banner is a small Client Component (no server read).
 // The balance box (components/store/home-balance.tsx) reads the visitor's sessions and wallet: personal, never cached, also
-// behind <Suspense>.
+// behind <Suspense>. The round WhatsApp button floats over the page's bottom end corner (components/store/whatsapp-float.tsx).
 // Motion: the hero row never animates (LCP). The blocks below it fade and rise in as they scroll into view (CSS
 // scroll-driven `.reveal` / `.reveal-grid`, globals.css); a client navigation to the page plays the shop's page enter.
 import { Suspense, type ReactNode } from "react";
@@ -38,6 +38,7 @@ import { HomeBalance, HomeBalanceSkeleton } from "@/components/store/home-balanc
 import { CollectionCards, CollectionCardsSkeleton } from "@/components/store/home-collections";
 import { HomeProducts, HomeProductsSkeleton } from "@/components/store/home-products";
 import { ServiceCard, ServiceCardMini, ServiceGridSkeleton } from "@/components/store/service-card";
+import { WhatsAppFloat } from "@/components/store/whatsapp-float";
 import { getStoreConfig, listStoreServices } from "@/lib/api/public";
 import { catalogCollections, catalogCounts, lowestPrice, type CatalogCount } from "@/lib/catalog";
 import { sortQuery, type ListSort } from "@/lib/catalog-facets";
@@ -119,6 +120,7 @@ export default function HomePage(props: PageProps<"/en">) {
           <DestinationBanners t={t.home.explore} />
         </Section>
       </Container>
+      <WhatsAppFloat />
     </PageTransition>
   );
 }

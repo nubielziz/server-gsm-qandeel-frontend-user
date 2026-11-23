@@ -14,7 +14,8 @@ ARG NEXT_PUBLIC_SITE_URL
 ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
 ARG NEXT_PUBLIC_TIME_ZONE=UTC
 ARG NEXT_PUBLIC_API_PUBLIC_URL=
-# The team's WhatsApp number for merchant applications (owner, 2026-11-16); a build arg overrides it.
+# The team's WhatsApp number: merchant applications (owner, 2026-11-16) and the home page's floating WhatsApp button
+# (2026-11-23); a build arg overrides it.
 ARG NEXT_PUBLIC_MERCHANT_WHATSAPP="+20 12 10230575"
 # NEXT_COMPRESS=0 turns Next's own gzip off (next.config.ts `compress`, fixed into the standalone server at build time):
 # Caddy compresses in production (backend/deploy/Caddyfile, `encode zstd gzip`). Never expose this image without Caddy.

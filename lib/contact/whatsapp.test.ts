@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { displayWhatsAppNumber, merchantWhatsApp, normaliseWhatsAppNumber, referralCodeFrom, whatsAppLink } from "./whatsapp";
+import { displayWhatsAppNumber, merchantWhatsApp, normaliseWhatsAppNumber, referralCodeFrom, whatsAppChatLink, whatsAppLink } from "./whatsapp";
 
 describe("normaliseWhatsAppNumber", () => {
   it("keeps only the digits of a number written with a plus, spaces, dashes or brackets", () => {
@@ -119,5 +119,11 @@ describe("displayWhatsAppNumber", () => {
     expect(displayWhatsAppNumber("12025550100", "12025550100")).toBe("+12025550100");
     expect(displayWhatsAppNumber("+0 20 12 10230575", "201210230575")).toBe("+201210230575");
     expect(displayWhatsAppNumber(undefined, "12025550100")).toBe("+12025550100");
+  });
+});
+
+describe("the chat link without a message", () => {
+  it("is the wa.me address of the number and nothing else", () => {
+    expect(whatsAppChatLink("201210230575")).toBe("https://wa.me/201210230575");
   });
 });

@@ -433,6 +433,15 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
 - **Checks:** typecheck, lint, 997 unit tests, a production build; the home page looked at in a browser at 1440 and 390 px (no
   sideways scroll at 390 and 360 px). The e2e specs were changed to match but not run.
 
+## Home: a floating WhatsApp button (2026-11-23, owner's request)
+- `components/store/whatsapp-float.tsx`: a round button with the WhatsApp logo (`public/images/brands/whatsapp.png`), fixed to the
+  bottom end corner of the home page only. A click opens `https://wa.me/<number>` in a new tab: a chat with the team's number
+  (WhatsApp Web or the desktop app on a computer, the app on a phone), nothing typed in advance.
+- The number is the site's one WhatsApp number, `NEXT_PUBLIC_MERCHANT_WHATSAPP` (build-time; the Dockerfile's default applies
+  unless the build gives another). Not configured: no button.
+- **Checks:** typecheck, lint, 1000 unit tests, a production build; looked at in a browser at 1440 and 390 px (it stays in
+  its corner while the page scrolls; no sideways scroll).
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.
