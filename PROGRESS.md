@@ -553,6 +553,12 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
   "Made by support" badge. The backend retires the three write routes in the same release (push the backend first: the shop's
   `api-types` check reads the backend's `main`).
 
+## Page kinds after the Shop content trim (2026-11-25, backend decision 068)
+- The backend retired landing pages: a content page is a static page or a blog post. Only `lib/api/schema.gen.ts` changes here (the
+  `kind` of `GET /store/v1/pages` and of a page is `static` or `blog`, plus `legal`); no page of the shop keyed on a landing kind. The
+  shop's search answers as before (the shipped synonyms stay); pins and hidden popular terms are gone on the backend. Push the backend
+  first: the `api-types` check reads its `main`.
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.

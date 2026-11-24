@@ -58,7 +58,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // The API is unreachable: serve the static pages only rather than failing the sitemap.
   }
 
-  // Content pages (landing pages, tools, blog, static pages). Their own guard keeps a failing page list from dropping the
+  // Content pages (static pages and blog posts; landing pages were retired, backend decision 068). Their own guard keeps a failing page list from dropping the
   // entries above.
   try {
     for (const page of await allContentPages()) {

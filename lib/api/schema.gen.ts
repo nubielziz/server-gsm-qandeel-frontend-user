@@ -2479,11 +2479,11 @@ export type GetStoreV1PagesQuery = {
   /** Case-insensitive text search over: title. */
   q?: string;
   /** Keep rows where kind equals (repeat the key for IN) the value. */
-  kind?: Array<"country" | "model" | "brand" | "carrier" | "tool" | "static" | "blog">;
+  kind?: Array<"static" | "blog">;
 };
 /** 200 */
 export type GetStoreV1PagesResponse = Array<{
-  kind: "country" | "model" | "brand" | "carrier" | "tool" | "static" | "blog";
+  kind: "static" | "blog";
   slug: string;
   title: string;
   /** `''` when none. */
@@ -2501,7 +2501,7 @@ export type GetStoreV1PagesBySlugParams = {
 };
 /** 200 */
 export type GetStoreV1PagesBySlugResponse = {
-  kind: "country" | "model" | "brand" | "carrier" | "tool" | "static" | "blog" | "legal";
+  kind: "static" | "blog" | "legal";
   slug: string;
   title: string;
   /** Markdown as stored; HTML inside is rendered only by the storefront. */
