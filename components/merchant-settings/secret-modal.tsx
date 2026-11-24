@@ -1,6 +1,6 @@
 "use client";
-// Shows a secret exactly once (API key `gsm_…`, webhook signing secret `whsec_…`) with a clear warning and a copy
-// button. The secret lives only in the parent's state: nothing stores it, and the API cannot show it again.
+// Shows a secret exactly once (an API key, `gsm_…`) with a clear warning and a copy button. The secret lives only in
+// the parent's state: nothing stores it, and the API cannot show it again.
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";

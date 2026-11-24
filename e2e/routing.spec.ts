@@ -18,7 +18,7 @@ test.describe("old Arabic addresses", () => {
       ["/ar/support/tickets/t_abc", "/en/support/tickets/t_abc"],
       ["/ar/checkout/resume?token=tok", "/en/checkout/resume?token=tok"],
       ["/ar/unsubscribe?token=tok", "/en/unsubscribe?token=tok"],
-      ["/ar/merchant/register?ref=ABC", "/en/merchant/register?ref=ABC"],
+      ["/ar/merchant/register?from=x", "/en/merchant/register?from=x"],
     ];
     for (const [from, to] of cases) {
       const res = await request.get(from, { maxRedirects: 0 });
@@ -38,6 +38,48 @@ test.describe("old Arabic addresses", () => {
     const other = await request.get("/arabic", { maxRedirects: 0 });
     expect(other.status()).toBe(307);
     expect(target(other.headers()["location"])).toBe("/en/arabic");
+  });
+});
+
+test.describe("retired pages", () => {
+  test("the old merchant verification address answers 308 to the settings page, with or without /en, before any sign-in check", async ({ request }) => {
+    const cases: [string, string][] = [
+      ["/en/merchant/settings/verification", "/en/merchant/settings"],
+      ["/merchant/settings/verification", "/en/merchant/settings"],
+    ];
+    for (const [from, to] of cases) {
+      const res = await request.get(from, { maxRedirects: 0 });
+      expect(res.status(), from).toBe(308);
+      expect(target(res.headers()["location"]), from).toBe(to);
+    }
+  });
+
+  test("the old merchant referrals address answers 308 to the merchant overview, with or without /en, query included", async ({ request }) => {
+    const cases: [string, string][] = [
+      ["/en/merchant/referrals", "/en/merchant"],
+      ["/merchant/referrals", "/en/merchant"],
+      // A bookmark of a filtered view still lands on the overview: the old query rides along and the overview ignores it.
+      ["/en/merchant/referrals?status=approved&period=2026-11", "/en/merchant?status=approved&period=2026-11"],
+    ];
+    for (const [from, to] of cases) {
+      const res = await request.get(from, { maxRedirects: 0 });
+      expect(res.status(), from).toBe(308);
+      expect(target(res.headers()["location"]), from).toBe(to);
+    }
+  });
+
+  test("the old merchant Webhooks addresses answer 308 to the API keys page, with or without /en, before any sign-in check", async ({ request }) => {
+    const cases: [string, string][] = [
+      ["/en/merchant/webhooks", "/en/merchant/api-keys"],
+      ["/en/merchant/webhooks/12", "/en/merchant/api-keys"],
+      ["/merchant/webhooks", "/en/merchant/api-keys"],
+      ["/merchant/webhooks/12", "/en/merchant/api-keys"],
+    ];
+    for (const [from, to] of cases) {
+      const res = await request.get(from, { maxRedirects: 0 });
+      expect(res.status(), from).toBe(308);
+      expect(target(res.headers()["location"]), from).toBe(to);
+    }
   });
 });
 
@@ -88,7 +130,7 @@ test.describe("language-less links", () => {
   test("an emailed link goes to /en and keeps the query, whatever cookie or Accept-Language is sent", async ({ request }) => {
     const cases: [string, string][] = [
       ["/sign-in?token=t", "/en/sign-in?token=t"],
-      ["/merchant/register?ref=r", "/en/merchant/register?ref=r"],
+      ["/merchant/register?from=x", "/en/merchant/register?from=x"],
       ["/merchant/set-password?token=xyz", "/en/merchant/set-password?token=xyz"],
       ["/support/tickets/t_abc", "/en/support/tickets/t_abc"],
       ["/", "/en"],
@@ -155,7 +197,7 @@ test.describe("private areas", () => {
   });
 
   test("merchant email-link pages stay public", async ({ request }) => {
-    for (const path of ["/en/merchant/register?ref=ABC", "/en/merchant/set-password?token=t", "/en/merchant/verify-email?token=t"]) {
+    for (const path of ["/en/merchant/register?from=x", "/en/merchant/set-password?token=t", "/en/merchant/verify-email?token=t"]) {
       const res = await request.get(path, { maxRedirects: 0 });
       expect(res.status(), path).not.toBe(307);
     }

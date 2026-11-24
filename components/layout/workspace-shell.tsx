@@ -211,7 +211,7 @@ export function WorkspaceShell({
         )}
       >
         <div className="flex w-full items-start gap-4">
-          {/* Rail (lg+). At least the screen's height; on a short screen it grows with its links (the merchant has eleven)
+          {/* Rail (lg+). At least the screen's height; on a short screen it grows with its links (the merchant has nine)
               instead of letting them spill below the dark panel. Above the main column (`z-20`): its tooltips reach over
               the page. Named for page transitions: held still while the page changes. */}
           <div className="surface-inverse vt-workspace-rail sticky top-4 z-20 hidden min-h-[calc(100dvh-2rem)] w-20 shrink-0 flex-col items-center rounded-panel py-4 lg:flex">

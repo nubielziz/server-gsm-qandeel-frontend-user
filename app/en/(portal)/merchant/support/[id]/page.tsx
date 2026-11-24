@@ -1,4 +1,4 @@
-// One support ticket of the merchant, live (feature 28): the thread of messages with typing, seen marks and files, on the
+// One support ticket of the merchant, live (feature 28): the thread of messages with seen marks and files, on the
 // merchant stream. The ticket is addressed by its id and the session is the credential: a foreign or unknown id is a 404
 // (shown in the page, with the way back to the list). The read is the first state of `TicketView`; nothing here calls
 // `router.refresh()`.

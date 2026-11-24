@@ -142,7 +142,8 @@ export function ordersExportQuery(f: OrdersFilters): QueryInput {
 
 export const INVOICE_STATUSES = ["open", "paid", "void"] as const;
 export type InvoiceStatusFilter = (typeof INVOICE_STATUSES)[number];
-export const INVOICE_KINDS = ["topup", "manual", "statement"] as const;
+// The kind "statement" is not offered any more (nothing makes such an invoice); an old row keeps its label (`t.invoices.kinds`).
+export const INVOICE_KINDS = ["topup", "manual"] as const;
 export type InvoiceKindFilter = (typeof INVOICE_KINDS)[number];
 export const INVOICE_SORTS = ["newest", "oldest", "total_desc", "total_asc"] as const;
 export type InvoiceSort = (typeof INVOICE_SORTS)[number];

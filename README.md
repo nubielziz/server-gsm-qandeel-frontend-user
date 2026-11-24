@@ -1,7 +1,7 @@
 # IMEI-HUB — public website
 
 One site for **customers** (shop, IMEI check, checkout, order tracking, support) and **merchants** (portal: prices,
-orders from the wallet, top-ups and invoices, API keys, webhooks, security), in English only (decision 039).
+orders from the wallet, top-ups and invoices, API keys, security), in English only (decision 039).
 Next.js 16.4 (App Router, Cache Components), React 19, Tailwind CSS 4. The API is the GSM backend in `../backend`.
 
 - Plan and backend facts: `../STOREFRONT-HANDOFF.md`

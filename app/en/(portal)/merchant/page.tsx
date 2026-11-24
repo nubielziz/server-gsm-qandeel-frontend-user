@@ -1,10 +1,10 @@
 // Merchant dashboard (handoff §4.3, mockup "Workspace"). Everything is personal, so it streams behind <Suspense>.
 // A merchant waiting for approval sees a "while you wait" area instead (the layout already shows the banner).
 import { Suspense } from "react";
-import { FileCheck2, Plus, ShieldCheck, UserRound } from "lucide-react";
+import { Plus, ShieldCheck, UserRound } from "lucide-react";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/layout/container";
-import { BalanceCard, HelpCard, OrderStats, QuickOrder, RecentOrders, RecentlyOrdered, StatusSummary } from "@/components/merchant/dashboard-widgets";
+import { BalanceCard, HelpCard, OrderStats, RecentOrders } from "@/components/merchant/dashboard-widgets";
 import { PageError } from "@/components/merchant/page-error";
 import { DashboardSkeleton } from "@/components/merchant/skeletons";
 import { ButtonLink } from "@/components/ui/button";
@@ -68,7 +68,6 @@ async function Dashboard() {
     const cards = [
       { key: "profile", href: "/merchant/settings", icon: <UserRound aria-hidden="true" />, label: p.pending.profile, ...t.dashboard.pendingCards.profile },
       { key: "security", href: "/merchant/settings/security", icon: <ShieldCheck aria-hidden="true" />, label: p.pending.security, ...t.dashboard.pendingCards.security },
-      { key: "verification", href: "/merchant/settings/verification", icon: <FileCheck2 aria-hidden="true" />, label: p.pending.verification, ...t.dashboard.pendingCards.verification },
     ];
     return (
       <div className="grid gap-6">
@@ -80,7 +79,7 @@ async function Dashboard() {
             </h2>
             <p className="mt-1 text-body text-ink-muted">{t.dashboard.pendingText}</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             {cards.map((card) => (
               <Card key={card.key}>
                 <CardBody className="flex h-full flex-col gap-4">
@@ -121,21 +120,8 @@ async function Dashboard() {
           <OrderStats {...props} />
         </div>
       </div>
-      <div className="grid gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-7">
-          <StatusSummary {...props} />
-        </div>
-        <div className="xl:col-span-5">
-          <QuickOrder t={t} />
-        </div>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-8">
-          <RecentOrders {...props} />
-        </div>
-        <div className="min-w-0 xl:col-span-4">
-          <RecentlyOrdered {...props} />
-        </div>
+      <div className="min-w-0">
+        <RecentOrders {...props} />
       </div>
       <HelpCard t={t} />
     </div>

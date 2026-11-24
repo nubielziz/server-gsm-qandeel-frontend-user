@@ -1,56 +1,69 @@
 import { describe, expect, it } from "vitest";
-import { changedEventRows, type EventMap } from "./notifications-form";
+import { changedEventRows, toEventMap, type EventMap } from "./notifications-form";
 
-// What the isolated demo API shows an unlinked merchant (curl GET /client/notification-preferences).
-const base: EventMap = {
+// What the isolated demo API shows today: each event also carries the older API's `telegram` flag.
+const older: EventMap = {
   "wallet.low_balance": { email: true, telegram: false },
   "order.completed": { email: false, telegram: false },
   "broadcast.announcement": { email: true, telegram: true },
 };
-const order = Object.keys(base);
+// What an API without that flag shows.
+const newer: EventMap = {
+  "wallet.low_balance": { email: true },
+  "order.completed": { email: false },
+  "broadcast.announcement": { email: true },
+};
+const order = Object.keys(older);
+
+describe("toEventMap: the events as the API showed them", () => {
+  it("keeps the older API's flag, and adds none when the API sent none", () => {
+    const events = [
+      { event: "wallet.low_balance", label: "Low wallet balance", email: true, telegram: true },
+      { event: "order.completed", label: "Order completed", email: false },
+    ];
+    expect(toEventMap(events)).toEqual({
+      "wallet.low_balance": { email: true, telegram: true },
+      "order.completed": { email: false },
+    });
+  });
+});
 
 describe("changedEventRows: the rows of PUT /client/notification-preferences", () => {
   it("sends nothing when no switch changed", () => {
-    expect(changedEventRows(order, base, base, false)).toEqual([]);
-    expect(changedEventRows(order, base, base, true)).toEqual([]);
+    expect(changedEventRows(order, older, older)).toEqual([]);
+    expect(changedEventRows(order, newer, newer)).toEqual([]);
   });
 
-  it("an Email switch alone goes back with the Telegram value the GET showed (Announcements keep Telegram on)", () => {
-    const working = { ...base, "broadcast.announcement": { email: false, telegram: true } };
-    expect(changedEventRows(order, working, base, false)).toEqual([{ event: "broadcast.announcement", email: false, telegram: true }]);
+  it("an email change sends the row with the new value", () => {
+    const working = { ...newer, "order.completed": { email: true } };
+    expect(changedEventRows(order, working, newer)).toEqual([{ event: "order.completed", email: true }]);
   });
 
-  it("while Telegram is not linked a Telegram change never goes out: the row carries the shown value", () => {
-    const working = { ...base, "wallet.low_balance": { email: true, telegram: true } };
-    expect(changedEventRows(order, working, base, false)).toEqual([]);
-    const both = { ...base, "wallet.low_balance": { email: false, telegram: true } };
-    expect(changedEventRows(order, both, base, false)).toEqual([{ event: "wallet.low_balance", email: false, telegram: false }]);
+  it("a row for an older API goes back with the flag value the GET showed, whatever it was", () => {
+    const working = { ...older, "broadcast.announcement": { email: false, telegram: true } };
+    expect(changedEventRows(order, working, older)).toEqual([{ event: "broadcast.announcement", email: false, telegram: true }]);
+    const other = { ...older, "wallet.low_balance": { email: false, telegram: false } };
+    expect(changedEventRows(order, other, older)).toEqual([{ event: "wallet.low_balance", email: false, telegram: false }]);
   });
 
-  it("an unlinked Announcements row is not switched off by anything but the merchant", () => {
-    // The old unlink handler flipped every Telegram switch off; the shown `true` must stay `true`.
-    expect(changedEventRows(order, base, base, false)).toEqual([]);
-    expect(changedEventRows(order, base, base, false).some((row) => row.telegram === false && row.event === "broadcast.announcement")).toBe(false);
-  });
-
-  it("once Telegram is linked a Telegram change is sent", () => {
-    const working = { ...base, "wallet.low_balance": { email: true, telegram: true } };
-    expect(changedEventRows(order, working, base, true)).toEqual([{ event: "wallet.low_balance", email: true, telegram: true }]);
+  it("a row for an API that showed no flag carries none", () => {
+    const working = { ...newer, "wallet.low_balance": { email: false } };
+    const [row] = changedEventRows(order, working, newer);
+    expect(row).toEqual({ event: "wallet.low_balance", email: false });
+    expect("telegram" in row).toBe(false);
   });
 
   it("keeps the list order and sends every changed row", () => {
     const working: EventMap = {
-      "wallet.low_balance": { email: false, telegram: false },
-      "order.completed": { email: true, telegram: false },
-      "broadcast.announcement": { email: true, telegram: true },
+      "wallet.low_balance": { email: false },
+      "order.completed": { email: true },
+      "broadcast.announcement": { email: true },
     };
-    expect(changedEventRows(order, working, base, false).map((row) => row.event)).toEqual(["wallet.low_balance", "order.completed"]);
+    expect(changedEventRows(order, working, newer).map((row) => row.event)).toEqual(["wallet.low_balance", "order.completed"]);
   });
 
-  it("an event the page did not know when it loaded is compared with both switches off", () => {
-    expect(changedEventRows(["new.event"], { "new.event": { email: true, telegram: false } }, {}, false)).toEqual([
-      { event: "new.event", email: true, telegram: false },
-    ]);
-    expect(changedEventRows(["new.event"], {}, {}, false)).toEqual([]);
+  it("an event the page did not know when it loaded is compared with its switch off", () => {
+    expect(changedEventRows(["new.event"], { "new.event": { email: true } }, {})).toEqual([{ event: "new.event", email: true }]);
+    expect(changedEventRows(["new.event"], {}, {})).toEqual([]);
   });
 });

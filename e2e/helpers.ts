@@ -2,7 +2,7 @@
 // session cookies land in the browser context exactly as after a real sign-in.
 import { readFileSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { FIXTURES_FILE, type E2eFixtures } from "./admin";
+import { FIXTURES_FILE, changeMerchantEmail, inviteMerchant, type E2eFixtures } from "./admin";
 
 /** Demo accounts on the isolated backend (scripts/dev-backend.sh; see PROGRESS.md). */
 export const ACCOUNTS = {
@@ -151,29 +151,32 @@ export async function freshCustomer(page: Page, withPassword?: string): Promise<
   return email;
 }
 
-/** The password `freshMerchant` gives a new merchant (the same one e2e/auth.spec.ts signs up with). */
+/** The password `freshMerchant` gives a new merchant (the one e2e/auth.spec.ts sets from the invitation). */
 export const FRESH_MERCHANT_PASSWORD = "Orchard-Lantern-8841";
 
 /**
- * A brand-new merchant: `POST /client/auth/register` with the site's Origin and the dev Turnstile token. The account is
- * pending (staff approve it with `approveMerchant`) and not signed in. With `verify` the email link is followed too.
- * Returns the credentials.
+ * A brand-new merchant, made the way the product makes one: staff create the account through the admin API (`inviteMerchant`)
+ * and the merchant sets a password from the invitation mailed to it (`POST /client/auth/password/reset` with the link's token,
+ * the call the set-password page makes). The account is active, its email is verified (an invitation proves the mailbox) and
+ * nobody is signed in.
+ *
+ * With `unverified`, staff then change the address (`changeMerchantEmail`): the verification is cleared and a verification
+ * link is mailed to the NEW address, which is the one returned. It is the only way left to get an unverified merchant.
+ *
+ * @returns the credentials
  */
-export async function freshMerchant(page: Page, options: { verify?: boolean } = {}): Promise<{ email: string; password: string }> {
-  const email = uniqueEmail("merchant");
-  const registered = await page.request.post("/client/auth/register", {
-    headers: { Origin: origin(page), "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "Content-Type": "application/json" },
-    data: { name: "E2E Merchant", email, password: FRESH_MERCHANT_PASSWORD, country: "JO" },
+export async function freshMerchant(page: Page, options: { unverified?: boolean } = {}): Promise<{ email: string; password: string }> {
+  const invited = uniqueEmail("merchant");
+  const id = await inviteMerchant(invited);
+  const invitation = await waitForLink(page, invited, /\/merchant\/set-password\?token=/);
+  const set = await page.request.post("/client/auth/password/reset", {
+    headers: { Origin: origin(page), "Content-Type": "application/json" },
+    data: { token: tokenOf(invitation), password: FRESH_MERCHANT_PASSWORD },
   });
-  expect(registered.status(), await registered.text()).toBe(204);
-  if (options.verify) {
-    const link = await waitForLink(page, email, /\/merchant\/verify-email\?token=/);
-    const verified = await page.request.post("/client/auth/verify-email", {
-      headers: { Origin: origin(page), "Content-Type": "application/json" },
-      data: { token: tokenOf(link) },
-    });
-    expect(verified.status(), await verified.text()).toBe(204);
-  }
+  expect(set.status(), await set.text()).toBe(204);
+  if (!options.unverified) return { email: invited, password: FRESH_MERCHANT_PASSWORD };
+  const email = uniqueEmail("merchant");
+  await changeMerchantEmail(id, email);
   return { email, password: FRESH_MERCHANT_PASSWORD };
 }
 

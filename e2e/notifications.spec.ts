@@ -221,7 +221,7 @@ test.describe("customer", () => {
 });
 
 test.describe("merchant", () => {
-  test("a pending merchant has the bell, the nav item and the page; read and open work on the merchant surface", async ({ page, isMobile }) => {
+  test("a merchant has the bell, the nav item and the page; read and open work on the merchant surface", async ({ page, isMobile }) => {
     const account = await freshMerchant(page);
     await signInMerchant(page, account);
     const id = await merchantIdByEmail(account.email);
@@ -234,7 +234,7 @@ test.describe("merchant", () => {
 
     await page.goto("/en/merchant/notifications");
     await expect(page.getByRole("heading", { level: 1, name: "Notifications" })).toBeVisible();
-    await expect(page.getByText("Your merchant account is waiting for approval").first()).toBeVisible();
+    await expect(page.getByText("Your merchant account is waiting for approval")).toHaveCount(0); // staff-made accounts are active
     await expect(bell(page)).toHaveAccessibleName("Notifications, 2 unread");
     // The rail's item, with its live badge in its name (owner, 2026-11-15); the bell has the same name, so scope to the rail.
     if (!isMobile) {
@@ -308,8 +308,8 @@ test.describe("narrow screens", () => {
   });
 
   test("a pending merchant's header has no horizontal overflow at 360 px", async ({ page }) => {
-    const account = await freshMerchant(page);
-    await signInMerchant(page, account);
+    // Staff-made accounts are active, so the waiting state is the demo's own pending account (only read here).
+    await signInMerchant(page, ACCOUNTS.pendingMerchant);
     await page.goto("/en/merchant");
     await expect(bell(page)).toBeVisible();
     // The badge repeats what the banner under the header says: on a phone it is only a small clock icon, which makes room for the bell.

@@ -33,7 +33,10 @@ Mailpit http://localhost:8025); the owner's API on :3000 and its data are never 
   answers a URL that matches no route).
   `proxy.ts` redirects paths that do not start with `/en` to the same path under `/en` (email links like
   `/sign-in?token=`, `/merchant/set-password?token=`), reading no cookie or `Accept-Language`; `next.config.ts` answers
-  every old `/ar…` address with a 308 to the same path under `/en`.
+  every old `/ar…` address with a 308 to the same path under `/en`, and the retired merchant verification page
+  (`/en/merchant/settings/verification`, also without `/en`) with a 308 to `/en/merchant/settings`. It also answers the retired
+  merchant Referrals and Webhooks pages the same way (`/en/merchant/referrals` to `/en/merchant`, `/en/merchant/webhooks/…` to
+  `/en/merchant/api-keys`, each also without `/en`): see `docs/decisions/001-merchant-extras-retired.md`.
   Route groups: `(store)` public shop (+ support tickets), `(auth)` sign-in/up and email-link pages (including
   `(auth)/merchant/{register,set-password,verify-email}`), `(checkout)` checkout, `account/` customer area,
   `(portal)/merchant/` merchant portal. `/client/*` and `/store/v1/*` are rewritten to the API.

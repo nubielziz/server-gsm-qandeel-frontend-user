@@ -1,6 +1,6 @@
 "use client";
-// API keys: the list (live first, revoked dimmed) and every action on it: create (secret shown once), edit name and
-// allowed IPs, revoke. All dates arrive already formatted from the server (UTC), so nothing here depends on the
+// API keys (Dhru credentials): the list (live first, revoked dimmed) and every action on it: create (secret shown once),
+// edit name and allowed IPs, revoke. All dates arrive already formatted from the server (UTC), so nothing here depends on the
 // browser's time zone. Mutations call the API from the browser, then refresh the route. A key staff made for the
 // merchant (`createdByStaff`) carries a "Made by support" badge.
 import { useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
@@ -12,13 +12,11 @@ import { pathOf } from "@/lib/api/query";
 import type { ApiKey, ApiKeyCreated } from "@/lib/api/types";
 import { fmt } from "@/lib/i18n/define";
 import type { MerchantSettingsMessages } from "@/lib/i18n/messages/merchant-settings";
-import { cn } from "@/lib/cn";
 import { PageHeader } from "@/components/layout/container";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Textarea } from "@/components/ui/input";
@@ -26,23 +24,17 @@ import { toast } from "@/components/ui/toast";
 import { ProblemAlert, useFocusFirstInvalid, useFormProblem } from "./form-problem";
 import { SecretModal } from "./secret-modal";
 
-export const API_KEY_SCOPES = [
-  "dhru",
-  "account:read",
-  "orders:read",
-  "orders:write",
-  "services:read",
-  "account:*",
-  "orders:*",
-  "services:*",
-] as const;
+/**
+ * The one scope a key is made with. A key is a Dhru credential; the API still asks for a non-empty scope list when a
+ * key is created, and `dhru` is the scope that opens the Dhru address. The scopes of an existing key are never shown.
+ */
+const KEY_SCOPE = "dhru";
 
 /** One key as the page shows it: raw values for actions, display strings for dates (formatted on the server). */
 export type KeyRow = {
   id: number;
   name: string;
   prefix: string;
-  scopes: string[];
   allowedIps: string[];
   rateLimitPerMin: number;
   /** "Nov 9, 2026" or null when never used. */
@@ -78,8 +70,21 @@ export function parseIps(text: string): string[] {
   return [...new Set(text.split(/[\s,;]+/).filter(Boolean))];
 }
 
-const scopeCopy = (t: Props["t"], scope: string) =>
-  (t.scopeList as Record<string, { title: string; text: string } | undefined>)[scope] ?? { title: scope, text: "" };
+/** The body of `POST /client/api-keys`: the name, the Dhru scope, and the address list and expiry only when given. */
+export function newKeyBody(values: { name: string; ips: string[]; date: string }): {
+  name: string;
+  scopes: string[];
+  allowedIps?: string[];
+  expiresAt?: string;
+} {
+  const body: { name: string; scopes: string[]; allowedIps?: string[]; expiresAt?: string } = {
+    name: values.name,
+    scopes: [KEY_SCOPE],
+  };
+  if (values.ips.length > 0) body.allowedIps = values.ips;
+  if (values.date) body.expiresAt = `${values.date}T23:59:59.999Z`;
+  return body;
+}
 
 export function ApiKeysManager({ rows, liveCount, max, t, fieldTexts, optional }: Props) {
   const router = useRouter();
@@ -123,14 +128,8 @@ export function ApiKeysManager({ rows, liveCount, max, t, fieldTexts, optional }
     }
   }
 
-  async function create(values: { name: string; scopes: string[]; ips: string[]; date: string }) {
-    const body: { name: string; scopes: string[]; allowedIps?: string[]; expiresAt?: string } = {
-      name: values.name,
-      scopes: values.scopes,
-    };
-    if (values.ips.length > 0) body.allowedIps = values.ips;
-    if (values.date) body.expiresAt = `${values.date}T23:59:59.999Z`;
-    const created = await mutate(() => api.post<ApiKeyCreated>("/client/api-keys", body), ["name", "scopes", "allowedIps", "expiresAt"]);
+  async function create(values: { name: string; ips: string[]; date: string }) {
+    const created = await mutate(() => api.post<ApiKeyCreated>("/client/api-keys", newKeyBody(values)), ["name", "allowedIps", "expiresAt"]);
     if (created) setModal({ kind: "secret", name: created.key.name, secret: created.secret });
   }
 
@@ -354,15 +353,6 @@ function KeyCard({ row, t, onEdit, onRevoke }: { row: KeyRow; t: Props["t"]; onE
         </div>
       </div>
       <dl className="grid gap-x-6 gap-y-4 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-3">
-        <Detail label={t.scopes} wide>
-          <span className="flex flex-wrap gap-1.5">
-            {row.scopes.map((s) => (
-              <Badge key={s} tone="outline" shape="tag" title={scopeCopy(t, s).text || undefined}>
-                <span dir="ltr">{s}</span>
-              </Badge>
-            ))}
-          </span>
-        </Detail>
         <Detail label={t.allowedIps}>
           {row.allowedIps.length === 0 ? (
             t.anyIp
@@ -405,9 +395,9 @@ function MadeBySupport({ label }: { label: string }) {
   );
 }
 
-function Detail({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) {
+function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className={cn("min-w-0", wide && "sm:col-span-2 lg:col-span-3")}>
+    <div className="min-w-0">
       <dt className="text-small text-ink-subtle">{label}</dt>
       <dd className="mt-0.5 text-body font-medium text-ink">{children}</dd>
     </div>
@@ -423,12 +413,11 @@ type FormProps = {
   initial?: { name: string; ips: string[] };
   problem: ReturnType<typeof useFormProblem>["problem"];
   failFields: (fields: Record<string, string>) => void;
-  onSubmit: (values: { name: string; scopes: string[]; ips: string[]; date: string }) => void;
+  onSubmit: (values: { name: string; ips: string[]; date: string }) => void;
 };
 
 function KeyForm({ id, mode, t, optional, minDate, initial, problem, failFields, onSubmit }: FormProps) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [scopes, setScopes] = useState<string[]>([]);
   const [ipsText, setIpsText] = useState((initial?.ips ?? []).join("\n"));
   const [date, setDate] = useState("");
 
@@ -437,14 +426,13 @@ function KeyForm({ id, mode, t, optional, minDate, initial, problem, failFields,
     const ips = parseIps(ipsText);
     const local: Record<string, string> = {};
     if (!name.trim()) local.name = t.nameRequired;
-    if (mode === "create" && scopes.length === 0) local.scopes = t.scopesRequired;
     if (ips.length > 20) local.allowedIps = t.ipsTooMany;
     if (mode === "create" && date && minDate && date < minDate) local.expiresAt = t.expiresPast;
     if (Object.keys(local).length > 0) {
       failFields(local);
       return;
     }
-    onSubmit({ name: name.trim(), scopes: API_KEY_SCOPES.filter((s) => scopes.includes(s)), ips, date });
+    onSubmit({ name: name.trim(), ips, date });
   }
 
   // `allowedIps.N` errors name an entry by position: show which address was refused.
@@ -470,40 +458,6 @@ function KeyForm({ id, mode, t, optional, minDate, initial, problem, failFields,
         onChange={(e) => setName(e.target.value)}
         error={problem?.fields.name}
       />
-      {mode === "create" ? (
-        <fieldset aria-describedby="scopes-hint scopes-error" className="grid gap-1">
-          <legend className="text-small font-semibold text-ink">
-            {t.scopesLegend}
-            <span aria-hidden="true" className="ms-0.5 text-danger-ink">
-              *
-            </span>
-          </legend>
-          <p id="scopes-hint" className="text-small text-ink-subtle">
-            {t.scopesHint}
-          </p>
-          <div className="mt-1 grid gap-0.5">
-            {API_KEY_SCOPES.map((scope) => (
-              <Checkbox
-                key={scope}
-                label={scopeCopy(t, scope).title}
-                description={
-                  <>
-                    <bdi dir="ltr" className="num">
-                      {scope}
-                    </bdi>
-                    {` · ${scopeCopy(t, scope).text}`}
-                  </>
-                }
-                checked={scopes.includes(scope)}
-                onChange={(e) => setScopes((list) => (e.target.checked ? [...list, scope] : list.filter((s) => s !== scope)))}
-              />
-            ))}
-          </div>
-          <div id="scopes-error" aria-live="polite">
-            {problem?.fields.scopes ? <p className="text-small font-medium text-danger-ink">{problem.fields.scopes}</p> : null}
-          </div>
-        </fieldset>
-      ) : null}
       <Textarea
         label={t.ipsLabel}
         optionalLabel={optional}

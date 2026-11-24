@@ -1,5 +1,5 @@
 // Support as a live chat (feature 28, backend plan `docs/briefs/28-support-live-chat.md` §4.2): a ticket page changes the moment
-// the other side writes, with no reload; typing, "Seen", files, "My tickets" and the merchant's portal thread work on the same
+// the other side writes, with no reload; "Seen", files, "My tickets" and the merchant's portal thread work on the same
 // layer. Runs against the isolated demo backend (:3100) built from the feature-28 branch. Written to be run by the lead.
 // Rules (F03): every test that changes data uses throwaway emails or a fresh customer or merchant; nothing global is switched.
 // Staff act through the admin API as the seeded Owner (`adminCall`; the Owner holds `support:read` and `support:reply`), because
@@ -11,7 +11,7 @@
 // responses that arrive after the call.
 // Locators are scoped to the conversation (`role="log"`): Next keeps the previous route hidden in the DOM.
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
-import { adminCall, API_ORIGIN, staff } from "./admin";
+import { adminCall } from "./admin";
 import { expect, test } from "./fixtures";
 import { DEV_TURNSTILE_TOKEN, freshCustomer, freshMerchant, go, signInMerchant, uniqueEmail } from "./helpers";
 
@@ -53,15 +53,6 @@ function countStreams(page: Page, path: string): () => number {
   return () => count;
 }
 
-/** Counts the typing pings the page sends to `pathSuffix` (`/typing`). */
-function countPosts(page: Page, pathSuffix: string): string[] {
-  const seen: string[] = [];
-  page.on("request", (request) => {
-    if (request.method() === "POST" && new URL(request.url()).pathname.endsWith(pathSuffix)) seen.push(request.url());
-  });
-  return seen;
-}
-
 // ── Filing tickets ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** A guest ticket through the public route. With the demo order's token the answer carries the ticket's own token. */
@@ -100,66 +91,9 @@ async function agentReply(id: number, body: string): Promise<number | undefined>
   const { body: message } = await adminCall<{ id?: number } | undefined>("POST", `/admin/support-tickets/${id}/reply`, { json: { body } });
   return typeof message?.id === "number" ? message.id : undefined;
 }
-const agentTyping = (id: number) => adminCall("POST", `/admin/support-tickets/${id}/typing`, { json: { mode: "reply" } });
 const agentRead = (id: number, upToMessageId: number) => adminCall("POST", `/admin/support-tickets/${id}/read`, { json: { upToMessageId } });
 /** Staff close (`resolved`) or reopen (`open`) the ticket: the requester gets `ticket.updated`. */
 const setTicketStatus = (id: number, status: "resolved" | "open") => adminCall("PATCH", `/admin/support-tickets/${id}`, { json: { status } });
-
-type StaffFrame = { event: string; data: unknown };
-
-/**
- * Reads `GET /admin/stream` as the Owner (a Node `fetch` with the staff cookies; the browser under test is not involved) and
- * collects its frames. Close it in a `finally`: the API allows three open streams per session.
- */
-async function watchStaffStream() {
-  const session = await staff();
-  const controller = new AbortController();
-  const frames: StaffFrame[] = [];
-  const res = await fetch(`${API_ORIGIN}/admin/stream`, {
-    headers: { Cookie: session.cookie, Origin: "http://localhost:5175", "X-Forwarded-For": "127.0.0.1", Accept: "text/event-stream" },
-    signal: controller.signal,
-  });
-  if (res.status !== 200 || !res.body) throw new Error(`GET /admin/stream answered ${res.status}`);
-  const body = res.body;
-  void (async () => {
-    const reader = body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    try {
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) return;
-        buffer += decoder.decode(value, { stream: true });
-        for (let end = buffer.indexOf("\n\n"); end >= 0; end = buffer.indexOf("\n\n")) {
-          const raw = buffer.slice(0, end);
-          buffer = buffer.slice(end + 2);
-          let event = "";
-          let data = "";
-          for (const line of raw.split("\n")) {
-            if (line.startsWith("event:")) event = line.slice(6).trim();
-            else if (line.startsWith("data:")) data += line.slice(5).trim();
-          }
-          if (!event) continue;
-          try {
-            frames.push({ event, data: JSON.parse(data) });
-          } catch {
-            frames.push({ event, data });
-          }
-        }
-      }
-    } catch {
-      // aborted by `close()`
-    }
-  })();
-  return {
-    frames,
-    /** Waits for the first frame (`ready`): events sent after it reach this reader. */
-    async ready() {
-      await expect.poll(() => frames.some((frame) => frame.event === "ready"), { timeout: 15_000 }).toBe(true);
-    },
-    close: () => controller.abort(),
-  };
-}
 
 // ── Customer: the token page ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -183,11 +117,6 @@ test.describe("customer: the token page", () => {
     await expect
       .poll(async () => (await ticketRow(number)).requesterSeenMessageId ?? 0, { timeout: 20_000 })
       .toBeGreaterThanOrEqual(replyId ?? 1);
-
-    // The team is typing: a line under the conversation, gone by itself a few seconds later.
-    await agentTyping(id);
-    await expect(page.getByText("Support is typing…")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("Support is typing…")).toBeHidden({ timeout: 15_000 });
 
     // The visitor writes: `Enter` sends, the answer is appended once (the event with the same id is ignored), focus stays.
     const sent = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith(`/tickets/${token}/messages`));
@@ -213,34 +142,6 @@ test.describe("customer: the token page", () => {
     await box(page).pressSequentially("line two");
     await box(page).press("Enter");
     await expect(log(page).locator("p.whitespace-pre-wrap", { hasText: "line one" })).toHaveText("line one\nline two", { useInnerText: true });
-  });
-
-  test("typing reaches staff as ticket.typing at most once every 3 s", async ({ page }) => {
-    const { number, token } = await fileTicket(page.request);
-    const id = await ticketIdOf(number);
-    const watcher = await watchStaffStream();
-    try {
-      await watcher.ready();
-      const pings = countPosts(page, `/tickets/${token}/typing`);
-      await go(page, `/en/support/tickets/${token}`);
-      await hydrated(box(page));
-
-      // Twelve keystrokes in about half a second: one ping.
-      await box(page).pressSequentially("hello, I am typing", { delay: 40 });
-      await expect
-        .poll(() => watcher.frames.some((frame) => frame.event === "ticket.typing" && (frame.data as { ticketId?: number }).ticketId === id), { timeout: 15_000 })
-        .toBe(true);
-      const typing = watcher.frames.find((frame) => frame.event === "ticket.typing")?.data as { by?: string };
-      expect(typing.by).toBe("requester");
-      expect(pings).toHaveLength(1);
-
-      // After the gap the next keystroke pings again.
-      await page.waitForTimeout(3_200);
-      await box(page).pressSequentially("!");
-      await expect.poll(() => pings.length).toBe(2);
-    } finally {
-      watcher.close();
-    }
   });
 
   test("a PDF goes with a message, a refused type is refused on the spot, and the download answers 302", async ({ page }) => {
@@ -354,9 +255,9 @@ test.describe("customer: a closed ticket", () => {
     await expect(page.getByRole("button", { name: "Send reply" })).toHaveCount(0);
     await expect(notice(page).getByText("The reply you were writing was not sent and has been cleared.")).toBeVisible();
     await expect(notice(page).getByText("A reply I never sent")).toHaveCount(0);
-    // A guest's way on is the public form; the rating appears as before; the status badge follows.
+    // A guest's way on is the public form; no rating form (the rating is retired); the status badge follows.
     await expect(notice(page).getByRole("link", { name: "Open a new ticket" })).toHaveAttribute("href", "/en/support");
-    await expect(page.getByRole("button", { name: "Send rating" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send rating" })).toHaveCount(0);
     await expect(page.getByText("Resolved").first()).toBeVisible();
     // The notice sits in a polite live region, so its arrival is announced.
     await expect(page.locator('[aria-live="polite"]').filter({ has: notice(page) })).toHaveCount(1);

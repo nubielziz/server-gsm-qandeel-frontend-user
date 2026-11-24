@@ -22,9 +22,8 @@ export const merchant = {
     loadErrorTitle: "We could not load this page",
     retry: "Try again",
     pendingTitle: "Available after approval",
-    pendingText: "This page opens once your merchant account is approved. Meanwhile you can finish your profile and verification.",
+    pendingText: "This page opens once your merchant account is approved. Meanwhile you can finish your profile.",
     openSettings: "Open settings",
-    completeVerification: "Verification documents",
     usd: "USD",
     help: "Help center",
     date: "Date",
@@ -47,7 +46,6 @@ export const merchant = {
     pendingCards: {
       profile: { title: "Your profile", text: "Add your company, phone and country." },
       security: { title: "Account security", text: "Change your password and turn on two-step verification." },
-      verification: { title: "Verification", text: "Upload your business documents for review." },
     },
     balance: {
       title: "Available balance",
@@ -68,18 +66,6 @@ export const merchant = {
       pending: "Pending",
       pendingHint: "{count} rejected",
     },
-    summary: {
-      title: "Order status summary",
-      barLabel: "Orders by status",
-      empty: "No orders yet.",
-    },
-    quick: {
-      title: "Quick order",
-      text: "Find a service and place your next order.",
-      label: "Search services",
-      placeholder: "IMEI, unlock, activation…",
-      submit: "Start order",
-    },
     recent: {
       title: "Recent orders",
       viewAll: "View all",
@@ -89,13 +75,6 @@ export const merchant = {
       columns: { order: "Order", service: "Service", input: "Input", price: "Price", status: "Status", date: "Date" },
       caption: "Your latest orders",
       open: "Open order {id}",
-    },
-    again: {
-      title: "Recently ordered",
-      text: "Services from your latest orders.",
-      orderAgain: "Order again",
-      orderedOn: "Last ordered {date}",
-      empty: "Services you order will show up here.",
     },
     help: {
       title: "Need help?",
@@ -265,7 +244,6 @@ export const merchant = {
     sources: { dhru: "Dhru API", v1: "REST API", portal: "Portal", store: "Online store", admin: "Support team" },
     created2: "Placed",
     completed: "Completed",
-    note: "Your note",
     inputsTitle: "Details you provided",
     inputFile: "Input file",
     downloadFile: "Download file",

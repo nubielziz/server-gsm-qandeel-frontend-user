@@ -33,7 +33,7 @@ site:3000 ── server-side reads (Server Components) ──► GSM_API_ORIGIN 
 | `NEXT_PUBLIC_SITE_URL` | at build | The public origin, `https://<SHOP_HOST>`. Used for canonical URLs, social cards, `robots.txt` and the sitemap. Required. |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | at build | Cloudflare Turnstile site key of the widget for `<SHOP_HOST>`. Required (production has no test key). |
 | `NEXT_PUBLIC_TIME_ZONE` | at build | IANA time zone for dates on the site. Default `UTC`, the API's own zone. |
-| `NEXT_PUBLIC_API_PUBLIC_URL` | at build | Optional: `https://<API_HOST>`, the machine API host shown as "Base URL" on the merchant API keys page. Empty hides those two lines. |
+| `NEXT_PUBLIC_API_PUBLIC_URL` | at build | Optional: `https://<API_HOST>`, the machine API host shown as "Base URL" on the merchant API keys page. Empty hides that line. |
 | `NEXT_PUBLIC_MERCHANT_WHATSAPP` | at build | The team's WhatsApp number for merchant applications. "Apply as a merchant" sends the visitor to it. Default in the `Dockerfile`: `+20 12 10230575` (the owner's number, 2026-11-16); pass the build arg only to change it. International format: `+`, the country code, then the number **without** the national leading 0 (never `+44 (0)20 …`); spaces are allowed and kept on the page. Empty or malformed: the page shows no WhatsApp button and points to the support page. |
 | `PORT`, `HOSTNAME` | at run time | The image sets `3000` and `0.0.0.0`. |
 

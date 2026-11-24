@@ -1,4 +1,4 @@
-// API keys (handoff §4.9): list, create (secret shown once), edit name / allowed IPs, revoke.
+// API keys (handoff §4.9): Dhru credentials. List, create (secret shown once), edit name / allowed IPs, revoke.
 // Needs an approved merchant: a pending one (403 ACCOUNT_PENDING_APPROVAL) sees the notice, never a sign-out.
 import { Suspense } from "react";
 import type { Metadata } from "next";
@@ -70,7 +70,6 @@ async function ApiKeysContent() {
     id: k.id,
     name: k.name,
     prefix: k.prefix,
-    scopes: k.scopes,
     allowedIps: k.allowedIps,
     rateLimitPerMin: k.rateLimitPerMin,
     lastUsed: k.lastUsedAt ? utcDateTime(k.lastUsedAt, t.utc) : null,
@@ -98,16 +97,6 @@ async function ApiKeysContent() {
       <Card tone="muted">
         <CardHeader title={h.title} titleAs="h2" />
         <CardBody className="grid gap-5">
-          <div className="grid gap-2">
-            <h3 className="text-subheading text-ink">{h.rest}</h3>
-            <p className="text-body text-ink-muted">{h.restText}</p>
-            <CodeBlock label={h.rest}>{"Authorization: Bearer <your key>"}</CodeBlock>
-            {base ? (
-              <p className="text-small text-ink-subtle">
-                {h.baseUrl}: <span dir="ltr" className="num font-medium text-ink">{`${base}/v1`}</span>
-              </p>
-            ) : null}
-          </div>
           <div className="grid gap-2">
             <h3 className="text-subheading text-ink">{h.dhru}</h3>
             <p className="text-body text-ink-muted">{h.dhruText}</p>

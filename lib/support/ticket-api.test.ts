@@ -42,13 +42,11 @@ describe("tokenAdapter (the customer's page)", () => {
     await adapter.send({ body: "hello", fileIds: [] });
     await adapter.send({ body: "", fileIds: [9] });
     await adapter.read(12);
-    await adapter.typing();
     await adapter.refetch();
     expect(calls).toEqual([
       { method: "POST", path: `${base}/messages`, body: { body: "hello" } },
       { method: "POST", path: `${base}/messages`, body: { body: "", fileIds: [9] } },
       { method: "POST", path: `${base}/read`, body: { upToMessageId: 12 } },
-      { method: "POST", path: `${base}/typing`, body: undefined },
       { method: "GET", path: base },
     ]);
   });
@@ -65,14 +63,18 @@ describe("tokenAdapter (the customer's page)", () => {
     const adapter = tokenAdapter(token, "T-1042", fakeHttp().http);
     expect(adapter.fileHref(5)).toBe(`${base}/files/5`);
     expect(adapter.stream).toEqual({ kind: "own", url: `${base}/stream`, lockName: "gsm-ticket-T-1042" });
-    expect(adapter.supportsRating).toBe(true);
     expect(adapter.ticketId).toBeUndefined();
   });
 
-  it("a typing ping or a read that fails rejects, so the caller can ignore or retry it", async () => {
+  it("a read that fails rejects, so the caller can retry it", async () => {
     const http = { ...fakeHttp().http, post: vi.fn().mockRejectedValue(new Error("429")) } as unknown as TicketHttp;
-    await expect(tokenAdapter(token, "T-1", http).typing()).rejects.toThrow("429");
     await expect(tokenAdapter(token, "T-1", http).read(1)).rejects.toThrow("429");
+  });
+
+  it("has no rating and no typing call: only messages, read marks, files and the ticket itself", () => {
+    expect(Object.keys(tokenAdapter(token, "T-1", fakeHttp().http)).sort()).toEqual(
+      ["fileHref", "read", "refetch", "send", "stream", "upload"].sort(),
+    );
   });
 });
 
@@ -82,12 +84,10 @@ describe("merchantAdapter (the portal thread)", () => {
     const adapter = merchantAdapter(42, http);
     await adapter.send({ body: "hello", fileIds: [] });
     await adapter.read(8);
-    await adapter.typing();
     await adapter.refetch();
     expect(calls).toEqual([
       { method: "POST", path: "/client/tickets/42/messages", body: { body: "hello" } },
       { method: "POST", path: "/client/tickets/42/read", body: { upToMessageId: 8 } },
-      { method: "POST", path: "/client/tickets/42/typing", body: undefined },
       { method: "GET", path: "/client/tickets/42" },
     ]);
   });
@@ -100,6 +100,11 @@ describe("merchantAdapter (the portal thread)", () => {
     expect(adapter.fileHref(5)).toBe("/client/tickets/42/files/5");
     expect(adapter.stream).toEqual({ kind: "surface", surface: "merchant" });
     expect(adapter.ticketId).toBe(42);
-    expect(adapter.supportsRating).toBe(false);
+  });
+
+  it("has no typing call either", () => {
+    expect(Object.keys(merchantAdapter(42, fakeHttp().http)).sort()).toEqual(
+      ["fileHref", "read", "refetch", "send", "stream", "ticketId", "upload"].sort(),
+    );
   });
 });

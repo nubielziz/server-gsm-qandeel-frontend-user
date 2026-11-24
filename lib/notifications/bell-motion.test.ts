@@ -10,17 +10,12 @@ import {
   type BellMotionSnapshot,
 } from "./bell-motion";
 
-/**
- * A fake browser: a visibility switch and a reduced-motion switch that tests script, and the chime it was asked to play;
- * time is Vitest's fake clock.
- */
+/** A fake browser: a visibility switch and a reduced-motion switch that tests script; time is Vitest's fake clock. */
 function fakeEnv(options: { visible?: boolean; reduced?: boolean } = {}) {
   let visible = options.visible ?? true;
   let reduced = options.reduced ?? false;
   const listeners = new Set<() => void>();
-  const chime = vi.fn();
   const env: BellMotionEnv = {
-    chime,
     now: () => Date.now(),
     isVisible: () => visible,
     reducedMotion: () => reduced,
@@ -33,7 +28,6 @@ function fakeEnv(options: { visible?: boolean; reduced?: boolean } = {}) {
   };
   return {
     env,
-    chimes: () => chime.mock.calls.length,
     visibilityListeners: () => listeners.size,
     setVisible(next: boolean) {
       visible = next;
@@ -237,55 +231,5 @@ describe("what the bell plays", () => {
     expect(view).toMatchObject({ ring: false, pop: null, roll: null });
     expect(settleBellView(view, "count-in-up")).toBe(view);
     expect(settleBellView(view, "bell-ring")).toBe(view);
-  });
-});
-
-describe("the arrival sound", () => {
-  it("plays with each ring: a live item in a visible tab, never on load, a replay or a read", () => {
-    const browser = fakeEnv();
-    const motion = createBellMotion(browser.env);
-    motion.subscribe("customer", () => {});
-    initialBellView(3, "3", motion.getSnapshot("customer"));
-    expect(browser.chimes()).toBe(0);
-    motion.arrival("customer", 3, false);
-    motion.read("customer", 2);
-    expect(browser.chimes()).toBe(0);
-    motion.arrival("customer", 3, true);
-    expect(browser.chimes()).toBe(1);
-  });
-
-  it("plays at most once every 3 s, like the ring", () => {
-    const browser = fakeEnv();
-    const motion = createBellMotion(browser.env);
-    motion.arrival("customer", 1, true);
-    vi.advanceTimersByTime(RING_WINDOW_MS - 1);
-    motion.arrival("customer", 2, true);
-    expect(browser.chimes()).toBe(1);
-    vi.advanceTimersByTime(1);
-    motion.arrival("customer", 3, true);
-    expect(browser.chimes()).toBe(2);
-  });
-
-  it("plays with reduced motion too (a sound is not motion), keeping the 3 s window", () => {
-    const browser = fakeEnv({ reduced: true });
-    const motion = createBellMotion(browser.env);
-    motion.arrival("customer", 1, true);
-    motion.arrival("customer", 2, true);
-    expect(motion.getSnapshot("customer")).toBe(IDLE_MOTION);
-    expect(browser.chimes()).toBe(1);
-  });
-
-  it("is silent in a hidden tab and plays once when the visitor comes back", () => {
-    const browser = fakeEnv({ visible: false });
-    const motion = createBellMotion(browser.env);
-    motion.subscribe("customer", () => {});
-    motion.arrival("customer", 1, true);
-    motion.arrival("customer", 2, true);
-    expect(browser.chimes()).toBe(0);
-    browser.setVisible(true);
-    expect(browser.chimes()).toBe(1);
-    browser.setVisible(false);
-    browser.setVisible(true);
-    expect(browser.chimes()).toBe(1);
   });
 });

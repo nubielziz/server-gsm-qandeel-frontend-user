@@ -1,4 +1,4 @@
-// Notification preferences and Telegram. These routes need an approved merchant: a pending one gets the notice.
+// Notification preferences. These routes need an approved merchant: a pending one gets the notice.
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { apiSessionGet } from "@/lib/api/server";
@@ -17,14 +17,7 @@ export function generateMetadata(): Metadata {
 export default function NotificationsPage() {
   return (
     <PageTransition>
-      <Suspense
-        fallback={
-          <div className="grid gap-4">
-            <CardSkeleton rows={1} footer={false} />
-            <CardSkeleton rows={5} />
-          </div>
-        }
-      >
+      <Suspense fallback={<CardSkeleton rows={5} />}>
         <NotificationsContent />
       </Suspense>
     </PageTransition>

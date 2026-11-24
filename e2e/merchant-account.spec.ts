@@ -1,35 +1,28 @@
 // Merchant account (plan F22): the verification-mail resend, address and tax id in the profile, "Made by support" API
 // keys and the Announcements row. Real browser -> Next -> the isolated demo backend (:3100) and Mailpit.
 // Rules: one throwaway merchant per test (the resend limiter is 5 an hour per merchant, and the demo merchant is never
-// changed); nothing is switched off globally. `mustChangePassword` has no e2e: no staff route sets the flag on a full
+// changed), made the way the product makes one: staff invite it and it sets its password from the invitation (`freshMerchant`);
+// the ones that need an unverified email get it from a staff change of the address (`unverified`); nothing is switched off globally. `mustChangePassword` has no e2e: no staff route sets the flag on a full
 // session, so the gate's decision is a unit test (components/merchant/must-change-password-gate.test.tsx) and the lead
 // checks it by hand (plan section 7).
 import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
-import { approveMerchant, merchantIdByEmail, staffApiKeyFor } from "./admin";
+import { merchantIdByEmail, staffApiKeyFor } from "./admin";
 import { BASE_URL, freshMerchant, go, hydrated, signInMerchant, tokenOf, waitForLink } from "./helpers";
 
 const VERIFY_LINK = /\/merchant\/verify-email\?token=/;
 
-/** A signed-in throwaway merchant, still pending (the profile, the security page and the resend work for a pending one). */
-async function signedInMerchant(page: Page) {
-  const account = await freshMerchant(page);
-  const csrf = await signInMerchant(page, account);
-  return { ...account, csrf };
-}
-
-/** A signed-in throwaway merchant that staff approved (notifications and API keys need an approved account). */
-async function approvedMerchant(page: Page) {
-  const account = await freshMerchant(page);
+/** A signed-in throwaway merchant: active, its email verified, or not verified yet with `unverified`. */
+async function signedInMerchant(page: Page, options: { unverified?: boolean } = {}) {
+  const account = await freshMerchant(page, options);
   const id = await merchantIdByEmail(account.email);
-  await approveMerchant(id);
   const csrf = await signInMerchant(page, account);
   return { ...account, id, csrf };
 }
 
 test.describe("verification mail: resend", () => {
   test("a new link arrives, the success text says older links stop working, and they do", async ({ page }) => {
-    const account = await freshMerchant(page);
+    const account = await freshMerchant(page, { unverified: true });
     const first = await waitForLink(page, account.email, VERIFY_LINK);
     await signInMerchant(page, account);
 
@@ -52,7 +45,7 @@ test.describe("verification mail: resend", () => {
   });
 
   test("verified in another tab: the resend says it is already verified and the badge turns to Verified", async ({ page }) => {
-    const account = await freshMerchant(page);
+    const account = await freshMerchant(page, { unverified: true });
     const link = await waitForLink(page, account.email, VERIFY_LINK);
     await signInMerchant(page, account);
 
@@ -76,7 +69,7 @@ test.describe("verification mail: resend", () => {
   });
 
   test("a 429 shows the wait the API sent", async ({ page }) => {
-    await signedInMerchant(page);
+    await signedInMerchant(page, { unverified: true });
     await page.route("**/client/auth/verify-email/resend", (route) =>
       route.fulfill({
         status: 429,
@@ -139,11 +132,11 @@ test.describe("profile: address and tax id", () => {
 
 test.describe("API keys", () => {
   test("a key staff made shows \"Made by support\"; a key the merchant made does not", async ({ page }) => {
-    const merchant = await approvedMerchant(page);
+    const merchant = await signedInMerchant(page);
     const supportKey = await staffApiKeyFor(merchant.id, `Support key ${Date.now()}`);
     const own = await page.request.post("/client/api-keys", {
       headers: { Origin: new URL(BASE_URL).origin, "X-CSRF-Token": merchant.csrf, "Content-Type": "application/json" },
-      data: { name: `Own key ${Date.now()}`, scopes: ["orders:read"] },
+      data: { name: `Own key ${Date.now()}`, scopes: ["dhru"] },
     });
     expect(own.status(), await own.text()).toBe(201);
     const ownName = ((await own.json()) as { key: { name: string } }).key.name;
@@ -158,28 +151,25 @@ test.describe("API keys", () => {
 });
 
 test.describe("notification preferences: Announcements", () => {
-  test("the row has the site's own title, Telegram starts on and disabled, and saving Email alone answers 200", async ({ page }) => {
-    await approvedMerchant(page);
+  test("the row has the site's own title and one Email switch, and saving it answers 200", async ({ page }) => {
+    await signedInMerchant(page);
     await go(page, "/en/merchant/settings/notifications");
 
     const announcements = page.getByRole("group", { name: "Announcements" });
     await expect(page.getByText("News, offers and updates from our team.")).toBeVisible();
     await expect(announcements.getByRole("switch", { name: "Email" })).toBeChecked();
-    await expect(announcements.getByRole("switch", { name: "Telegram" })).toBeDisabled();
-    await expect(announcements.getByRole("switch", { name: "Telegram" })).toBeChecked();
+    await expect(announcements.getByRole("switch")).toHaveCount(1);
 
     await announcements.getByRole("switch", { name: "Email" }).uncheck();
     const saved = page.waitForResponse((r) => r.url().endsWith("/client/notification-preferences") && r.request().method() === "PUT");
     await page.getByRole("button", { name: "Save changes" }).click();
     const response = await saved;
     expect(response.status()).toBe(200);
-    // The row goes back with the Telegram value the GET showed: no "Link Telegram first".
-    expect(response.request().postDataJSON()).toEqual({ events: [{ event: "broadcast.announcement", email: false, telegram: true }] });
+    // One row, the Email value (an older API also gets back the extra flag it showed).
+    expect(response.request().postDataJSON()).toMatchObject({ events: [{ event: "broadcast.announcement", email: false }] });
     await expect(page.getByText("Notification settings saved").first()).toBeVisible();
-    await expect(page.getByText("Link Telegram first.")).toHaveCount(0);
 
     await page.reload();
     await expect(page.getByRole("group", { name: "Announcements" }).getByRole("switch", { name: "Email" })).not.toBeChecked();
-    await expect(page.getByRole("group", { name: "Announcements" }).getByRole("switch", { name: "Telegram" })).toBeChecked();
   });
 });

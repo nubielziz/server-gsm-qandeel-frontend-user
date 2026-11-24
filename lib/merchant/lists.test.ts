@@ -72,6 +72,11 @@ describe("invoices", () => {
     expect(f.selected).toBe("55");
     expect(qs(invoicesQuery(f))).toBe("?_start=0&_end=20&_sort=total&_order=desc&q=INV-2026&status=open&kind=topup");
   });
+  it("ignores the kind statement: it is not offered and not sent", () => {
+    const f = parseInvoicesFilters({ kind: "statement" });
+    expect(f.kind).toBe("");
+    expect(qs(invoicesQuery(f))).not.toContain("kind=");
+  });
   it("builds a count-only request", () => {
     expect(qs(countQuery({ status: "paid" }))).toBe("?_start=0&_end=1&status=paid");
   });

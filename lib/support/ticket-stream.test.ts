@@ -29,7 +29,7 @@ describe("openTicketStream: the customer's own stream", () => {
     const handle = openTicketStream({ kind: "own", url: "/store/v1/tickets/tok/stream", lockName: "gsm-ticket-T-1042" });
     expect(created).toHaveLength(1);
     expect(created[0].options).toMatchObject({ url: "/store/v1/tickets/tok/stream", lockName: "gsm-ticket-T-1042" });
-    expect(created[0].options.events).toEqual(["ticket.message.created", "ticket.updated", "ticket.read", "ticket.typing"]);
+    expect(created[0].options.events).toEqual(["ticket.message.created", "ticket.updated", "ticket.read"]);
     expect(typeof created[0].options.parseEvent).toBe("function");
     expect(typeof created[0].options.dedupeKey).toBe("function");
     // No probe: the ticket token needs no session, so a refusal only backs off.

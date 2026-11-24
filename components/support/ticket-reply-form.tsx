@@ -2,8 +2,7 @@
 // TicketReplyForm: writes to the ticket (feature 28). `Enter` sends, `Shift+Enter` starts a new line; files upload as they
 // are picked and go with the message as `fileIds` (PDF, JPEG or PNG, 5 MB, five a message; a message may be files only).
 // The answer of the `POST` goes to `onSent`, which appends it to the conversation: there is no `router.refresh()` any
-// more, and the event the stream sends for the same message is ignored by id. The box tells the other side the visitor is
-// typing, at most once every 3 s (a refused ping is harmless and silent). Focus stays in the box after sending.
+// more, and the event the stream sends for the same message is ignored by id. Focus stays in the box after sending.
 // Replying moves a pending ticket back to open (the page's hint says so). A resolved ticket shows no box at all (the
 // conversation shows the closed notice instead, owner 2026-11-15); a send or an upload that still meets one (staff closed it
 // a moment ago) answers `409 TICKET_RESOLVED`, which goes to `onClosed` with the box's text so the notice can keep it.
@@ -27,7 +26,6 @@ import {
   type AttachmentProblem,
   type Chip,
 } from "@/lib/support/attachments";
-import { shouldSendTyping } from "@/lib/support/conversation";
 import { TICKET_RESOLVED } from "@/lib/support/reply-area";
 import { sendsMessage } from "@/lib/support/send-key";
 import type { TicketAdapter } from "@/lib/support/ticket-api";
@@ -41,7 +39,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 
 export type TicketReplyFormProps = {
-  adapter: Pick<TicketAdapter, "send" | "upload" | "typing">;
+  adapter: Pick<TicketAdapter, "send" | "upload">;
   t: SupportMessages["ticket"]["reply"];
   /** Shown above the box: "We are waiting for your reply." */
   hint?: string;
@@ -66,7 +64,6 @@ export function TicketReplyForm({ adapter, t, hint, initialBody = "", onSent, on
   const form = useRef<HTMLFormElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const nextKey = useRef(1);
-  const lastTypingAt = useRef<number | null>(null);
   const [body, setBody] = useState(initialBody);
   const [chips, dispatch] = useReducer(chipsReducer, [] as Chip[]);
   /** A sentence about the last pick that is not about one file (too many files). */
@@ -93,11 +90,6 @@ export function TicketReplyForm({ adapter, t, hint, initialBody = "", onSent, on
     const text = event.target.value;
     setBody(text);
     onDraft?.(text.trim() !== "" || chips.length > 0);
-    const now = Date.now();
-    if (shouldSendTyping({ text, lastSentAt: lastTypingAt.current, now })) {
-      lastTypingAt.current = now;
-      adapter.typing().catch(() => undefined);
-    }
   }
 
   function onPick(event: ChangeEvent<HTMLInputElement>) {

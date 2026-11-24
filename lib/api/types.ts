@@ -55,8 +55,11 @@ export type Attachment = { id: S.Id; filename: string; mime: string; size: numbe
 type StoreTicketBase = S.GetStoreV1TicketsByTokenResponse;
 /** A public message of a ticket: `from` is `you` (the requester) or `support`; never an internal note. */
 export type TicketMessage = StoreTicketBase["messages"][number] & { attachments?: Attachment[] };
-/** `GET /store/v1/tickets/:token`. `seenByYou` / `seenBySupport` are the highest message id each side has seen. */
-export type Ticket = Omit<StoreTicketBase, "messages"> & {
+/**
+ * `GET /store/v1/tickets/:token`. `seenByYou` / `seenBySupport` are the highest message id each side has seen. The retired
+ * rating keys (`canRate`, `csatScore`) are left out on purpose: an older backend may still send them, and nothing reads them.
+ */
+export type Ticket = Omit<StoreTicketBase, "messages" | "canRate" | "csatScore"> & {
   messages: TicketMessage[];
   seenByYou?: S.Id | null;
   seenBySupport?: S.Id | null;
@@ -80,8 +83,8 @@ export type MyTicketRow = {
 export type MyTicketCreated = Ticket & { token: string };
 /** One row of `GET /client/tickets` (a merchant's ticket has no token: the id is the address). */
 export type ClientTicketRow = Omit<MyTicketRow, "token"> & { id: S.Id };
-/** `GET /client/tickets/:id`, `POST /client/tickets`: no rating (customers only). */
-export type ClientTicket = Omit<Ticket, "canRate" | "csatScore"> & { id: S.Id };
+/** `GET /client/tickets/:id`, `POST /client/tickets`: a merchant's ticket has an id and no token. */
+export type ClientTicket = Ticket & { id: S.Id };
 /** The answer of a ticket file upload (`POST /store/v1/tickets/:token/files`, `POST /client/files`). */
 export type TicketFile = { id: S.Id; filename: string; size: number; mime: string };
 /** `POST /store/v1/me/tickets` and `POST /client/tickets`. */
@@ -153,14 +156,13 @@ export type InvoiceDetail = S.GetClientInvoicesByIdResponse;
 export type InvoiceCreated = S.PostClientInvoicesResponse;
 export type ApiKey = S.GetClientApiKeysResponse[number];
 export type ApiKeyCreated = S.PostClientApiKeysResponse;
-export type Webhook = S.GetClientWebhooksResponse[number];
-export type WebhookCreated = S.PostClientWebhooksResponse;
-export type WebhookDelivery = S.GetClientWebhooksByIdDeliveriesResponse[number];
-export type NotificationPreferences = S.GetClientNotificationPreferencesResponse;
-export type KycView = S.GetClientKycResponse;
-export type Referrals = S.GetClientReferralsResponse;
-export type Commission = S.GetClientCommissionsResponse[number];
-export type MerchantSession = S.GetClientSessionsResponse[number];
+/**
+ * The preferences as the site reads them. An older API also sends a `telegram` flag on each event (and one on the page): the
+ * page's is never read, an event's is only sent back as shown (components/merchant-settings/notifications-form.tsx).
+ */
+export type NotificationPreferences = Omit<S.GetClientNotificationPreferencesResponse, "telegram" | "events"> & {
+  events: Array<Omit<S.GetClientNotificationPreferencesResponse["events"][number], "telegram"> & { telegram?: boolean }>;
+};
 export type TwoFactorSetup = S.PostClientSecurity2faSetupResponse;
 export type UploadedFile = S.PostClientFilesResponse;
 

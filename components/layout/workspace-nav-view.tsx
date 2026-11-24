@@ -115,7 +115,7 @@ export function WorkspaceNavView({ items, pathname, variant }: WorkspaceNavViewP
   }
 
   // Short screens (under 46rem, where the rail also drops its avatar): 44px buttons and tighter gaps; under 41rem 40px and
-  // tighter still (the merchant has eleven links since feature 28's Support), so the merchant's
+  // tighter still (the merchant has nine links with Settings), so the merchant's
   // links fit a 1366×768 laptop window without the rail growing past the screen.
   return (
     <ul className="grid justify-items-center gap-2 [@media(max-height:46rem)]:gap-1 [@media(max-height:41rem)]:gap-0.5!">

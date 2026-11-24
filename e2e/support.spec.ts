@@ -1,4 +1,4 @@
-// Support tickets: the public form, the conversation page opened from the link, replying, the rating, and the friendly
+// Support tickets: the public form, the conversation page opened from the link, replying, and the friendly
 // 404. Staff answers come from the admin API of the isolated backend (the seeded Support agent), because the customer
 // side cannot create them. Throwaway emails keep the "3 tickets per hour per email" limit away from the demo customers.
 import { createHmac } from "node:crypto";
@@ -137,7 +137,7 @@ test.describe("new ticket form", () => {
     await expect(page.locator('input[name="email"]')).toHaveValue(ACCOUNTS.customer.email);
   });
 
-  test("with an order link: ticket created, conversation opens, reply appears, staff answer and rating work", async ({ page }) => {
+  test("with an order link: ticket created, conversation opens, reply appears, staff answer arrives and the ticket closes", async ({ page }) => {
     const email = uniqueEmail("ticket");
     await go(page, "/en/support");
     await page.locator('select[name="category"]').selectOption("delay");
@@ -164,7 +164,7 @@ test.describe("new ticket form", () => {
     await expect(page.getByRole("log").getByText("Any news? Thank you.")).toBeVisible();
     await expect(page.locator('textarea[name="body"]')).toHaveValue("");
 
-    // The team answers and resolves: its message is on the start side, a rating appears.
+    // The team answers and resolves: its message is on the start side.
     const lina = await staff(page);
     const id = await lina.idOf(number);
     await lina.reply(id, "We found the problem and fixed it.");
@@ -184,11 +184,7 @@ test.describe("new ticket form", () => {
     await expect(page.locator('input[type="file"]')).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Send reply" })).toHaveCount(0);
 
-    // The rating still works on a closed ticket.
-    await expect(page.getByRole("button", { name: "Send rating" })).toBeDisabled();
-    await page.getByRole("radiogroup", { name: "Rating" }).getByText("5", { exact: true }).click();
-    await page.getByRole("button", { name: "Send rating" }).click();
-    await expect(page.getByText("Thank you for rating this ticket 5 out of 5.")).toBeVisible();
+    // No rating form on a closed ticket, whatever an older backend sends.
     await expect(page.getByRole("button", { name: "Send rating" })).toHaveCount(0);
 
     // Writing on it is refused by the API itself: only staff reopen a ticket.

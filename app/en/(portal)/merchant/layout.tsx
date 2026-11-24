@@ -20,7 +20,6 @@ import {
   Bell,
   ClipboardList,
   Clock,
-  Gift,
   Headset,
   KeyRound,
   LayoutDashboard,
@@ -29,7 +28,6 @@ import {
   Settings,
   Store,
   Wallet,
-  Webhook,
 } from "lucide-react";
 import { apiSessionGet } from "@/lib/api/server";
 import { getMerchant, requireMerchant } from "@/lib/api/session";
@@ -163,8 +161,6 @@ export default function MerchantLayout({ children }: LayoutProps<"/en/merchant">
     wallet,
     { href: p("/merchant/invoices"), label: t.merchantNav.invoices, icon: <ReceiptText aria-hidden="true" className={icon} /> },
     { href: p("/merchant/api-keys"), label: t.merchantNav.apiKeys, icon: <KeyRound aria-hidden="true" className={icon} /> },
-    { href: p("/merchant/webhooks"), label: t.merchantNav.webhooks, icon: <Webhook aria-hidden="true" className={icon} /> },
-    { href: p("/merchant/referrals"), label: t.merchantNav.referrals, icon: <Gift aria-hidden="true" className={icon} /> },
     notifications,
     support,
   ];

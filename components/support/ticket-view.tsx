@@ -1,7 +1,7 @@
 // TicketView: the body of a ticket page, shared by the customer's token page (`/support/tickets/<token>`) and the merchant's
 // thread (`/merchant/support/<id>`) (feature 28). Server component: the header, the cards and the fixed facts are static
-// output; everything that changes while the page is open (the messages, the status badge, the dates, the rating, the reply
-// box) is a client leaf inside `<TicketLive>` (`ticket-conversation.tsx`), which owns the state and the stream.
+// output; everything that changes while the page is open (the messages, the status badge, the dates, the reply box) is a
+// client leaf inside `<TicketLive>` (`ticket-conversation.tsx`), which owns the state and the stream.
 // Conversation on the start side, ticket information on the end side (Support Tickets mockup). A resolved ticket shows the
 // closed notice instead of the reply box, with "Open a new ticket" to `newTicketHref` (owner, 2026-11-15).
 import Link from "next/link";
@@ -24,13 +24,11 @@ import { Breadcrumbs, type BreadcrumbItem } from "@/components/ui/breadcrumbs";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { DescriptionItem, DescriptionList } from "@/components/ui/description-list";
 
-/** What both ticket answers (`Ticket`, `ClientTicket`) hold; the rating exists for customers only. */
-export type TicketViewTicket = Omit<Ticket, "canRate" | "csatScore"> & Partial<Pick<Ticket, "canRate" | "csatScore">>;
-
 export type TicketViewProps = {
   t: SupportMessages;
   c: CommonMessages;
-  ticket: TicketViewTicket;
+  /** `Ticket` or `ClientTicket`: the page shows what both hold. */
+  ticket: Ticket;
   access: TicketAccess;
   breadcrumbs: BreadcrumbItem[];
   /** The related order as the area names it (`SF-12`, `#12`); `href` where the area has a page for it. */
@@ -49,8 +47,6 @@ export function TicketView({ t, c, ticket, access, breadcrumbs, order, newTicket
     status: ticket.status,
     updatedAt: ticket.updatedAt,
     resolvedAt: ticket.resolvedAt,
-    canRate: ticket.canRate,
-    csatScore: ticket.csatScore,
     messages: ticket.messages,
     seenByYou: ticket.seenByYou,
     seenBySupport: ticket.seenBySupport,
@@ -78,7 +74,6 @@ export function TicketView({ t, c, ticket, access, breadcrumbs, order, newTicket
                   team: t.ticket.team,
                   sentAt: t.ticket.sentAt,
                   reply: t.ticket.reply,
-                  csat: t.ticket.csat,
                   chat: t.ticket.chat,
                   closed: t.ticket.closed,
                 }}

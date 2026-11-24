@@ -9,9 +9,6 @@
 const MIN_DIGITS = 8;
 const MAX_DIGITS = 15;
 
-/** A referral code of the `?ref=` query: ASCII letters and digits only, 1 to 32 of them (what a merchant's own code looks like). */
-const REFERRAL_CODE = /^[A-Za-z0-9]{1,32}$/;
-
 /**
  * The digits of a phone number written in any common way ("+1 202 555 0100", "(1) 202-555-0100", "0012025550100").
  * Everything but digits is dropped, then the leading zeros: `wa.me` wants the number "in international format, omitting
@@ -58,15 +55,4 @@ export function whatsAppLink(digits: string, text: string): string {
 /** The `wa.me` link that opens a chat with `digits` and nothing typed (the home page's floating button). */
 export function whatsAppChatLink(digits: string): string {
   return `https://wa.me/${digits}`;
-}
-
-/**
- * A referral code from the `?ref=` query: trimmed and upper-cased, kept only when it is 1 to 32 letters or digits.
- * Anything else is null: unchecked query text never goes into the message or onto the page.
- */
-export function referralCodeFrom(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  // Checked before upper-casing: some letters (ß, ſ, ı) turn into A-Z only through the case mapping and must stay refused.
-  const code = raw.trim();
-  return REFERRAL_CODE.test(code) ? code.toUpperCase() : null;
 }

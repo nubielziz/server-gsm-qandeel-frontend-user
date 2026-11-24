@@ -73,7 +73,7 @@ describe("every page with link tabs wraps its list in <TabPanel>", () => {
   });
 
   it("finds the pages", () => {
-    expect(users.length).toBeGreaterThanOrEqual(7);
+    expect(users.length).toBeGreaterThanOrEqual(6);
   });
 
   for (const file of users) {

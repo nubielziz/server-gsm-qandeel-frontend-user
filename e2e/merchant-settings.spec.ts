@@ -1,37 +1,15 @@
-// Merchant settings and integrations: profile, security (password, 2FA, sessions), notifications + Telegram,
-// verification (KYC), API keys, webhooks and referrals. Real browser → Next → the isolated demo backend.
-// - Active merchant m1 is only read, except for harmless, restored changes (phone, one API key that ends revoked,
-//   one webhook that is deleted). Password, 2FA and KYC run on a freshly registered (pending) merchant.
-// - Mutating integration tests (API keys, webhooks) run on the desktop project only.
+// Merchant settings and integrations: profile, security (password, 2FA), notifications,
+// API keys. Real browser → Next → the isolated demo backend.
+// - Active merchant m1 is only read, except for harmless, restored changes (phone, one API key that ends revoked).
+//   Password and 2FA run on a throwaway merchant that staff invite (`freshMerchant`); the approval notice is read on the demo's
+//   own pending account.
+// - Mutating integration tests (API keys) run on the desktop project only.
 import { createHmac } from "node:crypto";
 import { expect, test } from "./fixtures";
-import { type APIRequestContext, type Request } from "@playwright/test";
-import { ACCOUNTS, BASE_URL, hydrated, signInMerchant } from "./helpers";
+import { type Request } from "@playwright/test";
+import { ACCOUNTS, freshMerchant, hydrated, signInMerchant } from "./helpers";
 
 // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────────────
-
-const STRONG_PASSWORD = "Quartz-Lamp-58203";
-
-/**
- * Registers a new merchant (it stays `pending`). Registration is rate limited per IP (a few per 10 minutes), so do it
- * once per suite; when the limit is hit, wait for the `Retry-After` the API gives and try again (up to 3 times).
- */
-async function registerPendingMerchant(request: APIRequestContext) {
-  const email = `settings-e2e-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.test`;
-  const send = () =>
-    request.post("/client/auth/register", {
-      headers: { Origin: new URL(BASE_URL).origin, "Content-Type": "application/json" },
-      data: { name: "E2E Check", email, password: STRONG_PASSWORD, country: "JO" },
-    });
-  let res = await send();
-  for (let attempt = 0; attempt < 3 && res.status() === 429; attempt++) {
-    const wait = Math.min(Number(res.headers()["retry-after"] ?? 60), 600);
-    await new Promise((resolve) => setTimeout(resolve, (wait + 1) * 1000));
-    res = await send();
-  }
-  expect(res.status(), await res.text()).toBe(204);
-  return { email, password: STRONG_PASSWORD };
-}
 
 function base32Decode(text: string): Buffer {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -66,6 +44,9 @@ test.describe("settings (active merchant)", () => {
     const nav = page.getByRole("navigation", { name: "Settings sections" });
     await expect(nav.getByRole("link", { name: "Profile" })).toHaveAttribute("aria-current", "page");
     await expect(nav.getByRole("link", { name: "Security" })).not.toHaveAttribute("aria-current", "page");
+    // The page of verification documents is gone: three tabs are left.
+    await expect(nav.getByRole("link")).toHaveCount(3);
+    await expect(nav.getByRole("link", { name: "Verification" })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Account summary" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Account security" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Contact support" })).toHaveAttribute("href", "/en/help");
@@ -111,29 +92,26 @@ test.describe("settings (active merchant)", () => {
     await expect(page.getByLabel("Full name")).toBeFocused();
   });
 
-  test("security: sessions list marks this device", async ({ page }) => {
-    await page.goto("/en/merchant/settings/security");
-    await expect(page.getByRole("heading", { name: "Active sessions" })).toBeVisible();
-    const sessions = page.locator("section#sessions");
-    await expect(sessions.getByText("This device", { exact: true })).toHaveCount(1);
-    await expect(sessions.getByRole("button", { name: "Sign out" })).toHaveCount(1);
+  test("security: password and two-step cards only; the old #sessions address opens the page without an error", async ({ page }) => {
+    // The per-device session list is retired; a bookmark or an old shortcut to its anchor still lands on the security page.
+    const response = await page.goto("/en/merchant/settings/security#sessions");
+    expect(response?.status()).toBe(200);
     await expect(page.getByRole("heading", { name: "Password" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Two-step verification" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Active sessions" })).toHaveCount(0);
+    await expect(page.locator("section#sessions")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Active sessions" })).toHaveCount(0);
   });
 
-  test("notifications: Telegram says it is not available, the threshold is validated, the Telegram switches stay disabled (Announcements on)", async ({ page }) => {
+  test("notifications: every event has one Email switch, the threshold is validated and discarding restores the form", async ({ page }) => {
     await page.goto("/en/merchant/settings/notifications");
     await expect(page.getByText("ops@zainmobilehub.example")).toBeVisible();
-    await expect(page.getByRole("switch", { name: "Telegram" }).first()).toBeDisabled();
 
-    // Announcements (`broadcast.announcement`): its Telegram switch starts on and takes effect once a chat is linked, so
-    // it is checked and disabled (F22; the account is only read here, e2e/merchant-account.spec.ts saves on a throwaway one).
+    // Announcements (`broadcast.announcement`): one switch, Email (the account is only read here, e2e/merchant-account.spec.ts
+    // saves on a throwaway one).
     const announcements = page.getByRole("group", { name: "Announcements" });
-    await expect(announcements.getByRole("switch", { name: "Telegram" })).toBeDisabled();
-    await expect(announcements.getByRole("switch", { name: "Telegram" })).toBeChecked();
-
-    await page.getByRole("button", { name: "Link Telegram" }).click();
-    await expect(page.getByText("Telegram notifications are not available yet.")).toBeVisible();
+    await expect(announcements.getByRole("switch")).toHaveCount(1);
+    const announcementsOn = await announcements.getByRole("switch", { name: "Email" }).isChecked();
 
     await page.getByLabel(/Alert me when my available balance/).fill("abc");
     await page.getByRole("switch", { name: "Email" }).nth(4).check();
@@ -143,7 +121,7 @@ test.describe("settings (active merchant)", () => {
     await page.getByRole("button", { name: "Discard changes" }).click();
     await expect(page.getByRole("switch", { name: "Email" }).nth(4)).not.toBeChecked();
     // Discarding leaves Announcements as the API showed it.
-    await expect(announcements.getByRole("switch", { name: "Telegram" })).toBeChecked();
+    expect(await announcements.getByRole("switch", { name: "Email" }).isChecked()).toBe(announcementsOn);
   });
 
   test("notifications: saving sends only what changed, and the change is restored", async ({ page }) => {
@@ -177,41 +155,34 @@ test.describe("settings (active merchant)", () => {
     expect(await save()).toEqual({ lowBalanceThreshold: null });
   });
 
-  test("verification: an approved merchant sees the status and no form", async ({ page }) => {
+  test("the old verification address opens the profile page", async ({ page }) => {
     await page.goto("/en/merchant/settings/verification");
-    await expect(page.getByText("Your documents were approved. Nothing more to do.")).toBeVisible();
-    await expect(page.getByText("Verification is informational.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Submit for review" })).toHaveCount(0);
+    await expect(page).toHaveURL(/\/en\/merchant\/settings$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Account settings" })).toBeVisible();
+    await expect(page.getByLabel("Full name")).toBeVisible();
   });
 
-  test("referrals: link, plan, referred merchants and commission filters", async ({ page }) => {
+  test("the old referrals address opens the merchant overview", async ({ page }) => {
     await page.goto("/en/merchant/referrals");
-    await expect(page.getByLabel("Referral code", { exact: true })).toHaveValue("GSM0001");
-    await expect(page.getByLabel("Referral link", { exact: true })).toHaveValue(/register\?ref=GSM0001$/);
-    await expect(page.getByRole("heading", { name: "Your commission plan" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Merchants you referred" })).toBeVisible();
-    await expect(page.getByRole("table", { name: "Commissions" })).toBeVisible();
-    await expect(page.getByRole("table", { name: "Commissions" }).locator("tbody tr").first()).toBeVisible();
-
-    // Status tab and month filter live in the URL and keep each other.
-    await page.getByRole("link", { name: "Approved" }).click();
-    await expect(page).toHaveURL(/status=approved/);
-    await page.getByLabel("Month").fill("1999-01");
-    await page.getByRole("button", { name: "Apply" }).click();
-    await expect(page).toHaveURL(/status=approved&period=1999-01|period=1999-01&status=approved/);
-    await expect(page.getByText("No commissions match these filters")).toBeVisible();
+    await expect(page).toHaveURL(/\/en\/merchant$/);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Welcome back,");
+    await page.goto("/en/merchant/referrals?status=approved&period=2026-11"); // a filtered bookmark ends on the same page
+    await expect(page).toHaveURL(/\/en\/merchant(\?|$)/);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Welcome back,");
   });
 
-  test("webhook deliveries: an unknown endpoint is a not-found page", async ({ page }) => {
-    await page.goto("/en/merchant/webhooks/999999");
-    await expect(page.getByText(/not found/i).first()).toBeVisible();
+  test("the old Webhooks addresses open the API keys page", async ({ page }) => {
+    for (const path of ["/en/merchant/webhooks", "/en/merchant/webhooks/12"]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/en\/merchant\/api-keys$/);
+      await expect(page.getByRole("heading", { level: 1, name: "API keys" })).toBeVisible();
+    }
   });
 
-  test("the settings, API keys and referrals pages open with their heading and do not scroll sideways", async ({ page }) => {
+  test("the settings and API keys pages open with their heading and do not scroll sideways", async ({ page }) => {
     for (const [path, heading] of [
       ["/en/merchant/settings", "Account settings"],
       ["/en/merchant/api-keys", "API keys"],
-      ["/en/merchant/referrals", "Referrals"],
     ] as const) {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
@@ -230,15 +201,17 @@ test.describe("settings (active merchant)", () => {
     // Browser validation first, then a server-side IP error that names the bad entry.
     await create.getByRole("button", { name: "Create key" }).click();
     await expect(create.getByText("Name the key.")).toBeVisible();
-    await expect(create.getByText("Choose at least one permission.")).toBeVisible();
+    // A key is a Dhru credential: no list of permissions to choose from.
+    await expect(create.getByText("Permissions")).toHaveCount(0);
     await create.getByLabel(/^Name/).fill(keyName);
-    await create.getByLabel(/Read orders/).check();
     await create.getByLabel(/Allowed IP addresses/).fill("203.0.113.9\nnot-an-ip");
     await create.getByRole("button", { name: "Create key" }).click();
     await expect(create.getByText(/not-an-ip: This is not a valid IP/)).toBeVisible();
 
     await create.getByLabel(/Allowed IP addresses/).fill("203.0.113.9");
+    const post = page.waitForRequest((r) => r.url().endsWith("/client/api-keys") && r.method() === "POST");
     await create.getByRole("button", { name: "Create key" }).click();
+    expect((await post).postDataJSON()).toEqual({ name: keyName, scopes: ["dhru"], allowedIps: ["203.0.113.9"] });
     const secretDialog = page.getByRole("dialog", { name: "Copy your API key now" });
     await expect(secretDialog).toBeVisible();
     await expect(secretDialog.getByText(/only time the key is shown/)).toBeVisible();
@@ -250,6 +223,7 @@ test.describe("settings (active merchant)", () => {
 
     const card = () => page.locator("article", { has: page.getByRole("heading", { name: keyName }) });
     await expect(card()).toContainText("203.0.113.9");
+    await expect(card().getByText("Permissions")).toHaveCount(0);
     await card().getByRole("button", { name: /Edit/ }).click();
     const edit = page.getByRole("dialog", { name: "Edit API key" });
     await edit.getByLabel(/Allowed IP addresses/).fill("203.0.113.77");
@@ -263,101 +237,34 @@ test.describe("settings (active merchant)", () => {
     await expect(card().getByText("Revoked")).toBeVisible();
     await expect(card().getByRole("button", { name: /Revoke/ })).toHaveCount(0);
   });
-
-  test("webhooks: create → secret shown once → test → deliveries → delete", async ({ page, isMobile }) => {
-    test.skip(isMobile, "mutating integration test: desktop project only");
-    const hookUrl = `https://example.com/e2e-${Date.now()}`;
-    await page.goto("/en/merchant/webhooks");
-    await page.getByRole("button", { name: "New endpoint" }).first().click();
-    const create = page.getByRole("dialog", { name: "New webhook endpoint" });
-
-    await create.getByLabel("Endpoint URL").fill("http://insecure.example/x");
-    await create.getByRole("button", { name: "Create endpoint" }).click();
-    await expect(create.getByText("The address must start with https://.")).toBeVisible();
-    await expect(create.getByText("Choose at least one event.")).toBeVisible();
-
-    await create.getByLabel("Endpoint URL").fill(hookUrl);
-    await create.getByLabel(/Invoice paid/).check();
-    await create.getByRole("button", { name: "Create endpoint" }).click();
-    const secretDialog = page.getByRole("dialog", { name: "Copy your signing secret now" });
-    await expect(secretDialog).toBeVisible();
-    expect((await secretDialog.locator("code").innerText()).trim()).toMatch(/^whsec_/);
-    await secretDialog.getByRole("button", { name: "I have copied the secret" }).click();
-
-    const card = () => page.locator("article", { has: page.getByRole("heading", { name: hookUrl }) });
-    await expect(card()).toBeVisible();
-
-    // A paused endpoint refuses a test (409); an active one accepts it (202).
-    await card().getByRole("switch").uncheck();
-    await expect(card().getByText("Paused").first()).toBeVisible();
-    await card().getByRole("button", { name: "Send test" }).click();
-    await expect(page.getByText("This endpoint is paused. Turn it on first.").first()).toBeVisible();
-    await card().getByRole("switch").check();
-    await expect(card().getByText("Active", { exact: true }).first()).toBeVisible();
-    await card().getByRole("button", { name: "Send test" }).click();
-    await expect(page.getByText("Test event sent").first()).toBeVisible();
-
-    await card().getByRole("link", { name: "Deliveries" }).click();
-    await expect(page).toHaveURL(/\/en\/merchant\/webhooks\/\d+$/);
-    await expect(page.getByRole("table", { name: "Webhook deliveries" }).locator("tbody tr").first()).toContainText("Test event");
-
-    await page.getByRole("link", { name: "All webhooks" }).click();
-    await card().getByRole("button", { name: "Delete" }).click();
-    await page.getByRole("dialog", { name: "Delete this endpoint?" }).getByRole("button", { name: "Delete endpoint" }).click();
-    await expect(page.getByText("Endpoint deleted").first()).toBeVisible();
-    await expect(card()).toHaveCount(0);
-  });
 });
 
-// ── pending merchant (a fresh registration) ─────────────────────────────────────────────────────────────────
+// ── merchant waiting for approval (the demo's pending account, only read) ───────────────────────────────────
+// Staff-made accounts are active at once, so the waiting state is no longer made by a test: the demo's own pending account is read.
 
-test.describe("settings (pending merchant)", () => {
-  test.describe.configure({ mode: "serial" });
-  let pending: { email: string; password: string };
-
-  test.beforeAll(async ({ playwright }) => {
-    test.setTimeout(25 * 60_000); // may have to wait out the registration rate limit
-    const request = await playwright.request.newContext({ baseURL: BASE_URL });
-    pending = await registerPendingMerchant(request);
-    await request.dispose();
-  });
-
+test.describe("settings (merchant waiting for approval)", () => {
   test.beforeEach(async ({ page }) => {
-    await signInMerchant(page, pending);
+    await signInMerchant(page, ACCOUNTS.pendingMerchant);
   });
 
-  test("API keys, webhooks, referrals and notifications show the approval notice, never a sign-out", async ({ page }) => {
-    for (const path of ["/en/merchant/api-keys", "/en/merchant/webhooks", "/en/merchant/referrals", "/en/merchant/settings/notifications"]) {
+  test("API keys and notifications show the approval notice, never a sign-out", async ({ page }) => {
+    for (const path of ["/en/merchant/api-keys", "/en/merchant/settings/notifications"]) {
       await page.goto(path);
       await expect(page.getByText("This page opens once your merchant account is approved.")).toBeVisible();
       await expect(page).toHaveURL(new RegExp(`${path}$`));
     }
-    // Profile, security and verification work.
+    // Profile and security work.
     await page.goto("/en/merchant/settings");
-    await expect(page.getByLabel("Full name")).toHaveValue("E2E Check");
+    await expect(page.getByLabel("Full name")).not.toHaveValue("");
     await expect(page.getByText("Pending approval").first()).toBeVisible();
   });
+});
 
-  test("verification: files are validated, uploaded and submitted for review", async ({ page }) => {
-    await page.goto("/en/merchant/settings/verification");
-    await expect(page.getByText("You have not sent any documents yet.")).toBeVisible();
+// ── a merchant that staff invited (a throwaway account for each test) ───────────────────────────────────────
 
-    await page.getByRole("button", { name: "Submit for review" }).click();
-    await expect(page.getByText("Add at least one document.")).toBeVisible();
-
-    const input = page.locator('input[type="file"]');
-    await input.setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello") });
-    await expect(page.getByText("Only PDF, JPEG or PNG files are accepted.")).toBeVisible();
-
-    await input.setInputFiles({ name: "company-registration.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%%EOF\n") });
-    await expect(page.getByText("company-registration.pdf")).toBeVisible();
-    await page.getByLabel(/^Note/).fill("Company registration");
-    await page.getByRole("button", { name: "Submit for review" }).click();
-
-    await expect(page.getByText("Our team is reviewing your documents.", { exact: false })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Submit for review" })).toHaveCount(0);
-    const download = page.getByRole("link", { name: /Download company-registration\.pdf/ });
-    await expect(download).toHaveAttribute("href", /^\/client\/files\/\d+$/);
+test.describe("settings (invited merchant)", () => {
+  test.beforeEach(async ({ page }) => {
+    await signInMerchant(page, await freshMerchant(page));
   });
 
   test("password: wrong current password and mismatch are reported on the right fields", async ({ page }) => {
@@ -406,11 +313,11 @@ test.describe("settings (pending merchant)", () => {
     await expect(card.getByText("Off", { exact: true })).toBeVisible();
   });
 
-  test("sessions: ending the current session goes to sign-in", async ({ page, isMobile }) => {
+  test("sign out: the account menu ends the merchant session and goes to sign-in", async ({ page, isMobile }) => {
     test.skip(isMobile, "same flow as desktop");
     await page.goto("/en/merchant/settings/security");
-    await page.locator("section#sessions").getByRole("button", { name: "Sign out" }).click();
-    await page.getByRole("dialog", { name: "Sign out of this device?" }).getByRole("button", { name: "Sign out" }).click();
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/en\/sign-in\?as=merchant/);
     await expect(async () => {
       const me = await page.request.get("/client/auth/me");

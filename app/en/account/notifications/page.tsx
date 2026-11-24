@@ -6,7 +6,6 @@ import { notifications } from "@/lib/i18n/messages/notifications";
 import type { SearchParams } from "@/lib/merchant/lists";
 import { PageHeader } from "@/components/layout/container";
 import { NotificationList, NotificationListSkeleton } from "@/components/notifications/notification-list";
-import { SoundToggle } from "@/components/notifications/sound-toggle";
 import { PageTransition } from "@/components/layout/page-transition";
 
 export function generateMetadata(): Metadata {
@@ -19,7 +18,7 @@ export default function CustomerNotificationsPage({ searchParams }: { searchPara
   return (
     <PageTransition>
       <div className="grid gap-4">
-        <PageHeader variant="card" title={t.title} description={t.subtitle} actions={<SoundToggle labels={t.sound} />} />
+        <PageHeader variant="card" title={t.title} description={t.subtitle} />
         <Suspense fallback={<NotificationListSkeleton />}>
           <NotificationList surface="customer" searchParams={searchParams} />
         </Suspense>

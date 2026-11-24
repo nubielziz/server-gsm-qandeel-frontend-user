@@ -1,7 +1,7 @@
 // Every test gets its own client IP: the browser context and its API requests send `X-Forwarded-For`, which the site
 // passes to the API (rewrites and server reads), and the isolated backend trusts it (TRUST_PROXY=loopback in
-// scripts/dev-backend.sh). Without this, all tests share one IP and the API's per-IP limits (30/min on token routes,
-// 5 sign-ups per 15 min) fail later tests. Import `test` and `expect` from here instead of @playwright/test.
+// scripts/dev-backend.sh). Without this, all tests share one IP and the API's per-IP limits (30/min on token routes)
+// fail later tests. Import `test` and `expect` from here instead of @playwright/test.
 import { test as base, expect } from "@playwright/test";
 
 /** A stable private IP per test (10.x.y.z from a hash of its id and the retry). */

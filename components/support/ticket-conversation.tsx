@@ -4,7 +4,7 @@
 // - `TicketLive`: the provider. It owns the state (`lib/support/conversation.ts`), the adapter (the customer's token or
 //   the merchant's id), the stream and the refetch. It renders no markup of its own, so a server page can wrap its whole body
 //   in it and keep the static parts as Server Components.
-// - `TicketConversation`: the card body: the messages, the typing line, the reply form and the rating.
+// - `TicketConversation`: the card body: the messages, the connection line and the reply form.
 // - `LiveTicketStatus` and `LiveTicketFacts`: the status badge and the dates of the page, which change with the ticket.
 // Rules this file keeps:
 // - The ticket the server read is the FIRST state. The visitor's own message is added from the answer of the `POST`; the
@@ -18,12 +18,11 @@
 //   time the stream becomes live (it opens without a cursor, so nothing is replayed: the server's read and the first `ready`,
 //   or a hidden page that shows again, would lose messages otherwise), and a lost doorbell is covered by the client's own
 //   `stream.refetch` (a resync, a reconnect, a hand-over between tabs). The scheduler merges the two reads into one.
-// - Support's messages are marked seen only while the tab is visible AND the end of the conversation is on screen; typing is
-//   sent at most once every 3 s (by the reply form); "Support is typing" lasts 6 s after the last event.
+// - Support's messages are marked seen only while the tab is visible AND the end of the conversation is on screen.
 // - A message that arrives scrolls the page to it only when the reader was at the end, else a "New message" button appears.
 //   A message the visitor sends always scrolls. Nothing here moves content: the lines and the button reserve or float.
 // - A resolved ticket is closed to the visitor (owner, 2026-11-15; lib/support/reply-area.ts): no reply box, no attach
-//   control, no typing ping, but a calm "This ticket is closed" notice (a polite live region) with the way to a new ticket.
+//   control, but a calm "This ticket is closed" notice (a polite live region) with the way to a new ticket.
 //   It follows the status live: a `ticket.updated` that resolves the ticket swaps the box for the notice (a draft is
 //   discarded, and the notice says so), a reopen brings the box back. A send that meets a ticket closed a moment ago
 //   (`409 TICKET_RESOLVED`) shows the notice with the visitor's text in it, and asks for a fresh read of the ticket.
@@ -43,7 +42,6 @@ import {
 } from "react";
 import { ArrowDown, Lock } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
-import { fmt } from "@/lib/i18n/define";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
 import { createConnectionStore, type ConnectionStore } from "@/lib/support/connection";
 import {
@@ -62,10 +60,8 @@ import { merchantAdapter, tokenAdapter, type TicketAdapter } from "@/lib/support
 import { isAbout, type TicketStatus } from "@/lib/support/ticket-events";
 import { openTicketStream } from "@/lib/support/ticket-stream";
 import { createRefreshScheduler } from "@/lib/realtime/refresh-scheduler";
-import { TicketCsatForm } from "@/components/support/ticket-csat-form";
 import { TicketMessages } from "@/components/support/ticket-messages";
 import { TicketReplyForm } from "@/components/support/ticket-reply-form";
-import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { DescriptionItem } from "@/components/ui/description-list";
@@ -75,7 +71,6 @@ import { StatusBadge } from "@/components/ui/status-badge";
 export type TicketAccess = { kind: "token"; token: string } | { kind: "merchant"; id: number };
 
 type TicketLiveValue = {
-  access: TicketAccess;
   adapter: TicketAdapter;
   state: ConversationState;
   dispatch: Dispatch<ConversationAction>;
@@ -107,7 +102,7 @@ export type TicketLiveProps = {
   children: ReactNode;
 };
 
-/** Owns the state of one open ticket and keeps it current: stream events, the refetch fallback, the typing timer. */
+/** Owns the state of one open ticket and keeps it current: stream events and the refetch fallback. */
 export function TicketLive({ number, access, source, children }: TicketLiveProps) {
   const token = access.kind === "token" ? access.token : "";
   const merchantId = access.kind === "merchant" ? access.id : 0;
@@ -156,9 +151,6 @@ export function TicketLive({ number, access, source, children }: TicketLiveProps
       client.subscribe("ticket.read", (data) => {
         if (about(data)) dispatch({ type: "read", by: data.by, upToMessageId: data.upToMessageId });
       }),
-      client.subscribe("ticket.typing", (data) => {
-        if (about(data)) dispatch({ type: "typing", now: Date.now() });
-      }),
       // A resync, a reconnect, a hand-over between tabs: events may have been missed, so read the ticket again.
       client.subscribe("stream.refetch", () => scheduler.request()),
       // Every time the stream becomes live, read the ticket: a stream opened without a cursor replays nothing, and the client's
@@ -195,17 +187,9 @@ export function TicketLive({ number, access, source, children }: TicketLiveProps
     };
   }, [adapter, number, connection]);
 
-  // "Support is typing" ends by itself: tell the reducer when its time is up.
-  const { typingUntil } = state;
-  useEffect(() => {
-    if (typingUntil === 0) return;
-    const timer = window.setTimeout(() => dispatch({ type: "tick", now: Date.now() }), Math.max(0, typingUntil - Date.now()) + 50);
-    return () => window.clearTimeout(timer);
-  }, [typingUntil]);
-
   const value = useMemo(
-    () => ({ access, adapter, state, dispatch, connection, refresh: () => requestRead.current() }),
-    [access, adapter, state, connection],
+    () => ({ adapter, state, dispatch, connection, refresh: () => requestRead.current() }),
+    [adapter, state, connection],
   );
   return <TicketLiveContext.Provider value={value}>{children}</TicketLiveContext.Provider>;
 }
@@ -242,7 +226,7 @@ export function LiveTicketFacts({
 
 export type TicketConversationTexts = Pick<
   SupportMessages["ticket"],
-  "conversation" | "you" | "team" | "sentAt" | "reply" | "csat" | "chat" | "closed"
+  "conversation" | "you" | "team" | "sentAt" | "reply" | "chat" | "closed"
 >;
 
 function subscribeVisibility(listener: () => void) {
@@ -267,9 +251,9 @@ export type TicketConversationProps = {
   newTicketHref: string;
 };
 
-/** The messages, the typing and connection line, the rating (customers) and the reply form, or the closed notice. */
+/** The messages, the connection line and the reply form, or the closed notice. */
 export function TicketConversation({ t, newTicketHref }: TicketConversationProps) {
-  const { access, adapter, state, dispatch, connection, refresh } = useTicketLive();
+  const { adapter, state, dispatch, connection, refresh } = useTicketLive();
   const end = useRef<HTMLDivElement>(null);
   const markedUpTo = useRef(0);
 
@@ -354,7 +338,6 @@ export function TicketConversation({ t, newTicketHref }: TicketConversationProps
   }
 
   const hint = state.status === "pending" ? t.reply.pendingHint : undefined;
-  const typing = state.typingUntil !== 0;
 
   return (
     <>
@@ -383,9 +366,8 @@ export function TicketConversation({ t, newTicketHref }: TicketConversationProps
             </button>
           ) : null}
         </div>
-        {/* Reserved line, so "typing" and the connection never move what is below. */}
-        <div className="mt-2 flex min-h-6 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-small text-ink-subtle">
-          <p aria-live="polite">{typing ? t.chat.typing : null}</p>
+        {/* Reserved line, so the connection never moves what is below. */}
+        <div className="mt-2 flex min-h-6 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-small text-ink-subtle">
           <p role="status" className="inline-flex items-center gap-1.5">
             {link === "idle" ? null : (
               <>
@@ -396,14 +378,6 @@ export function TicketConversation({ t, newTicketHref }: TicketConversationProps
           </p>
         </div>
       </div>
-
-      {access.kind === "token" && state.canRate ? (
-        <div className="rounded-card border border-line bg-surface-muted p-4">
-          <TicketCsatForm token={access.token} t={t.csat} onSaved={(score) => dispatch({ type: "rated", csatScore: score })} />
-        </div>
-      ) : state.csatScore ? (
-        <Alert tone="success">{fmt(t.csat.thanks, { score: state.csatScore })}</Alert>
-      ) : null}
 
       <div className="border-t border-line pt-5">
         {/* Always there, so the notice is announced when it appears. */}

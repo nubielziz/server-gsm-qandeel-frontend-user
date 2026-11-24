@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { displayWhatsAppNumber, merchantWhatsApp, normaliseWhatsAppNumber, referralCodeFrom, whatsAppChatLink, whatsAppLink } from "./whatsapp";
+import { displayWhatsAppNumber, merchantWhatsApp, normaliseWhatsAppNumber, whatsAppChatLink, whatsAppLink } from "./whatsapp";
 
 describe("normaliseWhatsAppNumber", () => {
   it("keeps only the digits of a number written with a plus, spaces, dashes or brackets", () => {
@@ -75,35 +75,6 @@ describe("whatsAppLink", () => {
     expect(link).toBe("https://wa.me/12025550100?text=a%26b%20%231%20c%2Bd");
     expect(new URL(link).searchParams.get("text")).toBe("a&b #1 c+d");
     expect(new URL(link).hash).toBe("");
-  });
-});
-
-describe("referralCodeFrom", () => {
-  it("upper-cases a code and trims the spaces around it", () => {
-    expect(referralCodeFrom("gsm0001")).toBe("GSM0001");
-    expect(referralCodeFrom("  abc123  ")).toBe("ABC123");
-  });
-
-  it("keeps a code that is already valid", () => {
-    expect(referralCodeFrom("GSM0001")).toBe("GSM0001");
-    expect(referralCodeFrom("A")).toBe("A");
-    expect(referralCodeFrom("A".repeat(32))).toBe("A".repeat(32));
-  });
-
-  it("refuses markup, spaces inside, punctuation and anything longer than 32", () => {
-    expect(referralCodeFrom("<script>")).toBeNull();
-    expect(referralCodeFrom("a b")).toBeNull();
-    expect(referralCodeFrom("GSM-0001")).toBeNull();
-    expect(referralCodeFrom("A".repeat(33))).toBeNull();
-    expect(referralCodeFrom("جمعة")).toBeNull();
-    expect(referralCodeFrom("gſm0001")).toBeNull(); // "ſ" would upper-case to "S"
-  });
-
-  it("refuses empty, blank and missing values", () => {
-    expect(referralCodeFrom("")).toBeNull();
-    expect(referralCodeFrom("   ")).toBeNull();
-    expect(referralCodeFrom(null)).toBeNull();
-    expect(referralCodeFrom(undefined)).toBeNull();
   });
 });
 

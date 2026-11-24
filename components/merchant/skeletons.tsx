@@ -78,14 +78,7 @@ export function DashboardSkeleton() {
           <Skeleton className="h-28 rounded-card" />
         </div>
       </div>
-      <div className="grid gap-4 xl:grid-cols-12">
-        <Skeleton className="h-36 rounded-card xl:col-span-7" />
-        <Skeleton className="h-36 rounded-card xl:col-span-5" />
-      </div>
-      <div className="grid gap-4 xl:grid-cols-12">
-        <Skeleton className="h-96 rounded-card xl:col-span-8" />
-        <Skeleton className="h-96 rounded-card xl:col-span-4" />
-      </div>
+      <Skeleton className="h-96 rounded-card" />
     </div>
   );
 }

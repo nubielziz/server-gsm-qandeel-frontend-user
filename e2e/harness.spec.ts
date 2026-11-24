@@ -7,7 +7,6 @@ import { randomUUID } from "node:crypto";
 import { type APIRequestContext } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import {
-  approveMerchant,
   availableCodes,
   base32Decode,
   completeOrder,
@@ -28,7 +27,7 @@ import {
   totp,
   unfreezeCustomerWallet,
 } from "./admin";
-import { BASE_URL, DEV_TURNSTILE_TOKEN, fixtures, freshCustomer, freshMerchant, signInCustomer, signInMerchant } from "./helpers";
+import { BASE_URL, DEV_TURNSTILE_TOKEN, fixtures, freshCustomer, freshMerchant, signInCustomer, signInMerchant, tokenOf, waitForLink } from "./helpers";
 
 // API only: one project is enough (the setup, the accounts and the campaign are the same on both).
 test.skip(({ isMobile }) => isMobile, "API only: the desktop project is enough");
@@ -124,19 +123,24 @@ test.describe("helpers", () => {
     expect((await page.request.get("/store/v1/me")).status()).toBe(200);
   });
 
-  test("freshMerchant registers a pending merchant; staff approve it; verify follows the email link", async ({ page }) => {
+  test("freshMerchant: staff invite, the invitation sets the password; unverified follows a staff change of the address", async ({ page }) => {
     const { email, password } = await freshMerchant(page);
     expect(await signInMerchant(page, { email, password })).not.toBe("");
-    const pending = await getJson<{ status: string; emailVerifiedAt: string | null }>(page.request, "/client/auth/me");
-    expect(pending).toMatchObject({ status: "pending", emailVerifiedAt: null });
+    const active = await getJson<{ status: string; emailVerifiedAt: string | null }>(page.request, "/client/auth/me");
+    expect(active).toMatchObject({ status: "active", emailVerifiedAt: expect.any(String) }); // an invitation proves the mailbox
 
-    const id = await merchantIdByEmail(email);
-    await approveMerchant(id);
-    await approveMerchant(id); // an active merchant is left alone
-    expect((await getJson<{ status: string }>(page.request, "/client/auth/me")).status).toBe("active");
+    const unverified = await freshMerchant(page, { unverified: true });
+    expect(unverified.email).not.toBe(email);
+    await signInMerchant(page, unverified);
+    expect((await getJson<{ emailVerifiedAt: string | null }>(page.request, "/client/auth/me")).emailVerifiedAt).toBeNull();
 
-    const verified = await freshMerchant(page, { verify: true });
-    await signInMerchant(page, verified);
+    // The verification link went to the new address and verifies it.
+    const link = await waitForLink(page, unverified.email, /\/merchant\/verify-email\?token=/);
+    const verified = await page.request.post("/client/auth/verify-email", {
+      headers: { Origin: siteOrigin, "Content-Type": "application/json" },
+      data: { token: tokenOf(link) },
+    });
+    expect(verified.status(), await verified.text()).toBe(204);
     expect((await getJson<{ emailVerifiedAt: string | null }>(page.request, "/client/auth/me")).emailVerifiedAt).not.toBeNull();
   });
 
@@ -183,7 +187,6 @@ test.describe("helpers", () => {
   test("staff make an API key for a merchant and complete the merchant's order", async ({ page }) => {
     const { email, password } = await freshMerchant(page);
     const merchantId = await merchantIdByEmail(email);
-    await approveMerchant(merchantId);
     expect(await creditMerchant(merchantId, 50)).toBe("50.0000");
 
     const key = await staffApiKeyFor(merchantId, "e2e support key");

@@ -1,16 +1,14 @@
 // Profile (mockup "Personal Information"): editable name, company, phone, country, address and tax id; read-only email
-// (with "Resend verification email" while unverified), username, group, referral code, status and verification. Works
-// for pending merchants too (handoff §4.15).
+// (with "Resend verification email" while unverified), username, group and status. Works for pending
+// merchants too (handoff §4.15).
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { requireMerchant } from "@/lib/api/session";
 import { countryOptions } from "@/lib/countries";
 import { formatPercent } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
 import { common, statusLabel } from "@/lib/i18n/messages/common";
 import { merchantSettings } from "@/lib/i18n/messages/merchant-settings";
-import { sitePath } from "@/lib/site-path";
 import { ProfileForm } from "@/components/merchant-settings/profile-form";
 import { utcDate } from "@/components/merchant-settings/format";
 import { CardSkeleton } from "@/components/merchant-settings/skeletons";
@@ -72,25 +70,9 @@ async function ProfileContent() {
                 {fmt(t.layout.summary.discount, { percent: formatPercent(me.group.discountPercent) })}
               </span>
             </DescriptionItem>
-            <DescriptionItem label={t.profile.details.referralCode}>
-              <span dir="ltr" className="num">
-                {me.referralCode}
-              </span>
-            </DescriptionItem>
             <DescriptionItem label={t.profile.details.memberSince}>{utcDate(me.createdAt)}</DescriptionItem>
             <DescriptionItem label={t.profile.details.status}>
               <StatusBadge kind="account" status={me.status} label={statusLabel(c, "account", me.status)} />
-            </DescriptionItem>
-            <DescriptionItem label={t.profile.details.kyc}>
-              <span className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-                <StatusBadge kind="kyc" status={me.kycStatus} label={statusLabel(c, "kyc", me.kycStatus)} />
-                <Link
-                  href={sitePath("/merchant/settings/verification")}
-                  className="inline-flex min-h-11 items-center text-small font-semibold text-ink underline underline-offset-4"
-                >
-                  {t.profile.details.viewKyc}
-                </Link>
-              </span>
             </DescriptionItem>
           </DescriptionList>
         </CardBody>

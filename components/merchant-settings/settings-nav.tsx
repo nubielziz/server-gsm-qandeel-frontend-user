@@ -1,7 +1,7 @@
 // The settings sub-navigation (mockup "Account Settings"): on desktop a card on the start side with a black bar on
 // the active item, on phones a row of pill tabs that scrolls sideways. One list, two looks, so there are no
 // duplicate links. NavLink marks the current page with aria-current.
-import { Bell, BadgeCheck, ShieldCheck, User } from "lucide-react";
+import { Bell, ShieldCheck, User } from "lucide-react";
 import { sitePath } from "@/lib/site-path";
 import { NavLink } from "@/components/layout/nav-link";
 import { Card } from "@/components/ui/card";
@@ -12,7 +12,6 @@ export type SettingsNavLabels = {
   profile: string;
   security: string;
   notifications: string;
-  verification: string;
 };
 
 const itemClasses =
@@ -29,7 +28,6 @@ export function SettingsNav({ labels }: { labels: SettingsNavLabels }) {
     { href: "/merchant/settings", label: labels.profile, icon: <User aria-hidden="true" />, match: "exact" as const },
     { href: "/merchant/settings/security", label: labels.security, icon: <ShieldCheck aria-hidden="true" /> },
     { href: "/merchant/settings/notifications", label: labels.notifications, icon: <Bell aria-hidden="true" /> },
-    { href: "/merchant/settings/verification", label: labels.verification, icon: <BadgeCheck aria-hidden="true" /> },
   ];
   return (
     <nav aria-label={labels.navLabel}>

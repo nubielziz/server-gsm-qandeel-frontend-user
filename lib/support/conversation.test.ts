@@ -7,10 +7,6 @@ import {
   lastIdFrom,
   nextReadMark,
   receiptOf,
-  shouldSendTyping,
-  typingActive,
-  TYPING_SEND_GAP_MS,
-  TYPING_SHOW_MS,
   type TicketSource,
 } from "./conversation";
 
@@ -26,8 +22,6 @@ const source = (overrides: Partial<TicketSource> = {}): TicketSource => ({
   status: "open",
   updatedAt: "2026-11-15T10:00:10.000Z",
   resolvedAt: null,
-  canRate: false,
-  csatScore: null,
   messages: [message(1, "you"), message(2, "support")],
   ...overrides,
 });
@@ -41,16 +35,22 @@ describe("initialState: the ticket the server read", () => {
     expect(state.messages.every((m) => Array.isArray(m.attachments))).toBe(true);
   });
 
-  it("starts with no seen marks and no typing when the answer has none (an older backend)", () => {
+  it("starts with no seen marks when the answer has none (an older backend)", () => {
     const state = start();
-    expect([state.seenByYou, state.seenBySupport, state.typingUntil]).toEqual([0, 0, 0]);
-    expect(state.canRate).toBe(false);
-    expect(state.csatScore).toBeNull();
+    expect([state.seenByYou, state.seenBySupport]).toEqual([0, 0]);
   });
 
-  it("takes the seen marks and the rating the server sent", () => {
-    const state = start({ seenByYou: 2, seenBySupport: 1, canRate: true, csatScore: 4 });
-    expect([state.seenByYou, state.seenBySupport, state.canRate, state.csatScore]).toEqual([2, 1, true, 4]);
+  it("takes the seen marks the server sent", () => {
+    const state = start({ seenByYou: 2, seenBySupport: 1 });
+    expect([state.seenByYou, state.seenBySupport]).toEqual([2, 1]);
+  });
+
+  it("ignores the rating keys an older backend still sends: the state holds none", () => {
+    const older = { ...source(), canRate: true, csatScore: 4 };
+    const state = initialState(older);
+    expect(state).not.toHaveProperty("canRate");
+    expect(state).not.toHaveProperty("csatScore");
+    expect(state).not.toHaveProperty("typingUntil");
   });
 });
 
@@ -107,10 +107,10 @@ describe("sent: the visitor writing moves a pending ticket to open, never reopen
     expect(next.status).toBe("open");
   });
 
-  it("leaves a resolved ticket resolved, with its date and its rating form (only staff reopen it)", () => {
-    const state = start({ status: "resolved", resolvedAt: "2026-11-15T10:00:09.000Z", canRate: true });
+  it("leaves a resolved ticket resolved, with its date (only staff reopen it)", () => {
+    const state = start({ status: "resolved", resolvedAt: "2026-11-15T10:00:09.000Z" });
     const next = conversationReducer(state, { type: "sent", message: message(8, "you") });
-    expect([next.status, next.resolvedAt, next.canRate]).toEqual(["resolved", "2026-11-15T10:00:09.000Z", true]);
+    expect([next.status, next.resolvedAt]).toEqual(["resolved", "2026-11-15T10:00:09.000Z"]);
   });
 
   it("leaves an open or new ticket as it is", () => {
@@ -139,13 +139,13 @@ describe("closed: the API refused the visitor's message as 409 TICKET_RESOLVED",
     expect(conversationReducer(state, { type: "closed" })).toBe(state);
   });
 
-  it("the ticket.updated that follows (newer) brings the dates and the rating form", () => {
+  it("the ticket.updated that follows (newer) brings the dates", () => {
     const closed = conversationReducer(start({ status: "open" }), { type: "closed" });
     const next = conversationReducer(closed, {
       type: "updated",
-      data: { status: "resolved", updatedAt: "2026-11-15T10:30:00.000Z", resolvedAt: "2026-11-15T10:30:00.000Z", canRate: true, csatScore: null },
+      data: { status: "resolved", updatedAt: "2026-11-15T10:30:00.000Z", resolvedAt: "2026-11-15T10:30:00.000Z" },
     });
-    expect([next.status, next.resolvedAt, next.canRate]).toEqual(["resolved", "2026-11-15T10:30:00.000Z", true]);
+    expect([next.status, next.resolvedAt]).toEqual(["resolved", "2026-11-15T10:30:00.000Z"]);
   });
 });
 
@@ -154,13 +154,19 @@ describe("updated and snapshot: never older data over newer", () => {
     status,
     updatedAt,
     resolvedAt: status === "resolved" ? updatedAt : null,
-    canRate: status === "resolved",
-    csatScore: null,
   });
 
   it("applies a newer ticket.updated", () => {
     const state = conversationReducer(start(), { type: "updated", data: data("2026-11-15T10:05:00.000Z") });
-    expect([state.status, state.canRate, state.updatedAt]).toEqual(["resolved", true, "2026-11-15T10:05:00.000Z"]);
+    expect([state.status, state.updatedAt]).toEqual(["resolved", "2026-11-15T10:05:00.000Z"]);
+  });
+
+  it("an older backend's rating keys in the event never reach the state", () => {
+    const older = { ...data("2026-11-15T10:05:00.000Z"), canRate: true, csatScore: 4 };
+    const state = conversationReducer(start(), { type: "updated", data: older });
+    expect(state.status).toBe("resolved");
+    expect(state).not.toHaveProperty("canRate");
+    expect(state).not.toHaveProperty("csatScore");
   });
 
   it("ignores an older one and returns the same state", () => {
@@ -171,14 +177,14 @@ describe("updated and snapshot: never older data over newer", () => {
   it("a snapshot adds the messages it brings and the newer status", () => {
     const next = conversationReducer(start(), {
       type: "snapshot",
-      source: source({ status: "resolved", updatedAt: "2026-11-15T10:30:00.000Z", resolvedAt: "2026-11-15T10:30:00.000Z", canRate: true, messages: [message(1, "you"), message(2, "support"), message(3, "support")], seenBySupport: 1 }),
+      source: source({ status: "resolved", updatedAt: "2026-11-15T10:30:00.000Z", resolvedAt: "2026-11-15T10:30:00.000Z", messages: [message(1, "you"), message(2, "support"), message(3, "support")], seenBySupport: 1 }),
     });
     expect(next.messages.map((m) => m.id)).toEqual([1, 2, 3]);
-    expect([next.status, next.canRate, next.seenBySupport]).toEqual(["resolved", true, 1]);
+    expect([next.status, next.seenBySupport]).toEqual(["resolved", 1]);
   });
 
   it("an older snapshot keeps the newer status but still learns new messages and marks", () => {
-    const state = start({ status: "resolved", updatedAt: "2026-11-15T11:00:00.000Z", canRate: true });
+    const state = start({ status: "resolved", updatedAt: "2026-11-15T11:00:00.000Z" });
     const next = conversationReducer(state, {
       type: "snapshot",
       source: source({ status: "open", updatedAt: "2026-11-15T10:00:00.000Z", messages: [message(1, "you"), message(2, "support"), message(3, "support")], seenByYou: 2 }),
@@ -192,12 +198,6 @@ describe("updated and snapshot: never older data over newer", () => {
     const state = start({ seenByYou: 5, seenBySupport: 4 });
     const next = conversationReducer(state, { type: "snapshot", source: source({ seenByYou: 1, seenBySupport: 1 }) });
     expect([next.seenByYou, next.seenBySupport]).toEqual([5, 4]);
-  });
-
-  it("the rating form's answer ends the rating", () => {
-    const state = start({ status: "resolved", canRate: true });
-    const next = conversationReducer(state, { type: "rated", csatScore: 5 });
-    expect([next.canRate, next.csatScore]).toEqual([false, 5]);
   });
 });
 
@@ -229,31 +229,6 @@ describe("seen marks: one per side, forward only", () => {
   });
 });
 
-describe("support is typing: 6 s, ended by its message", () => {
-  it("shows for 6 s after the last typing event and ends on the tick", () => {
-    let state = conversationReducer(start(), { type: "typing", now: 1_000 });
-    expect(state.typingUntil).toBe(1_000 + TYPING_SHOW_MS);
-    expect(typingActive(state, 6_999)).toBe(true);
-    expect(typingActive(state, 7_000)).toBe(false);
-    // Another event moves the end.
-    state = conversationReducer(state, { type: "typing", now: 5_000 });
-    expect(state.typingUntil).toBe(5_000 + TYPING_SHOW_MS);
-    expect(conversationReducer(state, { type: "tick", now: 10_999 })).toBe(state);
-    expect(conversationReducer(state, { type: "tick", now: 11_000 }).typingUntil).toBe(0);
-  });
-
-  it("a tick with nothing showing changes nothing", () => {
-    const state = start();
-    expect(conversationReducer(state, { type: "tick", now: 99_999 })).toBe(state);
-  });
-
-  it("ends when a message from support arrives, but not for the visitor's own message", () => {
-    const typing = conversationReducer(start(), { type: "typing", now: 1_000 });
-    expect(conversationReducer(typing, { type: "message", message: message(9, "support") }).typingUntil).toBe(0);
-    expect(conversationReducer(typing, { type: "message", message: message(9, "you") }).typingUntil).toBe(1_000 + TYPING_SHOW_MS);
-  });
-});
-
 describe("nextReadMark: seen only when visible and the end is on screen", () => {
   const base = { lastSupportId: 4, seenByYou: 2, markedUpTo: 0, visible: true, onScreen: true };
 
@@ -275,30 +250,5 @@ describe("nextReadMark: seen only when visible and the end is on screen", () => 
 
   it("sends again for a newer message", () => {
     expect(nextReadMark({ ...base, markedUpTo: 4, lastSupportId: 7 })).toBe(7);
-  });
-});
-
-describe("shouldSendTyping: at most once every 3 s, never for an empty box", () => {
-  it("sends the first ping, then waits 3 s", () => {
-    expect(shouldSendTyping({ text: "h", lastSentAt: null, now: 0 })).toBe(true);
-    expect(shouldSendTyping({ text: "he", lastSentAt: 0, now: TYPING_SEND_GAP_MS - 1 })).toBe(false);
-    expect(shouldSendTyping({ text: "hel", lastSentAt: 0, now: TYPING_SEND_GAP_MS })).toBe(true);
-  });
-
-  it("sends nothing for an empty or blank box", () => {
-    expect(shouldSendTyping({ text: "", lastSentAt: null, now: 0 })).toBe(false);
-    expect(shouldSendTyping({ text: "   \n", lastSentAt: null, now: 0 })).toBe(false);
-  });
-
-  it("a long burst of keystrokes sends one ping per 3 s window", () => {
-    let last: number | null = null;
-    let pings = 0;
-    for (let now = 0; now < 10_000; now += 100) {
-      if (shouldSendTyping({ text: "typing", lastSentAt: last, now })) {
-        last = now;
-        pings += 1;
-      }
-    }
-    expect(pings).toBe(4); // 0, 3000, 6000, 9000
   });
 });

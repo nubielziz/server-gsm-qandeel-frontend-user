@@ -1,6 +1,6 @@
 // Staff-side helpers of the e2e suite: the admin API of the ISOLATED demo backend (http://localhost:3100).
 // Used by e2e/global-setup.ts (demo data the specs expect) and by specs that need what only staff can do: credit a
-// wallet, approve a top-up, send a notification, hand out a temporary password.
+// wallet, approve a top-up, create a merchant, send a notification, hand out a temporary password.
 //
 // Rules this file keeps:
 // - It talks to the API directly with Node's fetch (not through the site), as the seeded Owner, from 127.0.0.1: the admin
@@ -578,13 +578,27 @@ export async function merchantIdByEmail(email: string): Promise<number> {
   return row.id;
 }
 
-/** Approves a pending merchant (`status: "active"`). An active merchant is left alone; a suspended one is an error. */
-export async function approveMerchant(merchantId: number): Promise<void> {
-  const current = (await adminCall<MerchantRow>("GET", `/admin/clients/${merchantId}`)).body;
-  if (current.status === "active") return;
-  if (current.status !== "pending") throw new Error(`Merchant ${merchantId} is ${current.status}, not pending.`);
-  // 409: a parallel run approved it between our read and our write.
-  await adminCall("PATCH", `/admin/clients/${merchantId}`, { json: { status: "active" }, allow: [409] });
+/**
+ * Staff create a merchant account, as the console's invite does (`POST /admin/clients`). The account is active at once and has no
+ * password: an invitation link is mailed to the address and the merchant sets a password from it (`freshMerchant` does that).
+ * The backend before the approval step went away makes the account `pending`; it is activated here, so both backends hand out
+ * the same account.
+ *
+ * @returns the staff id of the new merchant
+ */
+export async function inviteMerchant(email: string, name = "E2E Merchant"): Promise<number> {
+  const created = (await adminCall<MerchantRow>("POST", "/admin/clients", { json: { name, email, country: "JO", invite: true } })).body;
+  if (created.status === "pending") await adminCall("PATCH", `/admin/clients/${created.id}`, { json: { status: "active" } });
+  return created.id;
+}
+
+/**
+ * Staff change a merchant's address (`PATCH /admin/clients/:id` with `email`). The verification is cleared and a verification link
+ * is mailed to the new address; the old address gets a notice and every session of the merchant ends. It is the way a merchant
+ * with an unverified email is made now: an invitation always verifies.
+ */
+export async function changeMerchantEmail(merchantId: number, email: string): Promise<void> {
+  await adminCall("PATCH", `/admin/clients/${merchantId}`, { json: { email } });
 }
 
 /**
@@ -613,7 +627,7 @@ export async function temporaryMerchantPassword(merchantId: number): Promise<str
 /** Makes an API key for a merchant as staff (the merchant's list then marks it `createdByStaff`). The secret is shown once. */
 export async function staffApiKeyFor(merchantId: number, name: string): Promise<{ id: number; name: string; prefix: string; secret: string }> {
   const reply = await adminCall<{ key: { id: number; prefix: string }; secret: string }>("POST", `/admin/clients/${merchantId}/api-keys`, {
-    json: { name, scopes: ["orders:read"] },
+    json: { name, scopes: ["dhru"] },
   });
   return { id: reply.body.key.id, name, prefix: reply.body.key.prefix, secret: reply.body.secret };
 }
@@ -749,7 +763,7 @@ export interface CampaignOptions {
   link?: string | { customer?: string; merchant?: string };
   purpose?: "service" | "marketing";
   /** Default `["in_app"]`. */
-  channels?: ("in_app" | "email" | "telegram")[];
+  channels?: ("in_app" | "email")[];
 }
 
 /**

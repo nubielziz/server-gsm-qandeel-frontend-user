@@ -28,13 +28,6 @@ export function isMoneyInput(value: string): boolean {
   return /^\d{1,12}(\.\d{1,4})?$/.test(value.trim());
 }
 
-/** 1536 → "2 KB", 5242880 → "5.0 MB". */
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
 /** True when the time is already behind us (an expired key). Call on the server, per request. */
 export function isPast(iso: string): boolean {
   return Date.parse(iso) < Date.now();

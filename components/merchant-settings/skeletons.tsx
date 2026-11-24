@@ -23,7 +23,7 @@ export function CardSkeleton({ rows = 4, footer = true }: { rows?: number; foote
   );
 }
 
-/** A page header plus a list of `rows` cards (API keys, webhooks, commissions). */
+/** A page header plus a list of `rows` cards (API keys). */
 export function ListSkeleton({ rows = 3, rowHeight = "h-40" }: { rows?: number; rowHeight?: string }) {
   return (
     <div className="grid gap-4" aria-busy="true">

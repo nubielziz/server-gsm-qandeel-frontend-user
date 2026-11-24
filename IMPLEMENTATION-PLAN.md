@@ -511,7 +511,7 @@ CMD ["node", "server.js"]
 **`helpers.ts` additions** (moved from the specs that copy them today; the old specs keep their private copies until their owner feature touches them):
 - `stubTurnstile(page)`, `go(page, url)`, `uniqueEmail(prefix)`, `waitForLink(page, address, pattern, skip?)`
 - `freshCustomer(page, withPassword?)`
-- `freshMerchant(page, { verify? })`: `POST /client/auth/register` with `Origin` and the dev Turnstile token; returns `{ email, password }`
+- `freshMerchant(page, { unverified? })`: staff create the account (`inviteMerchant`), the merchant sets a password from the invitation mail (`POST /client/auth/password/reset`); `unverified` adds a staff change of the address; returns `{ email, password }` (first made with `POST /client/auth/register` and `verify?`, changed on 2026-11-24 when that route was retired)
 - `signInMerchant` and `signInCustomer` now also send `X-Turnstile-Token` (so they pass with `TURNSTILE_MERCHANT_AUTH=true`)
 - `fixtures()` reads `e2e/.auth/fixtures.json`
 
@@ -528,7 +528,7 @@ CMD ["node", "server.js"]
 | `setQuantityRule(serviceId, rule)` | `PATCH /admin/services/:id { minQty, maxQty, qtyOptions }` |
 | `availableCodes(serviceId)`, `importCodes(serviceId, n)` | `GET /admin/inventory-codes?serviceId=&status=available&_start=0&_end=1` (`x-total-count`); `POST /admin/services/:id/inventory/import { codes }` (unique codes, 6 to 128 characters, no spaces) |
 | `sendCampaign({ to, title, body, ar?, link?, purpose?, channels? })` | `POST /admin/notification-campaigns` with `audience: { include: [{ type, id }] }`, then `POST /admin/notification-campaigns/:id/send { confirmRecipients }` |
-| `merchantIdByEmail(email)`, `approveMerchant(id)` | `GET /admin/clients?q=`, `PATCH /admin/clients/:id { status: "active" }` |
+| `merchantIdByEmail(email)`, `inviteMerchant(email)`, `changeMerchantEmail(id, email)` | `GET /admin/clients?q=`, `POST /admin/clients { name, email, country, invite: true }`, `PATCH /admin/clients/:id { email }` (`approveMerchant` went on 2026-11-24 with the approval step) |
 | `temporaryMerchantPassword(id)`, `temporaryCustomerPassword(id)` | `POST /admin/clients/:id/password { mode: "temporary_password" }`, `POST /admin/customers/:id/password { mode: "temporary_password" }` |
 | `staffApiKeyFor(merchantId, name)` | `POST /admin/clients/:id/api-keys { name, scopes: ["orders:read"] }` |
 | `completeOrder(orderId, code)` | `POST /admin/orders/:id/reply { code }` |
@@ -1044,7 +1044,7 @@ Gateway body for `ensureCustomerWallet()`:
   4. Address and tax id save and survive a reload; a 301-character address is refused on its field.
   5. Changing the email language sends `{ locale: "ar" }`.
   6. The header switcher on a portal page sends `PATCH /client/profile { locale: "ar" }` before it navigates.
-  7. `approveMerchant` + `staffApiKeyFor` → the key row shows "Made by support".
+  7. `freshMerchant` + `staffApiKeyFor` → the key row shows "Made by support".
   8. The Announcements row shows its translated title; saving the Email switch alone answers 200 (no "Link Telegram first").
   9. `mustChangePassword` (mocked in the browser on `GET /client/auth/me` is not possible for server reads): covered by a unit-level render test of the gate's decision function, and by the lead's manual check in §7.
   10. On a service page the switcher's link target is the alternate slug.

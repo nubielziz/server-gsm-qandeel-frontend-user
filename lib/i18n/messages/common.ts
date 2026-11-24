@@ -170,8 +170,6 @@ export const common = {
     invoice: { open: "Unpaid", paid: "Paid", void: "Void" },
     ticket: { new: "New", open: "In progress", pending: "Awaiting reply", resolved: "Resolved" },
     account: { pending: "Pending approval", active: "Active", suspended: "Suspended" },
-    kyc: { none: "Not submitted", pending: "In review", approved: "Verified", rejected: "Rejected" },
-    delivery: { pending: "Pending", succeeded: "Delivered", failed: "Failed" },
     checkout: { open: "Awaiting payment", paid: "Paid", expired: "Expired" },
     request: { open: "Received", in_progress: "In progress", completed: "Completed", rejected: "Rejected" },
     verification: { verified: "Verified", unverified: "Not verified" },

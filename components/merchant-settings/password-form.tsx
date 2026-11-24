@@ -1,6 +1,7 @@
 "use client";
 // Change password (POST /client/security/password). 422 on `currentPassword` = wrong password, WEAK_PASSWORD on
-// `newPassword`. A success ends the merchant's other sessions, so the sessions list is refreshed.
+// `newPassword`. A success ends the merchant's other sessions; the refresh re-reads the account so the
+// must-change-password gate (components/merchant/must-change-password-gate.tsx) lifts.
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/browser";

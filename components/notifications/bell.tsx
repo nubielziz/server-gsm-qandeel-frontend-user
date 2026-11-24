@@ -8,8 +8,7 @@
 // top, pops the badge and rolls the number; a read rolls it down; reduced motion plays nothing. All of it is decoration:
 // the badge (count-badge.tsx, shared with the workspace navigation's Notifications item) is aria-hidden and the live region
 // says the same as before. While the tab is hidden the title carries
-// "(n) " (lib/notifications/title-badge.ts). Each ring also plays a soft chime (lib/notifications/chime.ts), unless the
-// visitor turned it off on the notifications page; it is extra feedback only.
+// "(n) " (lib/notifications/title-badge.ts).
 import Link from "next/link";
 import { Bell as BellIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
@@ -18,7 +17,6 @@ import { fmt } from "@/lib/i18n/define";
 import { unreadText, type NotificationSurface } from "@/lib/notifications/link";
 import { unreadStore } from "@/lib/notifications/unread-store";
 import { playRing } from "@/lib/notifications/bell-ring";
-import { notificationChime } from "@/lib/notifications/chime";
 import { CountBadge } from "./count-badge";
 import { useBellMotion, useTitleBadge } from "./use-bell-motion";
 
@@ -53,8 +51,6 @@ export function Bell({ surface, href, initialCount, labels }: BellProps) {
     if (!view.ring || !iconRef.current) return;
     return playRing(iconRef.current, () => settle("bell-ring"));
   }, [view.ring, view.rings, settle]);
-  // Browsers play sound only after a gesture: the chime starts listening for the first one (once per page).
-  useEffect(() => notificationChime.arm(), []);
   useTitleBadge(count, text);
   return (
     <Link

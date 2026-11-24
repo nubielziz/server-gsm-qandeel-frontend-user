@@ -183,12 +183,11 @@ export function TopUpActions({ id, canReceipt, canCancel, labels: t, errors }: T
               <div id={FILE_ID} tabIndex={-1} className="grid grid-cols-1 gap-2 focus:outline-none">
                 <FileUpload
                   required
-                  max={1}
                   accept={ACCEPT}
                   endpoint="/store/v1/files"
                   disabled={busy === "send" || sent}
-                  onChange={(files) => {
-                    setFile(files[0] ?? null);
+                  onChange={(next) => {
+                    setFile(next);
                     setFieldErrors((prev) => ({ ...prev, fileId: undefined }));
                   }}
                   labels={{

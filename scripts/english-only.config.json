@@ -53,7 +53,7 @@
     },
     {
       "path": "lib/contact/whatsapp.test.ts",
-      "why": "Group C: Arabic text in a WhatsApp link is percent-encoded and a referral code in Arabic is refused; the tests need Arabic samples."
+      "why": "Group C: Arabic text in a WhatsApp link is percent-encoded; the test needs an Arabic sample."
     },
     {
       "path": "components/support/ticket-conversation.test.tsx",

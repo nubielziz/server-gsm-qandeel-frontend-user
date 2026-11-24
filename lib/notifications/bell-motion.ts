@@ -6,12 +6,9 @@
 // - A read rolls the number down; it never rings. The stream's `notification.read` says the new count; a read action of
 //   this tab says "the next lower count" (its own refetch and the stream's event may land in either order).
 // - Reduced motion: no cue at all, so the number just changes (and the CSS plays nothing then either).
-// - The arrival sound (lib/notifications/chime.ts) plays with every ring taken, by the same rules, and with reduced
-//   motion too: a sound is not motion (the chime itself stays silent when muted or not unlocked yet).
 // Two pure parts: `createBellMotion` turns stream events into cues (counters a bell compares with what it has played), and
 // `nextBellView` turns the newest cue and the count on screen into what the bell plays. `bellMotion` at the end is the
 // browser's instance: import it only from Client Components.
-import { notificationChime } from "./chime";
 import { UNREAD_CAP, type NotificationSurface } from "./link";
 
 /** At most one ring in this window (the same 3 s as the toast's). */
@@ -45,8 +42,6 @@ export type BellMotionEnv = {
   reducedMotion(): boolean;
   /** Calls `listener` whenever the tab's visibility changes; returns the function that stops it. */
   onVisibilityChange(listener: () => void): () => void;
-  /** Plays the arrival sound: called for each ring taken, with reduced motion too. */
-  chime(): void;
 };
 
 export type BellMotion = {
@@ -104,9 +99,8 @@ export function createBellMotion(env: BellMotionEnv): BellMotion {
   function onVisibility(slot: Slot) {
     if (!env.isVisible() || !slot.missed) return;
     slot.missed = false;
-    if (!takeRing(slot)) return;
-    if (!env.reducedMotion()) publish(slot, { ...slot.snapshot, rings: slot.snapshot.rings + 1 });
-    env.chime();
+    if (env.reducedMotion() || !takeRing(slot)) return;
+    publish(slot, { ...slot.snapshot, rings: slot.snapshot.rings + 1 });
   }
 
   return {
@@ -132,12 +126,9 @@ export function createBellMotion(env: BellMotionEnv): BellMotion {
         slot.missed = true;
         return;
       }
-      // The window is taken with reduced motion too: the sound keeps the ring's rules.
+      if (env.reducedMotion()) return;
       const ring = takeRing(slot);
-      if (!env.reducedMotion()) {
-        publish(slot, { rings: slot.snapshot.rings + (ring ? 1 : 0), change: nextChange(slot, unread, ring) });
-      }
-      if (ring) env.chime();
+      publish(slot, { rings: slot.snapshot.rings + (ring ? 1 : 0), change: nextChange(slot, unread, ring) });
     },
     read(surface, unread) {
       const slot = slots[surface];
@@ -239,9 +230,6 @@ const browserEnv: BellMotionEnv = {
   onVisibilityChange(listener) {
     document.addEventListener("visibilitychange", listener);
     return () => document.removeEventListener("visibilitychange", listener);
-  },
-  chime: () => {
-    notificationChime.play();
   },
 };
 

@@ -1,8 +1,9 @@
 "use client";
 // Uploads files to `POST /client/files` (merchant session, 1 B – 25 MiB) or `POST /store/v1/files` (customer session,
 // top-up receipt, 1 B – 5 MiB, 413 above): one multipart part `file`, 20/min per IP. It reports the stored files
-// (`{ id, filename, size, mime … }`, the same shape on both routes) so a form can send their ids as `fileId` (orders,
-// receipts), `fileIds` (KYC, 1–5 PDF/JPEG/PNG). Labels come from the caller (server strings).
+// (`{ id, filename, size, mime … }`, the same shape on both routes) so a form can send its id as `fileId` (orders,
+// receipts). One file at a time: a chosen file must be removed before another is picked. Labels come from the caller
+// (server strings).
 import { useId, useRef, useState } from "react";
 import { FileUp, Loader2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api/browser";
@@ -32,12 +33,10 @@ export type FileUploadLabels = {
 
 export type FileUploadProps = {
   labels: FileUploadLabels;
-  /** Called with the full list of uploaded files after every change. */
-  onChange: (files: UploadedFile[]) => void;
+  /** Called with the uploaded file after every change, or null once it is removed. */
+  onChange: (file: UploadedFile | null) => void;
   /** MIME types accepted, e.g. ["application/pdf", "image/jpeg", "image/png"]; empty = any. */
   accept?: string[];
-  /** Maximum number of files (1 = single file). */
-  max?: number;
   /** Where the files go: `/client/files` (merchant, default) or `/store/v1/files` (customer). */
   endpoint?: FileUploadEndpoint;
   /** Largest file in bytes (default: the endpoint's own limit, 25 MiB for `/client/files`, 5 MiB for `/store/v1/files`). A larger file shows `labels.tooLarge` and is not sent. */
@@ -56,7 +55,6 @@ export function FileUpload({
   labels,
   onChange,
   accept = [],
-  max = 1,
   endpoint = "/client/files",
   maxBytes,
   required,
@@ -66,44 +64,35 @@ export function FileUpload({
   const input = useRef<HTMLInputElement>(null);
   const errorText = useErrorText();
   const limit = maxBytes ?? (endpoint === "/store/v1/files" ? STORE_MAX_BYTES : DEFAULT_MAX_BYTES);
-  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [file, setFile] = useState<UploadedFile | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function update(next: UploadedFile[]) {
-    setFiles(next);
+  function update(next: UploadedFile | null) {
+    setFile(next);
     onChange(next);
   }
 
   async function onPick(list: FileList | null) {
-    if (!list || list.length === 0) return;
+    const picked = list?.[0];
+    if (!picked) return;
     setError(null);
-    const picked = Array.from(list).slice(0, Math.max(0, max - files.length));
-    const uploaded: UploadedFile[] = [];
+    let uploaded: UploadedFile | null = null;
     setBusy(true);
     try {
-      for (const file of picked) {
-        if (file.size > limit || file.size === 0) {
-          setError(labels.tooLarge);
-          continue;
-        }
-        if (accept.length > 0 && !accept.includes(file.type)) {
-          setError(labels.wrongType);
-          continue;
-        }
-        uploaded.push(await api.upload<UploadedFile>(endpoint, file));
-      }
+      if (picked.size > limit || picked.size === 0) setError(labels.tooLarge);
+      else if (accept.length > 0 && !accept.includes(picked.type)) setError(labels.wrongType);
+      else uploaded = await api.upload<UploadedFile>(endpoint, picked);
     } catch (e) {
       setError(errorText.message(e));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = "";
-      if (uploaded.length > 0) update([...files, ...uploaded]);
+      if (uploaded) update(uploaded);
     }
   }
 
   const describedBy = [labels.hint ? `${id}-hint` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
-  const full = files.length >= max;
 
   return (
     <div className="space-y-2">
@@ -118,8 +107,7 @@ export function FileUpload({
           type="file"
           className="sr-only"
           accept={accept.join(",") || undefined}
-          multiple={max > 1}
-          disabled={disabled || busy || full}
+          disabled={disabled || busy || file !== null}
           aria-describedby={describedBy}
           aria-invalid={error ? true : undefined}
           onChange={(e) => onPick(e.currentTarget.files)}
@@ -127,7 +115,7 @@ export function FileUpload({
         <button
           type="button"
           onClick={() => input.current?.click()}
-          disabled={disabled || busy || full}
+          disabled={disabled || busy || file !== null}
           className="inline-flex min-h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <FileUp aria-hidden className="size-4" />}
@@ -147,23 +135,21 @@ export function FileUpload({
           {error}
         </p>
       ) : null}
-      {files.length > 0 ? (
+      {file ? (
         <ul className="divide-y divide-line rounded-card border border-line bg-surface">
-          {files.map((f) => (
-            <li key={f.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-              <span className="min-w-0 truncate" dir="auto">
-                {f.filename} <span className="text-ink-subtle">· {formatSize(f.size)}</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => update(files.filter((x) => x.id !== f.id))}
-                className="inline-flex size-9 shrink-0 items-center justify-center rounded-control text-ink-muted hover:bg-surface-muted hover:text-ink"
-                aria-label={`${labels.remove}: ${f.filename}`}
-              >
-                <Trash2 aria-hidden className="size-4" />
-              </button>
-            </li>
-          ))}
+          <li className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+            <span className="min-w-0 truncate" dir="auto">
+              {file.filename} <span className="text-ink-subtle">· {formatSize(file.size)}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => update(null)}
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-control text-ink-muted hover:bg-surface-muted hover:text-ink"
+              aria-label={`${labels.remove}: ${file.filename}`}
+            >
+              <Trash2 aria-hidden className="size-4" />
+            </button>
+          </li>
         </ul>
       ) : null}
     </div>

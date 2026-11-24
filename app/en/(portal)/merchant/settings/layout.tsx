@@ -21,7 +21,6 @@ export default function SettingsLayout({ children }: LayoutProps<"/en/merchant/s
               profile: t.layout.nav.profile,
               security: t.layout.nav.security,
               notifications: t.layout.nav.notifications,
-              verification: t.layout.nav.verification,
             }}
           />
         </div>

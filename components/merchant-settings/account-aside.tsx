@@ -1,7 +1,7 @@
 // The end-side column of the settings pages: account summary, security quick links and the help card.
 // `AccountSummary` and `SecurityShortcuts` read the signed-in merchant, so the layout renders them inside <Suspense>.
 import Link from "next/link";
-import { ChevronRight, Headphones, Laptop, Lock, ShieldCheck } from "lucide-react";
+import { ChevronRight, Headphones, Lock, ShieldCheck } from "lucide-react";
 import { requireMerchant } from "@/lib/api/session";
 import { formatPercent } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
@@ -82,13 +82,6 @@ export async function SecurityShortcuts() {
               <ChevronRight aria-hidden="true" className="text-ink-subtle" />
             </Link>
           </li>
-          <li>
-            <Link href={`${base}#sessions`} className={rowClasses}>
-              <Laptop aria-hidden="true" className="text-ink-muted" />
-              <span className="flex-1">{t.sessions}</span>
-              <ChevronRight aria-hidden="true" className="text-ink-subtle" />
-            </Link>
-          </li>
         </ul>
         <Link href={base} className="mt-3 inline-flex min-h-11 items-center text-body font-semibold text-ink underline underline-offset-4">
           {t.manage}
@@ -119,7 +112,7 @@ export function AsideSkeleton() {
   return (
     <>
       <Skeleton className="h-[22rem] rounded-card" />
-      <Skeleton className="h-[16.5rem] rounded-card" />
+      <Skeleton className="h-[13.75rem] rounded-card" />
     </>
   );
 }

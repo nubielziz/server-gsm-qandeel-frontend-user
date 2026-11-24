@@ -95,7 +95,6 @@ export const support = {
       unsentHint: "The ticket was closed before your message arrived. Copy it if you still need it.",
     },
     chat: {
-      typing: "Support is typing…",
       sent: "Sent",
       seen: "Seen",
       newMessage: "New message",
@@ -103,14 +102,6 @@ export const support = {
       offline: "Reconnecting…",
       attachments: "Attachments",
       opensNewTab: "(opens in a new tab)",
-    },
-    csat: {
-      title: "How was our support?",
-      text: "Rate this conversation from 1 (poor) to 5 (excellent).",
-      label: "Rating",
-      submit: "Send rating",
-      thanks: "Thank you for rating this ticket {score} out of 5.",
-      saved: "Thank you for your rating",
     },
     info: {
       title: "Ticket information",

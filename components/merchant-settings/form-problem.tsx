@@ -16,7 +16,7 @@ export type FormProblem = {
 };
 
 /**
- * @param overrides texts for field error codes the shared error texts do not know (`telegram_not_linked` …).
+ * @param overrides texts for field error codes the shared error texts do not know (`invalid_ip` …).
  */
 export function useFormProblem(overrides: Record<string, string> = {}) {
   const errorText = useErrorText();

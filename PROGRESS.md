@@ -11,8 +11,8 @@ Rules: `CLAUDE.md`. Images to add: `docs/IMAGE-PROMPTS.md`.
 | M2 | Public store: home, catalog (search, brand/carrier/country filters, sort, paging), service page (slug per language, merchant price hint), IMEI check, help, content/legal pages, order tracking, robots + sitemap | done (2026-11-09) |
 | M3 | Customer checkout: details drawer, tax by country, locked session, consents, pay (Idempotency-Key), return polling, resume link | done (2026-11-09); paying stops at the gateway (demo keys are placeholders) |
 | M4 | Auth: sign-in (customer + merchant, 2FA, temporary password), sign-up, magic link, forgot/set password, verify email (both account types) | done (2026-11-09, `6bee86a`) |
-| M5 | Customer account (overview, orders, settings, privacy requests) and support tickets (new, conversation, rating) | done (2026-11-09, `6bee86a`) |
-| M6 | Merchant portal: dashboard, catalog + ordering, orders, wallet, top-ups, invoices (`230b7b3`); settings, security/2FA/sessions, notifications, KYC, API keys, webhooks, referrals (`5e0a8d2`) | done (2026-11-09) |
+| M5 | Customer account (overview, orders, settings, privacy requests) and support tickets (new, conversation, rating; the rating was retired on 2026-11-23) | done (2026-11-09, `6bee86a`) |
+| M6 | Merchant portal: dashboard, catalog + ordering, orders, wallet, top-ups, invoices (`230b7b3`); settings, security/2FA/sessions, notifications, KYC, API keys, webhooks, referrals (`5e0a8d2`); KYC, the session list, webhooks and referrals were retired on 2026-11-23 | done (2026-11-09) |
 
 ## Backend handoff implementation (from 2026-11-13; plan: `IMPLEMENTATION-PLAN.md`)
 Everything in `../STOREFRONT-BACKEND-HANDOFF.md` (features 20–26) and the open items of `../STOREFRONT-HANDOFF.md`, in 16
@@ -183,8 +183,10 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
   `<Suspense>`) and `merchant-whatsapp-actions.tsx` (also the Suspense fallback: same button and number without the
   referral sentence). Removed: `merchant-register-form.tsx`, `lib/merchant/signup-locale.ts` (+ test) and its call in
   `sign-in-flow.tsx`, the form's `auth.register` strings. The site no longer calls `POST /client/auth/register`
-  (`docs/BACKEND-NEEDS.md` open item 2 is closed); the e2e helper `freshMerchant` still calls it
-  directly.
+  (`docs/BACKEND-NEEDS.md` open item 2 is closed). The e2e helper `freshMerchant` stopped calling it on 2026-11-24: staff
+  create the account through the admin API (`inviteMerchant`) and the merchant sets its password from the invitation mail.
+- **Retired 2026-11-23:** the `?ref=` handling, its note and `components/auth/merchant-whatsapp.tsx` went with the referral
+  program (`docs/decisions/001-merchant-extras-retired.md`); the page is fully static and item 19 is closed.
 
 ## English only (2026-11-16, owner's decision; backend decision 039, feature 30)
 - **Decision:** English is the only language of the system. No language field, parameter, selector, translation or
@@ -451,6 +453,25 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
   an icon; opBNB shows the BNB Chain mark.
 - **Checks:** typecheck, lint, 1003 unit tests, a production build; the footer looked at in a browser at 1440 and 390 px (all
   logos load, no sideways scroll).
+
+## Merchant extras retired (2026-11-23, owner's decision; `docs/decisions/001-merchant-extras-retired.md`)
+- **Gone:** the merchant Referrals page and the referral code row of the settings; the Webhooks pages and the delivery log;
+  the REST API parts of the API keys page (an API key is a Dhru credential only: the create form sends `scopes: ["dhru"]`);
+  the Telegram channel of the merchant notification preferences and every notification sound (the switch of both notifications
+  pages and the bell's arrival chime: nothing plays a sound); the rating and the typing line of a ticket; the per-device
+  session list of the merchant security page; the quick-order box, the order-status summary bar and the "order again" cards of
+  the merchant dashboard. The merchant application page stays
+  (WhatsApp, now fully static: `?ref=` is ignored), as do seen marks, live ticket messages, attachments, the email
+  preferences, the bell (swing, badge pop, rolling number, title badge), the password and two-step cards and the rest of the
+  dashboard.
+- **Old addresses:** `/en/merchant/referrals` → 308 `/en/merchant`; everything under `/en/merchant/webhooks` → 308
+  `/en/merchant/api-keys` (both also without `/en`, in `next.config.ts`).
+- **Release order:** the shop calls none of the retired routes and ignores the retired fields, so it runs against the backend
+  before and after their removal; `docs/BACKEND-NEEDS.md` items 20 to 32 say what the removal must keep. `lib/api/schema.gen.ts`
+  is regenerated after the backend removal; the decision lists the bridges that go then. Item 19 is closed. The order detail
+  no longer reads `clientNote` and the invoices filter no longer offers the kind `statement` (items 31 and 32).
+- **Built** as five packages joined on `feat/accounts`. **Checks:** typecheck, lint, a production build. Unit and e2e tests were
+  written and updated, not run.
 
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an

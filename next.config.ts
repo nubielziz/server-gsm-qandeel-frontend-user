@@ -67,8 +67,22 @@ const nextConfig: NextConfig = {
   // under /en with its query, so indexed and bookmarked Arabic links and the token links of old mails keep working.
   // Redirects run before proxy.ts and the filesystem (Next docs, proxy.md "Execution order"). robots.ts must not
   // disallow /ar: a crawler has to fetch an old address to see its redirect.
+  // The merchant "Verification" page was retired (merchant accounts are created by the team and no documents are
+  // collected): its old address, with and without /en, opens the settings page instead of a 404.
+  // The merchant "Referrals" page was retired with the program it showed: its old address, with and without /en, opens
+  // the merchant overview (bookmarks and stored notification links keep working).
+  // The merchant "Webhooks" pages (the list and the delivery log of an endpoint) were retired too (an API key is a Dhru
+  // credential only): every old address under them, with and without /en, opens the API keys page.
   async redirects() {
-    return [{ source: "/ar/:path*", destination: "/en/:path*", permanent: true }];
+    return [
+      { source: "/ar/:path*", destination: "/en/:path*", permanent: true },
+      { source: "/en/merchant/settings/verification", destination: "/en/merchant/settings", permanent: true },
+      { source: "/merchant/settings/verification", destination: "/en/merchant/settings", permanent: true },
+      { source: "/en/merchant/referrals", destination: "/en/merchant", permanent: true },
+      { source: "/merchant/referrals", destination: "/en/merchant", permanent: true },
+      { source: "/en/merchant/webhooks/:path*", destination: "/en/merchant/api-keys", permanent: true },
+      { source: "/merchant/webhooks/:path*", destination: "/en/merchant/api-keys", permanent: true },
+    ];
   },
   async rewrites() {
     return {

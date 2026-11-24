@@ -410,9 +410,6 @@ export default function UiKitPage() {
               ))}
             </div>
             <div className="flex flex-wrap gap-2">
-              {(["none", "pending", "approved", "rejected"] as const).map((s) => (
-                <StatusBadge key={s} kind="kyc" status={s} label={statusLabel(t, "kyc", s)} />
-              ))}
               {(["verified", "unverified"] as const).map((s) => (
                 <StatusBadge key={s} kind="verification" status={s} label={statusLabel(t, "verification", s)} />
               ))}

@@ -1,8 +1,8 @@
 // What the bottom of a ticket conversation shows (owner, 2026-11-15): the reply box while the ticket is open, a calm
 // "This ticket is closed" notice once staff resolve it (`status: "resolved"`). Pure functions, so the component only wires
 // them; safe to import anywhere.
-// Backend rules: a requester's message or upload on a resolved ticket answers `409 TICKET_RESOLVED`, typing is ignored,
-// read marks and the rating still work, and staff can reopen the ticket (the requester cannot).
+// Backend rules: a requester's message or upload on a resolved ticket answers `409 TICKET_RESOLVED`, read marks still
+// work, and staff can reopen the ticket (the requester cannot).
 // - Closed while the visitor was writing (a `ticket.updated` event or a read): the draft is discarded, and the notice says
 //   so politely.
 // - A send (or an upload) refused as closed (the visitor sent before the event arrived): the notice shows and keeps the

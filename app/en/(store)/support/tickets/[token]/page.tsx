@@ -1,6 +1,6 @@
 // A support ticket, opened from the link in its email or from "My tickets" (`/support/tickets/<token>`). The token IS the
 // credential: the page is never indexed and sends no Referer. The ticket is read at request time, so it streams behind
-// <Suspense>; that read is the first state of the live conversation (`TicketView`, feature 28): messages, typing, seen
+// <Suspense>; that read is the first state of the live conversation (`TicketView`, feature 28): messages, seen
 // marks and files arrive through the ticket's own stream, with no reload and no `router.refresh()`. A closed (resolved)
 // ticket offers a new one: the account's form to a signed-in customer (with the order), the public form to a guest.
 import type { Metadata } from "next";

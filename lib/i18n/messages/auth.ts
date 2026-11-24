@@ -95,7 +95,7 @@ export const auth = {
       points: [
         "Our team opens every merchant account with you on WhatsApp.",
         "Group prices, a prepaid wallet and invoices.",
-        "API keys and webhooks to connect your own tools.",
+        "API keys to connect Dhru-compatible tools.",
       ],
       submit: "Apply as a merchant",
     },
@@ -157,8 +157,6 @@ export const auth = {
     opensNewTab: "opens WhatsApp in a new tab",
     numberLabel: "Or message this number on WhatsApp:",
     message: "Hello, I would like to open a merchant account.",
-    referralSentence: "Referral code: {code}.",
-    referralNote: "The referral code {code} will be included in your message.",
     unavailableText: "Merchant accounts are opened by our team. Contact support and we will help you open yours.",
     contactSupport: "Contact support",
     haveAccount: "Already a merchant?",

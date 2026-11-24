@@ -1,6 +1,7 @@
 // Server-rendered markup of the live ticket parts (the state machine is tested in lib/support/*.test.ts; the stream and the
 // timers need a browser and are covered by e2e/support-live.spec.ts). What this guards: the first state is the server's ticket,
-// the receipt, the reserved lines, the files as plain links, the rating only for customers, the hints by status, a message
+// the receipt, the reserved line, the files as plain links, no rating or typing line even when an older backend still sends
+// them, the hints by status, a message
 // typed in Arabic (user text, shown as typed), that the reply box and the attach control are real labelled controls, and that
 // a resolved ticket shows the closed notice instead of them (owner, 2026-11-15).
 import { renderToStaticMarkup } from "react-dom/server";
@@ -27,8 +28,6 @@ const source = (overrides: Partial<TicketSource> = {}): TicketSource => ({
   status: "open",
   updatedAt: "2026-11-15T10:09:00.000Z",
   resolvedAt: null,
-  canRate: false,
-  csatScore: null,
   messages: [message(1, "you", "My unlock is slow"), message(2, "support", "We are on it", { attachments: [file] })],
   ...overrides,
 });
@@ -41,7 +40,7 @@ function render(options: { source?: TicketSource; access?: TicketAccess; newTick
         <LiveTicketStatus labels={statuses} />
         <TicketConversation
           newTicketHref={options.newTicketHref ?? "/en/support"}
-          t={{ conversation: t.conversation, you: t.you, team: t.team, sentAt: t.sentAt, reply: t.reply, csat: t.csat, chat: t.chat, closed: t.closed }}
+          t={{ conversation: t.conversation, you: t.you, team: t.team, sentAt: t.sentAt, reply: t.reply, chat: t.chat, closed: t.closed }}
         />
       </TicketLive>
     </ErrorTextProvider>,
@@ -112,35 +111,33 @@ describe("attachments are plain download links", () => {
   });
 });
 
-describe("the lines that must not move the page", () => {
-  it("always renders the typing line (a polite live region, empty) and the connection line (silent until live)", () => {
+describe("the line that must not move the page", () => {
+  it("always renders the connection line (silent until live)", () => {
     const html = render();
-    expect(html).toMatch(/<p aria-live="polite"><\/p>/);
     expect(html).toContain('role="status"');
     expect(html).not.toContain("Connected");
     expect(html).not.toContain("Reconnecting");
-    expect(html).not.toContain("Support is typing");
     // The "New message" button is not there until a message arrives out of sight.
     expect(html).not.toContain("New message");
   });
 });
 
-describe("the rating (customers only)", () => {
-  it("offers the form when the ticket can be rated", () => {
-    const html = render({ source: source({ status: "resolved", canRate: true }) });
-    expect(html).toContain("How was our support?");
-    expect(html).toContain("Send rating");
+describe("an older backend that still sends the retired rating keys", () => {
+  // `canRate` and `csatScore` are no longer part of the ticket types: this answer is what the API sent before it dropped them.
+  const older = { ...source({ status: "resolved", resolvedAt: "2026-11-15T10:08:00.000Z" }), canRate: true, csatScore: 4 };
+
+  it("shows no rating form and no thanks to a customer", () => {
+    const html = render({ source: older });
+    expect(html).not.toContain("How was our support?");
+    expect(html).not.toContain("Send rating");
+    expect(html).not.toContain("Thank you for rating");
+    expect(html).toContain("This ticket is closed");
   });
 
-  it("thanks the customer for a score already given and offers no form", () => {
-    const html = render({ source: source({ status: "resolved", csatScore: 4 }) });
-    expect(html).toContain("Thank you for rating this ticket 4 out of 5.");
+  it("shows none to a merchant either", () => {
+    const html = render({ access: { kind: "merchant", id: 7 }, source: older });
     expect(html).not.toContain("Send rating");
-  });
-
-  it("a merchant never gets the form, whatever the answer says", () => {
-    const html = render({ access: { kind: "merchant", id: 7 }, source: source({ status: "resolved", canRate: true }) });
-    expect(html).not.toContain("Send rating");
+    expect(html).not.toContain("Thank you for rating");
   });
 });
 
@@ -181,9 +178,8 @@ describe("a resolved ticket is closed: the notice instead of the reply box", () 
     expect(html).not.toContain('name="unsent"');
   });
 
-  it("keeps the rating for a customer, and the conversation and its files readable", () => {
-    const html = render({ source: source({ status: "resolved", canRate: true }) });
-    expect(html).toContain("Send rating");
+  it("keeps the conversation and its files readable", () => {
+    const html = render({ source: source({ status: "resolved" }) });
     expect(html).toContain("This ticket is closed");
     expect(html).toContain("We are on it");
     expect(html).toContain('href="/store/v1/tickets/tok/files/9"');

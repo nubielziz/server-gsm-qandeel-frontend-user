@@ -82,10 +82,11 @@ test.describe("dashboard", () => {
     await expect(main(page).getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/en/merchant/wallet/top-up");
     await expect(main(page).getByRole("link", { name: "New order" })).toHaveAttribute("href", "/en/merchant/services");
     await expect(vis(main(page).getByRole("link", { name: /^Open order \d+$/ })).first()).toBeVisible();
-    // The quick order form goes to the catalog with ?q=.
-    await main(page).getByRole("searchbox", { name: "Search services" }).fill("unlock");
-    await main(page).getByRole("button", { name: "Start order" }).click();
-    await expect(page).toHaveURL(/\/en\/merchant\/services\?q=unlock/);
+    // The quick-order box, the status summary and the "order again" cards are gone: the header search (outside the main
+    // landmark) and the orders page do their jobs.
+    await expect(main(page).getByRole("searchbox")).toHaveCount(0);
+    await expect(main(page).getByRole("heading", { name: /Quick order|Order status summary|Recently ordered/ })).toHaveCount(0);
+    await expect(main(page).getByRole("link", { name: "Order again" })).toHaveCount(0);
   });
 
   test("the rail keeps all its links on its dark panel in a short laptop window", async ({ page, isMobile }) => {
@@ -96,7 +97,7 @@ test.describe("dashboard", () => {
       await page.setViewportSize({ width: 1366, height });
       await go(page, "/en/merchant");
       const rail = vis(page.getByRole("navigation", { name: "Workspace navigation" }));
-      await expect(rail.getByRole("link")).toHaveCount(11); // ten plus Support (feature 28)
+      await expect(rail.getByRole("link")).toHaveCount(9); // eight plus Settings
       const fit = await rail.evaluate((nav) => ({
         panelBottom: nav.parentElement!.getBoundingClientRect().bottom,
         lowestLink: Math.max(...[...nav.querySelectorAll("a")].map((a) => a.getBoundingClientRect().bottom)),
@@ -532,7 +533,7 @@ test.describe("a merchant waiting for approval", () => {
     await expect(main(page).getByRole("heading", { name: "While you wait for approval" })).toBeVisible();
     await expect(main(page).getByRole("link", { name: "Complete your profile" })).toHaveAttribute("href", "/en/merchant/settings");
     await expect(main(page).getByRole("link", { name: "Secure your account" })).toHaveAttribute("href", "/en/merchant/settings/security");
-    await expect(main(page).getByRole("link", { name: "Upload verification documents" })).toHaveAttribute("href", "/en/merchant/settings/verification");
+    await expect(main(page).getByRole("link", { name: /verification/i })).toHaveCount(0);
     await expect(main(page).getByRole("link", { name: "New order" })).toHaveCount(0);
   });
 
@@ -614,7 +615,7 @@ test.describe("workspace frame", () => {
     const drawer = page.getByRole("dialog", { name: "Workspace navigation", exact: true });
     await expect(drawer).toBeVisible();
     expect(await drawer.evaluate((element) => element.matches(":modal"))).toBe(true);
-    // All ten links and Settings: the merchant's own list (the static one shows the same before it is read).
+    // All eight links and Settings: the merchant's own list (the static one shows the same before it is read).
     await expect(drawer.getByRole("link", { name: "Invoices", exact: true })).toBeVisible();
     await expect(drawer.getByRole("link", { name: "Settings", exact: true })).toBeVisible();
 

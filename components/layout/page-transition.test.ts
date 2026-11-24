@@ -45,7 +45,7 @@ describe("PageTransition: every shop page plays the page enter on a client navig
 describe("PageTransition: every workspace page (customer area, merchant portal) plays it too", () => {
   const areas = [
     { name: "account", dir: path.join(APP, "account"), first: "page.tsx", min: 9 },
-    { name: "merchant", dir: path.join(APP, "(portal)/merchant"), first: "page.tsx", min: 20 },
+    { name: "merchant", dir: path.join(APP, "(portal)/merchant"), first: "page.tsx", min: 17 },
   ];
 
   for (const area of areas) {

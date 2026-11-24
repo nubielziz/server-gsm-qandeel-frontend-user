@@ -1,19 +1,20 @@
 // The ticket chat's live events, REQUESTER VIEW (feature 28; backend plan `docs/briefs/28-support-live-chat.md` §3.4).
 // Hand-written on purpose: the OpenAPI describes the stream routes but not the frames. Safe to import anywhere.
 //
-// A requester (a customer on the token page, a merchant in the portal) gets four events. None carries a token, a staff
+// A requester (a customer on the token page, a merchant in the portal) gets three events. None carries a token, a staff
 // name, an assignee or a note: the server renders a separate, smaller view for the requester.
 // - `ticket.message.created`: a public message (id `t<message id>` on the wire). The only event that can repeat.
-// - `ticket.updated`: status, dates, rating, `hasUnread`.
+// - `ticket.updated`: status, dates, `hasUnread`.
 // - `ticket.read`: one side saw messages up to an id (`by: "you"` is another tab or device of the same person).
-// - `ticket.typing`: support is typing a REPLY (a note never reaches a requester).
+// A backend that still sends other events or keys (`ticket.typing`, a rating in `ticket.updated`) is heard and ignored:
+// the stream only listens to the names in `TICKET_EVENT_NAMES`, and a frame of any other name is dropped by `parseTicketFrame`.
 // `ticketId` is the id for a merchant and `null` for a customer (customers address tickets by token, which never goes into
 // an event): a customer's page matches by `number`.
 import type { TicketMessage } from "@/lib/api/types";
 import { isRecord, parseBaseFrame, parseJson, type BaseEvents } from "@/lib/realtime/stream-client";
 
 /** The events of the ticket chat besides the base ones (`ready`, `hb`, `resync`, `bye`). */
-export const TICKET_EVENT_NAMES = ["ticket.message.created", "ticket.updated", "ticket.read", "ticket.typing"] as const;
+export const TICKET_EVENT_NAMES = ["ticket.message.created", "ticket.updated", "ticket.read"] as const;
 
 export type TicketStatus = "new" | "open" | "pending" | "resolved";
 
@@ -22,7 +23,7 @@ export type TicketRef = { ticketId: number | null; number: string };
 
 export type TicketMessageCreated = TicketRef & {
   message: TicketMessage;
-  /** False for a message a reconnect replayed: it is not news (no "New message" button, no typing reset). */
+  /** False for a message a reconnect replayed: it is not news (no "New message" button). */
   live: boolean;
 };
 
@@ -30,8 +31,6 @@ export type TicketUpdated = TicketRef & {
   status: TicketStatus;
   updatedAt: string;
   resolvedAt: string | null;
-  canRate: boolean;
-  csatScore: number | null;
   hasUnread: boolean;
 };
 
@@ -42,13 +41,10 @@ export type TicketRead = TicketRef & {
   at: string;
 };
 
-export type TicketTyping = TicketRef;
-
 export type TicketEvents = BaseEvents & {
   "ticket.message.created": TicketMessageCreated;
   "ticket.updated": TicketUpdated;
   "ticket.read": TicketRead;
-  "ticket.typing": TicketTyping;
 };
 
 const STATUSES: readonly unknown[] = ["new", "open", "pending", "resolved"];
@@ -116,8 +112,6 @@ export function parseTicketFrame(event: string, raw: string): unknown {
         status: value.status as TicketStatus,
         updatedAt: value.updatedAt,
         resolvedAt: (value.resolvedAt as string | null | undefined) ?? null,
-        canRate: value.canRate === true,
-        csatScore: typeof value.csatScore === "number" ? value.csatScore : null,
         hasUnread: value.hasUnread === true,
       } satisfies TicketUpdated;
     }
@@ -127,10 +121,6 @@ export function parseTicketFrame(event: string, raw: string): unknown {
       const ref = refOf(value);
       if (!ref || (value.by !== "you" && value.by !== "support") || !isId(value.upToMessageId)) return undefined;
       return { ...ref, by: value.by, upToMessageId: value.upToMessageId, at: isText(value.at) ? value.at : "" } satisfies TicketRead;
-    }
-    case "ticket.typing": {
-      const value = parseJson(raw);
-      return isRecord(value) ? (refOf(value) ?? undefined) : undefined;
     }
     case "ready":
     case "hb":

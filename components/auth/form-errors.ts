@@ -15,7 +15,7 @@ export type FormFeedback = {
 /**
  * `knownFields` are the form's input names: a 422 field error on one of them goes under that input; anything else
  * (or any non-422 failure) becomes the form-level message, so no error is ever swallowed.
- * `fieldOverrides` replaces the text of a field error (e.g. a referral code that matches no merchant).
+ * `fieldOverrides` replaces the text of a field error with a text written for this form.
  */
 export function feedbackFrom(
   error: unknown,

@@ -123,9 +123,51 @@ several services, favourites, customer wallet (phase 2W), notification feed, soc
     top-up answers `200`; top-up list rows carry no instructions.
 
 Site limitation, kept: an unknown slug inside a streamed page answers 200 with `noindex`.
-19. **Referral code on staff-created merchants (2026-11-16).** Merchants now apply on WhatsApp and staff create the
+19. ~~**Referral code on staff-created merchants (2026-11-16).** Merchants now apply on WhatsApp and staff create the
    account with `POST /admin/clients`, whose body has no referral code; no staff route sets `referredById` (only the
    self-registration route did). The site still reads `?ref=CODE` and puts "Referral code: CODE." in the WhatsApp message,
    but staff cannot record it, so a referred merchant is not linked to the referrer and earns them no commission. Needs an
    optional `referralCode` on `POST /admin/clients` (422 `unknown_code` like the register route) and the field in the
-   console's New merchant dialog.
+   console's New merchant dialog.~~ **Closed 2026-11-23:** referrals and commissions are retired
+   (`docs/decisions/001-merchant-extras-retired.md`); the site no longer reads `?ref=` and nobody needs the field.
+
+## Retired features: what the backend removal must respect (2026-11-23, `docs/decisions/001-merchant-extras-retired.md`)
+
+The shop stopped calling these routes and reading these fields before the backend removes them (shop first, backend last, then
+`npm run gen:api`). Each item: what the shop does now, what the API does today, what the removal must keep.
+
+20. **Referrals and commissions.** `GET /client/referrals` and `GET /client/commissions` are no longer called; `referralCode`
+    on `GET /client/auth/me` and the profile answers is no longer read; the site never calls `POST /client/auth/register`,
+    whose body has a `referralCode` (the e2e helper `freshMerchant` no longer calls it either: staff create the account through
+    the admin API and the invitation sets the password). All of them still answer today. The backend may remove them; nothing in
+    the shop breaks either way.
+21. **Statement kind `commission`.** Old ledger rows keep the kind; the merchant wallet statement keeps the label "Commission"
+    (`lib/i18n/messages/merchant.ts`), so they keep their stored word.
+22. **`POST /client/api-keys`.** The shop always sends `scopes: ["dhru"]` and never lets the merchant pick scopes. Today
+    `scopes` is required: a non-empty subset of `dhru`, the REST scopes and their wildcards. When the REST API goes, the API
+    must keep accepting `["dhru"]` (or make the field optional and ignore it), never reject it as unknown, until the shop stops
+    sending it.
+23. **`GET /client/api-keys`, `PATCH /client/api-keys/:id`.** `scopes` is read and never shown. A key made only with REST
+    scopes is listed like any other key ("Active"); the backend's migration decides what happens to such keys (revoke them, or
+    add `dhru`).
+24. **Webhooks.** `GET` and `POST /client/webhooks`, `PATCH` and `DELETE /client/webhooks/:id`,
+    `POST /client/webhooks/:id/test` and `GET /client/webhooks/:id/deliveries` are never called; the backend may remove them
+    any time after the shop's release.
+25. **Order source `v1`.** Old rows keep `orders.source = 'v1'`; the shop keeps the label "REST API" for them, and an unknown
+    source shows its raw value.
+26. **`PUT /client/notification-preferences`.** Rows are `{event, email}`; `telegram` is added only when the GET showed it
+    for that event, with the shown value. Today the row's `telegram` is required, and a `true` that is not the shown value
+    without a linked chat answers 422 `events.N.telegram` `telegram_not_linked`. The removal drops `telegram` from the row body,
+    from the GET and PUT answers (the page's `telegram: {linked}` and each event's flag) and the `telegram_not_linked` code.
+27. **`POST /client/telegram/link`.** No longer called; it goes with the bot webhook and the campaign channel.
+28. **Ticket rating.** `POST /store/v1/tickets/:token/csat` is no longer called; `canRate` and `csatScore` in the ticket
+    answers and in `ticket.updated` are not read. The backend may stop sending them.
+29. **Ticket typing.** `POST /store/v1/tickets/:token/typing` and `POST /client/tickets/:id/typing` are never sent and the
+    `ticket.typing` stream event is not listened to; the routes and the event go together.
+30. **Device sessions.** `GET /client/sessions` and `DELETE /client/sessions/:id` are no longer called. `GET /client/dashboard`
+    is still read (the wallet, the order counts, the latest orders); none of its fields go.
+31. **Order note.** `clientNote` on `GET /client/orders/:id` is no longer read (the order detail shows no note). The backend may
+    remove the field from the answer any time; after `npm run gen:api` nothing in the shop refers to it.
+32. **Invoice kind `statement`.** The invoices filter offers `topup` and `manual` only and sends no other `kind`; a `?kind=statement`
+    in an old address is ignored. Old rows keep their kind and the label "Statement" in the list. The backend may narrow the
+    `kind` values of `GET /client/invoices`.

@@ -11,8 +11,6 @@ export const portal = {
     wallet: "Wallet",
     invoices: "Invoices",
     apiKeys: "API keys",
-    webhooks: "Webhooks",
-    referrals: "Referrals",
     notifications: "Notifications",
     support: "Support",
     settings: "Settings",
@@ -67,10 +65,9 @@ export const portal = {
   pending: {
     badge: "Waiting for approval",
     title: "Your merchant account is waiting for approval",
-    body: "Our team reviews every new merchant. Until then you can complete your profile, secure your account and upload verification documents. Prices, orders and the wallet open as soon as you are approved.",
+    body: "Our team reviews every new merchant. Until then you can complete your profile and secure your account. Prices, orders and the wallet open as soon as you are approved.",
     profile: "Complete your profile",
     security: "Secure your account",
-    verification: "Upload verification documents",
     unavailable: "This page opens once your merchant account is approved.",
   },
 };

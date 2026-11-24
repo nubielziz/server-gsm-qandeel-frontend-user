@@ -1,15 +1,12 @@
 // The cards of the merchant dashboard (mockup "Workspace"). Server components fed with `GET /client/dashboard`.
 // Everything is derived from that one answer: no favourites, no notifications (the API has neither).
 import Link from "next/link";
-import { ChevronRight, ClipboardList, CircleCheck, CircleDashed, Clock, Headset, Package, Wallet, Zap } from "lucide-react";
+import { ChevronRight, ClipboardList, CircleCheck, CircleDashed, Clock, Headset, Package, Wallet } from "lucide-react";
 import { MobileList } from "@/components/merchant/mobile-list";
-import { TypeBadge } from "@/components/merchant/type-badge";
 import { ButtonLink } from "@/components/ui/button";
-import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Money } from "@/components/ui/money";
-import { ProgressBar } from "@/components/ui/progress-bar";
-import { SearchInput } from "@/components/ui/search-input";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
@@ -92,65 +89,6 @@ export function OrderStats({ data, t }: Props) {
         href={`${orders}?status=pending`}
       />
     </div>
-  );
-}
-
-const SEGMENTS = [
-  { key: "completed", tone: "success", swatch: "bg-success" },
-  { key: "processing", tone: "warning", swatch: "bg-warning" },
-  { key: "pending", tone: "neutral", swatch: "bg-control" },
-  { key: "rejected", tone: "danger", swatch: "bg-danger" },
-] as const;
-
-/** A stacked bar of the four statuses with the numbers beside it (the bar alone says nothing to a screen reader). */
-export function StatusSummary({ data, t, c }: Props) {
-  const { counts } = data;
-  const total = counts.pending + counts.processing + counts.completed + counts.rejected;
-  return (
-    <Card>
-      <CardBody className="grid gap-4">
-        <h2 className="text-heading text-ink">{t.dashboard.summary.title}</h2>
-        {total === 0 ? (
-          <p className="text-body text-ink-muted">{t.dashboard.summary.empty}</p>
-        ) : (
-          <>
-            <ProgressBar label={t.dashboard.summary.barLabel} segments={SEGMENTS.map((s) => ({ value: counts[s.key], tone: s.tone }))} />
-            <ul className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-              {SEGMENTS.map((s) => (
-                <li key={s.key} className="flex items-start gap-2">
-                  <span aria-hidden="true" className={`mt-1.5 size-2.5 shrink-0 rounded-[3px] ${s.swatch}`} />
-                  <span>
-                    <span className="block text-small text-ink-subtle">{statusLabel(c, "order", s.key)}</span>
-                    <span className="num block text-subheading text-ink">{formatNumber(counts[s.key])}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </CardBody>
-    </Card>
-  );
-}
-
-/** A search box that starts an order: it goes to the catalog with `?q=`. */
-export function QuickOrder({ t }: Omit<Props, "data" | "c">) {
-  const q = t.dashboard.quick;
-  return (
-    <Card>
-      <CardBody className="grid gap-4">
-        <div className="flex items-start gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-card bg-surface-muted [&_svg]:size-5">
-            <Zap aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-heading text-ink">{q.title}</h2>
-            <p className="text-body text-ink-muted">{q.text}</p>
-          </div>
-        </div>
-        <SearchInput action={sitePath("/merchant/services")} label={q.label} placeholder={q.placeholder} submitLabel={q.submit} />
-      </CardBody>
-    </Card>
   );
 }
 
@@ -238,40 +176,6 @@ export function RecentOrders({ data, t, c }: Props) {
           </div>
         </div>
       )}
-    </Card>
-  );
-}
-
-/** Services from the latest orders (newest first, each once) with "Order again". No price: it may have changed. */
-export function RecentlyOrdered({ data, t, c }: Props) {
-  const a = t.dashboard.again;
-  const seen = new Set<number>();
-  const services = data.latestOrders.filter((o) => (seen.has(o.service.id) ? false : (seen.add(o.service.id), true)));
-  return (
-    <Card>
-      <CardHeader title={a.title} description={a.text} />
-      <CardBody className="pt-2 sm:pt-2">
-        {services.length === 0 ? (
-          <p className="text-body text-ink-muted">{a.empty}</p>
-        ) : (
-          <ul className="divide-y divide-line">
-            {services.map((o) => (
-              <li key={o.service.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0">
-                <div className="grid min-w-0 justify-items-start gap-1">
-                  <span className="font-semibold text-ink">{o.service.name}</span>
-                  <span className="flex flex-wrap items-center gap-2 text-small text-ink-subtle">
-                    <TypeBadge type={o.service.type} t={c} />
-                    {fmt(a.orderedOn, { date: formatDate(o.createdAt) })}
-                  </span>
-                </div>
-                <ButtonLink href={sitePath(`/merchant/services/${o.service.id}`)} size="sm" variant="secondary">
-                  {a.orderAgain}
-                </ButtonLink>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardBody>
     </Card>
   );
 }

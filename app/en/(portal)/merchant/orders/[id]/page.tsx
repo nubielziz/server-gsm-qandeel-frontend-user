@@ -122,13 +122,6 @@ async function Order({ params }: { params: Promise<{ id: string }> }) {
                 <DescriptionItem label={t.order.source}>{sources[o.source] ?? o.source}</DescriptionItem>
                 <DescriptionItem label={t.order.created2}>{formatDateTime(o.createdAt)}</DescriptionItem>
                 {o.completedAt ? <DescriptionItem label={t.order.completed}>{formatDateTime(o.completedAt)}</DescriptionItem> : null}
-                {o.clientNote ? (
-                  <DescriptionItem label={t.order.note}>
-                    <span dir="auto" className="whitespace-pre-line">
-                      {o.clientNote}
-                    </span>
-                  </DescriptionItem>
-                ) : null}
               </DescriptionList>
             </CardBody>
           </Card>

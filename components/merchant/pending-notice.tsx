@@ -20,14 +20,9 @@ export function PendingNotice({ title }: { title?: string }) {
         title={t.shared.pendingTitle}
         description={p.pending.unavailable}
         action={
-          <div className="flex flex-wrap justify-center gap-3">
-            <ButtonLink href={sitePath("/merchant/settings")} variant="primary">
-              {t.shared.openSettings}
-            </ButtonLink>
-            <ButtonLink href={sitePath("/merchant/settings/verification")} variant="secondary">
-              {t.shared.completeVerification}
-            </ButtonLink>
-          </div>
+          <ButtonLink href={sitePath("/merchant/settings")} variant="primary">
+            {t.shared.openSettings}
+          </ButtonLink>
         }
       />
     </Card>

@@ -3,10 +3,9 @@
 // accounts are never changed (passwords, settings): lifecycle tests create their own customer / merchant.
 // The sign-in page is ONE form for customers and merchants (plan F10): the radios are gone. The smart-sign-in specifics
 // (request shape, tokens, temporary passwords) live in e2e/smart-sign-in.spec.ts.
-import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { customerIdByEmail, temporaryCustomerPassword, totp } from "./admin";
-import { ACCOUNTS, DEV_TURNSTILE_TOKEN, freshMerchant, go, stubTurnstile, uniqueEmail, waitForLink } from "./helpers";
+import { customerIdByEmail, inviteMerchant, temporaryCustomerPassword, totp } from "./admin";
+import { ACCOUNTS, DEV_TURNSTILE_TOKEN, FRESH_MERCHANT_PASSWORD, freshMerchant, go, stubTurnstile, uniqueEmail, waitForLink } from "./helpers";
 import { siteEnv } from "./site-env";
 import { displayWhatsAppNumber, normaliseWhatsAppNumber } from "../lib/contact/whatsapp";
 
@@ -210,10 +209,34 @@ test.describe("email-link pages", () => {
     await expect(page.getByText("This sign-in link has expired").or(page.getByText("This link has expired"))).toBeVisible();
   });
 
-  test("merchant lifecycle: an account made without the site, verify the email, reset the password, sign in as pending", async ({ page }) => {
-    // The site has no application form any more (merchants apply on WhatsApp and staff create the account), so the account
-    // comes straight from the API (`POST /client/auth/register`, which still exists): pending, verification mail sent.
-    const { email } = await freshMerchant(page);
+  test("merchant invitation: staff create the account, the mailed link sets the password, and the merchant signs in with it", async ({ page }) => {
+    // The site has no application form (merchants apply on WhatsApp and staff create the account), so the account comes from
+    // the admin API: it is active at once, has no password, and an invitation link is mailed to it.
+    const email = uniqueEmail("invited");
+    await inviteMerchant(email);
+
+    const invitation = await waitForLink(page, email, /\/merchant\/set-password\?token=/);
+    await go(page, invitation);
+    await page.locator('input[name="password"]').fill(FRESH_MERCHANT_PASSWORD);
+    await page.locator('input[name="confirmPassword"]').fill(FRESH_MERCHANT_PASSWORD);
+    await page.getByRole("button", { name: "Save password" }).click();
+    await expect(page.getByText("Your password is saved")).toBeVisible();
+    await page.getByRole("link", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(/\/en\/sign-in/);
+    await page.locator('input[name="email"]').fill(email);
+    await page.locator('input[name="password"]').fill(FRESH_MERCHANT_PASSWORD);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page).toHaveURL(/\/en\/merchant$/);
+
+    // The invitation proves the mailbox: the account is active and its email is verified.
+    const me = await page.request.get("/client/auth/me");
+    expect(await me.json()).toMatchObject({ status: "active", emailVerifiedAt: expect.any(String) });
+  });
+
+  test("merchant lifecycle: a staff change of the address, verify the email, reset the password, sign in", async ({ page }) => {
+    // The account is made the way the product makes one (staff invite it, the invitation sets the password); then staff change
+    // the address, which clears the verification and mails a verification link to the new address.
+    const { email } = await freshMerchant(page, { unverified: true });
 
     const verify = await waitForLink(page, email, /\/merchant\/verify-email\?token=/);
     await go(page, verify);
@@ -241,7 +264,7 @@ test.describe("email-link pages", () => {
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL(/\/en\/merchant$/);
 
-    // Two-step verification on this account (a pending merchant may set it up): sign-in then asks for the code.
+    // Two-step verification on this account: sign-in then asks for the code.
     const csrf = (await page.request.get("/client/auth/me")).headers()["x-csrf-token"];
     const setup = await page.request.post("/client/security/2fa/setup", { headers: { "X-CSRF-Token": csrf } });
     expect(setup.status(), await setup.text()).toBe(200);
@@ -282,14 +305,6 @@ const WHATSAPP_DISPLAY = WHATSAPP_NUMBER ? displayWhatsAppNumber(WHATSAPP_RAW, W
 const WHATSAPP_MESSAGE_EN = "Hello, I would like to open a merchant account.";
 const waLink = (text: string) => `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
 
-/** Waits until the page's own script runs the WhatsApp link: the static fallback is replaced by the hydrated component. */
-async function whenWhatsAppLinkHydrated(page: Page) {
-  await page.waitForFunction(() => {
-    const link = document.querySelector('a[href^="https://wa.me/"]');
-    return !!link && Object.keys(link).some((key) => key.startsWith("__reactProps"));
-  });
-}
-
 test.describe("merchant application page", () => {
   test.skip(!WHATSAPP_NUMBER, "NEXT_PUBLIC_MERCHANT_WHATSAPP is not set in the env files of the site under test");
 
@@ -320,38 +335,20 @@ test.describe("merchant application page", () => {
 
     await expect(main.getByText("Or message this number on WhatsApp:")).toBeVisible();
     await expect(main.locator('span[dir="ltr"]', { hasText: WHATSAPP_DISPLAY })).toBeVisible();
-    await expect(main.getByText("will be included in your message.")).toHaveCount(0);
 
     await expect(page.locator("p", { hasText: "Already a merchant?" }).getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/en/sign-in");
   });
 
-  test("a valid ?ref= code (any case) goes into the message and a note names it", async ({ page }) => {
-    await go(page, "/en/merchant/register?ref=gsm0001");
-    const chat = page.getByRole("link", { name: "Chat on WhatsApp" });
-    await expect(chat).toHaveAttribute("href", waLink(`${WHATSAPP_MESSAGE_EN} Referral code: GSM0001.`));
-    const note = page.getByText("will be included in your message.");
-    await expect(note).toBeVisible();
-    await expect(note).toContainText("The referral code GSM0001");
-    await expect(note.locator('span[dir="ltr"]')).toHaveText("GSM0001");
-    await expect(page.locator('span[dir="ltr"]', { hasText: WHATSAPP_DISPLAY })).toBeVisible();
-  });
-
-  test("an invalid ?ref= value is ignored: the plain message and no note", async ({ page }) => {
-    await go(page, "/en/merchant/register?ref=%3Cscript%3E");
-    await whenWhatsAppLinkHydrated(page); // so the page has read the query, not only shown its static version
-    await expect(page.getByRole("link", { name: "Chat on WhatsApp" })).toHaveAttribute("href", waLink(WHATSAPP_MESSAGE_EN));
-    await expect(page.getByText("will be included in your message.")).toHaveCount(0);
-    await expect(page.locator("main")).not.toContainText("script");
-  });
-
-  test("the page sends no request to the register route", async ({ page }) => {
+  test("an old shared link that still carries a ?ref= value opens the same page: the plain message, no note, no request to the register route", async ({ page }) => {
     const registerRequests: string[] = [];
     page.on("request", (request) => {
       if (new URL(request.url()).pathname === "/client/auth/register") registerRequests.push(`${request.method()} ${request.url()}`);
     });
-    await go(page, "/en/merchant/register?ref=GSM0001");
-    await whenWhatsAppLinkHydrated(page);
-    await expect(page.getByText("will be included in your message.")).toBeVisible();
+    await go(page, "/en/merchant/register?ref=gsm0001");
+    await expect(page.getByRole("heading", { level: 1, name: "Apply as a merchant" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Chat on WhatsApp" })).toHaveAttribute("href", waLink(WHATSAPP_MESSAGE_EN));
+    await expect(page.locator("main")).not.toContainText("GSM0001");
+    await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
     expect(registerRequests).toEqual([]);
   });
 });

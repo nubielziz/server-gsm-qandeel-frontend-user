@@ -21,16 +21,12 @@ export type TicketStreamSpec =
 export type SendInput = { body: string; fileIds: number[] };
 
 export type TicketAdapter = {
-  /** Only a customer's ticket has a rating (merchants have none). */
-  supportsRating: boolean;
   /** The merchant's ticket id; absent for a customer (events are matched by number then). */
   ticketId?: number;
   /** `POST …/messages`: the message as the API stored it. */
   send(input: SendInput): Promise<TicketMessage>;
   /** `POST …/read`: the visitor has read support's messages up to this id. */
   read(upToMessageId: number): Promise<void>;
-  /** `POST …/typing`: the visitor is typing (the API throttles it; a refusal is harmless). */
-  typing(): Promise<void>;
   /** Uploads one file; its id goes in `fileIds` of the message. */
   upload(file: File): Promise<TicketFile>;
   /** The download link of a file of this ticket (a plain link: the API answers 302 to a short-lived address). */
@@ -53,13 +49,9 @@ function fileOf(uploaded: TicketFile | Attachment): TicketFile {
 export function tokenAdapter(token: string, number: string, http: TicketHttp = api): TicketAdapter {
   const base = `/store/v1/tickets/${encodeURIComponent(token)}`;
   return {
-    supportsRating: true,
     send: (input) => http.post<TicketMessage>(`${base}/messages`, messageBody(input)),
     read: async (upToMessageId) => {
       await http.post(`${base}/read`, { upToMessageId });
-    },
-    typing: async () => {
-      await http.post(`${base}/typing`);
     },
     upload: async (file) => fileOf(await http.upload<TicketFile>(`${base}/files`, file)),
     fileHref: (fileId) => `${base}/files/${fileId}`,
@@ -72,14 +64,10 @@ export function tokenAdapter(token: string, number: string, http: TicketHttp = a
 export function merchantAdapter(id: number, http: TicketHttp = api): TicketAdapter {
   const base = `/client/tickets/${id}`;
   return {
-    supportsRating: false,
     ticketId: id,
     send: (input) => http.post<TicketMessage>(`${base}/messages`, messageBody(input)),
     read: async (upToMessageId) => {
       await http.post(`${base}/read`, { upToMessageId });
-    },
-    typing: async () => {
-      await http.post(`${base}/typing`);
     },
     // Merchants upload with the portal's own upload route (any type, 25 MiB); the ticket checks type and size when the
     // files are attached to the message.

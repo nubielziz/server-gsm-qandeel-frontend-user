@@ -1,13 +1,11 @@
 // Merchant application. Since 2026-11-16 this is not a form: the visitor is told to message the team on WhatsApp, where a
 // team member completes the steps, and staff then create the merchant in the admin console and send the set-password
-// link. The site sends nothing. Static page; `?ref=` (a merchant's referral code) is read in the browser behind <Suspense>.
+// link. The site sends nothing. Fully static page: it reads no query, so a link with any query opens it unchanged.
 // No number configured (NEXT_PUBLIC_MERCHANT_WHATSAPP, build-time): no WhatsApp link, no steps (they all start with
 // WhatsApp); the subtitle says the team opens accounts and the only action is the support page.
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
 import { AuthHeading, authLinkClass } from "@/components/auth/auth-heading";
-import { MerchantWhatsApp } from "@/components/auth/merchant-whatsapp";
 import { MerchantWhatsAppActions } from "@/components/auth/merchant-whatsapp-actions";
 import { ButtonLink } from "@/components/ui/button";
 import { merchantWhatsApp, whatsAppLink } from "@/lib/contact/whatsapp";
@@ -23,14 +21,6 @@ export function generateMetadata(): Metadata {
 export default function MerchantRegisterPage() {
   const t = auth;
   const contact = merchantWhatsApp();
-  const text = {
-    chat: t.register.chat,
-    opensNewTab: t.register.opensNewTab,
-    numberLabel: t.register.numberLabel,
-    message: t.register.message,
-    referralSentence: t.register.referralSentence,
-    referralNote: t.register.referralNote,
-  };
   return (
     <>
       <AuthHeading title={t.register.title} subtitle={contact ? t.register.subtitle : t.register.unavailableText} />
@@ -51,13 +41,7 @@ export default function MerchantRegisterPage() {
           </ol>
         ) : null}
         {contact ? (
-          <Suspense
-            fallback={
-              <MerchantWhatsAppActions href={whatsAppLink(contact.digits, text.message)} display={contact.display} t={text} />
-            }
-          >
-            <MerchantWhatsApp digits={contact.digits} display={contact.display} t={text} />
-          </Suspense>
+          <MerchantWhatsAppActions href={whatsAppLink(contact.digits, t.register.message)} display={contact.display} t={t.register} />
         ) : (
           <ButtonLink href={sitePath("/support")} size="lg" block>
             {t.register.contactSupport}

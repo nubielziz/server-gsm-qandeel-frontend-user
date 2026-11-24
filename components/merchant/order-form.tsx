@@ -550,9 +550,8 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
               <div id={ID.file} tabIndex={-1} className="grid gap-2 focus:outline-none">
                 <FileUpload
                   required={fileRequired}
-                  max={1}
-                  onChange={(files) => {
-                    setFile(files[0] ?? null);
+                  onChange={(next) => {
+                    setFile(next);
                     dropServerError({ fileId: undefined });
                   }}
                   labels={{

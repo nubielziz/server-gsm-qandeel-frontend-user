@@ -41,7 +41,7 @@ describe("parseTicketFrame: the state events", () => {
   it("reads ticket.updated", () => {
     const data = parseTicketFrame(
       "ticket.updated",
-      json({ ticketId: null, number: "T-9", status: "resolved", updatedAt: "2026-11-15T10:00:00.000Z", resolvedAt: "2026-11-15T10:00:00.000Z", canRate: true, csatScore: null, hasUnread: true }),
+      json({ ticketId: null, number: "T-9", status: "resolved", updatedAt: "2026-11-15T10:00:00.000Z", resolvedAt: "2026-11-15T10:00:00.000Z", hasUnread: true }),
     );
     expect(data).toEqual({
       ticketId: null,
@@ -49,17 +49,32 @@ describe("parseTicketFrame: the state events", () => {
       status: "resolved",
       updatedAt: "2026-11-15T10:00:00.000Z",
       resolvedAt: "2026-11-15T10:00:00.000Z",
-      canRate: true,
-      csatScore: null,
       hasUnread: true,
     });
+  });
+
+  it("ignores the rating keys an older backend still sends in ticket.updated", () => {
+    const data = parseTicketFrame(
+      "ticket.updated",
+      json({ ticketId: null, number: "T-9", status: "resolved", updatedAt: "2026-11-15T10:00:00.000Z", resolvedAt: "2026-11-15T10:00:00.000Z", canRate: true, csatScore: 4, hasUnread: false }),
+    );
+    expect(data).toEqual({
+      ticketId: null,
+      number: "T-9",
+      status: "resolved",
+      updatedAt: "2026-11-15T10:00:00.000Z",
+      resolvedAt: "2026-11-15T10:00:00.000Z",
+      hasUnread: false,
+    });
+    expect(data).not.toHaveProperty("canRate");
+    expect(data).not.toHaveProperty("csatScore");
   });
 
   it("drops a ticket.updated with an unknown status", () => {
     expect(parseTicketFrame("ticket.updated", json({ number: "T-9", status: "closed", updatedAt: "2026-11-15T10:00:00.000Z" }))).toBeUndefined();
   });
 
-  it("reads ticket.read and ticket.typing", () => {
+  it("reads ticket.read", () => {
     expect(parseTicketFrame("ticket.read", json({ ticketId: 3, number: "T-3", by: "support", upToMessageId: 12, at: "2026-11-15T10:00:00.000Z" }))).toEqual({
       ticketId: 3,
       number: "T-3",
@@ -68,8 +83,11 @@ describe("parseTicketFrame: the state events", () => {
       at: "2026-11-15T10:00:00.000Z",
     });
     expect(parseTicketFrame("ticket.read", json({ number: "T-3", by: "staff", upToMessageId: 12 }))).toBeUndefined();
-    expect(parseTicketFrame("ticket.typing", json({ ticketId: null, number: "T-3" }))).toEqual({ ticketId: null, number: "T-3" });
-    expect(parseTicketFrame("ticket.typing", json({ ticketId: null }))).toBeUndefined();
+  });
+
+  it("drops ticket.typing, which an older backend may still send", () => {
+    expect(parseTicketFrame("ticket.typing", json({ ticketId: null, number: "T-3" }))).toBeUndefined();
+    expect(parseTicketFrame("ticket.typing", json({ ticketId: 3, number: "T-3", by: "support" }))).toBeUndefined();
   });
 
   it("passes the stream's own events through the base parser and drops an unknown name", () => {
@@ -78,8 +96,8 @@ describe("parseTicketFrame: the state events", () => {
     expect(parseTicketFrame("ticket.exploded", "{}")).toBeUndefined();
   });
 
-  it("lists the four ticket events", () => {
-    expect([...TICKET_EVENT_NAMES]).toEqual(["ticket.message.created", "ticket.updated", "ticket.read", "ticket.typing"]);
+  it("lists the three ticket events", () => {
+    expect([...TICKET_EVENT_NAMES]).toEqual(["ticket.message.created", "ticket.updated", "ticket.read"]);
   });
 });
 

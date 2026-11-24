@@ -94,10 +94,9 @@ export function ReceiptForm({ invoiceId, methods, labels: t, upload, optionalLab
       <div id="receipt-file" tabIndex={-1} className="grid grid-cols-1 gap-2 focus:outline-none">
         <FileUpload
           required
-          max={1}
           accept={ACCEPT}
           disabled={submitting}
-          onChange={(files) => setFile(files[0] ?? null)}
+          onChange={setFile}
           labels={{
             label: t.receiptFile,
             choose: upload.choose,

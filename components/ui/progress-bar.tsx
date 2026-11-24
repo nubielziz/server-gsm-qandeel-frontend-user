@@ -1,4 +1,4 @@
-// ProgressBar: a single value bar, or a stacked bar of segments (order status summary).
+// ProgressBar: a single value bar, or a stacked bar of segments (the shares of a total).
 import { cn } from "@/lib/cn";
 
 export type ProgressTone = "ink" | "success" | "warning" | "danger" | "neutral";
