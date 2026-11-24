@@ -499,6 +499,42 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
   passes (153 files, 1,544 tests); `npm run gen:api:check` up to date against the merged backend's OpenAPI (110 operations); `npm run build`
   passes against the isolated backend (:3100). The browser specs were written and type-checked, not run.
 
+## Own prices in the shop (2026-11-24, owner's request; `docs/decisions/003-own-prices-in-the-shop.md`, backend decision 066)
+- **What changed:** the price list of a merchant rank is retired. `/account/services` leaves the rail, the drawer, the tab bar (a
+  merchant rank's tabs are the retail ones with its wallet), the account area's header search, the avatar menu, the home banner and
+  the "New order" buttons; it redirects to `/services` (`lib/account/legacy-paths.ts`), and the old order form address
+  `/account/services/<id>` redirects to the service's checkout (or `/services` without a shop page). `capabilitiesOf` lost
+  `priceList`; `RankBanner` and `RankPriceHint` are gone.
+- **Own prices:** a personal layer in the browser (`lib/store/own-prices.ts`, `components/store/own-price.tsx`, mounted once in the shop
+  layout) shows an account of a merchant rank its own price in every price slot: cards, collection rows, search suggestions, the
+  service page and the quick view (with "Buy now" off for a service it may not buy). It reads `GET /client/auth/me` once per session
+  and `GET /client/services?ids=…` (≤ 100 ids a call, `no-store`, kept 5 minutes in the tab), only when the portal family's cookie is
+  there: guests and retail accounts read nothing and see the page as before. An inline guard in the root layout hides the server's
+  public prices from a merchant session until the page is live. The hero's "Starting from" and a collection's "From" are not shown to
+  a merchant rank; the price sort and filter keep the public prices. `PriceBlock` moved to `components/store/price-block.tsx`.
+- **Buying:** `/checkout?service=<slug>` mounts the merchant order form for a merchant rank (`MerchantCheckout`, file services
+  included; `checkoutAccess` answers `order-form`); the retail form never mounts for it. The notice of an open checkout and of a 403
+  `RANK_NOT_ALLOWED` now leads to that address. The service details card moved to `components/merchant/service-about.tsx`.
+- **API:** the `ids` parameter is in the regenerated `lib/api/schema.gen.ts`; `OwnPricesQuery` (`lib/store/own-prices.ts`) is the exact query the layer sends.
+  Release the backend first (an unknown parameter is a 422, and the slots would show no price).
+- **Checks (2026-11-24):** typecheck: 0 errors; `npm run lint` clean (ESLint and the English guard); the whole unit suite passes
+  (154 files, 1,581 tests). The browser specs (`merchant`, `merchant-order-idempotency`, `checkout`, `routing`, `home-sections`,
+  `account`) were updated and type-checked, not run.
+
+## One name per field (2026-11-24, `docs/decisions/004-one-field-name.md`, backend decision 065)
+- **What changed:** the merchant order page (`/en/account/orders/<id>`) lists the answers of an order by the label of their field, read
+  from `answers` of `GET /client/orders/:id` (generated type; an order read without them shows an empty list), keeps the line breaks
+  of a multi-line value and gives label and value their own text direction (`components/merchant/order-answers.tsx`). The order form
+  of a merchant rank and the shop checkout draw every field the API sends: the API leaves the main-input field of an IMEI service out,
+  so there is no second IMEI box and `visibleFields` filters nothing. A refused balance payment of a merchant rank points to the
+  service page (no other payment method is offered).
+- **Release order:** the backend of decision 065 first; `lib/api/schema.gen.ts` is regenerated from it and the `api-types` check passes
+  once that backend is on `main`.
+- **Also in this change (own prices):** an account read that says "not signed in" or "not a merchant rank" (a leftover cookie of an ended
+  session) shows the public prices at once and lifts the rule that hides them; decision 003 now says what a merchant sees with
+  JavaScript off and that the hero's and a collection's "from" prices are hidden for a merchant rank.
+- **Checks (2026-11-24):** typecheck: 0 errors; `npm run lint` clean (ESLint and the English guard); the whole unit suite passes (155 files, 1,590 tests). `gen:api:check` and the browser specs were not run.
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.

@@ -7,7 +7,6 @@ export const portal = {
   accountRole: "Your account",
   nav: {
     overview: "Overview",
-    priceList: "Price list",
     orders: "Orders",
     wallet: "Wallet",
     invoices: "Invoices",
@@ -20,7 +19,6 @@ export const portal = {
   tabs: {
     overview: "Overview",
     orders: "Orders",
-    priceList: "Prices",
     wallet: "Wallet",
     notifications: "Alerts",
     support: "Support",
@@ -32,7 +30,6 @@ export const portal = {
     newReply: ", new reply",
   },
   // Header titles of the pages the static frame does not list (a merchant rank's own places).
-  servicesTitle: "Price list",
   apiKeysTitle: "API keys",
   searchServices: "Search services…",
   availableBalance: "Available balance",

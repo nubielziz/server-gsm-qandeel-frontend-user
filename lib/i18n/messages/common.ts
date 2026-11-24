@@ -35,7 +35,6 @@ export const common = {
     accountMenu: "Account menu",
     myAccount: "My account",
     myOrders: "My orders",
-    priceList: "Price list",
     settings: "Settings",
     signOut: "Sign out",
     signingOut: "Signing out…",
@@ -73,12 +72,6 @@ export const common = {
     accountMenu: "Account menu",
     /** The phone tab bar's landmark (never "Workspace navigation": that names the rail and the drawer). */
     tabsLabel: "Shortcuts",
-  },
-
-  /** The home page's pointer to the price list of a merchant rank (components/store/rank-banner.tsx). */
-  rankBanner: {
-    text: "You are signed in with a merchant rank. Your own prices are in your price list.",
-    cta: "See my prices",
   },
 
   /** Left panel of the sign-in and sign-up pages. */

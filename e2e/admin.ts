@@ -478,7 +478,7 @@ export async function ensureCurrency(code = "JOD", decimals = 2): Promise<{ id: 
 
 // ── Ranks and accounts ───────────────────────────────────────────────────────────────────────────────────────────────
 
-/** The kind of a rank (the wire's word): a merchant rank has a price list, an API and invoices; a retail rank buys in the shop. */
+/** The kind of a rank (the wire's word): a merchant rank buys in the shop at its own prices and has an API and invoices. */
 export type RankKind = "retail" | "merchant";
 
 /** A row of `GET /admin/client-groups`: the rank, with its kind as `rankKind` (the stored `kind` stays beside it). */

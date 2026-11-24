@@ -8,6 +8,7 @@ import { errors } from "@/lib/i18n/messages/errors";
 import { ErrorTextProvider } from "@/lib/i18n/error-text";
 import { siteImage } from "@/lib/site-images";
 import { ViewTransitionGuard } from "@/components/layout/view-transition-guard";
+import { OWN_PRICES_GUARD } from "@/lib/store/own-prices";
 import "../globals.css";
 
 // Latin letters and digits. No `opsz` axis: the file stays a plain weight-only variable font (48 KB instead of 73 KB),
@@ -53,6 +54,10 @@ export default function RootLayout({ children }: LayoutProps<"/en">) {
     // <body> before React starts. It covers only these two elements' own attributes, never the page content.
     <html lang="en" dir="ltr" className={inter.variable} suppressHydrationWarning>
       <body className="min-h-dvh bg-page font-sans text-ink antialiased" suppressHydrationWarning>
+        {/* The personal price layer's guard (decision 003): runs while the HTML is read, before the first paint, so a browser
+            that holds a merchant session never shows a public price the server drew as if it were its own. It only marks
+            <html> (covered by suppressHydrationWarning); the root layout is never rendered again on the client. */}
+        <script dangerouslySetInnerHTML={{ __html: OWN_PRICES_GUARD }} />
         <ViewTransitionGuard />
         <ErrorTextProvider messages={errors}>{children}</ErrorTextProvider>
       </body>

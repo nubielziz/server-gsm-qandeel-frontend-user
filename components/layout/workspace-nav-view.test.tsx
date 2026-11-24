@@ -128,7 +128,6 @@ describe("headingItems and activeItem: the header title", () => {
       "Notifications",
       "Support",
       "Settings",
-      "Price list",
       "Invoices",
       "API keys",
     ]);
@@ -152,13 +151,11 @@ describe("headingItems and activeItem: the header title", () => {
 
   it("the static shell alone leaves a merchant rank's own pages without a title; the titles name them", () => {
     const staticOnly = headingItems(nav, footerNav);
-    expect(activeItem(staticOnly, "/en/account/services/12")).toBeUndefined();
     expect(activeItem(staticOnly, "/en/account/invoices/5")).toBeUndefined();
     const named = headingItems(nav, footerNav, accountPageTitles());
-    const prices = activeItem(named, "/en/account/services/12");
-    expect(prices?.label).toBe("Price list");
-    expect(prices?.title).toBe("Price list");
     expect(activeItem(named, "/en/account/invoices/5")?.label).toBe("Invoices");
+    // The retired price list (decision 003) has no title any more: its old addresses only redirect.
+    expect(activeItem(named, "/en/account/services/12")).toBeUndefined();
   });
 
   it("a title never replaces a nav item that has the same address", () => {

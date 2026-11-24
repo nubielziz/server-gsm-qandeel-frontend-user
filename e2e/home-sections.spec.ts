@@ -5,9 +5,9 @@
 // follow the demo data instead of repeating it. Nothing here changes data. The site caches catalog reads for up to
 // 30 s (plan D14) and other specs place orders, which can move the best sellers: values that come from the catalog are read
 // through `toPass` with a reload (F03 rules).
-// The last group is the header and the home page by rank: one account menu with one Sign out, the price list row and the
-// banner for a merchant rank only, the balance box with the same addresses for both ranks, and the currency choice kept on
-// a retail account only. Every test that signs in uses a throwaway account (`freshAccount`).
+// The last group is the header and the home page by rank: one account menu with one Sign out and no price list for any rank
+// (decision 003), the balance box with the same addresses for both ranks, and the currency choice kept on a retail account
+// only. Every test that signs in uses a throwaway account (`freshAccount`).
 import { type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { freshAccount, go } from "./helpers";
@@ -303,14 +303,15 @@ test.describe("the header and the home page by rank", () => {
     await expect(page.getByRole("link", { name: "See my prices" })).toHaveCount(0);
   });
 
-  test("a merchant rank has the same menu with the price list, and the home page points to it", async ({ page }) => {
+  test("a merchant rank has the same menu, with no price list and no banner pointing to one (decision 003)", async ({ page }) => {
     await freshAccount(page, { rank: "merchant", signedIn: true });
     await go(page, "/en");
-    await expect(page.getByRole("link", { name: "See my prices" })).toHaveAttribute("href", "/en/account/services");
+    await expect(page.getByRole("link", { name: "See my prices" })).toHaveCount(0);
     const menu = await openAccountMenu(page);
     await expect(menu.getByRole("link", { name: "My account", exact: true })).toHaveAttribute("href", "/en/account");
     await expect(menu.getByRole("link", { name: "Wallet", exact: true })).toHaveAttribute("href", "/en/account/wallet");
-    await expect(menu.getByRole("link", { name: "Price list", exact: true })).toHaveAttribute("href", "/en/account/services");
+    await expect(menu.getByRole("link", { name: "Price list", exact: true })).toHaveCount(0);
+    await expect(menu.locator('a[href^="/en/account/services"]')).toHaveCount(0);
     await expect(menu.getByRole("link", { name: "Merchant portal" })).toHaveCount(0);
     await expect(menu.getByRole("button", { name: /Sign out/ })).toHaveCount(1);
     await expect(menu.locator('a[href^="/en/merchant"]')).toHaveCount(0);

@@ -80,9 +80,13 @@ describe("checkField", () => {
 
 describe("visibleFields and buildInputs", () => {
   const fields = [field({ key: "imei" }), field({ key: "device" })];
-  it("hides the imei field on IMEI services only", () => {
-    expect(visibleFields({ type: "imei", fields }).map((f) => f.key)).toEqual(["device"]);
-    expect(visibleFields({ type: "server", fields }).map((f) => f.key)).toEqual(["imei", "device"]);
+  it("returns the fields as the API sent them: a field keyed imei is not special", () => {
+    expect(visibleFields({ fields }).map((f) => f.key)).toEqual(["imei", "device"]);
+    expect(visibleFields({ fields: [] })).toEqual([]);
+  });
+  it("keeps the order and the objects of the fields it was given", () => {
+    const given = [field({ key: "serial", label: "Serial" }), field({ key: "device" })];
+    expect(visibleFields({ fields: given })).toEqual(given);
   });
   it("sends only filled fields, trimmed", () => {
     expect(buildInputs(fields, { imei: " ", device: " iPhone " })).toEqual({ device: "iPhone" });
@@ -205,13 +209,13 @@ describe("mapOrderFieldErrors", () => {
 });
 
 describe("where the order form leads", () => {
-  it("every address is a page of the account area, none is under the old portal folder", () => {
+  it("every address is a page of the account area or the shop's services, none is under the old portal folder", () => {
     const hrefs = orderFormHrefs();
     expect(hrefs).toEqual({
       orders: "/en/account/orders",
       orderBase: "/en/account/orders",
       topUp: "/en/account/wallet/add-funds",
-      services: "/en/account/services",
+      services: "/en/services",
     });
     for (const href of Object.values(hrefs)) expect(href).not.toContain("/merchant");
   });

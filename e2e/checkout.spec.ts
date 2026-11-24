@@ -1,7 +1,8 @@
 // Shop checkout: open a checkout (details drawer, tax from the country), review and pay (locked amounts, consents,
 // payment methods), the payment return page and the resume link, and what each rank sees (a retail account buys here, a merchant
-// rank is sent to its price list and no checkout session is created for it). The demo gateways have placeholder keys, so `pay` is
-// EXPECTED to answer 502 GATEWAY_ERROR in this setup: the test accepts a redirect too, but never a silent success.
+// rank gets its own order form at the same address and no checkout session is created for it, decision 003). The demo gateways
+// have placeholder keys, so `pay` is EXPECTED to answer 502 GATEWAY_ERROR in this setup: the test accepts a redirect too, but
+// never a silent success.
 // Server errors that cannot be provoked on demand (suspended email, guest checkout off, maintenance) are answered by
 // Playwright route mocks at the browser boundary.
 import { expect, test } from "./fixtures";
@@ -181,9 +182,8 @@ test.describe("opening a checkout", () => {
 
 test.describe("checkout by rank", () => {
   const SLUG = "icloud-clean-lost-check";
-  const SERVICE_ID = 1;
 
-  test("a signed-in merchant rank gets the price list notice, no form, and no checkout session is created", async ({ page }) => {
+  test("a signed-in merchant rank gets its own order form at the same address, and no checkout session is created", async ({ page }) => {
     await stubTurnstile(page);
     await freshAccount(page, { rank: "merchant", signedIn: true });
     const posted: string[] = [];
@@ -191,16 +191,15 @@ test.describe("checkout by rank", () => {
       if (r.method() === "POST" && r.url().includes("/store/v1/checkout-sessions")) posted.push(r.url());
     });
     await page.goto(`/en/checkout?service=${SLUG}`);
-    await expect(page.getByText("The shop checkout is for retail buyers")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Order at your price" })).toHaveAttribute("href", `/en/account/services/${SERVICE_ID}`);
-    await expect(page.getByRole("link", { name: "Back to the service" })).toHaveAttribute("href", `/en/services/${SLUG}`);
+    await expect(page.getByRole("main").getByRole("button", { name: /^Place order/ })).toBeVisible();
+    await expect(page.getByText("The shop checkout is for retail buyers")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Continue to payment" })).toHaveCount(0);
     await expect(page.getByLabel("Email")).toHaveCount(0);
     await page.waitForLoadState("networkidle");
     expect(posted, "the page must not open a checkout session for a merchant rank").toEqual([]);
   });
 
-  test("a 403 RANK_NOT_ALLOWED to the session shows the same notice in place of the form", async ({ page }) => {
+  test("a 403 RANK_NOT_ALLOWED to the session shows the notice, which leads to the order form at the same address", async ({ page }) => {
     await stubTurnstile(page);
     await page.route("**/store/v1/checkout-sessions", (route) => {
       if (route.request().method() !== "POST") return route.fallback();
@@ -215,31 +214,40 @@ test.describe("checkout by rank", () => {
     await fillBuyer(page);
     await page.getByRole("button", { name: "Continue to payment" }).click();
     await expect(page.getByText("The shop checkout is for retail buyers")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Order at your price" })).toHaveAttribute("href", `/en/account/services/${SERVICE_ID}`);
+    await expect(page.getByRole("link", { name: "Order at your price" })).toHaveAttribute("href", `/en/checkout?service=${SLUG}`);
     await expect(page.getByRole("button", { name: "Continue to payment" })).toHaveCount(0);
   });
 
-  test('the service page offers "Order at your price" to a merchant rank only', async ({ page }) => {
-    // A visitor and a retail account see the retail page alone.
+  test("the service page: a visitor and a retail account see the public price; a merchant rank its own, in the same place", async ({ page }) => {
+    const taxLine = "Tax is added at checkout, based on your country.";
+    // A visitor and a retail account see the retail page alone, with no placeholder and no merchant words.
     await page.goto(`/en/services/${SLUG}`);
     await expect(page.getByRole("link", { name: "Buy now" })).toBeVisible();
+    await expect(page.getByText(taxLine)).toBeVisible();
     await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("link", { name: "Order at your price" })).toHaveCount(0);
-    await expect(page.getByText("The shop checkout is for retail buyers.")).toHaveCount(0);
+    await expect(page.getByText("Loading your price")).toHaveCount(0);
+    await expect(page.getByText("Not available for your account")).toHaveCount(0);
 
     await signIn(page, ACCOUNTS.retail);
     await page.goto(`/en/services/${SLUG}`);
     await expect(page.getByRole("link", { name: "Buy now" })).toBeVisible();
+    await expect(page.getByText(taxLine)).toBeVisible();
     await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("link", { name: "Order at your price" })).toHaveCount(0);
+    await expect(page.getByText("Loading your price")).toHaveCount(0);
 
-    // A merchant rank sees its price, the way to order at it and the line that the shop checkout is for retail buyers.
+    // A merchant rank: its own price in the price block, no tax line, no separate "Your price" box; Buy now opens its order form.
     await page.context().clearCookies();
     await freshAccount(page, { rank: "merchant", signedIn: true });
+    const own = ((await (await page.request.get("/client/services/1")).json()) as { price: string }).price;
+    const shown = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(own));
     await page.goto(`/en/services/${SLUG}`);
-    await expect(page.getByRole("link", { name: "Order at your price" })).toHaveAttribute("href", `/en/account/services/${SERVICE_ID}`);
-    await expect(page.getByText("The shop checkout is for retail buyers.")).toBeVisible();
-    await expect(page.getByText("Your price", { exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByText(shown).first()).toBeVisible();
+    await expect(page.getByText(taxLine)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Order at your price" })).toHaveCount(0);
+    await expect(page.getByText("Your price", { exact: true })).toHaveCount(0);
+    await page.getByRole("link", { name: "Buy now" }).click();
+    await expect(page).toHaveURL(new RegExp(`/en/checkout\\?service=${SLUG}$`));
+    await expect(page.getByRole("main").getByRole("button", { name: /^Place order/ })).toBeVisible();
   });
 });
 

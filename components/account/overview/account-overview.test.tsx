@@ -151,12 +151,13 @@ describe("MerchantOverview", () => {
     expect(html).toContain('href="/en/account/wallet/add-funds"');
   });
 
-  it("greets by name with the rank beside it and offers a new order in the price list", async () => {
+  it("greets by name with the rank beside it and offers a new order in the shop (decision 003)", async () => {
     request.get.mockResolvedValue(dashboard);
     const html = renderToStaticMarkup(await MerchantOverview({ me: account("merchant") }));
     expect(html).toContain("Welcome back, Daniel Whitmore");
     expect(html).toContain("Gold merchant");
-    expect(html).toContain('href="/en/account/services"');
+    expect(html).toContain('href="/en/services"');
+    expect(html).not.toContain("/en/account/services");
   });
 
   it("keeps the greeting and shows the failure when the dashboard cannot be read", async () => {

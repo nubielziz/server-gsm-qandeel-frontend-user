@@ -26,6 +26,7 @@ const OLD_PAGES = [
   "/merchant/set-password",
   "/merchant/verify-email",
   "/merchant/register",
+  "/account/services",
   "/account/tickets",
   "/account/tickets/new",
 ];
@@ -100,8 +101,11 @@ describe("LEGACY_PATHS: the table", () => {
 describe("legacyAccountPath: where each old page goes", () => {
   const cases: [string, string][] = [
     ["/merchant", "/account"],
-    ["/merchant/services", "/account/services"],
+    // The retired price list ends at the shop's services; an old order form address keeps its own page, which redirects
+    // to the service's checkout (decision 003).
+    ["/merchant/services", "/services"],
     ["/merchant/services/9", "/account/services/9"],
+    ["/account/services", "/services"],
     ["/merchant/orders", "/account/orders"],
     ["/merchant/orders/42", "/account/orders/42"],
     ["/merchant/wallet", "/account/wallet"],

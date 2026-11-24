@@ -11,8 +11,6 @@ export type CapabilitySource = RankSource & { hasPassword?: boolean | null };
 export type AccountCapabilities = {
   readonly rankKind: RankKind;
   readonly family: AccountFamily;
-  /** The account's own price list, and the order form that uses it (merchant rank only). */
-  readonly priceList: boolean;
   /** Invoices, which are how a merchant rank adds funds (merchant rank only). */
   readonly invoices: boolean;
   /** API keys for the Dhru address (merchant rank only). */
@@ -28,10 +26,10 @@ export type AccountCapabilities = {
 };
 
 /**
- * The capabilities of an account, by rank. Retail: no price list, no invoices, no API keys, no notification switches;
- * merchant: all four. Two-step needs a password (`hasPassword === true`: an unknown value counts as no password). Data
- * export is open to every signed-in account and erasure to the retail rank only. Fails closed like `rankKindOf`; null
- * (signed out) can do nothing.
+ * The capabilities of an account, by rank. Retail: no invoices, no API keys, no notification switches; merchant: all three.
+ * There is no price list: every rank buys in the shop, a merchant rank at its own prices (decision 003). Two-step needs a
+ * password (`hasPassword === true`: an unknown value counts as no password). Data export is open to every signed-in account
+ * and erasure to the retail rank only. Fails closed like `rankKindOf`; null (signed out) can do nothing.
  */
 export function capabilitiesOf(me: CapabilitySource | null | undefined): AccountCapabilities {
   const rankKind = rankKindOf(me);
@@ -40,7 +38,6 @@ export function capabilitiesOf(me: CapabilitySource | null | undefined): Account
     return {
       rankKind,
       family,
-      priceList: false,
       invoices: false,
       apiKeys: false,
       notificationPreferences: false,
@@ -53,7 +50,6 @@ export function capabilitiesOf(me: CapabilitySource | null | undefined): Account
   return {
     rankKind,
     family,
-    priceList: merchant,
     invoices: merchant,
     apiKeys: merchant,
     notificationPreferences: merchant,

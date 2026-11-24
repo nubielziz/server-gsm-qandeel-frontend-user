@@ -11,6 +11,8 @@
 // waits for the navigation), so the page or the dialog's title shows at once on a tap. The others keep the default
 // prefetch of the route's shell, which leaves out the slug's content: a per-link prefetch for every card of a long grid
 // would cost one request each (plan P3.2, P3.3, Next docs "Optimizing prefetching", "Trade-offs").
+// The price and the order link sit in slots of the personal price layer (./own-price.tsx, decision 003): an account of a
+// merchant rank sees its own price there, and an order link that is off for a service it may not buy.
 import Link from "next/link";
 import { CircleCheck, Clock, Eye, MapPin, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +28,7 @@ import { sitePath } from "@/lib/site-path";
 import { deliveryTime } from "@/lib/store/delivery";
 import type { ServiceType, StoreServiceCard } from "@/lib/api/types";
 import { BdiText } from "./bdi-text";
+import { OwnBuy, OwnPrice } from "./own-price";
 import { ServiceMark } from "./service-art";
 
 export type ServiceCardLabels = {
@@ -183,21 +186,25 @@ export function ServiceCard({ service, decimals, labels, priority, index }: Serv
         </ul>
       </div>
       <div className="mt-auto flex items-center justify-between gap-3 pt-3">
-        <Money
-          amount={service.price.gross}
-          currency={service.price.currency}
-          decimals={decimals}
-          className="min-w-0 text-heading font-bold text-ink"
-        />
-        <ButtonLink
-          href={orderHref}
-          size="sm"
-          className="relative z-10"
-          startIcon={<ShoppingCart aria-hidden="true" />}
-          aria-label={fmt(labels.orderService, { title: service.title })}
-        >
-          {labels.orderNow}
-        </ButtonLink>
+        <OwnPrice serviceId={service.id} className="min-w-0 text-heading font-bold text-ink" placeholderClassName="w-20">
+          <Money
+            amount={service.price.gross}
+            currency={service.price.currency}
+            decimals={decimals}
+            className="min-w-0 text-heading font-bold text-ink"
+          />
+        </OwnPrice>
+        <OwnBuy serviceId={service.id}>
+          <ButtonLink
+            href={orderHref}
+            size="sm"
+            className="relative z-10"
+            startIcon={<ShoppingCart aria-hidden="true" />}
+            aria-label={fmt(labels.orderService, { title: service.title })}
+          >
+            {labels.orderNow}
+          </ButtonLink>
+        </OwnBuy>
       </div>
     </article>
   );
@@ -274,21 +281,25 @@ export function ServiceCardMini({ service, decimals, labels, index }: Omit<Servi
         <InStock service={service} labels={labels} />
       </div>
       <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-        <Money
-          amount={service.price.gross}
-          currency={service.price.currency}
-          decimals={decimals}
-          className="min-w-0 text-body font-bold text-ink"
-        />
-        <IconButtonLink
-          href={orderHref}
-          label={fmt(labels.orderService, { title: service.title })}
-          variant="primary"
-          size="sm"
-          className="z-10"
-        >
-          <ShoppingCart aria-hidden="true" />
-        </IconButtonLink>
+        <OwnPrice serviceId={service.id} className="min-w-0 text-body font-bold text-ink" placeholderClassName="w-14">
+          <Money
+            amount={service.price.gross}
+            currency={service.price.currency}
+            decimals={decimals}
+            className="min-w-0 text-body font-bold text-ink"
+          />
+        </OwnPrice>
+        <OwnBuy serviceId={service.id}>
+          <IconButtonLink
+            href={orderHref}
+            label={fmt(labels.orderService, { title: service.title })}
+            variant="primary"
+            size="sm"
+            className="z-10"
+          >
+            <ShoppingCart aria-hidden="true" />
+          </IconButtonLink>
+        </OwnBuy>
       </div>
     </article>
   );

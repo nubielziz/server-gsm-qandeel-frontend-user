@@ -41,6 +41,7 @@ staff pages. This is the shop's side of it.
    answers `guest-form`, `sign-in`, `account-form` or `price-list`: a merchant rank gets a card that sends it to its price list and the
    checkout form never mounts for it. On the home page a merchant rank sees a banner that links to
    its price list; it reads the account only when the readable cookie of the merchant family exists, so a visitor costs no request.
+   (Replaced by decision 003: no price list; a merchant rank sees its own prices in the shop and orders at the checkout address.)
 8. **Privacy.** The data export is offered to every account; the erasure request is offered to the retail rank only. A merchant rank
    sees a sentence in place of the erasure button (move the account to the retail rank first) and no request is sent.
 9. **Old addresses.** `lib/account/legacy-paths.ts` is the one table of the retired addresses (every page under `/merchant`, the

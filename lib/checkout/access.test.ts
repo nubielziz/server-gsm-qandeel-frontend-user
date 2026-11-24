@@ -1,15 +1,15 @@
-// Who may open a shop checkout, and the addresses it builds. A merchant rank orders from its own price list: the retail form
-// is never mounted for it, so no checkout session is created.
+// Who may open a shop checkout, and the addresses it builds. A merchant rank gets its own order form at the same checkout address
+// (decision 003): the retail form is never mounted for it, so no checkout session is created.
 import { describe, expect, it } from "vitest";
-import { checkoutAccess, checkoutBuyerOf, checkoutSignInHref, priceListHref, sessionPriceList } from "./access";
+import { checkoutAccess, checkoutBuyerOf, checkoutHref, checkoutSignInHref, sessionPriceList } from "./access";
 
 const retail = { email: "buyer@example.com", country: "DE", rank: { kind: "retail" } };
 const merchant = { email: "ops@example.com", country: "JO", rank: { kind: "merchant" } };
 
 describe("checkoutAccess", () => {
-  it("gives a merchant rank the price list, never the form, whether or not guests may buy", () => {
-    expect(checkoutAccess(merchant, true)).toBe("price-list");
-    expect(checkoutAccess(merchant, false)).toBe("price-list");
+  it("gives a merchant rank its own order form, never the retail form, whether or not guests may buy", () => {
+    expect(checkoutAccess(merchant, true)).toBe("order-form");
+    expect(checkoutAccess(merchant, false)).toBe("order-form");
   });
 
   it("gives a retail rank the form with its own account", () => {
@@ -37,7 +37,7 @@ describe("checkoutBuyerOf", () => {
     expect(checkoutBuyerOf(retail)).toEqual({ email: "buyer@example.com", country: "DE" });
   });
 
-  it("opens no form for a merchant rank, and none for a visitor who is signed out", () => {
+  it("opens no retail form for a merchant rank, and none for a visitor who is signed out", () => {
     expect(checkoutBuyerOf(merchant)).toBeNull();
     expect(checkoutBuyerOf(null)).toBeNull();
     expect(checkoutBuyerOf(undefined)).toBeNull();
@@ -49,34 +49,39 @@ describe("checkoutBuyerOf", () => {
 });
 
 describe("sessionPriceList", () => {
-  it("gives a merchant rank the way to its own price and the way back to the service", () => {
-    expect(sessionPriceList(merchant, 42, "icloud-clean")).toEqual({
-      priceListHref: "/en/account/services/42",
+  it("gives a merchant rank the way to its own order form at the service's checkout address and the way back", () => {
+    expect(sessionPriceList(merchant, "icloud-clean")).toEqual({
+      orderHref: "/en/checkout?service=icloud-clean",
       serviceHref: "/en/services/icloud-clean",
     });
   });
 
-  it("sends a merchant rank back to the service list when the service is no longer listed", () => {
-    expect(sessionPriceList(merchant, 42, null)).toEqual({ priceListHref: "/en/account/services/42", serviceHref: "/en/services" });
+  it("has no order form to offer for a service that is no longer listed, and sends the rank back to the service list", () => {
+    expect(sessionPriceList(merchant, null)).toEqual({ orderHref: null, serviceHref: "/en/services" });
+  });
+
+  it("never leads to the retired price list", () => {
+    expect(JSON.stringify(sessionPriceList(merchant, "x"))).not.toContain("/account/services");
   });
 
   it("gives a retail rank, a visitor who is signed out and an account that was not read no notice", () => {
-    expect(sessionPriceList(retail, 42, "icloud-clean")).toBeNull();
-    expect(sessionPriceList(null, 42, "icloud-clean")).toBeNull();
-    expect(sessionPriceList(undefined, 42, "icloud-clean")).toBeNull();
+    expect(sessionPriceList(retail, "icloud-clean")).toBeNull();
+    expect(sessionPriceList(null, "icloud-clean")).toBeNull();
+    expect(sessionPriceList(undefined, "icloud-clean")).toBeNull();
   });
 
   it("fails closed: only the exact word merchant gets the notice", () => {
     for (const kind of ["partner", "", "Merchant", undefined, null]) {
-      expect(sessionPriceList({ rank: { kind } }, 42, "x"), String(kind)).toBeNull();
+      expect(sessionPriceList({ rank: { kind } }, "x"), String(kind)).toBeNull();
     }
-    expect(sessionPriceList({}, 42, "x")).toBeNull();
+    expect(sessionPriceList({}, "x")).toBeNull();
   });
 });
 
 describe("addresses", () => {
-  it("leads a merchant rank to the page of the service in its price list", () => {
-    expect(priceListHref(42)).toBe("/en/account/services/42");
+  it("the checkout address of a service is the same for every buyer, its slug encoded", () => {
+    expect(checkoutHref("icloud-clean")).toBe("/en/checkout?service=icloud-clean");
+    expect(checkoutHref("a b&c")).toBe("/en/checkout?service=a%20b%26c");
   });
 
   it("comes back to the page after sign-in with no account type, whoever signs in", () => {

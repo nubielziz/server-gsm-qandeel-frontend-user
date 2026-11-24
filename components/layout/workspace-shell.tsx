@@ -13,7 +13,7 @@
 // area are prerendered, so the page has text on screen at first paint instead of a skeleton until the session is read.
 // Nothing personal is in it. The parts that depend on who is signed in are small holes with their own <Suspense> and a
 // same-size fallback, each read by an async function the layout passes (`resolveNav`, `resolveUser`): the nav lists
-// when the session decides which links exist, the search form (a merchant rank searches its own price list) and the avatar
+// when the session decides which links exist, the search form (when a layout's search depends on the session) and the avatar
 // with the name. A layout puts its session gate and its own holes (wallet pill, bell) in `headerSlot` / `children`.
 import { Suspense, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
@@ -63,7 +63,7 @@ export type WorkspaceShellProps = {
   nav: WorkspaceNavItem[];
   /**
    * Pages that are not in the static `nav` but still need their header title in the static shell: the places only some
-   * accounts have (a merchant rank's price list and invoices). They are never drawn as links; the heading reads them.
+   * accounts have (a merchant rank's invoices). They are never drawn as links; the heading reads them.
    */
   titles?: WorkspaceTitleItem[];
   /** Secondary navigation pinned to the bottom of the rail (settings), as the static shell shows it. */
@@ -93,8 +93,8 @@ export type WorkspaceShellProps = {
   /** A search form in the header (shown from `md`), as the static shell draws it. Omit for none. */
   search?: WorkspaceSearch;
   /**
-   * Reads the session and returns the search form the account uses (a merchant rank searches its own price list, any other
-   * account the shop). It runs inside <Suspense>; `search` shows until it returns, so it must be given too.
+   * Reads the session and returns the search form the account uses, for a layout whose search depends on the session. It runs
+   * inside <Suspense>; `search` shows until it returns, so it must be given too.
    */
   resolveSearch?: () => Promise<WorkspaceSearch>;
   /** The page. Personal content needs its own <Suspense> (the layout adds the page-wide one and the session gate). */

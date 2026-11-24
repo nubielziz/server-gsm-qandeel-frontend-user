@@ -1,7 +1,10 @@
 // A service page: art (the service's own picture, else brand logo, else type picture), title, chips, price (visitor
 // currency, with "per unit", "From" and the packs), availability, delivery and quantity rules, "Buy now", description,
-// requirements and FAQ. `params` is read behind <Suspense>; the price and the rank hint stream in behind their own
-// and wait for the navigation (`navigation()`), so a prefetch of a prerendered slug is served from the static output.
+// requirements and FAQ. `params` is read behind <Suspense>; the price streams in behind its own and waits for the
+// navigation (`navigation()`), so a prefetch of a prerendered slug is served from the static output. The price block and
+// "Buy now" are slots of the personal price layer (decision 003): an account of a merchant rank sees its own price there,
+// without the tax line, and "Buy now" leads it to the same checkout address, where its own order form opens (a file service
+// too, which the shop checkout does not sell to anybody else); for a service it may not buy, "Buy now" is off.
 // An old address (a retired Arabic page, decision 039) sends the reader on to the service's page, else to the list
 // (`resolveService`, plan 30 §7.1); it streams, so it is an instant redirect inside a 200 answer that is `noindex`.
 // An unknown slug is a 404.
@@ -20,15 +23,9 @@ import { Markdown } from "@/components/ui/markdown";
 import { Skeleton } from "@/components/ui/skeleton";
 import { demoteHeadings } from "@/components/store/markdown-source";
 import { resolveService } from "@/components/store/resolve-service";
+import { OwnBuy, OwnPriceBlock } from "@/components/store/own-price";
 import { ServiceArt } from "@/components/store/service-art";
-import {
-  Accordion,
-  PriceBlock,
-  RankPriceHint,
-  ServicePrice,
-  serviceFacts,
-  serviceStockHint,
-} from "@/components/store/service-parts";
+import { Accordion, PriceBlock, ServicePrice, serviceFacts, serviceStockHint } from "@/components/store/service-parts";
 import { serviceStaticParams } from "@/components/store/service-static-params";
 import { countryName } from "@/lib/countries";
 import { common } from "@/lib/i18n/messages/common";
@@ -91,6 +88,12 @@ async function ServiceContent({ params }: { params: Promise<{ slug: string }> })
   const hasDetails = Boolean(service.descriptionMd.trim() || service.requirementsMd.trim() || service.faqs.length > 0);
   const facts = serviceFacts(service, t, c);
   const hint = serviceStockHint(service, c);
+  // prefetch: the checkout's service summary and form come with the prefetch (plan P3.1).
+  const buyNow = (
+    <ButtonLink href={checkoutHref} prefetch size="lg" block endIcon={<ArrowRight aria-hidden="true" />}>
+      {t.service.buyNow}
+    </ButtonLink>
+  );
 
   return (
     <>
@@ -140,12 +143,14 @@ async function ServiceContent({ params }: { params: Promise<{ slug: string }> })
             <CardBody className="grid gap-5">
               <div>
                 <p className="text-small font-semibold text-ink-muted">{t.service.priceLabel}</p>
-                <div className="mt-1">
-                  <Suspense fallback={<PriceBlock pending rule={service.quantity} q={c.quantity} t={t.service} />}>
-                    <ServicePrice slug={service.slug} />
-                  </Suspense>
-                </div>
-                <p className="mt-1.5 text-small text-ink-subtle">{t.service.taxNote}</p>
+                <OwnPriceBlock serviceId={service.id} rule={service.quantity} q={c.quantity} t={t.service}>
+                  <div className="mt-1">
+                    <Suspense fallback={<PriceBlock pending rule={service.quantity} q={c.quantity} t={t.service} />}>
+                      <ServicePrice slug={service.slug} />
+                    </Suspense>
+                  </div>
+                  <p className="mt-1.5 text-small text-ink-subtle">{t.service.taxNote}</p>
+                </OwnPriceBlock>
               </div>
               <div className="grid gap-3 border-y border-line py-4">
                 <dl className="grid gap-3 text-body">
@@ -163,34 +168,24 @@ async function ServiceContent({ params }: { params: Promise<{ slug: string }> })
               </div>
               {buyable ? (
                 <div className="grid gap-3">
-                  {/* prefetch: the checkout's service summary and form come with the prefetch (plan P3.1). */}
-                  <ButtonLink
-                    href={checkoutHref}
-                    prefetch
-                    size="lg"
-                    block
-                    endIcon={<ArrowRight aria-hidden="true" />}
-                  >
-                    {t.service.buyNow}
-                  </ButtonLink>
+                  <OwnBuy serviceId={service.id}>{buyNow}</OwnBuy>
                   <p className="text-small text-ink-subtle">{t.service.afterPay}</p>
                 </div>
               ) : (
-                <Alert
-                  tone="warning"
-                  icon={<TriangleAlert aria-hidden="true" />}
-                  title={t.service.fileTitle}
-                  action={undefined}
-                >
-                  <p>{t.service.fileText}</p>
-                  <ButtonLink href={sitePath("/support")} variant="secondary" size="sm" className="mt-3">
-                    {t.service.fileCta}
-                  </ButtonLink>
-                </Alert>
+                <OwnBuy as="div" serviceId={service.id} merchant={buyNow}>
+                  <Alert
+                    tone="warning"
+                    icon={<TriangleAlert aria-hidden="true" />}
+                    title={t.service.fileTitle}
+                    action={undefined}
+                  >
+                    <p>{t.service.fileText}</p>
+                    <ButtonLink href={sitePath("/support")} variant="secondary" size="sm" className="mt-3">
+                      {t.service.fileCta}
+                    </ButtonLink>
+                  </Alert>
+                </OwnBuy>
               )}
-              <Suspense fallback={null}>
-                <RankPriceHint serviceId={service.id} />
-              </Suspense>
             </CardBody>
           </Card>
         </aside>

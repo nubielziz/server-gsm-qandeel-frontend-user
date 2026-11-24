@@ -1,6 +1,6 @@
 // Shared e2e helpers. Sign-in goes through the site's own origin (the /client and /store/v1 rewrites), so the
 // session cookies land in the browser context exactly as after a real sign-in. There is one kind of account: a rank tells a
-// retail account (it buys in the shop) from a merchant (price list, wallet invoices, API); the helpers take the rank as an option.
+// retail account from a merchant (its own prices in the shop, wallet invoices, API); the helpers take the rank as an option.
 import { readFileSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
 import { FIXTURES_FILE, changeAccountEmail, createAccount, setAccountStatus, type E2eFixtures, type RankKind } from "./admin";

@@ -3,7 +3,8 @@
 // For the store balance (plan F30, D9) the server also reads who is signed in and their wallet, in this request and never
 // cached, and hands the view only the facts it needs (`balanceOption` decides what shows). An account of a merchant rank
 // has no store balance: its wallet is not read, and the view offers the payment methods only (`balanceContextFor`). The same
-// read tells the view that the account orders from its price list, so the view shows that notice first (`sessionPriceList`).
+// read tells the view that the account orders at its own price through its order form, so the view shows that notice first
+// (`sessionPriceList`, decision 003).
 import { Suspense } from "react";
 import { connection } from "next/server";
 import type { Metadata } from "next";
@@ -83,7 +84,7 @@ async function Session({ params }: { params: Promise<{ token: string }> }) {
     slugForService(session.service.id),
     readAccountContext(session),
   ]);
-  const priceList = sessionPriceList(me, session.service.id, slug);
+  const priceList = sessionPriceList(me, slug);
   const decimals = config.currencies.find((currency) => currency.code === session.currency)?.decimals ?? 2;
   return (
     <SessionView
@@ -102,7 +103,7 @@ async function Session({ params }: { params: Promise<{ token: string }> }) {
 }
 
 /**
- * Who is signed in and their store balance, for the "Store balance" choice and the price-list notice. Only an open checkout
+ * Who is signed in and their store balance, for the "Store balance" choice and the merchant notice. Only an open checkout
  * needs it. A visitor without an account session costs no request (`getAccount` looks at the CSRF cookie first), and an account
  * of a merchant rank costs no wallet read: it has no store balance (`balanceContextFor`). Any failure leaves the balance out
  * (and the account unknown): the card gateways must keep working when the wallet cannot be read.

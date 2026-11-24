@@ -8,13 +8,13 @@ import {
   type AccountMenuRow,
   type MenuWalletRead,
 } from "./account-menu";
-import { capabilitiesOf } from "./capabilities";
 
 const RETAIL = { rank: { kind: "retail" } };
 const MERCHANT = { rank: { kind: "merchant" } };
 
 const ids = (rows: AccountMenuRow[]) => rows.map((row) => row.id);
-const rowsFor = (me: typeof RETAIL | typeof MERCHANT, walletShows: boolean) => accountMenuItems(capabilitiesOf(me), walletShows);
+// One menu for every rank: the rank only decides whether the wallet row shows (`walletRowShows`), so `me` reads nothing here.
+const rowsFor = (_me: unknown, walletShows: boolean) => accountMenuItems(walletShows);
 
 const storeWallet = (over: { enabled?: boolean; balance?: string; frozen?: { at: string } | null } = {}): MenuWalletRead => ({
   kind: "store",
@@ -27,8 +27,8 @@ describe("accountMenuItems", () => {
     expect(ids(rowsFor(RETAIL, false))).toEqual(["account", "orders", "settings", "signOut"]);
   });
 
-  it("a merchant rank has the same rows and the price list between the wallet and Settings", () => {
-    expect(ids(rowsFor(MERCHANT, true))).toEqual(["account", "orders", "wallet", "priceList", "settings", "signOut"]);
+  it("a merchant rank has the same rows: no price list (it sees its own prices in the shop, decision 003)", () => {
+    expect(ids(rowsFor(MERCHANT, walletRowShows(MERCHANT, null)))).toEqual(["account", "orders", "wallet", "settings", "signOut"]);
   });
 
   it("there is exactly one Sign out, and it is the last row, whatever the rank", () => {
@@ -56,13 +56,8 @@ describe("accountMenuItems", () => {
       account: "/account",
       orders: "/account/orders",
       wallet: "/account/wallet",
-      priceList: "/account/services",
       settings: "/account/settings",
     });
-  });
-
-  it("an unknown rank kind has no price list (fail closed)", () => {
-    expect(ids(rowsFor({ rank: { kind: "wholesale" } } as never, true))).not.toContain("priceList");
   });
 });
 

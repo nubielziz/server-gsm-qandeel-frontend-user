@@ -1,10 +1,10 @@
 // AccountArea: the signed-in state in the header: "Sign in" button, or the bell, the wallet pill and the account menu.
 // It reads the session cookies, so it must be rendered inside <Suspense fallback={<AccountAreaSkeleton />}>.
-// There is one account type: the menu is the same for every rank, with a row more or less (the price list is a merchant
-// rank's, the wallet row of a retail rank shows only while its store balance does). The rows come from
+// There is one account type: the menu is the same for every rank, with a row more or less (the wallet row of a retail rank
+// shows only while its store balance does). The rows come from
 // `accountMenuItems` (lib/account/account-menu.ts); the wallet is the request's one shared read (`readAccountWallet`).
 import { Fragment, Suspense, type ReactNode } from "react";
-import { ClipboardList, LogIn, Settings, Tag, UserRound, Wallet } from "lucide-react";
+import { ClipboardList, LogIn, Settings, UserRound, Wallet } from "lucide-react";
 import Link from "next/link";
 import { accountMenuItems, walletRowShows, type AccountMenuLink, type AccountMenuRow } from "@/lib/account/account-menu";
 import { capabilitiesOf } from "@/lib/account/capabilities";
@@ -31,7 +31,6 @@ const ROWS: Record<AccountMenuLink["id"], { label: string; icon: ReactNode }> = 
   account: { label: common.header.myAccount, icon: <UserRound aria-hidden="true" /> },
   orders: { label: common.header.myOrders, icon: <ClipboardList aria-hidden="true" /> },
   wallet: { label: common.header.myWallet, icon: <Wallet aria-hidden="true" /> },
-  priceList: { label: common.header.priceList, icon: <Tag aria-hidden="true" /> },
   settings: { label: common.header.settings, icon: <Settings aria-hidden="true" /> },
 };
 
@@ -97,7 +96,7 @@ export async function AccountAreaContent({ compact }: { compact?: boolean }) {
 
   const capabilities = capabilitiesOf(me);
   const pill = walletPillOf(wallet);
-  const rows = accountMenuItems(capabilities, walletRowShows(me, wallet));
+  const rows = accountMenuItems(walletRowShows(me, wallet));
   const name = me.name || me.email;
 
   return (

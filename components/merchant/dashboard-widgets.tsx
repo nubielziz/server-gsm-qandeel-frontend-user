@@ -113,7 +113,7 @@ export function RecentOrders({ data, t, c }: Props) {
           icon={<ClipboardList aria-hidden="true" />}
           title={r.emptyTitle}
           description={r.emptyText}
-          action={<ButtonLink href={sitePath("/account/services")}>{r.emptyAction}</ButtonLink>}
+          action={<ButtonLink href={sitePath("/services")}>{r.emptyAction}</ButtonLink>}
         />
       ) : (
         <div className="mt-4">

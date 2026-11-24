@@ -1,5 +1,6 @@
-// The merchant rank's pages of the account area, end to end against the isolated demo backend (ops@zainmobilehub.example is
-// an active merchant with a wallet). The flows place REAL orders and invoices in the isolated database: IMEIs are
+// The merchant rank's pages of the account area and its order form, end to end against the isolated demo backend
+// (ops@zainmobilehub.example is an active merchant with a wallet). There is no price list (decision 003): the merchant sees its own
+// prices in the shop and its order form opens at a service's checkout address. The flows place REAL orders and invoices in the isolated database: IMEIs are
 // generated per run so a second run never trips the "duplicate open order" rule. The backend can end a session at any
 // time (other test runs sign in as the same merchant), so every navigation goes through `go()`, which signs in again when
 // it lands on the sign-in page. A retail account has none of these pages: the last group checks it is sent home.
@@ -59,6 +60,18 @@ async function priceOf(page: Page, serviceId: number): Promise<string> {
   return ((await res.json()) as { price: string }).price;
 }
 
+/** The checkout address of service 1, where the merchant's order form opens (decision 003). */
+const SERVICE_1 = "/en/checkout?service=icloud-clean-lost-check";
+
+/**
+ * Opens a service's order form through its old address (`/account/services/<id>`), which sends a merchant to the checkout of the
+ * service's shop page. A service without a shop page cannot be ordered on the website: the test says so.
+ */
+async function orderForm(page: Page, serviceId: number) {
+  await go(page, `/en/account/services/${serviceId}`);
+  await expect(page, `service ${serviceId} needs a shop page to be ordered on the website`).toHaveURL(/\/en\/checkout\?service=/);
+}
+
 /** `price x quantity` as the form shows it, worked out in whole cents so no float error creeps in. */
 function usdTotal(price: string, quantity: number): string {
   const cents = Math.round(Number(price) * 100) * quantity;
@@ -80,7 +93,7 @@ test.describe("dashboard", () => {
     const total = dash.counts.pending + dash.counts.processing + dash.counts.completed + dash.counts.rejected;
     await expect(main(page).getByRole("link", { name: new RegExp(`Total orders\\s*${total}`) })).toBeVisible();
     await expect(main(page).getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/en/account/wallet/add-funds");
-    await expect(main(page).getByRole("link", { name: "New order" })).toHaveAttribute("href", "/en/account/services");
+    await expect(main(page).getByRole("link", { name: "New order" })).toHaveAttribute("href", "/en/services");
     await expect(vis(main(page).getByRole("link", { name: /^Open order \d+$/ })).first()).toBeVisible();
     // The quick-order box, the status summary and the "order again" cards are gone: the header search (outside the main
     // landmark) and the orders page do their jobs.
@@ -97,7 +110,7 @@ test.describe("dashboard", () => {
       await page.setViewportSize({ width: 1366, height });
       await go(page, "/en/account");
       const rail = vis(page.getByRole("navigation", { name: "Workspace navigation" }));
-      await expect(rail.getByRole("link")).toHaveCount(8); // seven plus Settings
+      await expect(rail.getByRole("link")).toHaveCount(7); // six plus Settings (no price list, decision 003)
       const fit = await rail.evaluate((nav) => ({
         panelBottom: nav.parentElement!.getBoundingClientRect().bottom,
         lowestLink: Math.max(...[...nav.querySelectorAll("a")].map((a) => a.getBoundingClientRect().bottom)),
@@ -109,42 +122,51 @@ test.describe("dashboard", () => {
   });
 });
 
-test.describe("catalog", () => {
-  test("lists the merchant's prices and filters by search, type and category", async ({ page }) => {
+test.describe("own prices in the shop (decision 003)", () => {
+  const SLUG = "icloud-clean-lost-check"; // service 1
+
+  test("the retired price list leads to the shop's services, the old order form address to the service's checkout", async ({ page }) => {
     await go(page, "/en/account/services");
-    const all = await (await page.request.get("/client/services?_end=1000")).json();
-    await expect(main(page).getByText(`${all.length} results`)).toBeVisible();
-
-    // A price on the page is the API's price for this merchant.
-    const first = all.find((s: { name: string }) => s.name === "Apple Warranty & Activation Date");
-    await expect(vis(main(page).getByRole("link", { name: first.name })).first()).toBeVisible();
-
-    await main(page).getByRole("searchbox", { name: "Search services" }).fill("vodafone");
-    await main(page).getByRole("button", { name: "Apply filters" }).click();
-    await expect(page).toHaveURL(/q=vodafone/);
-    await expect(main(page).getByText("1 result")).toBeVisible();
-
-    await go(page, "/en/account/services");
-    await main(page).getByRole("link", { name: "File service", exact: true }).click();
-    await expect(page).toHaveURL(/type=file/);
-    await expect(main(page).getByText("4 results")).toBeVisible();
+    await expect(page).toHaveURL(/\/en\/services$/);
+    await go(page, "/en/account/services/1");
+    await expect(page).toHaveURL(new RegExp(`/en/checkout\\?service=${SLUG}$`));
+    await expect(main(page).getByRole("button", { name: /^Place order/ })).toBeVisible();
   });
 
-  test("exports the price list as CSV", async ({ page }) => {
-    await go(page, "/en/account/services?type=imei");
-    const [download] = await Promise.all([page.waitForEvent("download"), main(page).getByRole("button", { name: "Export prices (CSV)" }).click()]);
-    expect(download.suggestedFilename()).toBe("price-list.csv"); // the name the API sends in Content-Disposition
-    const text = await fs.readFile((await download.path())!, "utf8");
-    expect(text.split(/\r?\n/)[0]).toBe("serviceId,code,name,type,category,price,currency,deliveryTime");
-    expect(text).toContain(",imei,");
-    expect(text).not.toContain(",server,");
+  test("the service page shows the merchant's own price, without the tax line, and Buy now opens its order form", async ({ page }) => {
+    const price = await priceOf(page, 1);
+    await go(page, `/en/services/${SLUG}`);
+    await expect(main(page).getByText(usdTotal(price, 1)).first()).toBeVisible();
+    await expect(main(page).getByText("Tax is added at checkout, based on your country.")).toHaveCount(0);
+    await expect(main(page).getByRole("link", { name: "Order at your price" })).toHaveCount(0);
+    await main(page).getByRole("link", { name: "Buy now" }).click();
+    await expect(page).toHaveURL(new RegExp(`/en/checkout\\?service=${SLUG}$`));
+    await expect(main(page).getByRole("button", { name: /^Place order/ })).toContainText(usdTotal(price, 1));
+  });
+
+  test("the cards of the services list show the merchant's own prices", async ({ page }) => {
+    const price = await priceOf(page, 1);
+    await go(page, "/en/services?q=icloud");
+    const card = main(page).locator("article").filter({ has: page.locator(`a[href="/en/services/${SLUG}"]`) }).first();
+    await expect(card.getByText(usdTotal(price, 1))).toBeVisible();
+  });
+
+  test("before the page is live, a merchant session never shows the public prices the server drew", async ({ page }) => {
+    // Every client script is aborted (the CSS still loads), so React never hydrates; the guard is an inline script and runs.
+    await page.route("**/_next/static/chunks/**", (route) => (route.request().resourceType() === "script" ? route.abort() : route.continue()));
+    await page.goto(`/en/services/${SLUG}`);
+    await expect(page.locator("html")).toHaveAttribute("data-own-prices", "");
+    // The slots themselves have no box (display: contents): the prices inside them are what must not show.
+    const prices = page.locator("[data-retail-price] .num");
+    await expect(prices.first()).toBeAttached();
+    for (const price of await prices.all()) await expect(price).toBeHidden();
   });
 });
 
 test.describe("ordering", () => {
   test("places an IMEI order, finds it in orders and the statement, and cancels it when the API allows", async ({ page }) => {
     const imei = randomImei();
-    await go(page, "/en/account/services/1");
+    await go(page, SERVICE_1);
     const input = main(page).getByRole("textbox", { name: /^IMEI/ });
     const place = main(page).getByRole("button", { name: /^Place order/ });
 
@@ -166,7 +188,7 @@ test.describe("ordering", () => {
     await expect(vis(main(page).getByText("$0.10")).first()).toBeVisible();
 
     // The same open order again: the API refuses a duplicate (409 DUPLICATE_ORDER) and we link to the first one.
-    await go(page, "/en/account/services/1");
+    await go(page, SERVICE_1);
     await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(imei);
     await main(page).getByRole("button", { name: /^Place order/ }).click();
     await expect(main(page).getByText("You already have this order open")).toBeVisible();
@@ -194,7 +216,7 @@ test.describe("ordering", () => {
 
   test("bulk IMEIs: per-line errors, an exact live total, all orders placed together", async ({ page }) => {
     const [a, b] = [randomImei(), randomImei()];
-    await go(page, "/en/account/services/1");
+    await go(page, SERVICE_1);
     await main(page).getByRole("radio", { name: "Several IMEIs" }).click();
     const list = main(page).getByRole("textbox", { name: /^IMEI list/ });
     await list.fill(`${a}\n\n12345\n${b}`);
@@ -215,7 +237,7 @@ test.describe("ordering", () => {
 
   test("custom field: required, then the result code of an instant order", async ({ page }) => {
     const account = `e2e-${Date.now()}@example.com`;
-    await go(page, "/en/account/services/15");
+    await orderForm(page, 15);
     const field = main(page).getByRole("textbox", { name: /^Z3X account/ });
     const place = main(page).getByRole("button", { name: /^Place order/ });
     await place.click();
@@ -230,7 +252,7 @@ test.describe("ordering", () => {
   });
 
   test("file service: the upload is required and travels as the input file", async ({ page }) => {
-    await go(page, "/en/account/services/24");
+    await orderForm(page, 24);
     const place = main(page).getByRole("button", { name: /^Place order/ });
     await place.click();
     await expect(main(page).getByText("Attach the file this service needs.").first()).toBeVisible();
@@ -249,7 +271,7 @@ test.describe("quantity rules (the three services the global setup configured, n
   test("packs: the page says the packs, the form offers only them and totals the chosen pack", async ({ page }) => {
     const { packs } = fixtures();
     const price = await priceOf(page, packs.id);
-    await go(page, `/en/account/services/${packs.id}`);
+    await go(page, `/en/checkout?service=${packs.slug}`);
     await expect(main(page).getByText("Packs of 5, 10, 25")).toBeVisible();
     await formReady(page);
 
@@ -270,7 +292,7 @@ test.describe("quantity rules (the three services the global setup configured, n
     page.on("request", (request) => {
       if (request.method() === "POST" && new URL(request.url()).pathname === "/client/orders") posts.push(request.url());
     });
-    await go(page, `/en/account/services/${range.id}`);
+    await go(page, `/en/checkout?service=${range.slug}`);
     await expect(main(page).getByText("2 to 50 per order")).toHaveCount(2); // the details card and the hint under the box
     await formReady(page);
 
@@ -292,7 +314,7 @@ test.describe("quantity rules (the three services the global setup configured, n
   test("an exact N: nothing to choose, the total is N units", async ({ page }) => {
     const { exact } = fixtures();
     const price = await priceOf(page, exact.id);
-    await go(page, `/en/account/services/${exact.id}`);
+    await go(page, `/en/checkout?service=${exact.slug}`);
     await expect(main(page).getByText("5 per order")).toBeVisible();
     await formReady(page);
     await expect(main(page).getByRole("combobox", { name: /^Quantity/ })).toHaveCount(0);
@@ -420,7 +442,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
 
   test("PRICE_CHANGED shows both prices and offers to reload the price", async ({ page }) => {
     await refuse(page, "**/client/orders", 409, { code: "PRICE_CHANGED", listedPrice: "0.1000", currentPrice: "0.1100" });
-    await go(page, "/en/account/services/1");
+    await go(page, SERVICE_1);
     await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
     await place(page).click();
     await expect(alert(page, "The price changed")).toContainText(/You saw \u2066?\$0\.10/); // amounts are wrapped in bidi isolates
@@ -431,7 +453,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
   });
 
   test("INSUFFICIENT_FUNDS links to the top-up page; SERVICE_DISABLED links back to the catalog", async ({ page }) => {
-    await go(page, "/en/account/services/1");
+    await go(page, SERVICE_1);
     await refuse(page, "**/client/orders", 402, { code: "INSUFFICIENT_FUNDS" });
     await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
     await place(page).click();
@@ -440,7 +462,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
     await page.unroute("**/client/orders");
     await refuse(page, "**/client/orders", 409, { code: "SERVICE_DISABLED" });
     await place(page).click();
-    await expect(alert(page, "This service is unavailable").getByRole("link", { name: "Back to services" })).toHaveAttribute("href", "/en/account/services");
+    await expect(alert(page, "This service is unavailable").getByRole("link", { name: "Back to services" })).toHaveAttribute("href", "/en/services");
   });
 
   test("a 422 on imeis.N lands on the right textarea line, and inputs.<key> on its field", async ({ page }) => {
@@ -448,7 +470,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
       code: "VALIDATION_FAILED",
       errors: [{ field: "imeis.1", code: "invalid_imei", message: "English text from the API" }],
     });
-    await go(page, "/en/account/services/1");
+    await go(page, SERVICE_1);
     await main(page).getByRole("radio", { name: "Several IMEIs" }).click();
     await main(page).getByRole("textbox", { name: /^IMEI list/ }).fill(`${randomImei()}\n\n${randomImei()}`);
     await place(page).click();
@@ -457,7 +479,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
 
     await page.unroute("**/client/orders");
     await refuse(page, "**/client/orders", 422, { code: "VALIDATION_FAILED", errors: [{ field: "inputs.account", code: "custom", message: "x" }] });
-    await go(page, "/en/account/services/15");
+    await orderForm(page, 15);
     await main(page).getByRole("textbox", { name: /^Z3X account/ }).fill("someone@example.com");
     await place(page).click();
     await expect(main(page).getByText("This value is not valid.")).toBeVisible();
@@ -470,7 +492,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
       code: "VALIDATION_FAILED",
       errors: [{ field: "quantity", code: "invalid_quantity", message: "Choose one of the quantities this service sells: 5, 10, 25." }],
     });
-    await go(page, `/en/account/services/${packs.id}`);
+    await go(page, `/en/checkout?service=${packs.slug}`);
     await formReady(page);
     await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
     await place(page).click();
@@ -523,20 +545,27 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
   });
 });
 
-test.describe("a retail account has none of these pages", () => {
+test.describe("a retail account: the old price list addresses lead into the shop", () => {
   test.beforeEach(async ({ page }) => {
     // The session of the other rank is dropped first: one browser holds one session.
     await page.context().clearCookies();
     await signIn(page, ACCOUNTS.retail);
   });
 
-  for (const path of ["/en/account/services", "/en/account/services/1", "/en/account/services?type=imei"]) {
-    test(`${path} sends it to the account home and keeps the session`, async ({ page }) => {
+  test("the price list ends at the shop's services, with the session kept", async ({ page }) => {
+    for (const path of ["/en/account/services", "/en/account/services?type=imei"]) {
       await page.goto(path);
-      await expect(page).toHaveURL(/\/en\/account$/); // not the sign-in page: the session is fine, the rank has no price list
-      await expect(main(page).getByRole("button", { name: /^Place order/ })).toHaveCount(0);
-    });
-  }
+      await expect(page, path).toHaveURL(/\/en\/services(\?|$)/);
+    }
+    expect((await page.request.get("/store/v1/me")).status()).toBe(200);
+  });
+
+  test("an old order form address opens the shop checkout of the service, with the retail form and no merchant form", async ({ page }) => {
+    await page.goto("/en/account/services/1");
+    await expect(page).toHaveURL(/\/en\/checkout\?service=icloud-clean-lost-check$/);
+    await expect(page.getByRole("button", { name: "Continue to payment" })).toBeVisible();
+    await expect(main(page).getByRole("button", { name: /^Place order/ })).toHaveCount(0);
+  });
 });
 
 // ── Lists and frame (plan P1) ─────────────────────────────────────────────────────────────────────────────────────────
@@ -547,7 +576,6 @@ test.describe("a retail account has none of these pages", () => {
 test.describe("lists: one table for every screen", () => {
   const lists = [
     { name: "orders", path: "/en/account/orders" },
-    { name: "services", path: "/en/account/services" },
     { name: "invoices", path: "/en/account/invoices" },
   ];
 
@@ -724,8 +752,8 @@ test.describe("rail and tab bar", () => {
     expect(await links.evaluateAll((all) => all.map((a) => a.getAttribute("href")))).toEqual([
       "/en/account",
       "/en/account/orders",
-      "/en/account/services",
       "/en/account/wallet",
+      "/en/account/notifications",
       "/en/account/support",
     ]);
     await expect(bar.getByRole("link", { name: /^Orders/ })).toHaveAttribute("aria-current", "page");

@@ -6,8 +6,11 @@
 // the whole form. The form itself needs the account when it mounts, so for a signed-in account it streams in after the
 // click, behind the same skeleton.
 // The rank decides what the account sees (`checkoutAccess`): a retail rank gets the form with its email locked; a merchant
-// rank orders from its price list, so the form is never mounted for it and no checkout session is created.
-import { Suspense } from "react";
+// rank gets its own order form at the same address, at its own price and paid from its wallet (decision 003), so the shop's
+// form is never mounted for it and no checkout session is created. A file service has no shop checkout: everybody else gets
+// the notice to order it through support (also while the account is read, so a guest sees it at once), a merchant rank its
+// order form.
+import { Suspense, type ReactNode } from "react";
 import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
 import { PackageSearch, TriangleAlert } from "lucide-react";
@@ -18,13 +21,13 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CheckoutForm, type CheckoutFormProps } from "@/components/checkout/checkout-form";
-import { PriceListCard, type PriceListCardProps } from "@/components/checkout/price-list-card";
+import { MerchantCheckout, type MerchantCheckoutProps } from "@/components/checkout/merchant-checkout";
 import { resolveService } from "@/components/store/resolve-service";
 import { firstParam, intParam, type SearchParams } from "@/components/store/search-params";
 import { ServiceArt } from "@/components/store/service-art";
 import { getStoreConfig } from "@/lib/api/public";
 import { getAccount } from "@/lib/api/session";
-import { checkoutAccess, checkoutBuyerOf, checkoutSignInHref, priceListHref } from "@/lib/checkout/access";
+import { checkoutAccess, checkoutBuyerOf, checkoutSignInHref } from "@/lib/checkout/access";
 import { countryOptions } from "@/lib/countries";
 import { getCurrency } from "@/lib/currency";
 import { checkout } from "@/lib/i18n/messages/checkout";
@@ -99,8 +102,8 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
   }
   const { service } = resolved;
 
-  if (service.type === "file") {
-    return (
+  const fileNotice =
+    service.type === "file" ? (
       <Alert
         tone="warning"
         icon={<TriangleAlert aria-hidden="true" />}
@@ -113,8 +116,7 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
       >
         {t.start.fileText}
       </Alert>
-    );
-  }
+    ) : null;
 
   const utm: Record<string, string> = {};
   for (const key of UTM_KEYS) {
@@ -151,18 +153,15 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
   };
 
   return (
-    <Suspense fallback={<CheckoutSkeleton />}>
+    <Suspense fallback={fileNotice ?? <CheckoutSkeleton />}>
       <AccountCheckout
         // A new service or a new quantity in the URL starts the form over (no rule, details or notice of the last one).
         formKey={`${service.id}:${wanted ?? ""}`}
         form={form}
+        fileNotice={fileNotice}
         guestCheckout={config.policies.guestCheckout}
         signIn={{ title: t.start.signInTitle, text: t.start.signInText, action: t.start.signInAction, href: signInHref }}
-        priceList={{
-          labels: t.start.priceList,
-          priceListHref: priceListHref(service.id),
-          serviceHref: p(`/services/${encodeURIComponent(service.slug)}`),
-        }}
+        merchant={{ serviceId: service.id, next: nextPath, serviceHref: p(`/services/${encodeURIComponent(service.slug)}`) }}
       />
     </Suspense>
   );
@@ -171,27 +170,34 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
 /**
  * The part of the checkout that needs the signed-in account (`GET /store/v1/me` or `GET /client/auth/me`, by the account's own
  * session, per request, never cached). `checkoutAccess` decides from the account's rank:
+ * - for a merchant rank, its own order form (`MerchantCheckout`), for every type of service. The shop's form is never mounted,
+ *   so no checkout session is created;
+ * - for anybody else, a file service's notice (`fileNotice`), which the shop checkout does not sell;
  * - the form, with a retail account's email locked and its country prefilled (or empty, for a guest checkout);
- * - with guest checkout switched off and nobody signed in, the way to sign in;
- * - for a merchant rank, the notice that leads to its price list. The form is never mounted, so no session is created.
+ * - with guest checkout switched off and nobody signed in, the way to sign in.
  * Render it inside its own <Suspense> so the rest of the page stays in the prefetch.
  */
 async function AccountCheckout({
   formKey,
   form,
+  fileNotice,
   guestCheckout,
   signIn,
-  priceList,
+  merchant,
 }: {
   formKey: string;
   form: Omit<CheckoutFormProps, "account">;
+  /** The notice of a file service; null for every other service. */
+  fileNotice: ReactNode;
   guestCheckout: boolean;
   signIn: { title: string; text: string; action: string; href: string };
-  priceList: PriceListCardProps;
+  merchant: MerchantCheckoutProps;
 }) {
   const me = await getAccount();
   const access = checkoutAccess(me, guestCheckout);
 
+  if (access === "order-form") return <MerchantCheckout {...merchant} />;
+  if (fileNotice) return fileNotice;
   if (access === "sign-in") {
     return (
       <Card>
@@ -199,8 +205,6 @@ async function AccountCheckout({
       </Card>
     );
   }
-  if (access === "price-list") return <PriceListCard {...priceList} />;
-
   return <CheckoutForm key={formKey} {...form} account={checkoutBuyerOf(me)} />;
 }
 

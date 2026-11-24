@@ -89,9 +89,12 @@ export function checkField(field: ServiceField, value: string): FieldProblem | n
   return null;
 }
 
-/** The custom fields a person fills in. On an IMEI service the field keyed `imei` is the IMEI itself, so it is not asked twice. */
-export function visibleFields(service: Pick<MerchantServiceDetail, "type" | "fields">): ServiceField[] {
-  return service.type === "imei" ? service.fields.filter((f) => f.key !== "imei") : service.fields;
+/**
+ * The custom fields a person fills in: the fields as the API sends them. On an IMEI service the API already leaves out the
+ * field that is the IMEI itself (the form has its own IMEI box), so nothing is filtered here and no key is special.
+ */
+export function visibleFields(service: Pick<MerchantServiceDetail, "fields">): ServiceField[] {
+  return service.fields;
 }
 
 /** `inputs` for the request: only fields with a value, trimmed. */
@@ -183,17 +186,17 @@ export type OrderFormHrefs = {
   orderBase: string;
   /** The page that adds funds to the wallet (the notice for a balance that is too low). */
   topUp: string;
-  /** The price list (the way back when a service is switched off). */
+  /** The shop's services (the way back when a service is switched off). */
   services: string;
 };
 
-/** The addresses the price list's pages give the order form. */
+/** The addresses the order form leads to (it opens at a service's checkout address for a merchant rank, decision 003). */
 export function orderFormHrefs(): OrderFormHrefs {
   return {
     orders: sitePath("/account/orders"),
     orderBase: sitePath("/account/orders"),
     topUp: sitePath("/account/wallet/add-funds"),
-    services: sitePath("/account/services"),
+    services: sitePath("/services"),
   };
 }
 

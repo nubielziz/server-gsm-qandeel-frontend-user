@@ -1,6 +1,8 @@
 // The old portal and ticket addresses and where each one lives now. There is one account area at `/account`; the old
 // portal pages and the old ticket list answer a permanent redirect to it, and a stored link (an emailed link, a
-// notification, a bookmark) that still names an old address is rewritten with `legacyAccountPath`.
+// notification, a bookmark) that still names an old address is rewritten with `legacyAccountPath`. The retired price list
+// (decision 003) ends at the shop's services; the old order form of one service (`/account/services/<id>`) is not a row
+// here: it needs the service's shop page, so its own page redirects (app/en/account/services/[id]/page.tsx).
 //
 // Pure and import-free on purpose: next.config.ts reads this table too, and a config file cannot use the `@/` alias.
 //
@@ -15,7 +17,7 @@ export type LegacyPath = { readonly from: string; readonly to: string };
 
 export const LEGACY_PATHS: readonly LegacyPath[] = [
   { from: "/merchant", to: "/account" },
-  { from: "/merchant/services", to: "/account/services" },
+  { from: "/merchant/services", to: "/services" },
   { from: "/merchant/services/:id", to: "/account/services/:id" },
   { from: "/merchant/orders", to: "/account/orders" },
   { from: "/merchant/orders/:id", to: "/account/orders/:id" },
@@ -40,6 +42,8 @@ export const LEGACY_PATHS: readonly LegacyPath[] = [
   { from: "/merchant/set-password", to: "/set-password" },
   { from: "/merchant/verify-email", to: "/verify-email" },
   { from: "/merchant/register", to: "/become-a-merchant" },
+  // The retired price list: a merchant rank sees its own prices in the shop (decision 003).
+  { from: "/account/services", to: "/services" },
   { from: "/account/tickets", to: "/account/support" },
   { from: "/account/tickets/new", to: "/account/support/new" },
   // Anything else under the old portal prefix opens the overview. Keep this row last.

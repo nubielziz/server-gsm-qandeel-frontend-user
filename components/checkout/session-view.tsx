@@ -66,7 +66,7 @@ export type SessionViewProps = {
   priceList?: PriceListCardProps | null;
 };
 
-/** Answers after which the wallet may look different: the page reads it again. A rank that now orders from its price list has no store balance. */
+/** Answers after which the wallet may look different: the page reads it again. A rank that now orders at its own price has no store balance. */
 const BALANCE_REFRESH_CODES = new Set(["INSUFFICIENT_FUNDS", "WALLET_FROZEN", "WALLET_DISABLED", "RANK_NOT_ALLOWED"]);
 
 type PayError = { message: string; reference?: string; support?: boolean; link?: { href: string; label: string } };

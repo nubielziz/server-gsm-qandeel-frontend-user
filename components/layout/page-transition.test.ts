@@ -43,7 +43,7 @@ describe("PageTransition: every shop page plays the page enter on a client navig
 // Owner, 2026-11-15: the workspace pages get the same enter/exit as the shop's, with the rail, the header card and the
 // tab bar held still (named in globals.css).
 describe("PageTransition: every page of the account area (one area for every rank) plays it too", () => {
-  const areas = [{ name: "account", dir: path.join(APP, "account"), first: "page.tsx", min: 19 }];
+  const areas = [{ name: "account", dir: path.join(APP, "account"), first: "page.tsx", min: 18 }];
 
   for (const area of areas) {
     const list = pages(area.dir);

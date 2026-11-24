@@ -5,10 +5,13 @@
 // first service), so a middle click or a long press still opens a new tab. A mouse press on the panel keeps the focus in
 // the box. On phones each phrase has a 44 px fill arrow: an `aria-hidden` span with its own click handler (not a button:
 // interactive content inside an option would be hidden from assistive technology), which puts the phrase in the box.
+// A service's price is a slot of the personal price layer (components/store/own-price.tsx, decision 003): an account of a
+// merchant rank sees its own price there instead of the public one the search answered.
 import Link from "next/link";
 import { getImageProps } from "next/image";
 import type { MouseEvent } from "react";
 import { ArrowUpLeft, Clock, Search, SpellCheck, TrendingUp, X } from "lucide-react";
+import { OwnPrice } from "@/components/store/own-price";
 import type { SuggestFilter, SuggestService } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
@@ -124,7 +127,9 @@ function ServiceRow({ service, labels }: { service: SuggestService; labels: Sugg
           </span>
         </span>
       </span>
-      <span className="num shrink-0 text-body font-semibold">{price}</span>
+      <OwnPrice serviceId={service.id} className="num shrink-0 text-body font-semibold">
+        <span className="num shrink-0 text-body font-semibold">{price}</span>
+      </OwnPrice>
     </>
   );
 }

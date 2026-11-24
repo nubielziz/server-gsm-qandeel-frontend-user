@@ -24,9 +24,14 @@ export const checkout = {
     fileAction: "Contact support",
     priceList: {
       title: "The shop checkout is for retail buyers",
-      text: "Your account orders from its price list, at your own prices. Open this service there to order it.",
+      text: "Your account orders at its own prices and pays from its wallet. Open your order form for this service.",
       action: "Order at your price",
       back: "Back to the service",
+    },
+    /** The checkout of a merchant rank, for a service its account may not order. */
+    merchantUnavailable: {
+      title: "Not available for your account",
+      text: "Your account cannot order this service. Browse the shop for the services you can order.",
     },
     signInTitle: "Sign in to buy",
     signInText: "Checkout is open to signed-in accounts only. Sign in or create an account to continue.",
@@ -199,7 +204,7 @@ export const checkout = {
         "This checkout was opened by another account or as a guest, so it cannot be paid from your balance. Start a new checkout while signed in to use it.",
       insufficient: "Your store balance is lower than the total of this order. Add funds, or pay another way.",
       rankRefused:
-        "Your account orders from its price list, so it has no store balance to pay with. Choose a payment method instead.",
+        "Your account orders at its own prices and pays from its wallet, so it cannot pay through the shop checkout. Open the service page to order it there.",
     },
   },
 

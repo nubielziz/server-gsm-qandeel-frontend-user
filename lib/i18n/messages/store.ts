@@ -198,11 +198,15 @@ export const store = {
     fileTitle: "This service cannot be bought online yet",
     fileText: "File services are handled by our team. Contact support to order it.",
     fileCta: "Contact support",
-    rankPrice: "Your price",
-    rankOrder: "Order at your price",
-    rankRetailOnly: "The shop checkout is for retail buyers.",
     notFoundTitle: "Service not found",
     loading: "Loading the service",
+  },
+
+  /** The personal price layer (decision 003): what an account of a merchant rank sees in a price slot. */
+  ownPrice: {
+    loading: "Loading your price",
+    unavailable: "Not available for your account",
+    failed: "Your price could not be loaded",
   },
 
   help: {

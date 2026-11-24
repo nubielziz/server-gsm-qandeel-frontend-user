@@ -57,7 +57,7 @@ export type ClientRoutes = FamilyRoutes & {
   readonly dashboard: string;
   /** The invoice list; creating one is how funds are added. */
   readonly invoices: string;
-  /** The account's own price list. */
+  /** The account's own catalog at its own prices; `?ids=` reads the prices the shop shows it (decision 003). */
   readonly services: string;
   readonly apiKeys: string;
   readonly notificationPreferences: string;

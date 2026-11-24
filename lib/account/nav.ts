@@ -1,10 +1,11 @@
 // The navigation of the one account frame, decided from the account's rank in pure functions (no React, no cookies), so the
 // rules are unit-tested: which places the rail, the drawer and the phone tab bar offer, which title the header shows for a
 // page the static list does not name, where the header search goes, which line sits under the name, and where the password
-// gate sends an account. Every account has the same pages under `/account`; the rank only adds places (a merchant rank's price
-// list and invoices) and decides whether the wallet is offered (always for a merchant rank, for a retail rank only while
-// its store wallet shows). The layout turns each entry into a link with an icon and, once the session is known, a live
-// badge. The shop never links to the retired `/merchant` pages from here.
+// gate sends an account. Every account has the same pages under `/account`; the rank only adds a place (a merchant rank's
+// invoices) and decides whether the wallet is offered (always for a merchant rank, for a retail rank only while its store
+// wallet shows). There is no price list: an account of a merchant rank buys in the shop like everybody, at its own prices
+// (decision 003). The layout turns each entry into a link with an icon and, once the session is known, a live badge. The
+// shop never links to the retired `/merchant` pages from here.
 import { common } from "@/lib/i18n/messages/common";
 import { portal } from "@/lib/i18n/messages/portal";
 import { sitePath } from "@/lib/site-path";
@@ -13,7 +14,7 @@ import type { AccountCapabilities } from "./capabilities";
 import type { AccountWalletRead } from "./wallet-read";
 
 /** The places an account can have in the frame. */
-export type AccountNavId = "overview" | "priceList" | "orders" | "wallet" | "invoices" | "notifications" | "support" | "settings";
+export type AccountNavId = "overview" | "orders" | "wallet" | "invoices" | "notifications" | "support" | "settings";
 
 /** One place of the frame: where it is and what it is called. The layout adds the icon and the live badge. */
 export type AccountNavEntry = {
@@ -54,13 +55,6 @@ const t = portal;
 
 const ENTRIES: Record<AccountNavId, AccountNavEntry> = {
   overview: { id: "overview", href: sitePath("/account"), label: t.nav.overview, shortLabel: t.tabs.overview, match: "exact" },
-  priceList: {
-    id: "priceList",
-    href: sitePath("/account/services"),
-    label: t.nav.priceList,
-    shortLabel: t.tabs.priceList,
-    title: t.servicesTitle,
-  },
   orders: { id: "orders", href: sitePath("/account/orders"), label: t.nav.orders, shortLabel: t.tabs.orders },
   wallet: { id: "wallet", href: sitePath("/account/wallet"), label: t.nav.wallet, shortLabel: t.tabs.wallet },
   invoices: { id: "invoices", href: sitePath("/account/invoices"), label: t.nav.invoices },
@@ -74,18 +68,19 @@ const ENTRIES: Record<AccountNavId, AccountNavEntry> = {
   settings: { id: "settings", href: sitePath("/account/settings"), label: t.nav.settings },
 };
 
-const MERCHANT_TABS: readonly AccountNavId[] = ["overview", "orders", "priceList", "wallet", "support"];
+/** A merchant rank's tab bar: the retail rank's places with its wallet (invoices stay in the rail and the drawer). */
+const MERCHANT_TABS: readonly AccountNavId[] = ["overview", "orders", "wallet", "notifications", "support"];
 
-/** What the lists are built from: the rank kind and the two flags that open a place. Any `AccountCapabilities` fits. */
-export type NavCapabilities = Pick<AccountCapabilities, "rankKind" | "priceList" | "invoices">;
+/** What the lists are built from: the rank kind and the flag that opens the invoices. Any `AccountCapabilities` fits. */
+export type NavCapabilities = Pick<AccountCapabilities, "rankKind" | "invoices">;
 
 /**
  * The lists of the frame for one account.
  * - Retail rank: Overview, Orders, Wallet (only while the store wallet shows), Notifications, Support.
- * - Merchant rank: Overview, Price list, Orders, Wallet (always), Invoices, Notifications, Support.
+ * - Merchant rank: Overview, Orders, Wallet (always), Invoices, Notifications, Support.
  * - Footer: Settings.
- * - Phone tab bar: the retail rank's own list; a merchant rank's Overview, Orders, Price list, Wallet and Support. Never more
- *   than `MAX_TABS`.
+ * - Phone tab bar: the retail rank's own list; a merchant rank's Overview, Orders, Wallet, Notifications and Support. Never
+ *   more than `MAX_TABS`.
  * A rank this code does not know is retail (`capabilitiesOf` fails closed), so it never gets a merchant place.
  *
  * @param caps what the account may do (`capabilitiesOf(me)`)
@@ -97,7 +92,6 @@ export function accountNav(caps: NavCapabilities, storeWalletShown: boolean): Ac
   const walletShown = merchant || storeWalletShown;
   const nav = [
     ENTRIES.overview,
-    ...(caps.priceList ? [ENTRIES.priceList] : []),
     ENTRIES.orders,
     ...(walletShown ? [ENTRIES.wallet] : []),
     ...(caps.invoices ? [ENTRIES.invoices] : []),
@@ -110,7 +104,7 @@ export function accountNav(caps: NavCapabilities, storeWalletShown: boolean): Ac
 }
 
 /** The retail rank's list, as the static shell draws it before the session is read: the wallet's place is held, not shown. */
-const STATIC_CAPABILITIES: NavCapabilities = { rankKind: "retail", priceList: false, invoices: false };
+const STATIC_CAPABILITIES: NavCapabilities = { rankKind: "retail", invoices: false };
 
 /**
  * The lists the static shell draws before the session is read. Nothing personal is in them: the retail list, with the
@@ -124,12 +118,11 @@ export function staticAccountNav(): AccountNavLists {
 }
 
 /**
- * The pages that are not in the static list but need their title in the static shell: the price list and the invoices
- * (a merchant rank's places) and the API keys page of its settings. They are never drawn as links.
+ * The pages that are not in the static list but need their title in the static shell: the invoices (a merchant rank's place)
+ * and the API keys page of its settings. They are never drawn as links.
  */
 export function accountPageTitles(): AccountTitleEntry[] {
   return [
-    { href: ENTRIES.priceList.href, label: ENTRIES.priceList.label, title: ENTRIES.priceList.title },
     { href: ENTRIES.invoices.href, label: ENTRIES.invoices.label },
     { href: sitePath("/account/settings/api-keys"), label: t.apiKeysTitle },
   ];
@@ -140,14 +133,10 @@ export function storeWalletShows(wallet: AccountWalletRead | null): boolean {
   return wallet?.kind === "store" && wallet.read.ok && walletCapabilities(wallet.read.data).show;
 }
 
-/**
- * The header search: a merchant rank searches its own price list, any other account the shop's services.
- *
- * @param caps what the account may do (only `priceList` is read)
- */
-export function accountSearch(caps: Pick<AccountCapabilities, "priceList">): AccountSearch {
+/** The header search: every account searches the shop's services (a merchant rank sees its own prices there, decision 003). */
+export function accountSearch(): AccountSearch {
   return {
-    action: caps.priceList ? ENTRIES.priceList.href : sitePath("/services"),
+    action: sitePath("/services"),
     label: t.searchServices,
     placeholder: t.searchServices,
     submitLabel: common.actions.search,

@@ -43,7 +43,7 @@ export async function MerchantOrders({ searchParams }: { searchParams: Promise<S
       title={t.orders.title}
       description={t.orders.description}
       actions={
-        <ButtonLink href={sitePath("/account/services")} startIcon={<Plus aria-hidden="true" />}>
+        <ButtonLink href={sitePath("/services")} startIcon={<Plus aria-hidden="true" />}>
           {t.orders.newOrder}
         </ButtonLink>
       }
@@ -170,7 +170,7 @@ export async function MerchantOrders({ searchParams }: { searchParams: Promise<S
                   icon={<ClipboardList aria-hidden="true" />}
                   title={t.orders.emptyTitle}
                   description={t.orders.emptyText}
-                  action={<ButtonLink href={sitePath("/account/services")}>{t.orders.emptyAction}</ButtonLink>}
+                  action={<ButtonLink href={sitePath("/services")}>{t.orders.emptyAction}</ButtonLink>}
                 />
               )
             ) : (

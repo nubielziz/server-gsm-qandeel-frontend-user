@@ -14,7 +14,6 @@ import {
   ClipboardList,
   Headset,
   LayoutDashboard,
-  PlusCircle,
   ReceiptText,
   Settings,
   Store,
@@ -47,7 +46,6 @@ import {
   WorkspaceShell,
   type WorkspaceNavItem,
   type WorkspaceNavLists,
-  type WorkspaceSearch,
   type WorkspaceUser,
 } from "@/components/layout/workspace-shell";
 import { MustChangePasswordGate } from "@/components/merchant/must-change-password-gate";
@@ -57,7 +55,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const ICONS: Record<AccountNavId, LucideIcon> = {
   overview: LayoutDashboard,
-  priceList: PlusCircle,
   orders: ClipboardList,
   wallet: Wallet,
   invoices: ReceiptText,
@@ -111,11 +108,6 @@ async function resolveNav(): Promise<WorkspaceNavLists> {
 async function resolveUser(): Promise<WorkspaceUser> {
   const me = await requireAccount();
   return { name: me.name || me.email, subtitle: accountSubtitle(me) };
-}
-
-/** The header search of the account's rank. A failed read gives the shop's search, which every account may use. */
-async function resolveSearch(): Promise<WorkspaceSearch> {
-  return accountSearch(capabilitiesOf(await getAccount().catch(() => null)));
 }
 
 /** The bell of the account's API family. It never breaks the page: no account, no bell. */
@@ -183,8 +175,7 @@ export default function AccountLayout({ children }: LayoutProps<"/en/account">) 
           </Suspense>
         </>
       }
-      search={accountSearch({ priceList: false })}
-      resolveSearch={resolveSearch}
+      search={accountSearch()}
     >
       {/* The element between the boundary and the page keeps the streamed page from playing its enter transition on the
           first load (React's streamed reveal animates a <ViewTransition> that is the first thing in the revealed content). */}

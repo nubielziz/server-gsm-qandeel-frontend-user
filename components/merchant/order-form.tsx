@@ -4,8 +4,9 @@
 //  - quantity (lib/quantity.ts decides): a select for two or more packs, a number box for a range, nothing for one
 //    pack, an exact N or one per order; the rule and its refusals are worded by `quantityRuleText` and
 //    `invalidQuantityText`, for the local check and for a server `invalid_quantity` alike;
-//  - custom fields (text / number / select / textarea) with the catalog's regex; a field keyed `imei` on an IMEI
-//    service is the IMEI itself, so it is not shown twice;
+//  - custom fields (text / number / select / textarea) with the catalog's regex, exactly as the API sends them: on an IMEI
+//    service the API leaves out the field that is the main input (it is the IMEI box itself), so the IMEI is not asked twice
+//    and no key is special here (decision 004);
 //  - file services: an upload → `fileId` (required when the service has no fields).
 // One submission = one `Idempotency-Key` (`POST /client/orders` replays the first answer for a repeated key and the
 // same body): the key is the same while the same body is sent again (a lost answer, a double click) and new as soon

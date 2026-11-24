@@ -5,23 +5,21 @@ const retail = (extra: Record<string, unknown> = {}) => ({ rank: { kind: "retail
 const merchant = (extra: Record<string, unknown> = {}) => ({ rank: { kind: "merchant" }, hasPassword: true, ...extra });
 
 describe("capabilitiesOf: the merchant-only features", () => {
-  it("gives a retail rank no price list, no invoices, no API keys and no notification switches", () => {
+  it("gives a retail rank no invoices, no API keys and no notification switches", () => {
     const caps = capabilitiesOf(retail());
-    expect(caps.priceList).toBe(false);
     expect(caps.invoices).toBe(false);
     expect(caps.apiKeys).toBe(false);
     expect(caps.notificationPreferences).toBe(false);
   });
 
-  it("gives a merchant rank all four", () => {
+  it("gives a merchant rank all three", () => {
     const caps = capabilitiesOf(merchant());
-    expect(caps.priceList).toBe(true);
     expect(caps.invoices).toBe(true);
     expect(caps.apiKeys).toBe(true);
     expect(caps.notificationPreferences).toBe(true);
   });
 
-  it("fails closed: an unknown kind, a missing rank or a signed-out visitor gets none of the four", () => {
+  it("fails closed: an unknown kind, a missing rank or a signed-out visitor gets none of the three", () => {
     const unknown: unknown[] = [
       { rank: { kind: "wholesale" }, hasPassword: true },
       { rank: { kind: "Merchant" }, hasPassword: true },
@@ -33,12 +31,7 @@ describe("capabilitiesOf: the merchant-only features", () => {
     ];
     for (const me of unknown) {
       const caps = capabilitiesOf(me as never);
-      expect([caps.priceList, caps.invoices, caps.apiKeys, caps.notificationPreferences], JSON.stringify(me)).toEqual([
-        false,
-        false,
-        false,
-        false,
-      ]);
+      expect([caps.invoices, caps.apiKeys, caps.notificationPreferences], JSON.stringify(me)).toEqual([false, false, false]);
     }
   });
 });
@@ -79,6 +72,12 @@ describe("capabilitiesOf: privacy requests", () => {
     const caps = capabilitiesOf(null);
     expect(caps.dataExport).toBe(false);
     expect(caps.dataErasure).toBe(false);
+  });
+});
+
+describe("capabilitiesOf: no price list", () => {
+  it("offers no rank a price list of its own: every rank buys in the shop (decision 003)", () => {
+    for (const me of [retail(), merchant(), null]) expect(capabilitiesOf(me)).not.toHaveProperty("priceList");
   });
 });
 

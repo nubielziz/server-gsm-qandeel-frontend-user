@@ -27,24 +27,24 @@ describe("accountNav: the rail and the drawer", () => {
     expect(ids(accountNav(retail, true).nav)).toEqual(["overview", "orders", "wallet", "notifications", "support"]);
   });
 
-  it("retail rank never gets the price list or the invoices, whatever its wallet does", () => {
+  it("retail rank never gets the invoices, whatever its wallet does", () => {
     for (const shown of [true, false]) {
-      const list = ids(accountNav(retail, shown).nav);
-      expect(list).not.toContain("priceList");
-      expect(list).not.toContain("invoices");
+      expect(ids(accountNav(retail, shown).nav)).not.toContain("invoices");
     }
   });
 
-  it("merchant rank: Overview, Price list, Orders, Wallet, Invoices, Notifications, Support", () => {
-    expect(ids(accountNav(merchant, false).nav)).toEqual([
-      "overview",
-      "priceList",
-      "orders",
-      "wallet",
-      "invoices",
-      "notifications",
-      "support",
-    ]);
+  it("merchant rank: Overview, Orders, Wallet, Invoices, Notifications, Support (no price list, decision 003)", () => {
+    expect(ids(accountNav(merchant, false).nav)).toEqual(["overview", "orders", "wallet", "invoices", "notifications", "support"]);
+  });
+
+  it("no rank has a price list: no place leads to the retired /account/services", () => {
+    for (const caps of [retail, merchant, capabilitiesOf(null)]) {
+      for (const shown of [true, false]) {
+        const lists = accountNav(caps, shown);
+        const hrefs = [...lists.nav, ...lists.footerNav, ...lists.tabs].map((entry) => entry.href);
+        expect(hrefs.filter((href) => href.startsWith("/en/account/services"))).toEqual([]);
+      }
+    }
   });
 
   it("the merchant rank's wallet shows whatever the store wallet says", () => {
@@ -52,9 +52,9 @@ describe("accountNav: the rail and the drawer", () => {
     expect(ids(accountNav(merchant, true).nav)).toEqual(ids(accountNav(merchant, false).nav));
   });
 
-  it("a merchant rank adds exactly the price list and the invoices to the retail list that shows its wallet", () => {
+  it("a merchant rank adds exactly the invoices to the retail list that shows its wallet", () => {
     const extra = ids(accountNav(merchant, true).nav).filter((id) => !ids(accountNav(retail, true).nav).includes(id));
-    expect(extra).toEqual(["priceList", "invoices"]);
+    expect(extra).toEqual(["invoices"]);
   });
 
   it("an unknown rank kind, a missing rank and a signed-out visitor get the retail list (fail closed)", () => {
@@ -82,9 +82,9 @@ describe("accountNav: the rail and the drawer", () => {
     }
   });
 
-  it("the words are the account's, not a kind's: Price list, Invoices and no portal name", () => {
+  it("the words are the account's, not a kind's: Invoices and no portal name", () => {
     const labels = accountNav(merchant, true).nav.map((entry) => entry.label);
-    expect(labels).toEqual(["Overview", "Price list", "Orders", "Wallet", "Invoices", "Notifications", "Support"]);
+    expect(labels).toEqual(["Overview", "Orders", "Wallet", "Invoices", "Notifications", "Support"]);
     expect(JSON.stringify(accountNav(merchant, true))).not.toMatch(/merchant portal/i);
   });
 
@@ -102,8 +102,9 @@ describe("accountNav: the phone tab bar", () => {
     }
   });
 
-  it("merchant rank: Overview, Orders, Price list, Wallet, Support", () => {
-    expect(ids(accountNav(merchant, false).tabs)).toEqual(["overview", "orders", "priceList", "wallet", "support"]);
+  it("merchant rank: the retail rank's tabs with its wallet: Overview, Orders, Wallet, Notifications, Support", () => {
+    expect(ids(accountNav(merchant, false).tabs)).toEqual(["overview", "orders", "wallet", "notifications", "support"]);
+    expect(ids(accountNav(merchant, false).tabs)).toEqual(ids(accountNav(retail, true).tabs));
   });
 
   it("never more than five tabs, each a place of the rail with a short label", () => {
@@ -120,9 +121,8 @@ describe("accountNav: the phone tab bar", () => {
     }
   });
 
-  it("the phone's words are short: the notifications are Alerts and the price list is Prices", () => {
-    const tabs = accountNav(merchant, true).tabs;
-    expect(tabs.find((tab) => tab.id === "priceList")?.shortLabel).toBe("Prices");
+  it("the phone's words are short: the notifications are Alerts", () => {
+    expect(accountNav(merchant, true).tabs.find((tab) => tab.id === "notifications")?.shortLabel).toBe("Alerts");
     expect(accountNav(retail, false).tabs.find((tab) => tab.id === "notifications")?.shortLabel).toBe("Alerts");
   });
 });
@@ -142,18 +142,15 @@ describe("staticAccountNav: what the static shell draws before the session is re
   });
 
   it("has no place that only a merchant rank has, and nothing personal", () => {
-    const names = ids(staticAccountNav().nav);
-    expect(names).not.toContain("priceList");
-    expect(names).not.toContain("invoices");
+    expect(ids(staticAccountNav().nav)).not.toContain("invoices");
   });
 });
 
 describe("accountPageTitles: the pages the static shell names only in the header", () => {
   const titles = accountPageTitles();
 
-  it("names the price list, the invoices and the API keys page", () => {
+  it("names the invoices and the API keys page (no price list, decision 003)", () => {
     expect(titles).toEqual([
-      { href: "/en/account/services", label: "Price list", title: "Price list" },
       { href: "/en/account/invoices", label: "Invoices" },
       { href: "/en/account/settings/api-keys", label: "API keys" },
     ]);
@@ -199,23 +196,16 @@ describe("storeWalletShows: whether a retail rank's wallet is a place of the fra
 });
 
 describe("accountSearch: where the header search goes", () => {
-  it("a merchant rank searches its own price list", () => {
-    expect(accountSearch(merchant).action).toBe("/en/account/services");
+  it("every account searches the shop's services, where a merchant rank sees its own prices (decision 003)", () => {
+    expect(accountSearch().action).toBe("/en/services");
   });
 
-  it("any other account searches the shop's services", () => {
-    for (const caps of [retail, capabilitiesOf(null), capabilitiesOf({ rank: { kind: "reseller" } })]) {
-      expect(accountSearch(caps).action).toBe("/en/services");
-    }
-  });
-
-  it("has the words of the form for both", () => {
-    expect(accountSearch(retail)).toMatchObject({
+  it("has the words of the form", () => {
+    expect(accountSearch()).toMatchObject({
       label: "Search services…",
       placeholder: "Search services…",
       submitLabel: "Search",
     });
-    expect(accountSearch(merchant).label).toBe(accountSearch(retail).label);
   });
 });
 

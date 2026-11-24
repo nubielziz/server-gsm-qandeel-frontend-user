@@ -7,6 +7,7 @@ import { Download } from "lucide-react";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/layout/container";
 import { OrderActions } from "@/components/merchant/order-actions";
+import { OrderAnswerItems, answersOf } from "@/components/merchant/order-answers";
 import { PageError } from "@/components/merchant/page-error";
 import { DetailSkeleton } from "@/components/merchant/skeletons";
 import { TypeBadge } from "@/components/merchant/type-badge";
@@ -29,7 +30,7 @@ import { sitePath } from "@/lib/site-path";
 import { fmt } from "@/lib/i18n/define";
 import { common, statusLabel } from "@/lib/i18n/messages/common";
 import { merchant } from "@/lib/i18n/messages/merchant";
-import { humanizeKind, labelOf } from "@/lib/merchant/format";
+import { labelOf } from "@/lib/merchant/format";
 import { settle } from "@/lib/merchant/load";
 import { PageTransition } from "@/components/layout/page-transition";
 
@@ -73,7 +74,7 @@ async function Order({ params }: { params: Promise<{ id: string }> }) {
   const sources = t.order.sources as Record<string, string>;
   const verification = t.order.verificationStatus as Record<string, string>;
   const events = t.order.events as Record<string, string>;
-  const inputs = Object.entries(o.inputs ?? {});
+  const answers = answersOf(o);
   const hasResult = Boolean(o.result.code || o.result.comment || o.result.fileId);
   const fileLink = (fileId: number, label: string) => (
     // A plain link: `GET /client/files/:id` answers 302 to a short-lived storage URL (handoff §3.13).
@@ -132,18 +133,12 @@ async function Order({ params }: { params: Promise<{ id: string }> }) {
             </CardBody>
           </Card>
 
-          {inputs.length > 0 || o.inputFileId ? (
+          {answers.length > 0 || o.inputFileId ? (
             <Card>
               <CardHeader title={t.order.inputsTitle} />
               <CardBody>
                 <DescriptionList>
-                  {inputs.map(([key, value]) => (
-                    <DescriptionItem key={key} label={humanizeKind(key)}>
-                      <span dir="auto" className="break-words">
-                        {String(value)}
-                      </span>
-                    </DescriptionItem>
-                  ))}
+                  <OrderAnswerItems answers={answers} />
                   {o.inputFileId ? <DescriptionItem label={t.order.inputFile}>{fileLink(o.inputFileId, t.order.downloadFile)}</DescriptionItem> : null}
                 </DescriptionList>
               </CardBody>

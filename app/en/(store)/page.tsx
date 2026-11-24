@@ -4,7 +4,8 @@
 // sort, pages: its state is in the home URL) and banners to the rest of the site. A section whose list is empty is left out.
 // The hero, promo, steps and banners are static. Everything that reads the catalog (language-specific
 // cached reads), the visitor's currency cookie or the URL's query streams in behind <Suspense> with skeletons of the
-// same size; the rank banner is a small Client Component (no server read).
+// same size. Every service price is a slot of the personal price layer (decision 003): an account of a merchant rank sees its
+// own prices in the cards; the hero's "Starting from" sums up the catalog at public prices, so it is left out for it.
 // The balance box (components/store/home-balance.tsx) reads the visitor's account and wallet: personal, never cached, also
 // behind <Suspense>. The round WhatsApp button floats over the page's bottom end corner (components/store/whatsapp-float.tsx).
 // Motion: the hero row never animates (LCP). The blocks below it fade and rise in as they scroll into view (CSS
@@ -18,7 +19,6 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { serviceCardLabels } from "@/components/store/card-labels";
-import { RankBanner } from "@/components/store/rank-banner";
 import {
   CatalogTiles,
   CatalogTilesSkeleton,
@@ -37,6 +37,7 @@ import {
 import { HomeBalance, HomeBalanceSkeleton } from "@/components/store/home-balance";
 import { CollectionCards, CollectionCardsSkeleton } from "@/components/store/home-collections";
 import { HomeProducts, HomeProductsSkeleton } from "@/components/store/home-products";
+import { RetailOnly } from "@/components/store/own-price";
 import { ServiceCard, ServiceCardMini, ServiceGridSkeleton } from "@/components/store/service-card";
 import { WhatsAppFloat } from "@/components/store/whatsapp-float";
 import { getStoreConfig, listStoreServices } from "@/lib/api/public";
@@ -77,9 +78,11 @@ export default function HomePage(props: PageProps<"/en">) {
               </Suspense>
             }
             price={
-              <Suspense fallback={<HeroPriceSpace />}>
-                <LowestPrice label={t.home.hero.from} />
-              </Suspense>
+              <RetailOnly as="div" fallback={<HeroPriceSpace />}>
+                <Suspense fallback={<HeroPriceSpace />}>
+                  <LowestPrice label={t.home.hero.from} />
+                </Suspense>
+              </RetailOnly>
             }
           />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 lg:grid-rows-[auto_1fr]">
@@ -89,8 +92,6 @@ export default function HomePage(props: PageProps<"/en">) {
             <TrackPromoCard t={t.home} />
           </div>
         </div>
-
-        <RankBanner text={common.rankBanner.text} cta={common.rankBanner.cta} href={sitePath("/account/services")} />
 
         <Suspense fallback={<CatalogTilesSkeleton />}>
           <Tiles />

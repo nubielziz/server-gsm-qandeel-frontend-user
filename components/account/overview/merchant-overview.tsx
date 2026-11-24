@@ -23,7 +23,8 @@ export async function MerchantOverview({ me }: { me: AccountMe }) {
       me={me}
       description={t.dashboard.welcomeText}
       actions={
-        <ButtonLink href={sitePath("/account/services")} startIcon={<Plus aria-hidden="true" />}>
+        // A new order starts in the shop, where a merchant rank sees its own prices (decision 003).
+        <ButtonLink href={sitePath("/services")} startIcon={<Plus aria-hidden="true" />}>
           {t.dashboard.newOrder}
         </ButtonLink>
       }

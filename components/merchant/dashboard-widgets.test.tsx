@@ -70,9 +70,10 @@ describe("the latest orders", () => {
     expect(links.filter((href) => href.startsWith("/en/account/orders/"))).toHaveLength(4);
   });
 
-  it("points the empty state at the price list", () => {
+  it("points the empty state at the shop's services, where a merchant rank sees its own prices (decision 003)", () => {
     const html = renderToStaticMarkup(<RecentOrders {...props(dashboard())} />);
-    expect(hrefs(html)).toContain("/en/account/services");
+    expect(hrefs(html)).toContain("/en/services");
+    expect(hrefs(html)).not.toContain("/en/account/services");
   });
 
   it("never names the old portal folder, whatever it shows", () => {

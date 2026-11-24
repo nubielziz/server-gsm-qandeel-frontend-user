@@ -5,6 +5,7 @@
 // (no cookie), so for a prerendered slug the title, body and actions are in the static output and a prefetch carries
 // them. Only the price reads the currency cookie: it is `ServicePrice`, in its own <Suspense>, rendered on the click
 // (plan P3.3). The mockup's stock number, favourites and cart do not exist in the API (handoff §1.7).
+// The price block and "Buy now" are slots of the personal price layer (./own-price.tsx, decision 003), as on the service page.
 import { Suspense } from "react";
 import { ArrowRight, MapPin, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,7 @@ import { common } from "@/lib/i18n/messages/common";
 import { store } from "@/lib/i18n/messages/store";
 import { sitePath } from "@/lib/site-path";
 import { demoteHeadings } from "./markdown-source";
+import { OwnBuy, OwnPriceBlock } from "./own-price";
 import { resolveService } from "./resolve-service";
 import { ServiceArt } from "./service-art";
 import { PriceBlock, ServicePrice, serviceFacts, serviceStockHint } from "./service-parts";
@@ -86,12 +88,14 @@ export async function QuickViewBody({ params }: { params: Params }) {
           {service.summary ? <p className="text-body text-ink-muted">{service.summary}</p> : null}
           <div>
             <p className="text-small font-semibold text-ink-muted">{t.service.priceLabel}</p>
-            <div className="mt-1">
-              <Suspense fallback={<PriceBlock pending rule={service.quantity} q={c.quantity} t={t.service} />}>
-                <ServicePrice slug={service.slug} />
-              </Suspense>
-            </div>
-            <p className="mt-1.5 text-caption text-ink-subtle">{t.service.taxNote}</p>
+            <OwnPriceBlock serviceId={service.id} rule={service.quantity} q={c.quantity} t={t.service}>
+              <div className="mt-1">
+                <Suspense fallback={<PriceBlock pending rule={service.quantity} q={c.quantity} t={t.service} />}>
+                  <ServicePrice slug={service.slug} />
+                </Suspense>
+              </div>
+              <p className="mt-1.5 text-caption text-ink-subtle">{t.service.taxNote}</p>
+            </OwnPriceBlock>
           </div>
         </div>
       </div>
@@ -140,18 +144,24 @@ export async function QuickViewActions({ params }: { params: Params }) {
     return <ButtonLink href={sitePath("/services")}>{t.quickView.browse}</ButtonLink>;
   }
   const slug = encodeURIComponent(service.slug);
+  // prefetch: the checkout's service summary and form come with the prefetch (plan P3.1).
+  const buyNow = (
+    <ButtonLink href={`${sitePath("/checkout")}?service=${slug}`} prefetch startIcon={<ShoppingCart aria-hidden="true" />}>
+      {t.service.buyNow}
+    </ButtonLink>
+  );
   return (
     <>
       <ButtonLink href={sitePath(`/services/${slug}`)} variant="secondary" endIcon={<ArrowRight aria-hidden="true" />}>
         {t.quickView.details}
       </ButtonLink>
+      {/* A file service is ordered through support, except by a merchant rank: its own order form takes it. */}
       {service.type === "file" ? (
-        <ButtonLink href={sitePath("/support")}>{t.service.fileCta}</ButtonLink>
+        <OwnBuy serviceId={service.id} merchant={buyNow}>
+          <ButtonLink href={sitePath("/support")}>{t.service.fileCta}</ButtonLink>
+        </OwnBuy>
       ) : (
-        // prefetch: the checkout's service summary and form come with the prefetch (plan P3.1).
-        <ButtonLink href={`${sitePath("/checkout")}?service=${slug}`} prefetch startIcon={<ShoppingCart aria-hidden="true" />}>
-          {t.service.buyNow}
-        </ButtonLink>
+        <OwnBuy serviceId={service.id}>{buyNow}</OwnBuy>
       )}
     </>
   );

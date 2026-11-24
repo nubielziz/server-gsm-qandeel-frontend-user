@@ -3,6 +3,8 @@
 // is inside: its best sellers with their delivery time and price (lib/catalog.ts `catalogCollections`). The head and
 // the foot open the catalog filtered by the collection; each row opens its service page. The catalog has no
 // categories (handoff §1.7), so these groups are what a collection can be.
+// Prices (decision 003): each row's price is a slot of the personal price layer (./own-price.tsx), so an account of a merchant
+// rank sees its own; a collection's "From" sums up services at their public prices and is left out for it (`RetailOnly`).
 import Link from "next/link";
 import { ArrowRight, Clock, Globe, Signal } from "lucide-react";
 import { initialsOf } from "@/components/ui/avatar";
@@ -17,6 +19,7 @@ import { fmt } from "@/lib/i18n/define";
 import type { StoreMessages } from "@/lib/i18n/messages/store";
 import { sitePath } from "@/lib/site-path";
 import { deliveryTime } from "@/lib/store/delivery";
+import { OwnPrice, RetailOnly } from "./own-price";
 import { Logo, isSymbolLogo, logoFile } from "./service-art";
 
 /** The grid: two collections share the row; with three the last one spans both columns until the row fits three. */
@@ -73,14 +76,16 @@ export function CollectionCards({ collections, decimals, t, countText }: Collect
                     {t.kinds[collection.kind]}
                     <span aria-hidden="true"> · </span>
                     <span className="num">{count}</span>
-                    <span aria-hidden="true"> · </span>
-                    {t.from}{" "}
-                    <Money
-                      amount={collection.from.gross}
-                      currency={collection.from.currency}
-                      decimals={decimals}
-                      className="font-semibold text-ink"
-                    />
+                    <RetailOnly>
+                      <span aria-hidden="true"> · </span>
+                      {t.from}{" "}
+                      <Money
+                        amount={collection.from.gross}
+                        currency={collection.from.currency}
+                        decimals={decimals}
+                        className="font-semibold text-ink"
+                      />
+                    </RetailOnly>
                   </p>
                 </div>
                 <span
@@ -149,12 +154,14 @@ function ServiceRow({ service, decimals }: { service: StoreServiceCard; decimals
           ) : null}
         </span>
       </span>
-      <Money
-        amount={service.price.gross}
-        currency={service.price.currency}
-        decimals={decimals}
-        className="num shrink-0 text-small font-bold text-ink"
-      />
+      <OwnPrice serviceId={service.id} className="num shrink-0 text-small font-bold text-ink" placeholderClassName="w-12">
+        <Money
+          amount={service.price.gross}
+          currency={service.price.currency}
+          decimals={decimals}
+          className="num shrink-0 text-small font-bold text-ink"
+        />
+      </OwnPrice>
     </Link>
   );
 }

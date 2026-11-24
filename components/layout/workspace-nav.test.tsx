@@ -59,10 +59,10 @@ describe("WorkspaceHeading: the title of the page the browser is on", () => {
   });
 
   it("a page only a merchant rank has is titled from the titles", () => {
-    nav.pathname = "/en/account/services/12";
+    nav.pathname = "/en/account/invoices/12";
     const html = renderToStaticMarkup(<WorkspaceHeading items={items} {...area} />);
-    expect(html).toContain(">Price list</p>");
-    expect(activeItem(items, nav.pathname)?.label).toBe("Price list");
+    expect(html).toContain(">Invoices</p>");
+    expect(activeItem(items, nav.pathname)?.label).toBe("Invoices");
   });
 
   it("an unknown pathname names only the area", () => {

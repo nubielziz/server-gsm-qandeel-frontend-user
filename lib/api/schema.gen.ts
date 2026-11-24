@@ -783,6 +783,14 @@ export type GetClientOrdersByIdResponse = {
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
   completedAt: IsoDateTime | null;
+  answers: Array<{
+    /** The field's key, the key of this answer in `inputs`. */
+    key: string;
+    /** The label of the field as it is now; the key itself when the service has no such field any more (it was deleted). */
+    label: string;
+    /** The value that was given, as text. */
+    value: string;
+  }>;
   events: Array<{
     /** Numeric record id. */
     id: Id;
@@ -950,6 +958,8 @@ export type GetClientServicesQuery = {
   type_ne?: Array<"imei" | "server" | "remote" | "file">;
   /** Keep rows where categoryId equals (repeat the key for IN) the value. */
   categoryId?: string[];
+  /** Comma-separated service ids (at most 100, each a positive whole number): only these services, when the merchant may see them. Combines with the other filters; the page range still applies. */
+  ids?: string;
 };
 /** 200 */
 export type GetClientServicesResponse = Array<{
@@ -2937,7 +2947,7 @@ export type GetStoreV1ServicesBySlugResponse = {
     /** Fixed packs; empty means any quantity from min to max. */
     options: number[];
   };
-  /** What the order form asks for besides the IMEI. */
+  /** What the order form asks for besides the IMEI. On an IMEI service the main-input field is left out. */
   fields: Array<{
     key: string;
     label: string;

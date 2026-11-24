@@ -20,7 +20,7 @@ import { Turnstile } from "@/components/turnstile";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { CheckoutSession, CheckoutSessionInput, StoreConfig, StoreServiceDetail } from "@/lib/api/types";
-import { priceListHref, type CheckoutBuyer } from "@/lib/checkout/access";
+import { checkoutHref, type CheckoutBuyer } from "@/lib/checkout/access";
 import { formatDateTime, formatNumber, formatPercent, isValidImei, normalizeImei } from "@/lib/format";
 import { fmt, plural } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
@@ -161,8 +161,9 @@ export function CheckoutForm({
   const [token, setToken] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
   const [busy, setBusy] = useState(false);
-  // The API refused the session because the account's rank orders from its price list (403 RANK_NOT_ALLOWED): the page never
-  // mounts this form for such an account, so this is a rank that changed after the page loaded. The same card takes its place.
+  // The API refused the session because the account's rank orders at its own price (403 RANK_NOT_ALLOWED): the page never
+  // mounts this form for such an account, so this is a rank that changed after the page loaded. The notice takes its place,
+  // with the way to this same address, where the account's own order form opens now.
   const [priceListOnly, setPriceListOnly] = useState(false);
 
   // ── The service as the API has it now (rule, availability, delivery, price): one read for the effect below and for
@@ -445,7 +446,7 @@ export function CheckoutForm({
     return (
       <PriceListCard
         labels={labels.priceList}
-        priceListHref={priceListHref(service.id)}
+        orderHref={checkoutHref(service.slug)}
         serviceHref={sitePath(`/services/${encodeURIComponent(service.slug)}`)}
       />
     );

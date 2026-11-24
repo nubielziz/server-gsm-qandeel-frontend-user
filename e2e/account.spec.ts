@@ -139,7 +139,7 @@ test.describe("overview and orders (demo merchant rank, read only)", () => {
     const total = dash.counts.pending + dash.counts.processing + dash.counts.completed + dash.counts.rejected;
     await expect(main.getByRole("link", { name: new RegExp(`Total orders\\s*${total}`) })).toHaveAttribute("href", "/en/account/orders");
     await expect(main.getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/en/account/wallet/add-funds");
-    await expect(main.getByRole("link", { name: "New order" })).toHaveAttribute("href", "/en/account/services");
+    await expect(main.getByRole("link", { name: "New order" })).toHaveAttribute("href", "/en/services");
     // None of the retail overview: no profile card to edit, no list of shop orders with track links.
     await expect(main.getByRole("link", { name: "Edit profile" })).toHaveCount(0);
     await expect(main.getByRole("link", { name: /^Track order/ })).toHaveCount(0);
@@ -154,7 +154,7 @@ test.describe("overview and orders (demo merchant rank, read only)", () => {
     const main = page.getByRole("main");
     await expect(main.getByRole("heading", { level: 1, name: "Orders" })).toBeVisible();
     await expect(main.getByRole("button", { name: "Export CSV" })).toBeVisible();
-    await expect(main.getByRole("link", { name: "New order" })).toHaveAttribute("href", "/en/account/services");
+    await expect(main.getByRole("link", { name: "New order" })).toHaveAttribute("href", "/en/services");
     // No row opens a tracking page: the tracking pages are the shop's, for retail orders.
     await expect(main.locator('a[href^="/en/track/"]')).toHaveCount(0);
 

@@ -163,7 +163,7 @@ describe("checkout: the balance and the sign-in link by account", () => {
 
   const priceList = {
     labels: checkout.start.priceList,
-    priceListHref: "/en/account/services/1",
+    orderHref: "/en/checkout?service=unlock",
     serviceHref: "/en/services/unlock",
   };
   const renderWithNotice = (notice: Parameters<typeof SessionView>[0]["priceList"]) =>
@@ -190,7 +190,7 @@ describe("checkout: the balance and the sign-in link by account", () => {
     expect(notice).toBeLessThan(html.indexOf(checkout.session.consent.title));
     expect(notice).toBeLessThan(html.indexOf(checkout.session.methods.title));
     expect(notice).toBeLessThan(html.indexOf("Card gateway"));
-    expect(html).toMatch(/<a [^>]*href="\/en\/account\/services\/1"[^>]*>Order at your price<\/a>/);
+    expect(html).toMatch(/<a [^>]*href="\/en\/checkout\?service=unlock"[^>]*>Order at your price<\/a>/);
     expect(html).toMatch(/<a [^>]*href="\/en\/services\/unlock"[^>]*>Back to the service<\/a>/);
   });
 
@@ -212,5 +212,13 @@ describe("checkout: the balance and the sign-in link by account", () => {
     expect(html).not.toContain("Sign in to pay from your store balance.");
     expect(html).toContain("Card gateway");
     expect(html.match(/type="radio"/g)).toHaveLength(1);
+  });
+});
+
+describe("checkout: the message for a merchant rank whose payment the API refuses (403 RANK_NOT_ALLOWED)", () => {
+  it("points to the service page, and never to another payment method: the pay step refuses a merchant rank whatever the method", () => {
+    const text = checkout.session.errors.rankRefused;
+    expect(text).toContain("service page");
+    expect(text).not.toMatch(/payment method|choose|pay another way/i);
   });
 });

@@ -977,6 +977,13 @@
     animation: var(--animate-shimmer);
   }
 
+  /* The personal price layer (decision 003, lib/store/own-prices.ts): until the page is live, a browser that holds a
+     merchant session (the guard script of the root layout marks <html>) does not show the public prices the server drew
+     (marked by their slots). The slots then show the account's own prices; nothing else of the page changes. */
+  [data-own-prices] [data-retail-price] {
+    visibility: hidden;
+  }
+
   /* Two-thumb range (components/ui/range-slider.tsx): two native range inputs on one 20px-high track. Only the thumbs
      take the pointer, so either can be dragged; the bar between them is drawn by the component. */
   .range-input {

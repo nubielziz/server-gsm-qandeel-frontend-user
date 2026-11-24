@@ -70,14 +70,8 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("AccountMenuRows", () => {
   it("draws the rows the menu decided, with exactly one Sign out", () => {
-    const html = renderToStaticMarkup(<AccountMenuRows rows={accountMenuItems({ priceList: true }, true)} />);
-    for (const href of [
-      "/en/account",
-      "/en/account/orders",
-      "/en/account/wallet",
-      "/en/account/services",
-      "/en/account/settings",
-    ]) {
+    const html = renderToStaticMarkup(<AccountMenuRows rows={accountMenuItems(true)} />);
+    for (const href of ["/en/account", "/en/account/orders", "/en/account/wallet", "/en/account/settings"]) {
       expect(html).toContain(`href="${href}"`);
     }
     expect(count(html, ">Sign out<")).toBe(1);
@@ -98,7 +92,7 @@ describe("AccountAreaContent", () => {
     expect(html).toContain('href="/en/sign-in"');
   });
 
-  it("a retail rank has the shop's bell, the store balance pill and one menu without a price list", async () => {
+  it("a retail rank has the shop's bell, the store balance pill and one menu", async () => {
     const html = await draw(account("retail"), storeWallet());
     expect(html).toContain('data-bell="store"');
     expect(html).toContain("Store balance: $4.00");
@@ -119,20 +113,16 @@ describe("AccountAreaContent", () => {
     expect(html).not.toContain('href="/en/account/wallet"');
   });
 
-  it("a merchant rank has the portal's bell, its available balance in the pill, the price list and the same one Sign out", async () => {
+  it("a merchant rank has the portal's bell, its available balance in the pill and the same menu, with no price list (decision 003)", async () => {
     const html = await draw(account("merchant"), merchantWallet("15.0000"));
     expect(html).toContain('data-bell="client"');
     expect(html).toContain("Available balance: $15.00");
     expect(html).toContain("Gold group");
-    for (const href of [
-      "/en/account",
-      "/en/account/orders",
-      "/en/account/wallet",
-      "/en/account/services",
-      "/en/account/settings",
-    ]) {
+    for (const href of ["/en/account", "/en/account/orders", "/en/account/wallet", "/en/account/settings"]) {
       expect(html).toContain(`href="${href}"`);
     }
+    expect(html).not.toContain("/en/account/services");
+    expect(html).not.toContain("Price list");
     expect(count(html, ">Sign out<")).toBe(1);
     expect(html).not.toContain("Merchant portal");
     expect(html).not.toContain("/merchant");
@@ -153,6 +143,6 @@ describe("AccountAreaContent", () => {
     const html = renderToStaticMarkup(await AccountAreaContent({}));
     expect(html).not.toContain("Available balance");
     expect(html).toContain("Account menu");
-    expect(html).toContain('href="/en/account/services"');
+    expect(html).toContain('href="/en/account/wallet"');
   });
 });
