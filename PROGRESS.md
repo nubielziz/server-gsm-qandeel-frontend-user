@@ -547,6 +547,12 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
 - Not changed: titles that start with a supplier number ("285# …") are data (the listing's public title); cleaning them is
   a separate backend decision.
 
+## API keys made by staff only (2026-11-24, owner's decision; `docs/decisions/005-api-keys-made-by-staff.md`, backend decision 067)
+- The API keys page is read only: the keys the team made, with their details, and "Contact us" (a WhatsApp chat with the team
+  that names the account, else the support page) for a new key or any change. No create, edit or revoke; no secret dialog; no
+  "Made by support" badge. The backend retires the three write routes in the same release (push the backend first: the shop's
+  `api-types` check reads the backend's `main`).
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.

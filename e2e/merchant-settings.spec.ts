@@ -1,8 +1,7 @@
 // Settings of a merchant rank and of a retail rank: profile, security (password, two-step), notifications, API keys and
 // privacy, all under /en/account/settings. Real browser -> Next -> the isolated demo backend.
-// - The demo merchant is only read, except for harmless, restored changes (phone, one API key that ends revoked).
+// - The demo merchant is only read, except for harmless, restored changes (phone).
 //   Password, two-step and privacy run on throwaway accounts that staff create (`freshAccount`).
-// - Mutating integration tests (API keys) run on the desktop project only.
 import { createHmac } from "node:crypto";
 import { expect, test } from "./fixtures";
 import { type Request } from "@playwright/test";
@@ -205,51 +204,12 @@ test.describe("settings (demo merchant)", () => {
     }
   });
 
-  test("API keys: create → secret shown once → edit IPs → revoke", async ({ page, isMobile }) => {
-    test.skip(isMobile, "mutating integration test: desktop project only");
-    const keyName = `E2E key ${Date.now()}`;
+  test("API keys are read only: no create, edit or revoke, and Contact us for any change (decision 005)", async ({ page }) => {
     await page.goto("/en/account/settings/api-keys");
-    await page.getByRole("button", { name: "New API key" }).click();
-    const create = page.getByRole("dialog", { name: "New API key" });
-
-    // Browser validation first, then a server-side IP error that names the bad entry.
-    await create.getByRole("button", { name: "Create key" }).click();
-    await expect(create.getByText("Name the key.")).toBeVisible();
-    // A key is a Dhru credential: no list of permissions to choose from.
-    await expect(create.getByText("Permissions")).toHaveCount(0);
-    await create.getByLabel(/^Name/).fill(keyName);
-    await create.getByLabel(/Allowed IP addresses/).fill("203.0.113.9\nnot-an-ip");
-    await create.getByRole("button", { name: "Create key" }).click();
-    await expect(create.getByText(/not-an-ip: This is not a valid IP/)).toBeVisible();
-
-    await create.getByLabel(/Allowed IP addresses/).fill("203.0.113.9");
-    const post = page.waitForRequest((r) => r.url().endsWith("/client/api-keys") && r.method() === "POST");
-    await create.getByRole("button", { name: "Create key" }).click();
-    expect((await post).postDataJSON()).toEqual({ name: keyName, scopes: ["dhru"], allowedIps: ["203.0.113.9"] });
-    const secretDialog = page.getByRole("dialog", { name: "Copy your API key now" });
-    await expect(secretDialog).toBeVisible();
-    await expect(secretDialog.getByText(/only time the key is shown/)).toBeVisible();
-    const secret = (await secretDialog.locator("code").innerText()).trim();
-    expect(secret).toMatch(/^gsm_/);
-    await secretDialog.getByRole("button", { name: "I have copied the key" }).click();
-    await expect(secretDialog).toBeHidden();
-    await expect(page.locator("body")).not.toContainText(secret);
-
-    const card = () => page.locator("article", { has: page.getByRole("heading", { name: keyName }) });
-    await expect(card()).toContainText("203.0.113.9");
-    await expect(card().getByText("Permissions")).toHaveCount(0);
-    await card().getByRole("button", { name: /Edit/ }).click();
-    const edit = page.getByRole("dialog", { name: "Edit API key" });
-    await edit.getByLabel(/Allowed IP addresses/).fill("203.0.113.77");
-    await edit.getByRole("button", { name: "Save changes" }).click();
-    await expect(page.getByText("API key updated").first()).toBeVisible();
-    await expect(card()).toContainText("203.0.113.77");
-
-    await card().getByRole("button", { name: /Revoke/ }).click();
-    await page.getByRole("dialog", { name: "Revoke this key?" }).getByRole("button", { name: "Revoke key" }).click();
-    await expect(page.getByText("API key revoked").first()).toBeVisible();
-    await expect(card().getByText("Revoked")).toBeVisible();
-    await expect(card().getByRole("button", { name: /Revoke/ })).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 2, name: "API keys" })).toBeVisible();
+    await expect(page.getByText(/Our team creates your keys/)).toBeVisible();
+    await expect(page.getByRole("link", { name: /Contact us/ }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /New API key|Edit|Revoke/ })).toHaveCount(0);
   });
 });
 

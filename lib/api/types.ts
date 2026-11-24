@@ -168,7 +168,6 @@ export type Invoice = S.GetClientInvoicesResponse[number];
 export type InvoiceDetail = S.GetClientInvoicesByIdResponse;
 export type InvoiceCreated = S.PostClientInvoicesResponse;
 export type ApiKey = S.GetClientApiKeysResponse[number];
-export type ApiKeyCreated = S.PostClientApiKeysResponse;
 /**
  * The preferences as the site reads them. An older API also sends a `telegram` flag on each event (and one on the page): the
  * page's is never read, an event's is only sent back as shown (components/merchant-settings/notifications-form.tsx).

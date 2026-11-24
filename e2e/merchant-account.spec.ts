@@ -1,4 +1,4 @@
-// Merchant account: the address and tax id in the profile, the "Made by support" API keys and the Announcements row, plus the
+// Merchant account: the address and tax id in the profile, the read-only API keys and the Announcements row, plus the
 // mark on an address that is not verified. Real browser -> Next -> the isolated demo backend (:3100).
 // Rules: one throwaway merchant per test (the demo merchant is never changed), made the way the product makes one: staff create
 // it and it sets its password from the invitation (`freshAccount`); the one that needs an unverified email gets it from a staff
@@ -74,23 +74,26 @@ test.describe("profile: address and tax id", () => {
   });
 });
 
-test.describe("API keys", () => {
-  test("a key staff made shows \"Made by support\"; a key the merchant made does not", async ({ page }) => {
+test.describe("API keys (read only, decision 005)", () => {
+  test("a key staff made shows with its details, and nothing on the page creates, edits or revokes a key", async ({ page }) => {
     const merchant = await signedInMerchant(page);
-    const supportKey = await staffApiKeyFor(merchant.id, `Support key ${Date.now()}`);
-    const own = await page.request.post("/client/api-keys", {
-      headers: { Origin: new URL(BASE_URL).origin, "X-CSRF-Token": merchant.csrf, "Content-Type": "application/json" },
-      data: { name: `Own key ${Date.now()}`, scopes: ["dhru"] },
-    });
-    expect(own.status(), await own.text()).toBe(201);
-    const ownName = ((await own.json()) as { key: { name: string } }).key.name;
-
+    const key = await staffApiKeyFor(merchant.id, `Support key ${Date.now()}`);
     await page.goto("/en/account/settings/api-keys");
-    const card = (name: string) => page.locator("article", { has: page.getByRole("heading", { name }) });
-    await expect(card(supportKey.name)).toBeVisible();
-    await expect(card(supportKey.name).getByText("Made by support")).toBeVisible();
-    await expect(card(ownName)).toBeVisible();
-    await expect(card(ownName).getByText("Made by support")).toHaveCount(0);
+    const card = page.locator("article", { has: page.getByRole("heading", { name: key.name }) });
+    await expect(card).toBeVisible();
+    await expect(card).toContainText(key.prefix);
+    await expect(card.getByText("Active")).toBeVisible();
+    await expect(page.getByRole("button", { name: /New API key|Edit|Revoke/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Contact us/ }).first()).toBeVisible();
+  });
+
+  test("the API no longer takes, changes or revokes a key from the merchant", async ({ page }) => {
+    const merchant = await signedInMerchant(page);
+    const key = await staffApiKeyFor(merchant.id, `Support key ${Date.now()}`);
+    const headers = { Origin: new URL(BASE_URL).origin, "X-CSRF-Token": merchant.csrf, "Content-Type": "application/json" };
+    expect((await page.request.post("/client/api-keys", { headers, data: { name: "Own key" } })).status()).toBe(404);
+    expect((await page.request.patch(`/client/api-keys/${key.id}`, { headers, data: { name: "Renamed" } })).status()).toBe(404);
+    expect((await page.request.delete(`/client/api-keys/${key.id}`, { headers })).status()).toBe(404);
   });
 });
 

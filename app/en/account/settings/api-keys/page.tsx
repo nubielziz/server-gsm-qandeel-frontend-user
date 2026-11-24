@@ -1,5 +1,6 @@
-// API keys (Dhru credentials): list, create (the secret is shown once), edit name and allowed IPs, revoke. A merchant rank has them;
-// any other rank is sent to the account home (`requireRank`).
+// API keys (Dhru credentials), read only (decision 005): the keys the team made for the account, and "Contact us" for a new key or
+// any change (a WhatsApp chat with the team, else the support page). A merchant rank has them; any other rank is sent to the account
+// home (`requireRank`).
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { FAMILY_ROUTES } from "@/lib/account/routes";
@@ -11,15 +12,15 @@ import type { ApiKey } from "@/lib/api/types";
 import { account } from "@/lib/i18n/messages/account";
 import { merchantSettings } from "@/lib/i18n/messages/merchant-settings";
 import { sitePath } from "@/lib/site-path";
-import { ApiKeysManager, type KeyRow } from "@/components/merchant-settings/api-keys-manager";
+import { fmt } from "@/lib/i18n/define";
+import { merchantWhatsApp, whatsAppLink } from "@/lib/contact/whatsapp";
+import { ApiKeysList, type KeyRow, type KeysContact } from "@/components/merchant-settings/api-keys-list";
 import { CodeBlock } from "@/components/merchant-settings/code-block";
 import { isPast, utcDate, utcDateTime } from "@/components/merchant-settings/format";
 import { LoadError, settle } from "@/components/merchant-settings/load";
 import { ListSkeleton, PageHeaderSkeleton } from "@/components/merchant-settings/skeletons";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageTransition } from "@/components/layout/page-transition";
-
-const MAX_LIVE_KEYS = 10;
 
 export function generateMetadata(): Metadata {
   return { title: account.settings.nav.apiKeys, robots: { index: false, follow: false } };
@@ -49,22 +50,18 @@ async function ApiKeysContent() {
     created: utcDate(k.createdAt),
     revoked: k.revokedAt !== null,
     expired: k.revokedAt === null && k.expiresAt !== null && isPast(k.expiresAt),
-    // Optional in the OpenAPI type, always sent by the server.
-    createdByStaff: k.createdByStaff === true,
   }));
+  // A chat with the team that names the account, else the support page (no number configured in this build).
+  const team = merchantWhatsApp();
+  const contact: KeysContact = team
+    ? { href: whatsAppLink(team.digits, fmt(t.apiKeys.contactMessage, { username: me.username })), external: true }
+    : { href: sitePath("/support"), external: false };
   const base = (process.env.NEXT_PUBLIC_API_PUBLIC_URL ?? "").replace(/\/+$/, "");
   const h = t.apiKeys.help;
 
   return (
     <div className="grid gap-4">
-      <ApiKeysManager
-        rows={rows}
-        liveCount={live.length}
-        max={MAX_LIVE_KEYS}
-        t={t.apiKeys}
-        fieldTexts={t.fieldErrors}
-        optional={t.optional}
-      />
+      <ApiKeysList rows={rows} contact={contact} t={t.apiKeys} />
       <Card tone="muted">
         <CardHeader title={h.title} titleAs="h2" />
         <CardBody className="grid gap-5">

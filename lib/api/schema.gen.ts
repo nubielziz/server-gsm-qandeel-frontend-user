@@ -41,71 +41,6 @@ export type GetClientApiKeysResponse = Array<{
   createdByStaff?: boolean;
 }>;
 
-// ── POST /client/api-keys — New API key
-export type PostClientApiKeysBody = {
-  name: string;
-  allowedIps?: string[];
-  /** ISO 8601 UTC time with milliseconds. */
-  expiresAt?: IsoDateTime;
-};
-/** 201 */
-export type PostClientApiKeysResponse = {
-  key: {
-    /** Numeric record id. */
-    id: Id;
-    /** Numeric record id. */
-    clientId: Id;
-    name: string;
-    prefix: string;
-    allowedIps: string[];
-    rateLimitPerMin: number;
-    lastUsedAt: IsoDateTime | null;
-    lastUsedIp: string;
-    expiresAt: IsoDateTime | null;
-    revokedAt: IsoDateTime | null;
-    /** ISO 8601 UTC time with milliseconds. */
-    createdAt: IsoDateTime;
-    createdByStaff?: boolean;
-  };
-  secret: string;
-};
-
-// ── PATCH /client/api-keys/:id — Rename a key or change its allowed IPs
-export type PatchClientApiKeysByIdParams = {
-  /** Numeric record id. */
-  id: Id;
-};
-export type PatchClientApiKeysByIdBody = {
-  name?: string;
-  allowedIps?: string[];
-};
-/** 200 */
-export type PatchClientApiKeysByIdResponse = {
-  /** Numeric record id. */
-  id: Id;
-  /** Numeric record id. */
-  clientId: Id;
-  name: string;
-  prefix: string;
-  allowedIps: string[];
-  rateLimitPerMin: number;
-  lastUsedAt: IsoDateTime | null;
-  lastUsedIp: string;
-  expiresAt: IsoDateTime | null;
-  revokedAt: IsoDateTime | null;
-  /** ISO 8601 UTC time with milliseconds. */
-  createdAt: IsoDateTime;
-  createdByStaff?: boolean;
-};
-
-// ── DELETE /client/api-keys/:id — Revoke a key
-export type DeleteClientApiKeysByIdParams = {
-  /** Numeric record id. */
-  id: Id;
-};
-/** 204 */
-export type DeleteClientApiKeysByIdResponse = void;
-
 // ── POST /client/auth/2fa — Complete the sign-in with a TOTP code
 export type PostClientAuth2faBody = {
   code: string;
@@ -3165,9 +3100,6 @@ export type GetStoreV1TicketsByTokenStreamResponse = Blob;
 /** Every /client and /store/v1 route: `ApiRoutes['GET /store/v1/services']['response']`. */
 export interface ApiRoutes {
   "GET /client/api-keys": { query: GetClientApiKeysQuery; params: never; body: never; response: GetClientApiKeysResponse; status: 200 };
-  "POST /client/api-keys": { query: never; params: never; body: PostClientApiKeysBody; response: PostClientApiKeysResponse; status: 201 };
-  "PATCH /client/api-keys/:id": { query: never; params: PatchClientApiKeysByIdParams; body: PatchClientApiKeysByIdBody; response: PatchClientApiKeysByIdResponse; status: 200 };
-  "DELETE /client/api-keys/:id": { query: never; params: DeleteClientApiKeysByIdParams; body: never; response: DeleteClientApiKeysByIdResponse; status: 204 };
   "POST /client/auth/2fa": { query: never; params: never; body: PostClientAuth2faBody; response: PostClientAuth2faResponse; status: 204 };
   "POST /client/auth/login": { query: never; params: never; body: PostClientAuthLoginBody; response: PostClientAuthLoginResponse; status: 200 };
   "POST /client/auth/logout": { query: never; params: never; body: never; response: PostClientAuthLogoutResponse; status: 204 };
