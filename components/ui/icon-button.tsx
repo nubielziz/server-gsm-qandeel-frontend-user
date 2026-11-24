@@ -6,11 +6,13 @@ import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Spinner } from "./spinner";
 
-export type IconButtonVariant = "ghost" | "secondary" | "primary" | "inverse" | "danger";
+export type IconButtonVariant = "ghost" | "quiet" | "secondary" | "primary" | "inverse" | "danger";
 export type IconButtonSize = "sm" | "md" | "lg";
 
 const variants: Record<IconButtonVariant, string> = {
   ghost: "text-ink hover:bg-surface-sunken active:bg-surface-sunken",
+  /** A ghost with a muted icon that turns ink on hover: a secondary action that should not compete (a card's quick view eye). */
+  quiet: "text-ink-subtle hover:bg-surface-sunken hover:text-ink active:bg-surface-sunken",
   secondary: "btn-lift-soft border border-line-strong bg-surface text-ink hover:border-ink active:bg-surface-muted",
   primary: "btn-lift bg-inverse text-on-inverse hover:bg-inverse-raised active:bg-inverse-raised",
   inverse: "bg-surface text-ink hover:bg-surface-sunken active:bg-surface-sunken",

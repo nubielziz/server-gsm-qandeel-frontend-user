@@ -535,6 +535,18 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
   JavaScript off and that the hero's and a collection's "from" prices are hidden for a merchant rank.
 - **Checks (2026-11-24):** typecheck: 0 errors; `npm run lint` clean (ESLint and the English guard); the whole unit suite passes (155 files, 1,590 tests). `gen:api:check` and the browser specs were not run.
 
+## Service cards: design A (2026-11-24, owner's choice)
+- The owner picked layout "A" of three card mockups. Both card sizes (`components/store/service-card.tsx`) now share one
+  layout: an identity row (picture or logo, the brand over the service type, a quiet quick view eye), a title that keeps room
+  for two lines, the facts as pills (delivery, carrier and country on the big card, "In stock"), then under a thin rule the
+  price and the order link. No more reserved empty rows: the footer sits at the bottom, so the cards of a row line up.
+- `ServiceCardMini` is a size container: below 15rem of content the title and price are smaller and the order link is the
+  cart alone; wider, "Order now" shows. Below 9rem (two cards side by side on a phone) the quick view eye is left out.
+  The dense card no longer shows the summary (the quick view and the page do).
+- `ServiceMark` takes a `caption` (the type's name under the brand); `IconButton` gains the `quiet` variant.
+- Not changed: titles that start with a supplier number ("285# …") are data (the listing's public title); cleaning them is
+  a separate backend decision.
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.

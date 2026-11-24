@@ -4,6 +4,7 @@
 // `brands/<name>.png` and `carriers/<name>.png` (docs/LOGOS.md: transparent, cropped to the logo, drawn at their real
 // proportions). Never draws artwork.
 import Image from "next/image";
+import type { ReactNode } from "react";
 import { Cable, FileArchive, Server, Smartphone, type LucideIcon } from "lucide-react";
 import { ImageSlot } from "@/components/ui/image-slot";
 import { logoSize, siteImage } from "@/lib/site-images";
@@ -193,20 +194,24 @@ export function ServiceThumb({
 }
 
 /**
- * The top corner of a service card. With the service's own picture: the picture and the brand name. Else with a brand
- * logo: the logo alone (a symbol keeps the name beside it). Else the type picture (the same for every service of a type,
- * so only a fallback) and the brand name. `md` for cards, `sm` for dense cards.
+ * The identity corner of a service card. With the service's own picture: the picture, then the brand name over the
+ * `caption` (the service type). Else with a brand logo: a word mark over the caption, or a symbol (Apple's apple) beside the
+ * name and the caption. Else the type picture (the same for every service of a type, so only a fallback) beside the name
+ * and the caption. `md` for cards, `sm` for dense cards.
  */
 export function ServiceMark({
   type,
   imageUrl,
   brand,
+  caption,
   size = "md",
   priority,
 }: {
   type: ServiceType;
   imageUrl?: string | null;
   brand: string;
+  /** A short line under the brand (the card passes the service type's name). */
+  caption?: string;
   size?: "sm" | "md";
   priority?: boolean;
 }) {
@@ -214,31 +219,36 @@ export function ServiceMark({
     <span
       dir="auto"
       className={cn(
-        "min-w-0 truncate uppercase",
-        size === "md" ? "text-body font-extrabold tracking-wide text-ink" : "text-micro text-ink-subtle",
+        "block min-w-0 max-w-full truncate uppercase",
+        size === "md" ? "text-body font-extrabold tracking-wide text-ink" : "text-micro text-ink-muted",
       )}
     >
       {brand}
     </span>
   ) : null;
+  const sub = caption ? <span className="block min-w-0 max-w-full truncate text-caption text-ink-subtle">{caption}</span> : null;
+  const words = (top: ReactNode) => (top || sub ? <span className="flex min-w-0 flex-col gap-0.5">{top}{sub}</span> : null);
+  const row = cn("flex min-w-0 flex-1 items-center", size === "md" ? "gap-3" : "gap-2.5");
   if (!servicePicture(imageUrl) && brand && logoFile("brands", brand)) {
+    if (isSymbolLogo("brands", brand)) {
+      return (
+        <span className={row}>
+          <Logo folder="brands" name={brand} alt="" size={size} className={CARD_ZOOM} />
+          {words(name)}
+        </span>
+      );
+    }
     return (
-      <span className="flex min-w-0 flex-1 items-center gap-2">
-        {isSymbolLogo("brands", brand) ? (
-          <>
-            <Logo folder="brands" name={brand} alt="" size={size} className={CARD_ZOOM} />
-            {name}
-          </>
-        ) : (
-          <Logo folder="brands" name={brand} size={size} className={CARD_ZOOM} />
-        )}
+      <span className={cn("flex min-w-0 flex-1 flex-col items-start", size === "md" ? "gap-1" : "gap-0.5")}>
+        <Logo folder="brands" name={brand} size={size} className={CARD_ZOOM} />
+        {sub}
       </span>
     );
   }
   return (
-    <span className={cn("flex min-w-0 flex-1 items-center", size === "md" ? "gap-3" : "gap-2.5")}>
+    <span className={row}>
       <ServiceThumb type={type} imageUrl={imageUrl} size={size} priority={priority} />
-      {name}
+      {words(name)}
     </span>
   );
 }

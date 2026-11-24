@@ -1,11 +1,15 @@
 // ServiceCard: one service of the catalog (mockup "Featured Products", adapted to what the API has: no stock number, no
-// cart, no favourites, no order counts). The whole card opens the service page (stretched title link); the eye button
-// opens the quick view (where the mockup has the favourite heart); "Order now" goes straight to checkout. Heights are
-// fixed by design (art row, tag row, 2-line title + 1-line summary, meta row, price row) so a skeleton has the same
-// size: the "In stock" badge shares the tag row (ServiceCard) or wraps under the delivery time in the two-line delivery
-// row (ServiceCardMini, reserved for every card) and never changes their height. The delivery time is the staff note
-// or the minutes in the page's language (lib/store/delivery.ts).
-// ServiceCardMini is the dense variant for side lists and the home list (mockup "New Arrivals", "All Products").
+// cart, no favourites, no order counts). Both sizes follow one layout (the owner's card design "A", 2026-11-24): an identity
+// row (the picture or brand logo, the brand and the service type, the quick view eye), a two-line title, the facts as pills
+// (delivery time, carrier and country on the big card, "In stock"), then under a thin rule the price and the order link.
+// The whole card opens the service page (stretched title link); the eye button opens the quick view; the order link goes
+// straight to checkout. The title always keeps room for two lines, so the pills of a row line up; the pills wrap; the
+// footer sits at the bottom of the card, so the cards of a row (stretched to one height by their grid) end on one line.
+// A skeleton has the same rows. The delivery time is the staff note or the minutes (lib/store/delivery.ts).
+// ServiceCardMini is the dense variant for side lists and the home list (mockup "New Arrivals", "All Products"). It is a
+// size container (`@container`): below 15rem of content (two cards side by side on a phone, the best sellers panel) its
+// title and price are smaller and the order link is the cart alone; wider, they grow and the link says "Order now". Below 9rem
+// (two cards side by side on a phone) the quick view eye is left out so the brand keeps its room.
 // In a browsable list (`index` given) the first PREFETCH_CARDS title links and quick view links use `prefetch={true}`:
 // their prefetch carries the service page's or the quick view's content (static output for a prerendered slug; the price
 // waits for the navigation), so the page or the dialog's title shows at once on a tap. The others keep the default
@@ -14,6 +18,7 @@
 // The price and the order link sit in slots of the personal price layer (./own-price.tsx, decision 003): an account of a
 // merchant rank sees its own price there, and an order link that is off for a service it may not buy.
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { CircleCheck, Clock, Eye, MapPin, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -77,14 +82,6 @@ const frame =
   "hover:before:absolute hover:before:inset-x-0 hover:before:top-full hover:before:h-0.5 " +
   "has-[.card-link:focus-visible]:outline-2 has-[.card-link:focus-visible]:outline-offset-2 has-[.card-link:focus-visible]:outline-focus";
 
-/**
- * Room for two title lines, one summary line and the meta row, wherever
- * cards stand side by side (`sm` up). A shorter title leaves the spare room above the price row. The skeleton reserves
- * the same.
- */
-const BODY_BLOCK =
-  "sm:min-h-[calc(2*var(--text-subheading)*var(--text-subheading--line-height)+var(--text-small)*var(--text-small--line-height)+2rem)]";
-
 const links = (service: StoreServiceCard) => ({
   href: sitePath(`/services/${encodeURIComponent(service.slug)}`),
   orderHref: `${sitePath("/checkout")}?service=${encodeURIComponent(service.slug)}`,
@@ -105,6 +102,7 @@ function QuickViewLink({
     <IconButtonLink
       href={sitePath(`/quick-view/${encodeURIComponent(service.slug)}`)}
       label={fmt(labels.quickView, { title: service.title })}
+      variant="quiet"
       size="sm"
       scroll={false}
       prefetch={cardPrefetch(index)}
@@ -116,31 +114,74 @@ function QuickViewLink({
 }
 
 /**
- * The delivery time with a clock: the staff note as written, else the minutes in the page's language. Screen readers
- * hear the whole sentence ("Delivery: 2 days"). Nothing when the service has no delivery information.
+ * The bottom of a card: pushed to the bottom of the card (the cards of a row end on one line), a thin rule, then the price
+ * and the order link. `md` for ServiceCard, `sm` for ServiceCardMini and the skeletons of each.
+ */
+function CardFooter({ size, children }: { size: "md" | "sm"; children: ReactNode }) {
+  return (
+    <div className={cn("mt-auto", size === "md" ? "pt-5" : "pt-4")}>
+      <div className={cn("flex items-center justify-between gap-3 border-t border-line", size === "md" ? "pt-4" : "pt-3")}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The delivery time as the text of its pill: the staff note as written, else the minutes. Screen readers hear the whole
+ * sentence ("Delivery: 2 days"); a long note is cut with an ellipsis.
  */
 function Delivery({ time, labels }: { time: string; labels: ServiceCardLabels }) {
-  if (!time) return null;
   return (
     <>
-      <Clock aria-hidden="true" className="size-3.5 shrink-0" />
       <VisuallyHidden>
         <BdiText template={labels.delivery} value={time} />
       </VisuallyHidden>
-      <bdi aria-hidden="true" className="truncate">
+      <bdi aria-hidden="true" className="min-w-0 truncate">
         {time}
       </bdi>
     </>
   );
 }
 
-/** The "In stock" mark: for `in_stock` services only (an `on_request` service says its delivery time instead). */
-function InStock({ service, labels }: Pick<ServiceCardProps, "service" | "labels">) {
-  if (service.availability !== "in_stock") return null;
+/**
+ * The facts of a service as pills, in this order: the delivery time (clock), the carrier and country (`place`, the big card
+ * only) and "In stock" (`in_stock` services only: an `on_request` service says its delivery time instead). Nothing when
+ * there is none. In a narrow card the pills wrap onto a second line; a long text is cut inside its pill.
+ */
+function Facts({
+  service,
+  labels,
+  time,
+  place,
+  className,
+}: Pick<ServiceCardProps, "service" | "labels"> & { time: string; place?: string; className?: string }) {
+  const stocked = service.availability === "in_stock";
+  if (!time && !place && !stocked) return null;
   return (
-    <Badge tone="success" shape="tag" caps icon={<CircleCheck aria-hidden="true" />} className="shrink-0">
-      {labels.inStock}
-    </Badge>
+    <ul className={cn("flex min-w-0 flex-wrap gap-1.5", className)}>
+      {time ? (
+        <li className="flex min-w-0 max-w-full">
+          <Badge icon={<Clock aria-hidden="true" />} className="max-w-full">
+            <Delivery time={time} labels={labels} />
+          </Badge>
+        </li>
+      ) : null}
+      {place ? (
+        <li className="flex min-w-0 max-w-full">
+          <Badge icon={<MapPin aria-hidden="true" />} className="max-w-full">
+            <span className="min-w-0 truncate">{place}</span>
+          </Badge>
+        </li>
+      ) : null}
+      {stocked ? (
+        <li className="flex">
+          <Badge tone="success" icon={<CircleCheck aria-hidden="true" />}>
+            {labels.inStock}
+          </Badge>
+        </li>
+      ) : null}
+    </ul>
   );
 }
 
@@ -149,43 +190,29 @@ export function ServiceCard({ service, decimals, labels, priority, index }: Serv
   const place = [service.network, service.country ? countryName(service.country) : ""].filter(Boolean).join(" · ");
   const time = deliveryTime(service).text;
   return (
-    <article className={cn(frame, "p-4")}>
+    <article className={cn(frame, "p-5")}>
       <div className="flex h-12 items-center gap-3">
-        <ServiceMark type={service.type} imageUrl={service.imageUrl} brand={service.brand} priority={priority} />
+        <ServiceMark
+          type={service.type}
+          imageUrl={service.imageUrl}
+          brand={service.brand}
+          caption={labels.types[service.type]}
+          priority={priority}
+        />
         <QuickViewLink service={service} labels={labels} index={index} className="-me-2 self-start" />
       </div>
-      <div className="mt-3.5 flex h-[1.375rem] items-center gap-2 overflow-hidden">
-        <Badge shape="tag" caps>
-          {labels.types[service.type]}
-        </Badge>
-        <InStock service={service} labels={labels} />
-      </div>
-      <div className={cn("mt-2", BODY_BLOCK)}>
-        <h3 className="text-subheading font-bold text-ink">
-          <Link
-            href={href}
-            prefetch={cardPrefetch(index)}
-            className="card-link line-clamp-2 rounded-badge after:absolute after:inset-0 focus-visible:outline-none"
-          >
-            {service.title}
-          </Link>
-        </h3>
-        {service.summary ? <p className="mt-0.5 line-clamp-1 text-small text-ink-muted">{service.summary}</p> : null}
-        <ul className="mt-2.5 flex h-5 items-center gap-x-4 text-small text-ink-muted">
-          {time ? (
-            <li className="flex min-w-0 shrink-0 items-center gap-1.5">
-              <Delivery time={time} labels={labels} />
-            </li>
-          ) : null}
-          {place ? (
-            <li className="flex min-w-0 items-center gap-1.5">
-              <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
-              <span className="truncate">{place}</span>
-            </li>
-          ) : null}
-        </ul>
-      </div>
-      <div className="mt-auto flex items-center justify-between gap-3 pt-3">
+      <h3 className="mt-4 min-h-[2lh] text-subheading font-bold text-ink">
+        <Link
+          href={href}
+          prefetch={cardPrefetch(index)}
+          className="card-link line-clamp-2 rounded-badge after:absolute after:inset-0 focus-visible:outline-none"
+        >
+          {service.title}
+        </Link>
+      </h3>
+      {service.summary ? <p className="mt-1 line-clamp-1 text-small text-ink-muted">{service.summary}</p> : null}
+      <Facts service={service} labels={labels} time={time} place={place} className="mt-3" />
+      <CardFooter size="md">
         <OwnPrice serviceId={service.id} className="min-w-0 text-heading font-bold text-ink" placeholderClassName="w-20">
           <Money
             amount={service.price.gross}
@@ -205,37 +232,38 @@ export function ServiceCard({ service, decimals, labels, priority, index }: Serv
             {labels.orderNow}
           </ButtonLink>
         </OwnBuy>
-      </div>
+      </CardFooter>
     </article>
   );
 }
 
-/** The same box as ServiceCard (art row, tag, title + summary, meta row, price row) while the catalog loads. */
+/** Two pills of the facts row while the catalog loads (the height of a Badge). */
+const PILL_SKELETON = "h-[1.375rem] rounded-full";
+
+/** The same box as ServiceCard (identity row, title, pills, footer) while the catalog loads. */
 export function ServiceCardSkeleton() {
   return (
-    <div aria-hidden="true" className="flex min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-card">
+    <div aria-hidden="true" className="flex min-w-0 flex-col rounded-card border border-line bg-surface p-5 shadow-card">
       <div className="flex h-12 items-center gap-3">
         <Skeleton className="size-12 shrink-0" />
-        <Skeleton className="h-4 w-20" />
-      </div>
-      <div className="mt-3.5 flex h-[1.375rem] items-center">
-        <Skeleton className="h-[1.375rem] w-24 rounded-badge" />
-      </div>
-      <div className={cn("mt-2", BODY_BLOCK)}>
-        <div className="text-subheading">
-          <Skeleton className="h-[1lh] w-4/5" />
+        <div className="grid gap-2">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-3 w-16" />
         </div>
-        <div className="mt-0.5 text-small">
-          <Skeleton className="h-[1lh] w-3/5" />
-        </div>
-        <Skeleton className="mt-2.5 h-5 w-32" />
       </div>
-      <div className="mt-auto flex items-center justify-between gap-3 pt-3">
+      <div className="mt-4 min-h-[2lh] text-subheading">
+        <Skeleton className="h-[1lh] w-4/5" />
+      </div>
+      <div className="mt-3 flex gap-1.5">
+        <Skeleton className={cn(PILL_SKELETON, "w-20")} />
+        <Skeleton className={cn(PILL_SKELETON, "w-24")} />
+      </div>
+      <CardFooter size="md">
         <div className="text-heading">
           <Skeleton className="h-[1lh] w-20" />
         </div>
         <Skeleton className="h-10 w-32" />
-      </div>
+      </CardFooter>
     </div>
   );
 }
@@ -251,20 +279,33 @@ export function ServiceGridSkeleton({ count = 8, className }: { count?: number; 
   );
 }
 
+/** The dense card's title: 13px in a narrow card, 15px from 15rem of content up; always room for two lines. */
+const MINI_TITLE = "min-h-[2lh] text-small font-semibold leading-snug text-ink @min-[15rem]:text-body";
+
+/** The dense card's price: 15px in a narrow card, 20px from 15rem of content up. */
+const MINI_PRICE = "min-w-0 text-body font-bold text-ink @min-[15rem]:text-heading";
+
 /**
- * The dense card: art, brand, a 2-line title, a 2-line summary, the delivery time (and the "In stock" mark), the price
- * and a square order link.
+ * The dense card: the identity row (picture, brand, type, quick view), a 2-line title, the delivery time and "In stock" as
+ * pills, the price and the order link (the cart alone in a narrow card, "Order now" from 15rem of content up).
  */
 export function ServiceCardMini({ service, decimals, labels, index }: Omit<ServiceCardProps, "priority">) {
   const { href, orderHref } = links(service);
   const time = deliveryTime(service).text;
   return (
-    <article className={cn(frame, "p-3.5")}>
-      <div className="flex h-10 items-center gap-2.5">
-        <ServiceMark type={service.type} imageUrl={service.imageUrl} brand={service.brand} size="sm" />
-        <QuickViewLink service={service} labels={labels} index={index} className="-me-2 -mt-1 self-start" />
+    <article className={cn(frame, "@container p-4")}>
+      <div className="flex h-10 items-center gap-2">
+        <ServiceMark
+          type={service.type}
+          imageUrl={service.imageUrl}
+          brand={service.brand}
+          caption={labels.types[service.type]}
+          size="sm"
+        />
+        {/* Below 9rem of content (two cards side by side on a phone) the eye leaves the brand its room; a tap on the card opens the page. */}
+        <QuickViewLink service={service} labels={labels} index={index} className="-me-2 -mt-1 self-start @max-[9rem]:hidden" />
       </div>
-      <h3 className="mt-3 text-small font-bold text-ink">
+      <h3 className={cn("mt-3.5", MINI_TITLE)}>
         <Link
           href={href}
           prefetch={cardPrefetch(index)}
@@ -273,34 +314,23 @@ export function ServiceCardMini({ service, decimals, labels, index }: Omit<Servi
           {service.title}
         </Link>
       </h3>
-      {service.summary ? <p className="mt-0.5 line-clamp-2 text-caption text-ink-muted">{service.summary}</p> : null}
-      <div className="mt-2 flex h-12 flex-wrap content-start items-center gap-x-2 gap-y-1 overflow-hidden text-caption text-ink-subtle">
-        <span className="flex h-[1.375rem] min-w-0 max-w-full items-center gap-1.5">
-          <Delivery time={time} labels={labels} />
-        </span>
-        <InStock service={service} labels={labels} />
-      </div>
-      <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-        <OwnPrice serviceId={service.id} className="min-w-0 text-body font-bold text-ink" placeholderClassName="w-14">
-          <Money
-            amount={service.price.gross}
-            currency={service.price.currency}
-            decimals={decimals}
-            className="min-w-0 text-body font-bold text-ink"
-          />
+      <Facts service={service} labels={labels} time={time} className="mt-2.5" />
+      <CardFooter size="sm">
+        <OwnPrice serviceId={service.id} className={MINI_PRICE} placeholderClassName="w-14">
+          <Money amount={service.price.gross} currency={service.price.currency} decimals={decimals} className={MINI_PRICE} />
         </OwnPrice>
         <OwnBuy serviceId={service.id}>
-          <IconButtonLink
+          <ButtonLink
             href={orderHref}
-            label={fmt(labels.orderService, { title: service.title })}
-            variant="primary"
             size="sm"
-            className="z-10"
+            className="relative z-10"
+            startIcon={<ShoppingCart aria-hidden="true" />}
+            aria-label={fmt(labels.orderService, { title: service.title })}
           >
-            <ShoppingCart aria-hidden="true" />
-          </IconButtonLink>
+            <span className="hidden @min-[15rem]:inline">{labels.orderNow}</span>
+          </ButtonLink>
         </OwnBuy>
-      </div>
+      </CardFooter>
     </article>
   );
 }
@@ -308,25 +338,26 @@ export function ServiceCardMini({ service, decimals, labels, index }: Omit<Servi
 /** The same box as ServiceCardMini while the catalog loads. */
 export function ServiceCardMiniSkeleton() {
   return (
-    <div aria-hidden="true" className="flex min-w-0 flex-col rounded-card border border-line bg-surface p-3.5 shadow-card">
-      <Skeleton className="size-10" />
-      <div className="mt-3 text-small">
+    <div aria-hidden="true" className="@container flex min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-card">
+      <div className="flex h-10 items-center gap-2.5">
+        <Skeleton className="size-10 shrink-0" />
+        <div className="grid gap-1.5">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+      </div>
+      <div className={cn("mt-3.5", MINI_TITLE)}>
         <Skeleton className="h-[1lh] w-4/5" />
       </div>
-      <div className="mt-0.5 text-caption">
-        <Skeleton className="h-[1lh] w-full" />
+      <div className="mt-2.5 flex">
+        <Skeleton className={cn(PILL_SKELETON, "w-16")} />
       </div>
-      <div className="mt-2 flex h-12 items-start">
-        <div className="flex h-[1.375rem] items-center">
-          <Skeleton className="h-3.5 w-16" />
-        </div>
-      </div>
-      <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-        <div className="text-body">
+      <CardFooter size="sm">
+        <div className={MINI_PRICE}>
           <Skeleton className="h-[1lh] w-14" />
         </div>
-        <Skeleton className="size-10" />
-      </div>
+        <Skeleton className="h-10 w-11 @min-[15rem]:w-28" />
+      </CardFooter>
     </div>
   );
 }
