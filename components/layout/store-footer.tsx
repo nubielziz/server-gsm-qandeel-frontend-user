@@ -20,12 +20,18 @@ async function CopyrightYear(): Promise<string> {
   return String(new Date().getFullYear());
 }
 
-/** The dark site footer. */
-export async function StoreFooter() {
-  const year = await CopyrightYear();
+export type FooterColumn = { title: string; links: { href: string; label: string }[] };
+
+/**
+ * The link columns of the footer. The merchants column leads to the page that explains how a merchant account is opened
+ * (`/become-a-merchant`); there is no link to a separate merchant area, because every account signs in at the same page and
+ * lands in the same account area.
+ *
+ * @param p wraps a path of this site into its public address (`sitePath`)
+ */
+export function footerColumns(p: (path: string) => string): FooterColumn[] {
   const t = common;
-  const p = (path: string) => sitePath(path);
-  const columns = [
+  return [
     {
       title: t.footer.shop,
       links: [
@@ -51,12 +57,16 @@ export async function StoreFooter() {
     },
     {
       title: t.footer.merchants,
-      links: [
-        { href: p("/merchant"), label: t.footer.portal },
-        { href: p("/merchant/register"), label: t.footer.becomeMerchant },
-      ],
+      links: [{ href: p("/become-a-merchant"), label: t.footer.becomeMerchant }],
     },
   ];
+}
+
+/** The dark site footer. */
+export async function StoreFooter() {
+  const year = await CopyrightYear();
+  const t = common;
+  const columns = footerColumns(sitePath);
 
   return (
     // vt-site-footer: held still while a page change animates the content above it (globals.css, page transitions).

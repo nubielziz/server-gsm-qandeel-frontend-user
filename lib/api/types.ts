@@ -36,7 +36,6 @@ export type ConsentsResult = S.PostStoreV1CheckoutSessionsByTokenConsentsRespons
 export type PayInput = S.PostStoreV1CheckoutSessionsByTokenPayBody;
 export type PayResult = S.PostStoreV1CheckoutSessionsByTokenPayResponse;
 export type TrackedOrder = S.GetStoreV1OrdersByTokenResponse;
-export type StoreMe = S.GetStoreV1MeResponse;
 export type StoreLoginResult = S.PostStoreV1AuthLoginResponse;
 export type CustomerOrder = S.GetStoreV1MeOrdersResponse[number];
 export type DataRequest = S.PostStoreV1MeDataExportResponse;
@@ -134,10 +133,24 @@ export type NotificationCategory = NotificationItem["category"];
 /** `{ unread }`, capped at 100: show "99+" when it is 100. */
 export type UnreadCount = S.GetStoreV1MeNotificationsUnreadCountResponse;
 
+// ── The account (one type for every rank)
+/**
+ * The signed-in account, as both "me" routes answer it: `GET /client/auth/me` for a merchant rank and `GET /store/v1/me` for
+ * the retail rank carry the same keys. `rank.kind` says which family of routes the account uses; `username` and `company` are
+ * empty text when the account has none. Read it through `getAccount()` (lib/api/session.ts).
+ */
+export type AccountMe = S.GetClientAuthMeResponse;
+/** The rank of an account: its id, name, kind (`retail` or `merchant`) and the discount it carries. */
+export type AccountRank = AccountMe["rank"];
+/**
+ * The part of the sign-in answer the site reads: the step still to do (`next`) and the rank. The answer still carries a `kind`
+ * word for older readers; nothing here reads it.
+ */
+export type SignInResult = Pick<SmartSignInResult, "next"> & Partial<Pick<SmartSignInResult, "rank">>;
+
 // ── Merchant (/client)
-export type MerchantMe = S.GetClientAuthMeResponse;
 export type MerchantLoginResult = S.PostClientAuthLoginResponse;
-/** `POST /client/auth/sign-in`: the smart sign-in. `kind` names the area, `next` the step still to do. */
+/** `POST /client/auth/sign-in`: the one sign-in form. `next` names the step still to do and `rank` the account's rank. */
 export type SmartSignInInput = S.PostClientAuthSignInBody;
 export type SmartSignInResult = S.PostClientAuthSignInResponse;
 export type MerchantPasswordChangeResult = S.PostClientAuthPasswordChangeResponse;

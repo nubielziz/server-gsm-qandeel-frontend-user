@@ -1,5 +1,6 @@
 // The look of the workspace navigation, as pure markup (no hooks) so the server can render a fallback without an
-// active item while the client version reads the pathname. See workspace-nav.tsx.
+// active item while the client version reads the pathname. See workspace-nav.tsx. The two small pure helpers the header
+// heading needs (which page is current, what the heading is given) are here too, so they can be tested and shared.
 // Three looks: the desktop rail (icons with a tooltip), the drawer (labelled rows) and the phone tab bar (icons with a
 // short label). The rail and the tab bar sit in a SlidingNav (sliding-nav.tsx): before it takes over (server HTML, no
 // JavaScript) the active link draws its own selected look from CSS (globals.css "Workspace rail and tab bar").
@@ -23,7 +24,7 @@ export type WorkspaceNavItem = {
   match?: "exact" | "prefix";
   /**
    * Holds the item's place without showing it: an empty slot of the same size, hidden from assistive technology. For an
-   * item that depends on the session (the customer's wallet): the static shell reserves the place, and the list read
+   * item that depends on the session (a retail account's wallet): the static shell reserves the place, and the list read
    * after the session either shows the item or drops the slot, so a likely item does not push the ones below it down.
    * The item still names its page for the header title.
    */
@@ -35,6 +36,30 @@ export type WorkspaceNavItem = {
    */
   badge?: ReactNode;
 };
+
+/**
+ * What the header heading needs of a page: where it is and what it is called. No icon and no badge, because the heading
+ * only names the page. A nav item fits; so does a page that has no place in the nav (a header title only).
+ */
+export type WorkspaceTitleItem = Pick<WorkspaceNavItem, "href" | "label" | "title" | "match">;
+
+/**
+ * The words the heading is given, from the nav lists and from the pages that only name a title. Nav items come first, so
+ * a title never replaces a nav item with the same address. The heading is a client component whose props travel to the
+ * browser: only the four fields it reads are kept (no icon, no badge).
+ */
+export function headingItems(
+  nav: readonly WorkspaceNavItem[],
+  footerNav: readonly WorkspaceNavItem[] = [],
+  titles: readonly WorkspaceTitleItem[] = [],
+): WorkspaceTitleItem[] {
+  return [...nav, ...footerNav, ...titles].map(({ href, label, title, match }) => ({ href, label, title, match }));
+}
+
+/** The item whose address is the longest match of the pathname (the deepest page the path is on), or undefined. */
+export function activeItem<T extends WorkspaceTitleItem>(items: readonly T[], pathname: string | null): T | undefined {
+  return items.filter((item) => isActivePath(pathname, item.href, item.match)).sort((a, b) => b.href.length - a.href.length)[0];
+}
 
 export type WorkspaceNavViewProps = {
   items: WorkspaceNavItem[];
@@ -115,8 +140,8 @@ export function WorkspaceNavView({ items, pathname, variant }: WorkspaceNavViewP
   }
 
   // Short screens (under 46rem, where the rail also drops its avatar): 44px buttons and tighter gaps; under 41rem 40px and
-  // tighter still (the merchant has nine links with Settings), so the merchant's
-  // links fit a 1366×768 laptop window without the rail growing past the screen.
+  // tighter still (the longest list has eight links with Settings), so the links fit a 1366×768 laptop window without the
+  // rail growing past the screen.
   return (
     <ul className="grid justify-items-center gap-2 [@media(max-height:46rem)]:gap-1 [@media(max-height:41rem)]:gap-0.5!">
       {items.map((item) => {

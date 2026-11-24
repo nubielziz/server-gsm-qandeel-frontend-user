@@ -1,12 +1,12 @@
-// A support ticket, opened from the link in its email or from "My tickets" (`/support/tickets/<token>`). The token IS the
-// credential: the page is never indexed and sends no Referer. The ticket is read at request time, so it streams behind
-// <Suspense>; that read is the first state of the live conversation (`TicketView`, feature 28): messages, seen
-// marks and files arrive through the ticket's own stream, with no reload and no `router.refresh()`. A closed (resolved)
-// ticket offers a new one: the account's form to a signed-in customer (with the order), the public form to a guest.
+// A support ticket, opened from the link in its email or from the Support list of an account (`/support/tickets/<token>`).
+// The token IS the credential: the page is never indexed and sends no Referer. The ticket is read at request time, so it
+// streams behind <Suspense>; that read is the first state of the live conversation (`TicketView`, feature 28): messages,
+// seen marks and files arrive through the ticket's own stream, with no reload and no `router.refresh()`. A closed
+// (resolved) ticket offers a new one: the account's form to a signed-in account (with the order), the public form to a guest.
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { apiSessionGet } from "@/lib/api/server";
-import { getCustomer } from "@/lib/api/session";
+import { getAccount } from "@/lib/api/session";
 import { isApiError } from "@/lib/api/errors";
 import { BusyState } from "@/components/ui/busy-state";
 import type { Ticket } from "@/lib/api/types";
@@ -39,9 +39,9 @@ function TicketSkeleton() {
 }
 
 async function TicketContent({ params }: { params: PageProps<"/en/support/tickets/[token]">["params"] }) {
-  const [{ token }, customer] = await Promise.all([
+  const [{ token }, me] = await Promise.all([
     params,
-    getCustomer().catch(() => null),
+    getAccount().catch(() => null),
   ]);
   const t = support;
   const c = common;
@@ -73,7 +73,7 @@ async function TicketContent({ params }: { params: PageProps<"/en/support/ticket
       access={{ kind: "token", token }}
       breadcrumbs={[{ label: t.ticket.support, href: sitePath("/support") }, { label: fmt(t.ticket.number, { number: ticket.number }) }]}
       order={ticket.orderId ? { text: `SF-${ticket.orderId}` } : null}
-      newTicketHref={newTicketHref(customer ? "customer" : "guest", ticket.orderId)}
+      newTicketHref={newTicketHref(Boolean(me), ticket.orderId)}
     />
   );
 }

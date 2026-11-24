@@ -6,17 +6,17 @@
 // (a double click, a retry), a new one when the file or the reference changes, forgotten after a success and after 409
 // IDEMPOTENCY_KEY_REUSED. A 409 CONFLICT means the top-up moved on meanwhile (credited, closed or reviewed): the text says
 // so and the page is refreshed; it stays here because the refreshed page no longer offers these buttons. A signed-out
-// answer refreshes the route; every other refusal is shown and never signs anyone out.
+// answer or a rank refusal (the account became a merchant rank) refreshes the route; every other refusal is shown and never signs anyone out.
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { flushSync } from "react-dom";
 import { Ban } from "lucide-react";
-import { api, forgetCsrf } from "@/lib/api/browser";
+import { api } from "@/lib/api/browser";
 import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { UploadedFile } from "@/lib/api/types";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
-import { isSignedOutError } from "@/lib/merchant/signed-out";
+import { leaveIfSignedOut } from "@/lib/merchant/signed-out";
 import { topUpErrorText, type TopUpAction } from "@/lib/wallet/top-up-errors";
 import { FileUpload } from "@/components/forms/file-upload";
 import { Alert } from "@/components/ui/alert";
@@ -64,13 +64,9 @@ export function TopUpActions({ id, canReceipt, canCancel, labels: t, errors }: T
 
   const fileError = fieldErrors.fileId ?? (submitted && !file ? t.receiptRequired : undefined);
 
-  /** The text of a failure of `action`; null when the session ended (the route was refreshed and nothing is left to show). */
+  /** The text of a failure of `action`; null when the session ended or the rank changed (the route was refreshed and nothing is left to show). */
   function explain(error: unknown, action: TopUpAction) {
-    if (isSignedOutError(error)) {
-      forgetCsrf("store");
-      router.refresh();
-      return null;
-    }
+    if (leaveIfSignedOut(error, router)) return null;
     return topUpErrorText(error, { action, generic: errorText, t: errors });
   }
 
@@ -184,7 +180,7 @@ export function TopUpActions({ id, canReceipt, canCancel, labels: t, errors }: T
                 <FileUpload
                   required
                   accept={ACCEPT}
-                  endpoint="/store/v1/files"
+                  family="store"
                   disabled={busy === "send" || sent}
                   onChange={(next) => {
                     setFile(next);

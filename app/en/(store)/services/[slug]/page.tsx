@@ -1,6 +1,6 @@
 // A service page: art (the service's own picture, else brand logo, else type picture), title, chips, price (visitor
 // currency, with "per unit", "From" and the packs), availability, delivery and quantity rules, "Buy now", description,
-// requirements and FAQ. `params` is read behind <Suspense>; the price and the merchant hint stream in behind their own
+// requirements and FAQ. `params` is read behind <Suspense>; the price and the rank hint stream in behind their own
 // and wait for the navigation (`navigation()`), so a prefetch of a prerendered slug is served from the static output.
 // An old address (a retired Arabic page, decision 039) sends the reader on to the service's page, else to the list
 // (`resolveService`, plan 30 §7.1); it streams, so it is an instant redirect inside a 200 answer that is `noindex`.
@@ -23,8 +23,8 @@ import { resolveService } from "@/components/store/resolve-service";
 import { ServiceArt } from "@/components/store/service-art";
 import {
   Accordion,
-  MerchantPriceHint,
   PriceBlock,
+  RankPriceHint,
   ServicePrice,
   serviceFacts,
   serviceStockHint,
@@ -189,7 +189,7 @@ async function ServiceContent({ params }: { params: Promise<{ slug: string }> })
                 </Alert>
               )}
               <Suspense fallback={null}>
-                <MerchantPriceHint serviceId={service.id} />
+                <RankPriceHint serviceId={service.id} />
               </Suspense>
             </CardBody>
           </Card>

@@ -1,12 +1,15 @@
 "use client";
 // Review and pay (`/checkout/<token>`): the locked amounts, the consents the session requires, the payment choices
-// (the store balance first when the customer can use it, then the gateways the session offers) and "Pay". Flow
+// (the store balance first when the account can use it, then the gateways the session offers) and "Pay". Flow
 // (handoff §5.8):
 // - gateway: POST …/consents (when something is new) → POST …/pay with one Idempotency-Key per attempt → send the browser
 //   to the gateway's `paymentUrl`; the gateway sends it back to `/en/checkout/return?token=<token>`;
 // - store balance (plan F30): POST …/consents → POST …/balance-payment with NO body, NO Content-Type and its own
 //   Idempotency-Key (never one a `/pay` call used) → 201 means the order exists at once (no webhook): go to tracking.
 //   A 401 or a 403 never signs anyone out here; the page says what to do instead.
+// An account of a merchant rank is never offered the balance (the page tells the view it has none). The shop checkout is for
+// retail buyers, so the page also hands it `priceList`: the notice that leads to its own price comes before the consents and
+// the payment choices. The API can refuse a merchant rank on the consents call of this checkout, so the notice says it up front.
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,14 +27,16 @@ import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { BalancePaymentResult, CheckoutSession, PayResult } from "@/lib/api/types";
+import { checkoutSignInHref } from "@/lib/checkout/access";
 import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
 import { fmt, plural } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import { sitePath } from "@/lib/site-path";
 import type { CheckoutMessages } from "@/lib/i18n/messages/checkout";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
-import { BALANCE_MAX_TRIES, balanceOption, balanceWaitMs, canPayFromBalance, showsBalanceChoice, type BalanceWallet } from "./balance-option";
+import { BALANCE_MAX_TRIES, balanceOption, balanceWaitMs, canPayFromBalance, showsBalanceChoice, type BalanceContext } from "./balance-option";
 import { Countdown } from "./countdown";
+import { PriceListCard, type PriceListCardProps } from "./price-list-card";
 import { slot } from "./rich";
 
 type Labels = CheckoutMessages["session"];
@@ -49,15 +54,20 @@ export type SessionViewProps = {
   restartHref: string | null;
   countryName: string;
   /**
-   * What the server read for this request (plan F30): whether a customer is signed in and their wallet (null when nobody
-   * is signed in or the read failed). Only `balanceOption` turns it into what shows; the session's `balancePayable`
-   * says whether the checkout itself may be paid from the balance.
+   * What the server read for this request (plan F30): whether an account is signed in and its store balance (null when
+   * nobody is signed in, the account has a merchant rank, or the read failed). Only `balanceOption` turns it into what
+   * shows; the session's `balancePayable` says whether the checkout itself may be paid from the balance.
    */
-  balance: { signedIn: boolean; wallet: BalanceWallet | null };
+  balance: BalanceContext;
+  /**
+   * Set only when the signed-in account has a merchant rank (`sessionPriceList`): the notice that this checkout is for retail
+   * buyers and the way to order at the account's own price. Shown above the consents and the payment choices.
+   */
+  priceList?: PriceListCardProps | null;
 };
 
-/** Answers after which the wallet may look different: the page reads it again. */
-const BALANCE_REFRESH_CODES = new Set(["INSUFFICIENT_FUNDS", "WALLET_FROZEN", "WALLET_DISABLED"]);
+/** Answers after which the wallet may look different: the page reads it again. A rank that now orders from its price list has no store balance. */
+const BALANCE_REFRESH_CODES = new Set(["INSUFFICIENT_FUNDS", "WALLET_FROZEN", "WALLET_DISABLED", "RANK_NOT_ALLOWED"]);
 
 type PayError = { message: string; reference?: string; support?: boolean; link?: { href: string; label: string } };
 
@@ -71,7 +81,17 @@ function fill(template: string, values: Record<string, ReactNode>): ReactNode {
   });
 }
 
-export function SessionView({ session, labels, quantityLabels, typeLabel, decimals, restartHref, countryName, balance }: SessionViewProps) {
+export function SessionView({
+  session,
+  labels,
+  quantityLabels,
+  typeLabel,
+  decimals,
+  restartHref,
+  countryName,
+  balance,
+  priceList = null,
+}: SessionViewProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const p = (path: string) => sitePath(path);
@@ -183,7 +203,7 @@ export function SessionView({ session, labels, quantityLabels, typeLabel, decima
   }
 
   // ── Open: pay
-  const signInHref = `${p("/sign-in")}?as=customer&next=${encodeURIComponent(p(`/checkout/${encodeURIComponent(session.token)}`))}`;
+  const signInHref = checkoutSignInHref(p(`/checkout/${encodeURIComponent(session.token)}`));
   /** A new checkout of the same service and quantity (the form checks the quantity against today's rule). */
   const reopenHref = restartHref ?? p("/services");
 
@@ -191,12 +211,15 @@ export function SessionView({ session, labels, quantityLabels, typeLabel, decima
     const reference = errorText.reference(failure);
     if (!isApiError(failure)) return { error: { message: errorText.message(failure), reference } };
     if (viaBalance) {
-      // Answers only the balance payment has. None of them ends the session: the customer stays signed in.
+      // Answers only the balance payment has. None of them ends the session: the account stays signed in.
       if (failure.status === 401) {
         return { error: { message: labels.errors.signInRequired, reference, link: { href: signInHref, label: labels.balance.signInAction } } };
       }
       if (failure.status === 403 && failure.code === "FORBIDDEN") {
         return { error: { message: labels.errors.forbidden, reference, link: { href: reopenHref, label: labels.balance.reopenAction } } };
+      }
+      if (failure.status === 403 && failure.code === "RANK_NOT_ALLOWED") {
+        return { error: { message: labels.errors.rankRefused, reference } };
       }
       if (failure.code === "INSUFFICIENT_FUNDS") {
         return {
@@ -257,7 +280,7 @@ export function SessionView({ session, labels, quantityLabels, typeLabel, decima
   }
 
   /**
-   * `POST …/balance-payment`: no body, no Content-Type, the store CSRF token of the signed-in customer and the key of
+   * `POST …/balance-payment`: no body, no Content-Type, the CSRF token of the signed-in account and the key of
    * this checkout. A double click and a retry send the same key (one payment); a success forgets it. The order exists
    * when the answer is 201, so the browser goes to tracking.
    * - `409 IDEMPOTENCY_KEY_REUSED`: the key is forgotten and the request is sent once more with a new one.
@@ -414,6 +437,8 @@ export function SessionView({ session, labels, quantityLabels, typeLabel, decima
             </DescriptionList>
           </CardBody>
         </Card>
+
+        {priceList ? <PriceListCard {...priceList} /> : null}
 
         <Card>
           <CardHeader title={labels.consent.title} description={labels.consent.description} />

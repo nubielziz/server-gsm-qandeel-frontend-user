@@ -1,24 +1,23 @@
 "use client";
-// SignInFlow: the one sign-in form for customers AND merchants (handoff §6.1, plan D1). `POST /client/auth/sign-in`
-// (email + password + Turnstile) answers `{ kind, next }`: `kind` picks the area, `next` the step still to do.
+// SignInFlow: the one sign-in form, for every account (one kind of account: the rank decides what the account can do, never the form).
+// `POST /client/auth/sign-in` (email + password + Turnstile) answers `{ next, rank }`: `next` is the step still to do.
 // Sign-in runs in the BROWSER (Set-Cookie must reach the browser), never in a Server Action. Steps:
-//   password   email + password + Turnstile → `api.signIn()` → `done` | `totp` | `password`
-//   magic      customer email link (MagicLinkForm); always offered under the form
-//   totp       merchant 6-digit code → POST /client/auth/2fa
-//   customer-new-password  `next: password` for a customer (temporary password) → POST /store/v1/me/password
-//   merchant-new-password  `next: password` for a merchant (temporary password) → POST /client/auth/password/change
-//              → `totp` (continue with the code) | `done`
-//   link       `/sign-in?token=` from the magic-link mail: a button, never auto-submitted (mail scanners)
+//   password       email + password + Turnstile → `api.signIn()` → `done` | `totp` | `password`
+//   magic          the email link (MagicLinkForm); always offered under the form
+//   totp           the 6-digit code → POST /client/auth/2fa (TotpStep)
+//   new-password   `next: password` (a temporary password) → POST /client/auth/password/change {password}
+//                  → `totp` (continue with the code) | `done`
+//   link           `/sign-in?token=` from the email-link mail: a box and a button, never auto-submitted (mail scanners)
 // A 401 is always "wrong email or password" and never reveals whether the email exists. After success
-// router.replace(target) and router.refresh() so the header shows the signed-in state. `?as=` is not a choice any more:
-// an old link's value only decides which tab the forgot page and the sign-up page open on.
+// router.replace(target) and router.refresh() so the header shows the signed-in state. `?as=` is not read: an old link that
+// carries it opens the same form.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { Mail, Store } from "lucide-react";
 import { api } from "@/lib/api/browser";
-import { ApiError, isApiError } from "@/lib/api/errors";
-import type { MerchantPasswordChangeResult, SmartSignInResult } from "@/lib/api/types";
+import { isApiError } from "@/lib/api/errors";
+import type { SignInResult } from "@/lib/api/types";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
 import { sitePath } from "@/lib/site-path";
@@ -27,64 +26,59 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Divider } from "@/components/ui/divider";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
-import { authLinkClass } from "./auth-heading";
-import { CustomerLinkConfirm } from "./customer-link-confirm";
+import { authLinkClass, StepHeading } from "./auth-heading";
+import { changeTemporaryPassword } from "./auth-requests";
 import { FormAlert } from "./form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "./form-errors";
+import { LinkConfirm } from "./link-confirm";
 import { MagicLinkForm } from "./magic-link-form";
-import { targetAfterSignIn, type SignInKind } from "./safe-next";
+import { targetAfterSignIn } from "./safe-next";
+import { moveAfterPasswordChange, moveAfterSignIn, pendingSessionEnded, type SignInStep } from "./sign-in-steps";
+import { TotpStep } from "./totp-step";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
 import { useTurnstile } from "./use-turnstile";
-
-type Step = "password" | "magic" | "totp" | "customer-new-password" | "merchant-new-password" | "link";
 
 export type SignInFlowProps = {
   t: Pick<AuthMessages, "fields" | "shared" | "signIn">;
 };
 
-function StepHeading({ title, text }: { title: string; text: string }) {
-  return (
-    <div>
-      <h2 className="text-heading text-ink">{title}</h2>
-      <p className="mt-1.5 text-body text-ink-muted">{text}</p>
-    </div>
-  );
-}
-
 export function SignInFlow({ t }: SignInFlowProps) {
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get("token");
-  const [step, setStep] = useState<Step>(token ? "link" : "password");
+  const [step, setStep] = useState<SignInStep>(token ? "link" : "password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   // "Your sign-in expired": shown on the form a step sent the visitor back to.
   const [notice, setNotice] = useState<string | null>(null);
 
-  // An old `?as=merchant` link only picks the default tab of the pages the links below open.
-  const asQuery = params.get("as") === "merchant" ? "?as=merchant" : "";
-
   /** Signs in: go to the target, then refresh so the server parts see the session. */
-  function finish(area: SignInKind) {
-    router.replace(targetAfterSignIn(area, params.get("next")));
+  function finish() {
+    router.replace(targetAfterSignIn(params.get("next")));
     router.refresh();
   }
 
-  /** The answer of the smart sign-in: `kind` picks the area, `next` the step still to do. */
-  function onSignedIn(result: SmartSignInResult) {
+  /** Goes where a step's answer says: the target, the code step or (for a temporary password) the new-password step. */
+  function go(move: "finish" | "totp" | "new-password") {
     setNotice(null);
-    if (result.next === "done") return finish(result.kind);
-    if (result.kind === "merchant") {
-      setPassword("");
-      setStep(result.next === "totp" ? "totp" : "merchant-new-password");
-      return;
-    }
-    // A customer has no second step: `password` (a temporary password) is the only one the API sends.
-    if (result.next === "password") {
-      setStep("customer-new-password");
-      return;
-    }
-    throw new ApiError({ status: 200, code: "INVALID_RESPONSE", title: "Unexpected sign-in step" });
+    if (move === "finish") return finish();
+    setPassword("");
+    setStep(move);
+  }
+
+  /** The answer of the password form; throws an ApiError for an answer the site has no step for. */
+  function onSignedIn(result: SignInResult) {
+    go(moveAfterSignIn(result));
+  }
+
+  /** "Not you? Sign out" on the link page: the link is spent and its session is gone. Back to the plain form, token dropped. */
+  function afterLinkSignOut() {
+    const next = params.get("next");
+    setNotice(null);
+    setPassword("");
+    setStep("password");
+    router.replace(next ? `${sitePath("/sign-in")}?next=${encodeURIComponent(next)}` : sitePath("/sign-in"));
+    router.refresh();
   }
 
   /** A step's pending session ended (10 minutes): back to the form with a sentence, nothing kept. */
@@ -96,11 +90,12 @@ export function SignInFlow({ t }: SignInFlowProps) {
 
   if (step === "link" && token) {
     return (
-      <CustomerLinkConfirm
+      <LinkConfirm
         token={token}
-        target={targetAfterSignIn("customer", params.get("next"))}
         strings={{ ...t.signIn.link, requestNewLink: t.shared.requestNewLink }}
+        onSignedIn={go}
         onRequestNewLink={() => setStep("magic")}
+        onSignedOut={afterLinkSignOut}
       />
     );
   }
@@ -109,7 +104,7 @@ export function SignInFlow({ t }: SignInFlowProps) {
     return (
       <TotpStep
         t={t}
-        onDone={() => finish("merchant")}
+        onDone={finish}
         onExpired={startAgain}
         onBack={() => {
           setPassword("");
@@ -120,32 +115,15 @@ export function SignInFlow({ t }: SignInFlowProps) {
     );
   }
 
-  if (step === "customer-new-password") {
+  if (step === "new-password") {
     return (
       <NewPasswordStep
         t={t}
         copy={t.signIn.newPassword}
         onExpired={startAgain}
         save={async (newPassword) => {
-          // The pending session becomes a full one; the answer carries the new CSRF token (lib/api/browser.ts keeps it).
-          await api.post("/store/v1/me/password", { currentPassword: password, newPassword });
-          await finish("customer");
-        }}
-      />
-    );
-  }
-
-  if (step === "merchant-new-password") {
-    return (
-      <NewPasswordStep
-        t={t}
-        copy={t.signIn.merchantNewPassword}
-        onExpired={startAgain}
-        save={async (newPassword) => {
-          const result = await api.post<MerchantPasswordChangeResult | undefined>("/client/auth/password/change", { password: newPassword });
-          if (result?.next === "totp") setStep("totp");
-          else if (result?.next === "done") await finish("merchant");
-          else throw new ApiError({ status: 200, code: "INVALID_RESPONSE", title: "Unexpected password step" });
+          // The pending session becomes a full one (or asks for the code); the answer's CSRF token is kept by lib/api/browser.ts.
+          go(moveAfterPasswordChange(await changeTemporaryPassword(newPassword)));
         }}
       />
     );
@@ -188,7 +166,7 @@ export function SignInFlow({ t }: SignInFlowProps) {
       <PasswordStep
         t={t}
         notice={notice}
-        forgotHref={`${sitePath("/forgot-password")}${asQuery}`}
+        forgotHref={sitePath("/forgot-password")}
         email={email}
         setEmail={setEmail}
         password={password}
@@ -207,15 +185,21 @@ export function SignInFlow({ t }: SignInFlowProps) {
             setStep("magic");
           }}
         >
-          {t.signIn.magicLinkCustomers}
+          {t.signIn.emailLink}
         </Button>
-        <ButtonLink href={sitePath("/merchant/register")} variant="secondary" size="md" block startIcon={<Store aria-hidden="true" />}>
-          {t.signIn.applyMerchant}
+        <ButtonLink
+          href={sitePath("/become-a-merchant")}
+          variant="secondary"
+          size="md"
+          block
+          startIcon={<Store aria-hidden="true" />}
+        >
+          {t.signIn.merchantPrices}
         </ButtonLink>
       </div>
       <p className="text-center text-body text-ink-muted">
         {t.signIn.noAccount}{" "}
-        <Link href={`${sitePath("/sign-up")}${asQuery}`} className={authLinkClass}>
+        <Link href={sitePath("/sign-up")} className={authLinkClass}>
           {t.signIn.createAccount}
         </Link>
       </p>
@@ -233,7 +217,7 @@ type PasswordStepProps = {
   password: string;
   setPassword: (value: string) => void;
   /** Called with the API's answer; may throw an ApiError for an answer the site has no step for. */
-  onSignedIn: (result: SmartSignInResult) => void | Promise<void>;
+  onSignedIn: (result: SignInResult) => void | Promise<void>;
 };
 
 function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPassword, onSignedIn }: PasswordStepProps) {
@@ -241,7 +225,9 @@ function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPas
   const ts = useTurnstile();
   const form = useRef<HTMLFormElement>(null);
   const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState<FormFeedback>(() => (notice ? { fields: {}, message: notice, reference: null } : NO_FEEDBACK));
+  const [feedback, setFeedback] = useState<FormFeedback>(() =>
+    notice ? { fields: {}, message: notice, reference: null } : NO_FEEDBACK,
+  );
   useFocusOnFeedback(feedback, form);
 
   async function onSubmit(event: FormEvent) {
@@ -323,83 +309,15 @@ function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPas
   );
 }
 
-type TotpStepProps = { t: SignInFlowProps["t"]; onDone: () => void | Promise<void>; onExpired: () => void; onBack: () => void };
-
-function TotpStep({ t, onDone, onExpired, onBack }: TotpStepProps) {
-  const errorText = useErrorText();
-  const form = useRef<HTMLFormElement>(null);
-  const [code, setCode] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState<FormFeedback>(NO_FEEDBACK);
-  useFocusOnFeedback(feedback, form);
-
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (busy) return;
-    if (!/^\d{6}$/.test(code)) {
-      setFeedback({ fields: { code: t.signIn.totp.invalidCode }, message: null, reference: null });
-      return;
-    }
-    setBusy(true);
-    setFeedback(NO_FEEDBACK);
-    let leaving = false;
-    try {
-      await api.post("/client/auth/2fa", { code });
-      leaving = true;
-      await onDone();
-    } catch (error) {
-      leaving = false;
-      if (isApiError(error) && error.status === 401) {
-        // A wrong code is a 422 on `code`, never a 401 (handoff §3.4): a 401 means the pending session ended.
-        onExpired();
-        return;
-      }
-      setFeedback(feedbackFrom(error, errorText, ["code"], { code: t.signIn.totp.invalidCode }));
-    } finally {
-      if (!leaving) setBusy(false);
-    }
-  }
-
-  return (
-    <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
-      <StepHeading title={t.signIn.totp.title} text={t.signIn.totp.text} />
-      <Input
-        name="code"
-        label={t.fields.code}
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        maxLength={6}
-        pattern="[0-9]*"
-        required
-        dir="ltr"
-        className="text-center text-subheading tracking-[0.4em]"
-        value={code}
-        onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-        error={feedback.fields.code}
-      />
-      <FormAlert message={feedback.message} reference={feedback.reference} />
-      <Button type="submit" size="lg" block loading={busy}>
-        {t.signIn.totp.submit}
-      </Button>
-      <Button variant="secondary" size="lg" block onClick={onBack}>
-        {t.shared.backToSignIn}
-      </Button>
-    </form>
-  );
-}
-
 type NewPasswordStepProps = {
   t: SignInFlowProps["t"];
   copy: { title: string; text: string; submit: string };
-  /** Sends the new password and goes on (the next step, or the target). Throws the ApiError of a refused call. */
+  /** Sends the new password and goes on (the code step, or the target). Throws the ApiError of a refused call. */
   save: (newPassword: string) => Promise<void>;
   onExpired: () => void;
 };
 
-/**
- * The forced "choose your own password" step after a temporary password, for both kinds. The two routes name the
- * field differently (`newPassword` for a customer, `password` for a merchant): both land under the first input.
- */
+/** The forced "choose your own password" step after a temporary password, for every account. The error lands under the first input. */
 function NewPasswordStep({ t, copy, save, onExpired }: NewPasswordStepProps) {
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
@@ -423,11 +341,11 @@ function NewPasswordStep({ t, copy, save, onExpired }: NewPasswordStepProps) {
       await save(next);
       leaving = true;
     } catch (error) {
-      if (isApiError(error) && error.status === 401) {
+      if (pendingSessionEnded(error)) {
         onExpired();
         return;
       }
-      setFeedback(feedbackFrom(error, errorText, ["newPassword", "currentPassword", "password"]));
+      setFeedback(feedbackFrom(error, errorText, ["password"]));
     } finally {
       if (!leaving) setBusy(false);
     }
@@ -444,7 +362,7 @@ function NewPasswordStep({ t, copy, save, onExpired }: NewPasswordStepProps) {
         required
         value={next}
         onChange={(e) => setNext(e.target.value)}
-        error={feedback.fields.newPassword ?? feedback.fields.currentPassword ?? feedback.fields.password}
+        error={feedback.fields.password}
       />
       <PasswordInput
         name="confirmPassword"

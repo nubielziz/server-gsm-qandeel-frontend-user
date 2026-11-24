@@ -1,22 +1,25 @@
 "use client";
-// Uploads files to `POST /client/files` (merchant session, 1 B – 25 MiB) or `POST /store/v1/files` (customer session,
-// top-up receipt, 1 B – 5 MiB, 413 above): one multipart part `file`, 20/min per IP. It reports the stored files
-// (`{ id, filename, size, mime … }`, the same shape on both routes) so a form can send its id as `fileId` (orders,
-// receipts). One file at a time: a chosen file must be removed before another is picked. Labels come from the caller
-// (server strings).
+// Uploads files to the file route of the account's family: `POST /client/files` (a merchant rank, 1 B – 25 MiB) or
+// `POST /store/v1/files` (a retail account, top-up receipt, 1 B – 5 MiB, 413 above): one multipart part `file`, 20/min per IP.
+// It reports the stored files (`{ id, filename, size, mime … }`, the same shape on both routes) so a form can send its id as
+// `fileId` (orders, receipts). One file at a time: a chosen file must be removed before another is picked. Labels come from
+// the caller (server strings).
 import { useId, useRef, useState } from "react";
 import { FileUp, Loader2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api/browser";
+import type { AccountFamily } from "@/lib/account/family";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
 import type { UploadedFile } from "@/lib/api/types";
 import { useErrorText } from "@/lib/i18n/error-text";
 
-/** The merchant route's own limit (`POST /client/files`); a form may ask for less with `maxBytes`. */
-const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
-/** The customer route's own limit (`POST /store/v1/files`): the server answers 413 PAYLOAD_TOO_LARGE above it. */
-const STORE_MAX_BYTES = 5 * 1024 * 1024;
-
-/** The upload route: the merchant surface (default) or the customer's. The CSRF token follows the path (lib/api/browser.ts). */
-export type FileUploadEndpoint = "/client/files" | "/store/v1/files";
+/**
+ * The largest file of each family's upload route; a form may ask for less with `maxBytes`. The server answers 413
+ * PAYLOAD_TOO_LARGE above it.
+ */
+const FAMILY_MAX_BYTES: Record<AccountFamily, number> = {
+  client: 25 * 1024 * 1024,
+  store: 5 * 1024 * 1024,
+};
 
 export type FileUploadLabels = {
   /** Visible label of the control. */
@@ -37,9 +40,12 @@ export type FileUploadProps = {
   onChange: (file: UploadedFile | null) => void;
   /** MIME types accepted, e.g. ["application/pdf", "image/jpeg", "image/png"]; empty = any. */
   accept?: string[];
-  /** Where the files go: `/client/files` (merchant, default) or `/store/v1/files` (customer). */
-  endpoint?: FileUploadEndpoint;
-  /** Largest file in bytes (default: the endpoint's own limit, 25 MiB for `/client/files`, 5 MiB for `/store/v1/files`). A larger file shows `labels.tooLarge` and is not sent. */
+  /** The family of the signed-in account: its upload route (`FAMILY_ROUTES[family].files`) and its limit apply. */
+  family: AccountFamily;
+  /**
+   * Largest file in bytes (default: the family's own limit, 25 MiB for `client`, 5 MiB for `store`). A larger file shows
+   * `labels.tooLarge` and is not sent.
+   */
   maxBytes?: number;
   required?: boolean;
   disabled?: boolean;
@@ -51,19 +57,11 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function FileUpload({
-  labels,
-  onChange,
-  accept = [],
-  endpoint = "/client/files",
-  maxBytes,
-  required,
-  disabled,
-}: FileUploadProps) {
+export function FileUpload({ labels, onChange, accept = [], family, maxBytes, required, disabled }: FileUploadProps) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const errorText = useErrorText();
-  const limit = maxBytes ?? (endpoint === "/store/v1/files" ? STORE_MAX_BYTES : DEFAULT_MAX_BYTES);
+  const limit = maxBytes ?? FAMILY_MAX_BYTES[family];
   const [file, setFile] = useState<UploadedFile | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +80,7 @@ export function FileUpload({
     try {
       if (picked.size > limit || picked.size === 0) setError(labels.tooLarge);
       else if (accept.length > 0 && !accept.includes(picked.type)) setError(labels.wrongType);
-      else uploaded = await api.upload<UploadedFile>(endpoint, picked);
+      else uploaded = await api.upload<UploadedFile>(FAMILY_ROUTES[family].files, picked);
     } catch (e) {
       setError(errorText.message(e));
     } finally {

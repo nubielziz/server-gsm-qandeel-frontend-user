@@ -1,14 +1,10 @@
 "use client";
-// ForgotPasswordForm: asks for an email and sends a reset link. The backend has two forgot routes and no smart one (plan
-// §8), so the page keeps a Customer | Merchant choice (default from `?as=`, customer without it). Both routes take the
-// Turnstile token in `X-Turnstile-Token` (merchants since BH §6.2: ignored by the API until it switches the check on, so
-// the site always sends it). The success text is the same for every address: the page never says whether an account
-// exists (handoff §4.1, §5.6).
+// ForgotPasswordForm: asks for an email and sends a password link. One route and one answer for every account
+// (`POST /client/auth/password/forgot`, Turnstile always sent), so there is no account-type choice. The success text is the
+// same for every address: the page never says whether an account exists (handoff §4.1, §5.6).
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
-import { Mail, Store, UserRound } from "lucide-react";
-import { api } from "@/lib/api/browser";
+import { Mail } from "lucide-react";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
@@ -17,28 +13,25 @@ import { Turnstile } from "@/components/turnstile";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { authLinkClass } from "./auth-heading";
+import { requestPasswordLink } from "./auth-requests";
 import { FormAlert } from "./form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "./form-errors";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
 import { useTurnstile } from "./use-turnstile";
 
 export type ForgotPasswordFormProps = {
-  t: Pick<AuthMessages, "surfaces" | "fields" | "shared" | "forgot">;
+  t: Pick<AuthMessages, "fields" | "shared" | "forgot">;
 };
 
 export function ForgotPasswordForm({ t }: ForgotPasswordFormProps) {
-  const params = useSearchParams();
   const errorText = useErrorText();
   const ts = useTurnstile();
   const form = useRef<HTMLFormElement>(null);
-  const [surface, setSurface] = useState<"customer" | "merchant">(params.get("as") === "merchant" ? "merchant" : "customer");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<FormFeedback>(NO_FEEDBACK);
   const [sentTo, setSentTo] = useState<string | null>(null);
-  const customer = surface === "customer";
 
   useFocusOnFeedback(feedback, form);
 
@@ -47,7 +40,11 @@ export function ForgotPasswordForm({ t }: ForgotPasswordFormProps) {
     if (busy) return;
     const address = email.trim();
     if (!address.includes("@")) {
-      setFeedback({ fields: { email: errorText.field({ field: "email", code: "required", message: "" }) ?? "" }, message: null, reference: null });
+      setFeedback({
+        fields: { email: errorText.field({ field: "email", code: "required", message: "" }) ?? "" },
+        message: null,
+        reference: null,
+      });
       return;
     }
     setBusy(true);
@@ -58,7 +55,7 @@ export function ForgotPasswordForm({ t }: ForgotPasswordFormProps) {
         setFeedback({ fields: {}, message: t.shared.securityCheckWait, reference: null });
         return;
       }
-      await api.post(customer ? "/store/v1/auth/password/forgot" : "/client/auth/password/forgot", { email: address }, { turnstileToken });
+      await requestPasswordLink(address, turnstileToken);
       setSentTo(address);
     } catch (error) {
       setFeedback(feedbackFrom(error, errorText, ["email"]));
@@ -90,28 +87,12 @@ export function ForgotPasswordForm({ t }: ForgotPasswordFormProps) {
 
   return (
     <div className="grid gap-6">
-      <div className="grid gap-2">
-        <SegmentedControl
-          label={t.surfaces.label}
-          fullWidth
-          value={surface}
-          onValueChange={(value) => {
-            setSurface(value === "merchant" ? "merchant" : "customer");
-            setFeedback(NO_FEEDBACK);
-          }}
-          options={[
-            { value: "customer", label: t.surfaces.customer, icon: <UserRound aria-hidden="true" /> },
-            { value: "merchant", label: t.surfaces.merchant, icon: <Store aria-hidden="true" /> },
-          ]}
-        />
-        <p className="text-small text-ink-muted">{t.forgot.chooseHint}</p>
-      </div>
       <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
         <Input
           type="email"
           name="email"
           label={t.fields.email}
-          hint={customer ? t.forgot.customerHint : undefined}
+          hint={t.forgot.hint}
           placeholder={t.fields.emailPlaceholder}
           leading={<Mail aria-hidden="true" />}
           autoComplete="email"

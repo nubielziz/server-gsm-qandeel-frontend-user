@@ -1,19 +1,19 @@
 "use client";
 // Keeps a ticket list current without a reload (feature 28, plan §4.2), like the notifications list does (feature 27): the
-// ticket events of the signed-in surface's stream (a new message, a status change, a new ticket, a read on another device)
+// ticket events of the signed-in family's stream (a new message, a status change, a new ticket, a read on another device)
 // make the server list render again in place with `router.refresh()`. Events are collected for 400 ms and refreshes are at
 // least 2 s apart. It renders nothing. The stream is the one the ticket chat shares (`lib/support/ticket-stream.ts`): the
 // last ticket page of the browser to leave it closes it. Without a stream the list stays as it was drawn.
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import type { NotificationSurface } from "@/lib/notifications/link";
+import type { AccountFamily } from "@/lib/account/family";
 import { createRefreshScheduler } from "@/lib/realtime/refresh-scheduler";
-import { acquireSurfaceTicketStream } from "@/lib/support/ticket-stream";
+import { acquireFamilyTicketStream } from "@/lib/support/ticket-stream";
 
-export function TicketsLiveRefresh({ surface }: { surface: NotificationSurface }) {
+export function TicketsLiveRefresh({ family }: { family: AccountFamily }) {
   const router = useRouter();
   useEffect(() => {
-    const handle = acquireSurfaceTicketStream(surface);
+    const handle = acquireFamilyTicketStream(family);
     const { client } = handle;
     const scheduler = createRefreshScheduler({
       timers: {
@@ -38,6 +38,6 @@ export function TicketsLiveRefresh({ surface }: { surface: NotificationSurface }
       scheduler.dispose();
       handle.release();
     };
-  }, [surface, router]);
+  }, [family, router]);
   return null;
 }

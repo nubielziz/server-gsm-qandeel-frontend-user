@@ -2,37 +2,69 @@
 // shared helpers (e2e/helpers.ts) and the staff helpers (e2e/admin.ts). Every later spec leans on these, so this one runs
 // first on a new build: `E2E_RUN=$(date +%s) E2E_BASE_URL=http://localhost:5176 npx playwright test e2e/harness.spec.ts --project=desktop`.
 // Calls go through the site (its /store/v1 and /client rewrites), as the browser's would; staff calls go straight to the
-// API (the admin allow-list is loopback). Accounts that change are throwaway ones.
+// API (the admin allow-list is loopback). Accounts that change are throwaway ones. There is one kind of account: the cases
+// that touch a wallet, a password or a notification run once for each rank.
 import { randomUUID } from "node:crypto";
 import { type APIRequestContext } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import {
+  accountWallet,
   availableCodes,
   base32Decode,
+  campaignLink,
+  changeRank,
   completeOrder,
-  creditCustomer,
-  creditMerchant,
-  customerIdByEmail,
-  freezeCustomerWallet,
-  merchantIdByEmail,
+  creditAccount,
+  freezeWallet,
   normalizeRule,
+  pickRanks,
   quantityMatches,
+  rankIds,
   sendCampaign,
   serviceIdByCode,
   splitMoney,
   staffApiKeyFor,
-  temporaryCustomerPassword,
-  temporaryMerchantPassword,
+  temporaryPassword,
   toMoney4,
   totp,
-  unfreezeCustomerWallet,
+  unfreezeWallet,
+  type RankKind,
 } from "./admin";
-import { BASE_URL, DEV_TURNSTILE_TOKEN, fixtures, freshCustomer, freshMerchant, signInCustomer, signInMerchant, tokenOf, waitForLink } from "./helpers";
+import {
+  BASE_URL,
+  DEV_TURNSTILE_TOKEN,
+  SET_PASSWORD_LINK,
+  SIGN_IN_LINK,
+  VERIFY_EMAIL_LINK,
+  fixtures,
+  freshAccount,
+  signIn,
+  signUpByLink,
+  tokenOf,
+  waitForLink,
+} from "./helpers";
 
 // API only: one project is enough (the setup, the accounts and the campaign are the same on both).
 test.skip(({ isMobile }) => isMobile, "API only: the desktop project is enough");
 
 const siteOrigin = new URL(BASE_URL).origin;
+const RANKS: RankKind[] = ["retail", "merchant"];
+
+/** The routes of each rank's family: a retail session reaches only the shop's, a merchant session only the portal's. */
+const FAMILY = {
+  retail: { me: "/store/v1/me", inbox: "/store/v1/me/notifications" },
+  merchant: { me: "/client/auth/me", inbox: "/client/notifications" },
+} as const;
+
+/** What both "me" routes answer (AccountMe), as far as the harness reads it. */
+interface AccountMe {
+  id: number;
+  email: string;
+  status: string;
+  rank: { id: number; name: string; kind: RankKind };
+  hasPassword: boolean;
+  emailVerifiedAt: string | null;
+}
 
 /** GET through the site; the answer must be 200. */
 async function getJson<T>(request: APIRequestContext, path: string): Promise<T> {
@@ -96,8 +128,15 @@ test.describe("demo data from the global setup", () => {
     expect(image.headers()["content-type"]).toMatch(/^image\//);
   });
 
-  test("the customer wallet is on and offers the manual gateway", async ({ page }) => {
-    await freshCustomer(page);
+  test("the retail rank and the default merchant rank exist", async () => {
+    const ranks = await rankIds();
+    expect(ranks.retail).toBeGreaterThan(0);
+    expect(ranks.merchant).toBeGreaterThan(0);
+    expect(ranks.merchant).not.toBe(ranks.retail);
+  });
+
+  test("the store wallet is on and offers the manual gateway", async ({ page }) => {
+    await freshAccount(page, { signedIn: true });
     const wallet = await getJson<{ enabled: boolean; balance: string }>(page.request, "/store/v1/me/wallet");
     expect(wallet.enabled).toBe(true);
     expect(wallet.balance).toBe("0.0000");
@@ -106,93 +145,116 @@ test.describe("demo data from the global setup", () => {
   });
 });
 
-test.describe("helpers", () => {
-  test("freshCustomer signs a new customer in, with or without a password", async ({ page }) => {
-    const email = await freshCustomer(page);
-    const me = await getJson<{ email: string; hasPassword: boolean }>(page.request, "/store/v1/me");
-    expect(me).toMatchObject({ email, hasPassword: false });
-
-    const password = "Willow-Anchor-7304";
-    const second = await freshCustomer(page, password);
-    expect(second).not.toBe(email);
-    expect((await getJson<{ email: string; hasPassword: boolean }>(page.request, "/store/v1/me"))).toMatchObject({ email: second, hasPassword: true });
-
-    await page.context().clearCookies();
-    expect((await page.request.get("/store/v1/me")).status()).toBe(401);
-    expect(await signInCustomer(page, { email: second, password })).not.toBe("");
-    expect((await page.request.get("/store/v1/me")).status()).toBe(200);
+test.describe("accounts", () => {
+  test("freshAccount makes a retail account by default: an invitation sets the password and proves the address", async ({ page }) => {
+    const account = await freshAccount(page);
+    expect(account.rank).toBe("retail");
+    expect(await signIn(page, account)).not.toBe("");
+    const me = await getJson<AccountMe>(page.request, FAMILY.retail.me);
+    expect(me).toMatchObject({ id: account.id, email: account.email, status: "active", hasPassword: true, rank: { kind: "retail" } });
+    expect(me.emailVerifiedAt).toEqual(expect.any(String));
   });
 
-  test("freshMerchant: staff invite, the invitation sets the password; unverified follows a staff change of the address", async ({ page }) => {
-    const { email, password } = await freshMerchant(page);
-    expect(await signInMerchant(page, { email, password })).not.toBe("");
-    const active = await getJson<{ status: string; emailVerifiedAt: string | null }>(page.request, "/client/auth/me");
-    expect(active).toMatchObject({ status: "active", emailVerifiedAt: expect.any(String) }); // an invitation proves the mailbox
+  test("freshAccount with the merchant rank: the Owner gives the rank and the one sign-in reaches the merchant routes", async ({ page }) => {
+    const account = await freshAccount(page, { rank: "merchant", signedIn: true });
+    const me = await getJson<AccountMe>(page.request, FAMILY.merchant.me);
+    expect(me).toMatchObject({ id: account.id, email: account.email, status: "active", rank: { kind: "merchant" } });
+    expect(me.emailVerifiedAt).toEqual(expect.any(String)); // an invitation proves the mailbox
+  });
 
-    const unverified = await freshMerchant(page, { unverified: true });
-    expect(unverified.email).not.toBe(email);
-    await signInMerchant(page, unverified);
-    expect((await getJson<{ emailVerifiedAt: string | null }>(page.request, "/client/auth/me")).emailVerifiedAt).toBeNull();
+  for (const rank of RANKS) {
+    test(`freshAccount unverified (${rank}): a staff change of the address clears the verification, and its link verifies it`, async ({ page }) => {
+      const account = await freshAccount(page, { rank, unverified: true });
+      await signIn(page, account);
+      expect((await getJson<AccountMe>(page.request, FAMILY[rank].me)).emailVerifiedAt).toBeNull();
 
-    // The verification link went to the new address and verifies it.
-    const link = await waitForLink(page, unverified.email, /\/merchant\/verify-email\?token=/);
-    const verified = await page.request.post("/client/auth/verify-email", {
-      headers: { Origin: siteOrigin, "Content-Type": "application/json" },
-      data: { token: tokenOf(link) },
+      // The verification link went to the new address and verifies it.
+      const link = await waitForLink(page, account.email, VERIFY_EMAIL_LINK);
+      const verified = await page.request.post("/client/auth/verify-email", {
+        headers: { Origin: siteOrigin, "Content-Type": "application/json" },
+        data: { token: tokenOf(link) },
+      });
+      expect(verified.status(), await verified.text()).toBe(204);
+      expect((await getJson<AccountMe>(page.request, FAMILY[rank].me)).emailVerifiedAt).not.toBeNull();
     });
-    expect(verified.status(), await verified.text()).toBe(204);
-    expect((await getJson<{ emailVerifiedAt: string | null }>(page.request, "/client/auth/me")).emailVerifiedAt).not.toBeNull();
-  });
+  }
 
-  test("staff credit, freeze and unfreeze a customer's balance", async ({ page }) => {
-    const email = await freshCustomer(page);
-    const id = await customerIdByEmail(email);
-    expect(await creditCustomer(id, "20")).toBe("20.0000");
-    expect(await creditCustomer(id, 5.5)).toBe("25.5000");
-    let wallet = await getJson<{ balance: string; available: string; frozen: unknown }>(page.request, "/store/v1/me/wallet");
-    expect(wallet).toMatchObject({ balance: "25.5000", available: "25.5000", frozen: null });
-
-    await freezeCustomerWallet(id);
-    wallet = await getJson(page.request, "/store/v1/me/wallet");
-    expect(wallet.frozen).not.toBeNull();
-    expect(wallet.balance).toBe("25.5000");
-
-    await unfreezeCustomerWallet(id);
-    wallet = await getJson(page.request, "/store/v1/me/wallet");
-    expect(wallet).toMatchObject({ balance: "25.5000", available: "25.5000", frozen: null });
-  });
-
-  test("a temporary password makes the next sign-in ask for a new one", async ({ page }) => {
-    const { email, password } = await freshMerchant(page);
-    const temporary = await temporaryMerchantPassword(await merchantIdByEmail(email));
-    expect(temporary).not.toBe(password);
-    const merchant = await page.request.post("/client/auth/login", {
+  test("freshAccount suspended: the one sign-in answers 403 ACCOUNT_SUSPENDED", async ({ page }) => {
+    const account = await freshAccount(page, { suspended: true });
+    const res = await page.request.post("/client/auth/sign-in", {
       headers: { Origin: siteOrigin, "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "Content-Type": "application/json" },
-      data: { email, password: temporary },
+      data: { email: account.email, password: account.password },
     });
-    expect(merchant.status(), await merchant.text()).toBe(200);
-    expect((await merchant.json()).next).toBe("password");
-
-    const customerEmail = await freshCustomer(page);
-    const customerTemporary = await temporaryCustomerPassword(await customerIdByEmail(customerEmail));
-    await page.context().clearCookies();
-    const customer = await page.request.post("/store/v1/auth/login", {
-      headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "Content-Type": "application/json" },
-      data: { email: customerEmail, password: customerTemporary },
-    });
-    expect(customer.status(), await customer.text()).toBe(200);
-    expect((await customer.json()).next).toBe("password");
+    expect(res.status(), await res.text()).toBe(403);
+    expect(((await res.json()) as { code: string }).code).toBe("ACCOUNT_SUSPENDED");
   });
 
-  test("staff make an API key for a merchant and complete the merchant's order", async ({ page }) => {
-    const { email, password } = await freshMerchant(page);
-    const merchantId = await merchantIdByEmail(email);
-    expect(await creditMerchant(merchantId, 50)).toBe("50.0000");
+  test("signUpByLink makes a retail account with no password and signs the page in", async ({ page }) => {
+    const { email, claimedOrders } = await signUpByLink(page, { claimGuestOrders: true });
+    expect(claimedOrders).toBe(0);
+    expect(await getJson<AccountMe>(page.request, FAMILY.retail.me)).toMatchObject({ email, hasPassword: false, rank: { kind: "retail" } });
+  });
 
-    const key = await staffApiKeyFor(merchantId, "e2e support key");
+  test("changeRank moves an account between ranks and ends its sessions", async ({ page }) => {
+    const account = await freshAccount(page, { signedIn: true });
+    expect((await changeRank(account.id, "merchant")).rank.kind).toBe("merchant");
+    expect((await page.request.get(FAMILY.retail.me)).status()).toBe(401); // every session of the account ended
+
+    await page.context().clearCookies();
+    await signIn(page, account);
+    expect(await getJson<AccountMe>(page.request, FAMILY.merchant.me)).toMatchObject({ id: account.id, rank: { kind: "merchant" } });
+
+    expect((await changeRank(account.id, "retail")).rank.kind).toBe("retail");
+    await page.context().clearCookies();
+    await signIn(page, account);
+    expect(await getJson<AccountMe>(page.request, FAMILY.retail.me)).toMatchObject({ id: account.id, rank: { kind: "retail" } });
+  });
+
+  for (const rank of RANKS) {
+    test(`staff credit, freeze and unfreeze the balance of a ${rank} account`, async ({ page }) => {
+      const account = await freshAccount(page, { rank });
+      const kind = rank === "retail" ? "store" : "merchant";
+      expect(await creditAccount(account.id, "20")).toBe("20.0000");
+      expect(await creditAccount(account.id, 5.5)).toBe("25.5000");
+      expect(await accountWallet(account.id)).toMatchObject({ kind, balance: "25.5000", frozen: null });
+
+      await freezeWallet(account.id);
+      const frozen = await accountWallet(account.id);
+      expect(frozen.frozen).not.toBeNull();
+      expect(frozen.balance).toBe("25.5000");
+
+      await unfreezeWallet(account.id);
+      expect(await accountWallet(account.id)).toMatchObject({ kind, balance: "25.5000", frozen: null });
+    });
+  }
+
+  test("a retail account reads its balance in the shop after staff credit it", async ({ page }) => {
+    const account = await freshAccount(page, { signedIn: true });
+    await creditAccount(account.id, "25.5");
+    expect(await getJson<{ balance: string; available: string; frozen: unknown }>(page.request, "/store/v1/me/wallet")).toMatchObject({
+      balance: "25.5000",
+      available: "25.5000",
+      frozen: null,
+    });
+  });
+
+  for (const rank of RANKS) {
+    test(`a temporary password makes the next sign-in of a ${rank} account ask for a new one`, async ({ page }) => {
+      const account = await freshAccount(page, { rank });
+      const temporary = await temporaryPassword(account.id);
+      expect(temporary).not.toBe(account.password);
+      await signIn(page, { email: account.email, password: temporary }, { next: "password" });
+    });
+  }
+
+  test("staff make an API key for a merchant and complete the merchant's order; a retail account gets no key", async ({ page }) => {
+    const account = await freshAccount(page, { rank: "merchant" });
+    expect(await creditAccount(account.id, 50)).toBe("50.0000");
+
+    const key = await staffApiKeyFor(account.id, "e2e support key");
     expect(key.secret.length).toBeGreaterThan(20);
 
-    const csrf = await signInMerchant(page, { email, password });
+    const csrf = await signIn(page, account);
     const keys = await getJson<{ id: number; name: string; createdByStaff?: boolean }[]>(page.request, "/client/api-keys");
     expect(keys).toContainEqual(expect.objectContaining({ id: key.id, name: "e2e support key", createdByStaff: true }));
 
@@ -208,32 +270,34 @@ test.describe("helpers", () => {
     const order = await getJson<{ status: string; result: { code: string } }>(page.request, `/client/orders/${orderId}`);
     expect(order.status).toBe("completed");
     expect(order.result.code).toBe("E2E-RESULT");
+
+    const retail = await freshAccount(page);
+    await expect(staffApiKeyFor(retail.id, "e2e retail key")).rejects.toMatchObject({ status: 409 });
   });
 
-  test("sendCampaign raises a customer's unread count to 1 within 20 seconds", async ({ page }) => {
-    const email = await freshCustomer(page);
-    const id = await customerIdByEmail(email);
-    expect((await getJson<{ unread: number }>(page.request, "/store/v1/me/notifications/unread-count")).unread).toBe(0);
+  for (const rank of RANKS) {
+    test(`sendCampaign raises the unread count of a ${rank} account to 1 within 20 seconds`, async ({ page }) => {
+      const account = await freshAccount(page, { rank, signedIn: true });
+      const inbox = FAMILY[rank].inbox;
+      expect((await getJson<{ unread: number }>(page.request, `${inbox}/unread-count`)).unread).toBe(0);
 
-    await sendCampaign({
-      to: { type: "customer", id },
-      title: "Harness hello",
-      body: "Line 1\nLine 2",
-      link: "/account/orders",
+      await sendCampaign({
+        to: { type: "account", id: account.id },
+        title: "Harness hello",
+        body: "Line 1\nLine 2",
+        link: "/account/orders",
+      });
+      await expect
+        .poll(async () => (await getJson<{ unread: number }>(page.request, `${inbox}/unread-count`)).unread, { timeout: 20_000, intervals: [500, 1_000] })
+        .toBe(1);
+
+      const feed = await getJson<{ title: string; body: string; link: string | null; readAt: string | null }[]>(page.request, `${inbox}?_start=0&_end=20`);
+      expect(feed[0]).toMatchObject({ title: "Harness hello", body: "Line 1\nLine 2", link: "/account/orders", readAt: null });
     });
-    await expect
-      .poll(async () => (await getJson<{ unread: number }>(page.request, "/store/v1/me/notifications/unread-count")).unread, { timeout: 20_000, intervals: [500, 1_000] })
-      .toBe(1);
-
-    const feed = await getJson<{ title: string; body: string; link: string | null; readAt: string | null }[]>(
-      page.request,
-      "/store/v1/me/notifications?_start=0&_end=20",
-    );
-    expect(feed[0]).toMatchObject({ title: "Harness hello", body: "Line 1\nLine 2", link: "/account/orders", readAt: null });
-  });
+  }
 });
 
-// Pure helpers of e2e/admin.ts: no network.
+// Pure helpers of e2e/admin.ts and e2e/helpers.ts: no network.
 test.describe("pure helpers", () => {
   test("totp matches the RFC 6238 SHA-1 test vectors", () => {
     // Appendix B: the secret is the ASCII text "12345678901234567890"; the RFC prints 8 digits, a code has the last 6.
@@ -272,5 +336,31 @@ test.describe("pure helpers", () => {
     expect(quantityMatches({ min: 5, max: 25, options: [5, 10, 25] }, { options: [5, 10, 25] })).toBe(true);
     expect(quantityMatches({ min: 5, max: 25, options: [] }, { options: [5, 10, 25] })).toBe(false);
     expect(quantityMatches({ min: 5, max: 25, options: [5, 10, 25] }, { min: 5, max: 25 })).toBe(false);
+  });
+
+  test("pickRanks: the lowest-id retail rank, and the default merchant rank (else the lowest-id one)", () => {
+    const rank = (id: number, rankKind: RankKind, isDefault = false) => ({ id, name: `Rank ${id}`, rankKind, isDefault });
+    expect(pickRanks([rank(3, "merchant"), rank(1, "retail"), rank(2, "merchant", true)])).toEqual({ retail: 1, merchant: 2 });
+    expect(pickRanks([rank(5, "merchant"), rank(4, "merchant"), rank(1, "retail"), rank(9, "retail")])).toEqual({ retail: 1, merchant: 4 });
+    expect(() => pickRanks([rank(2, "merchant")])).toThrow(/retail rank/);
+    expect(() => pickRanks([rank(1, "retail")])).toThrow(/merchant rank/);
+  });
+
+  test("a plain campaign link goes to both audiences; a link per audience stays as it is", () => {
+    expect(campaignLink(undefined)).toBeUndefined();
+    expect(campaignLink("/account/orders")).toEqual({ customer: "/account/orders", merchant: "/account/orders" });
+    expect(campaignLink({ merchant: "/account/invoices" })).toEqual({ merchant: "/account/invoices" });
+  });
+
+  test("the mailed links are the pages at the root of the shop, for every rank", () => {
+    expect(SET_PASSWORD_LINK.test("/set-password?token=abc")).toBe(true);
+    expect(VERIFY_EMAIL_LINK.test("/verify-email?token=abc")).toBe(true);
+    // The old portal folder is no address of a mailed link any more.
+    expect(SET_PASSWORD_LINK.test("/merchant/set-password?token=abc")).toBe(false);
+    expect(VERIFY_EMAIL_LINK.test("/merchant/verify-email?token=abc")).toBe(false);
+    expect(SIGN_IN_LINK.test("/sign-in?token=abc")).toBe(true);
+    expect(SET_PASSWORD_LINK.test("/verify-email?token=abc")).toBe(false);
+    expect(VERIFY_EMAIL_LINK.test("/set-password?token=abc")).toBe(false);
+    expect(SIGN_IN_LINK.test("/sign-in")).toBe(false);
   });
 });

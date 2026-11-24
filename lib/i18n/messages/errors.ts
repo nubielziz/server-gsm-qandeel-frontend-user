@@ -9,8 +9,8 @@ export const errors = {
   codes: {
     UNAUTHORIZED: "Please sign in to continue.",
     INSUFFICIENT_FUNDS: "Your balance is too low for this order. Add funds and try again.",
-    ACCOUNT_PENDING_APPROVAL: "Your merchant account is waiting for approval. This part opens once our team approves it.",
     ACCOUNT_SUSPENDED: "This account cannot be used right now. Please contact support.",
+    RANK_NOT_ALLOWED: "This part is not available for your account.",
     CSRF_FAILED: "Your session could not be confirmed. Reload the page and try again.",
     IP_NOT_ALLOWED: "Access from your network is not allowed.",
     TURNSTILE_FAILED: "The anti-bot check failed. Refresh the page and try again.",

@@ -1,14 +1,15 @@
-// The customer wallet page (`/account/wallet`): balance cards, notices (on hold, below zero, switched off) and the
-// statement with its date range. The header pill and the nav item reuse `portal.customerNav.wallet`, `portal.storeBalance`
-// and `common.header.*`. The merchant wallet page keeps its own texts (`merchant.wallet`) and only shares the components.
-// The wallet is always US dollars, so the texts say so. The API's `memo` is English and may carry a staff reason: it is
-// never shown, so the statement says what a line is by its kind (translated here) and by its order.
+// The wallet page (`/account/wallet`), one page for every account: the texts of the store balance of a retail rank (balance cards,
+// notices for a hold, a negative balance and a switched-off balance, the statement with its date range) and, under `merchant`,
+// those of the wallet of a merchant rank (four cards, an online-payment note, the statement and its CSV). The header pill and the
+// nav item reuse `portal.*` and `common.header.*`. Both wallets are in US dollars, so the texts say so. The API's `memo` of a
+// store balance is English and may carry a staff reason: it is never shown, so that statement says what a line is by its kind
+// (translated here) and by its order.
 
 export const wallet = {
   metaTitle: "Wallet",
   page: {
     title: "Wallet",
-    description: "Your store balance and every movement on it.",
+    description: "Your balance and every movement on it.",
     addFunds: "Add funds",
   },
   cards: {
@@ -53,6 +54,7 @@ export const wallet = {
       refund: "Refund",
       adjustment: "Adjustment",
       chargeback: "Reversed payment",
+      wallet_transfer: "Balance transfer",
     },
     order: "Order {id}",
     dash: "—",
@@ -65,5 +67,44 @@ export const wallet = {
     loadTitle: "We could not load your wallet",
     statementTitle: "We could not load the statement",
     retry: "Try again",
+  },
+
+  // The wallet of a merchant rank (`GET /client/wallet`): credit and reserved amounts are shown as the API sends them.
+  merchant: {
+    cards: {
+      available: "Available balance",
+      availableHint: "Balance plus credit limit",
+      balance: "Balance",
+      balanceHint: "Negative while you use your credit",
+      reserved: "Reserved",
+      reservedHint: "Held for open orders",
+      creditLimit: "Credit limit",
+      creditLimitHint: "Extra spending allowed",
+    },
+    onlineNote:
+      "If you just paid online, your balance updates once the payment is confirmed. Bank transfers are credited after our team reviews your receipt.",
+    statement: {
+      title: "Account statement",
+      description: "Newest first.",
+      download: "Download statement (CSV)",
+      exporting: "Exporting…",
+      exportFailed: "The export could not be created.",
+      caption: "Account statement",
+      columns: { date: "Date", kind: "Type", details: "Description", amount: "Amount", balanceAfter: "Balance after" },
+      emptyTitle: "No transactions yet",
+      emptyText: "Deposits, order charges and refunds appear here.",
+      kinds: {
+        deposit: "Deposit",
+        withdrawal: "Withdrawal",
+        order_hold: "Order charge",
+        order_release: "Order refund",
+        commission: "Commission",
+        adjustment: "Adjustment",
+        refund: "Refund",
+        fee: "Fee",
+        wallet_transfer: "Balance transfer",
+      },
+      dash: "—",
+    },
   },
 };

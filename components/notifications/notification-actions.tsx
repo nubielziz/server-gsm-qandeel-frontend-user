@@ -1,6 +1,6 @@
 "use client";
 // The buttons of the notifications page: "Open" and "Mark as read" on one item, and "Mark all as read" for the page.
-// Every action goes through the browser client (CSRF token of the area's surface), then refreshes the list
+// Every action goes through the browser client (the account's one CSRF token), then refreshes the list
 // (`router.refresh()`) and the bell (`unreadStore.refresh`), telling the bell first that its next lower count is a read
 // (the number rolls down, lib/notifications/bell-motion.ts). A 404 on mark-read means the item is gone: the refreshed
 // list shows what is left. A signed-out answer refreshes the route (the layout then asks to sign in); every other
@@ -16,7 +16,8 @@ import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import { isSignedOutError } from "@/lib/merchant/signed-out";
 import { bellMotion } from "@/lib/notifications/bell-motion";
-import { NOTIFICATION_API, NOTIFICATION_FEED_ID, type NotificationSurface } from "@/lib/notifications/link";
+import type { AccountFamily } from "@/lib/account/family";
+import { NOTIFICATION_API, NOTIFICATION_FEED_ID } from "@/lib/notifications/link";
 import { unreadStore } from "@/lib/notifications/unread-store";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -24,12 +25,12 @@ import { toast } from "@/components/ui/toast";
 type ReadAllResult = { updated: number };
 
 /** Shared by both buttons: what to do with a failed call. Returns true when the caller should carry on with a refresh. */
-function useFailureHandler(surface: NotificationSurface) {
+function useFailureHandler() {
   const router = useRouter();
   const errorText = useErrorText();
   return (error: unknown): boolean => {
     if (isSignedOutError(error)) {
-      forgetCsrf(surface === "merchant" ? "client" : "store");
+      forgetCsrf();
       router.refresh();
       return false;
     }
@@ -41,7 +42,7 @@ function useFailureHandler(surface: NotificationSurface) {
 
 export type NotificationActionsProps = {
   id: number;
-  surface: NotificationSurface;
+  family: AccountFamily;
   unread: boolean;
   /** Where the item leads (`notificationHref`), or null for an item without a link. */
   href: string | null;
@@ -53,13 +54,13 @@ export type NotificationActionsProps = {
 };
 
 /** "Open" (which also marks the item read, not awaited) and "Mark as read" for one item. */
-export function NotificationActions({ id, surface, unread, href, leavesList, titleId, labels }: NotificationActionsProps) {
+export function NotificationActions({ id, family, unread, href, leavesList, titleId, labels }: NotificationActionsProps) {
   const router = useRouter();
-  const fail = useFailureHandler(surface);
+  const fail = useFailureHandler();
   const [busy, setBusy] = useState(false);
   const [refreshing, startRefresh] = useTransition();
   const button = useRef<HTMLButtonElement>(null);
-  const readPath = pathOf(`${NOTIFICATION_API[surface]}/:id/read`, { id });
+  const readPath = pathOf(`${NOTIFICATION_API[family]}/:id/read`, { id });
 
   async function markRead() {
     if (busy) return;
@@ -75,8 +76,8 @@ export function NotificationActions({ id, surface, unread, href, leavesList, tit
         return;
       }
     }
-    bellMotion.read(surface, null);
-    void unreadStore.refresh(surface);
+    bellMotion.read(family, null);
+    void unreadStore.refresh(family);
     startRefresh(() => router.refresh());
     (leavesList ? document.getElementById(NOTIFICATION_FEED_ID) : row)?.focus({ preventScroll: true });
     setBusy(false);
@@ -87,8 +88,8 @@ export function NotificationActions({ id, surface, unread, href, leavesList, tit
     // Following the link also reads the item. Not awaited: a failure changes nothing for the visitor.
     api.post(readPath).then(
       () => {
-        bellMotion.read(surface, null);
-        return unreadStore.refresh(surface);
+        bellMotion.read(family, null);
+        return unreadStore.refresh(family);
       },
       () => undefined,
     );
@@ -118,16 +119,16 @@ export function NotificationActions({ id, surface, unread, href, leavesList, tit
 }
 
 export type MarkAllReadProps = {
-  surface: NotificationSurface;
+  family: AccountFamily;
   /** The newest id on screen: an item that arrived after the page was drawn stays unread. */
   upToId: number;
   labels: { markAllRead: string; markedAll: string; markedNone: string };
 };
 
 /** "Mark all as read": everything up to the newest item the visitor can see. */
-export function MarkAllRead({ surface, upToId, labels }: MarkAllReadProps) {
+export function MarkAllRead({ family, upToId, labels }: MarkAllReadProps) {
   const router = useRouter();
-  const fail = useFailureHandler(surface);
+  const fail = useFailureHandler();
   const [busy, setBusy] = useState(false);
   const [refreshing, startRefresh] = useTransition();
 
@@ -135,7 +136,7 @@ export function MarkAllRead({ surface, upToId, labels }: MarkAllReadProps) {
     if (busy) return;
     setBusy(true);
     try {
-      const result = await api.post<ReadAllResult | undefined>(`${NOTIFICATION_API[surface]}/read-all`, { upToId });
+      const result = await api.post<ReadAllResult | undefined>(`${NOTIFICATION_API[family]}/read-all`, { upToId });
       toast.success(result?.updated ? fmt(labels.markedAll, { count: formatNumber(result.updated) }) : labels.markedNone);
     } catch (error) {
       if (!fail(error)) {
@@ -143,8 +144,8 @@ export function MarkAllRead({ surface, upToId, labels }: MarkAllReadProps) {
         return;
       }
     }
-    bellMotion.read(surface, null);
-    void unreadStore.refresh(surface);
+    bellMotion.read(family, null);
+    void unreadStore.refresh(family);
     startRefresh(() => router.refresh());
     // The button goes away once nothing is unread: move the focus to the feed.
     document.getElementById(NOTIFICATION_FEED_ID)?.focus({ preventScroll: true });

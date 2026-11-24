@@ -1,15 +1,21 @@
 // Shared e2e helpers. Sign-in goes through the site's own origin (the /client and /store/v1 rewrites), so the
-// session cookies land in the browser context exactly as after a real sign-in.
+// session cookies land in the browser context exactly as after a real sign-in. There is one kind of account: a rank tells a
+// retail account (it buys in the shop) from a merchant (price list, wallet invoices, API); the helpers take the rank as an option.
 import { readFileSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { FIXTURES_FILE, changeMerchantEmail, inviteMerchant, type E2eFixtures } from "./admin";
+import { FIXTURES_FILE, changeAccountEmail, createAccount, setAccountStatus, type E2eFixtures, type RankKind } from "./admin";
+
+/** Credentials of an account. */
+export interface Credentials {
+  email: string;
+  password: string;
+}
 
 /** Demo accounts on the isolated backend (scripts/dev-backend.sh; see PROGRESS.md). */
 export const ACCOUNTS = {
-  customer: { email: "daniel.whitmore@mail.example", password: "demo-password" },
+  retail: { email: "daniel.whitmore@mail.example", password: "demo-password" },
   merchant: { email: "ops@zainmobilehub.example", password: "Storefront-Test-4821" },
-  pendingMerchant: { email: "ops@algiersservice.example", password: "Storefront-Test-4821" },
-} as const;
+} as const satisfies Record<RankKind, Credentials>;
 
 /** The token the backend's dev Turnstile verifier accepts (handoff §3.10). */
 export const DEV_TURNSTILE_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
@@ -23,30 +29,22 @@ function origin(_page: Page): string {
 }
 
 /**
- * Signs a merchant in (POST /client/auth/login with the site's Origin and the dev Turnstile token, as the browser would).
- * Returns the CSRF token of the new session (the answer's `X-CSRF-Token`), for specs that call the API with `page.request`.
+ * Signs an account of either rank in: `POST /client/auth/sign-in` with the site's Origin and the dev Turnstile token, as the
+ * browser would. One route, one form: the answer's `rank` decides which family of routes the session reaches.
+ *
+ * A page that already holds a session of the other rank should clear its cookies first (`page.context().clearCookies()`).
+ *
+ * @param account the credentials; only the email and the password are sent, so a `FreshAccount` can be passed as it is
+ * @param options `next`: the step the answer must name (default `"done"`; a temporary password answers `"password"`, two-step `"totp"`)
+ * @returns the CSRF token of the new session (the answer's `X-CSRF-Token`), for specs that call the API with `page.request`
  */
-export async function signInMerchant(page: Page, account: { email: string; password: string } = ACCOUNTS.merchant): Promise<string> {
-  const res = await page.request.post("/client/auth/login", {
+export async function signIn(page: Page, account: Credentials = ACCOUNTS.retail, options: { next?: "done" | "password" | "totp" } = {}): Promise<string> {
+  const res = await page.request.post("/client/auth/sign-in", {
     headers: { Origin: origin(page), "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "Content-Type": "application/json" },
-    data: account,
+    data: { email: account.email, password: account.password },
   });
   expect(res.status(), await res.text()).toBe(200);
-  expect((await res.json()).next).toBe("done");
-  return res.headers()["x-csrf-token"] ?? "";
-}
-
-/**
- * Signs a customer in (POST /store/v1/auth/login with the dev Turnstile token).
- * Returns the CSRF token of the new session, for specs that call the API with `page.request`.
- */
-export async function signInCustomer(page: Page, account: { email: string; password: string } = ACCOUNTS.customer): Promise<string> {
-  const res = await page.request.post("/store/v1/auth/login", {
-    headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "Content-Type": "application/json" },
-    data: account,
-  });
-  expect(res.status(), await res.text()).toBe(200);
-  expect((await res.json()).next).toBe("done");
+  expect((await res.json()).next).toBe(options.next ?? "done");
   return res.headers()["x-csrf-token"] ?? "";
 }
 
@@ -101,6 +99,13 @@ export function uniqueEmail(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@example.test`;
 }
 
+/** The mailed link that sets a password (an invitation or a reset): `/set-password` at the root of the shop, for every rank. */
+export const SET_PASSWORD_LINK = /^\/set-password\?token=/;
+/** The mailed link that verifies an address: `/verify-email` at the root of the shop, for every rank. */
+export const VERIFY_EMAIL_LINK = /^\/verify-email\?token=/;
+/** The mailed link that signs a retail account in (or makes it: the email link). */
+export const SIGN_IN_LINK = /\/sign-in\?token=/;
+
 /**
  * Waits for a Mailpit message to `address` whose text holds a link to `pathPattern`, and returns that link's path+query.
  * Links in mail point at the dev site (http://localhost:5175): use the path and query on the site under test.
@@ -129,55 +134,76 @@ export function tokenOf(link: string): string {
 }
 
 /**
- * A brand-new customer, signed in through the magic link (API calls through the site). `withPassword` also gives them a
- * password and signs in with it (setting a password ends every session). Returns the email.
+ * A brand-new retail account made the way a visitor makes one: the email link (`POST /store/v1/auth/magic-link`, then the link's
+ * token to `POST /store/v1/auth/verify`). The page is signed in afterwards, the account has no password and its address is proven.
+ * Use `freshAccount` for an account with a password or a merchant rank.
+ *
+ * @param options `email`: the address to sign up (default: a new one); `claimGuestOrders`: tick the box that adds the orders a guest
+ *   placed with this address (the account's address is proven by the link)
+ * @returns the address, how many guest orders the exchange added, and `claimSkipped` when it could not just now
  */
-export async function freshCustomer(page: Page, withPassword?: string): Promise<string> {
-  const email = uniqueEmail("acct");
+export async function signUpByLink(
+  page: Page,
+  options: { email?: string; claimGuestOrders?: boolean } = {},
+): Promise<{ email: string; claimedOrders: number; claimSkipped?: "busy" }> {
+  const email = options.email ?? uniqueEmail("acct");
   const asked = await page.request.post("/store/v1/auth/magic-link", { headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN }, data: { email } });
   expect(asked.status(), await asked.text()).toBe(204);
-  const link = await waitForLink(page, email, /\/sign-in\?token=/);
-  const verified = await page.request.post("/store/v1/auth/verify", { data: { token: tokenOf(link) } });
+  const link = await waitForLink(page, email, SIGN_IN_LINK);
+  const verified = await page.request.post("/store/v1/auth/verify", {
+    data: { token: tokenOf(link), ...(options.claimGuestOrders ? { claimGuestOrders: true } : {}) },
+  });
   expect(verified.status(), await verified.text()).toBe(200);
-  if (withPassword) {
-    const forgot = await page.request.post("/store/v1/auth/password/forgot", { headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN }, data: { email } });
-    expect(forgot.status(), await forgot.text()).toBe(204);
-    const reset = await waitForLink(page, email, /\/set-password\?token=/);
-    const set = await page.request.post("/store/v1/auth/password/set", { data: { token: tokenOf(reset), password: withPassword } });
-    expect(set.status(), await set.text()).toBe(204);
-    // Setting a password ends every session: sign in again.
-    await signInCustomer(page, { email, password: withPassword });
-  }
-  return email;
+  const answer = (await verified.json()) as { next?: string; claimedOrders?: number; claimSkipped?: "busy" };
+  expect(answer.next).toBe("done");
+  return { email, claimedOrders: answer.claimedOrders ?? 0, ...(answer.claimSkipped ? { claimSkipped: answer.claimSkipped } : {}) };
 }
 
-/** The password `freshMerchant` gives a new merchant (the one e2e/auth.spec.ts sets from the invitation). */
-export const FRESH_MERCHANT_PASSWORD = "Orchard-Lantern-8841";
+/** The password `freshAccount` gives a new account (the one e2e/auth.spec.ts sets from the invitation). */
+export const FRESH_ACCOUNT_PASSWORD = "Orchard-Lantern-8841";
+
+/** An account `freshAccount` made: its credentials, staff id and rank kind. */
+export interface FreshAccount extends Credentials {
+  id: number;
+  rank: RankKind;
+}
 
 /**
- * A brand-new merchant, made the way the product makes one: staff create the account through the admin API (`inviteMerchant`)
- * and the merchant sets a password from the invitation mailed to it (`POST /client/auth/password/reset` with the link's token,
- * the call the set-password page makes). The account is active, its email is verified (an invitation proves the mailbox) and
- * nobody is signed in.
+ * A brand-new account, made the way the product makes one: staff create it through the admin API (`createAccount`: a retail
+ * account unless `rank: "merchant"`, which the Owner gives) and the person sets a password from the invitation mailed to it
+ * (`POST /client/auth/password/reset` with the link's token, the call the set-password page makes). The account is active, its
+ * email is verified (an invitation proves the mailbox) and nobody is signed in unless `signedIn` is set.
  *
- * With `unverified`, staff then change the address (`changeMerchantEmail`): the verification is cleared and a verification
- * link is mailed to the NEW address, which is the one returned. It is the only way left to get an unverified merchant.
+ * With `unverified`, staff then change the address (`changeAccountEmail`): the verification is cleared and a verification link
+ * is mailed to the NEW address, which is the one returned (match it with `VERIFY_EMAIL_LINK`). With `suspended`, staff then
+ * suspend the account (it cannot sign in: 403 `ACCOUNT_SUSPENDED`). With `signedIn`, the page signs in with `signIn`.
  *
- * @returns the credentials
+ * @returns the credentials, the staff id and the rank kind
  */
-export async function freshMerchant(page: Page, options: { unverified?: boolean } = {}): Promise<{ email: string; password: string }> {
-  const invited = uniqueEmail("merchant");
-  const id = await inviteMerchant(invited);
-  const invitation = await waitForLink(page, invited, /\/merchant\/set-password\?token=/);
+export async function freshAccount(
+  page: Page,
+  options: { rank?: RankKind; name?: string; unverified?: boolean; suspended?: boolean; signedIn?: boolean } = {},
+): Promise<FreshAccount> {
+  if (options.signedIn && (options.suspended || options.unverified)) throw new Error("A page can sign in only to an active account with a proven address.");
+  const rank = options.rank ?? "retail";
+  const invited = uniqueEmail(rank === "retail" ? "acct" : "merchant");
+  const id = await createAccount({ email: invited, name: options.name, rank });
+  const invitation = await waitForLink(page, invited, SET_PASSWORD_LINK);
   const set = await page.request.post("/client/auth/password/reset", {
     headers: { Origin: origin(page), "Content-Type": "application/json" },
-    data: { token: tokenOf(invitation), password: FRESH_MERCHANT_PASSWORD },
+    data: { token: tokenOf(invitation), password: FRESH_ACCOUNT_PASSWORD },
   });
   expect(set.status(), await set.text()).toBe(204);
-  if (!options.unverified) return { email: invited, password: FRESH_MERCHANT_PASSWORD };
-  const email = uniqueEmail("merchant");
-  await changeMerchantEmail(id, email);
-  return { email, password: FRESH_MERCHANT_PASSWORD };
+
+  let email = invited;
+  if (options.unverified) {
+    email = uniqueEmail(rank === "retail" ? "acct" : "merchant");
+    await changeAccountEmail(id, email);
+  }
+  if (options.suspended) await setAccountStatus(id, "suspended");
+  const account = { email, password: FRESH_ACCOUNT_PASSWORD, id, rank };
+  if (options.signedIn) await signIn(page, account);
+  return account;
 }
 
 /** What the global setup wrote to e2e/.auth/fixtures.json (see e2e/global-setup.ts). */

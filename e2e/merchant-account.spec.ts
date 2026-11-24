@@ -1,100 +1,44 @@
-// Merchant account (plan F22): the verification-mail resend, address and tax id in the profile, "Made by support" API
-// keys and the Announcements row. Real browser -> Next -> the isolated demo backend (:3100) and Mailpit.
-// Rules: one throwaway merchant per test (the resend limiter is 5 an hour per merchant, and the demo merchant is never
-// changed), made the way the product makes one: staff invite it and it sets its password from the invitation (`freshMerchant`);
-// the ones that need an unverified email get it from a staff change of the address (`unverified`); nothing is switched off globally. `mustChangePassword` has no e2e: no staff route sets the flag on a full
-// session, so the gate's decision is a unit test (components/merchant/must-change-password-gate.test.tsx) and the lead
-// checks it by hand (plan section 7).
+// Merchant account: the address and tax id in the profile, the "Made by support" API keys and the Announcements row, plus the
+// mark on an address that is not verified. Real browser -> Next -> the isolated demo backend (:3100).
+// Rules: one throwaway merchant per test (the demo merchant is never changed), made the way the product makes one: staff create
+// it and it sets its password from the invitation (`freshAccount`); the one that needs an unverified email gets it from a staff
+// change of the address (`unverified`); nothing is switched off globally. `mustChangePassword` has no e2e: no staff route sets
+// the flag on a full session, so the gate's decision is a unit test (components/merchant/must-change-password-gate.test.tsx)
+// and a person checks it by hand.
 import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
-import { merchantIdByEmail, staffApiKeyFor } from "./admin";
-import { BASE_URL, freshMerchant, go, hydrated, signInMerchant, tokenOf, waitForLink } from "./helpers";
-
-const VERIFY_LINK = /\/merchant\/verify-email\?token=/;
+import { staffApiKeyFor } from "./admin";
+import { BASE_URL, freshAccount, go, hydrated, signIn } from "./helpers";
 
 /** A signed-in throwaway merchant: active, its email verified, or not verified yet with `unverified`. */
 async function signedInMerchant(page: Page, options: { unverified?: boolean } = {}) {
-  const account = await freshMerchant(page, options);
-  const id = await merchantIdByEmail(account.email);
-  const csrf = await signInMerchant(page, account);
-  return { ...account, id, csrf };
+  const account = await freshAccount(page, { rank: "merchant", ...options });
+  const csrf = await signIn(page, account);
+  return { ...account, csrf };
 }
 
-test.describe("verification mail: resend", () => {
-  test("a new link arrives, the success text says older links stop working, and they do", async ({ page }) => {
-    const account = await freshMerchant(page, { unverified: true });
-    const first = await waitForLink(page, account.email, VERIFY_LINK);
-    await signInMerchant(page, account);
-
-    await go(page, "/en/merchant/settings");
-    await expect(page.getByText("Not verified", { exact: true })).toBeVisible();
-    await expect(page.getByText(/not verified yet\. Open the link in the email we sent you/)).toBeVisible();
-    await page.getByRole("button", { name: "Resend verification email" }).click();
-    await expect(page.getByText("We sent a new link. Older links no longer work.")).toBeVisible();
-
-    const second = await waitForLink(page, account.email, VERIFY_LINK, [first]);
-    expect(second).not.toBe(first);
-
-    // The first link was replaced by the newest one.
-    const origin = new URL(BASE_URL).origin;
-    const stale = await page.request.post("/client/auth/verify-email", {
-      headers: { Origin: origin, "Content-Type": "application/json" },
-      data: { token: tokenOf(first) },
-    });
-    expect(stale.status()).toBe(410);
-  });
-
-  test("verified in another tab: the resend says it is already verified and the badge turns to Verified", async ({ page }) => {
-    const account = await freshMerchant(page, { unverified: true });
-    const link = await waitForLink(page, account.email, VERIFY_LINK);
-    await signInMerchant(page, account);
-
-    await go(page, "/en/merchant/settings");
-    await expect(page.getByText("Not verified", { exact: true })).toBeVisible();
-
-    // The link is used somewhere else while this page stays open.
-    const verified = await page.request.post("/client/auth/verify-email", {
-      headers: { Origin: new URL(BASE_URL).origin, "Content-Type": "application/json" },
-      data: { token: tokenOf(link) },
-    });
-    expect(verified.status(), await verified.text()).toBe(204);
-
-    await page.getByRole("button", { name: "Resend verification email" }).click();
-    await expect(page.getByText("Your email is already verified.")).toBeVisible();
-    await expect(page.getByText("Verified", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Not verified", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Resend verification email" })).toHaveCount(0);
-    // The message stays after the refresh took the button away.
-    await expect(page.getByText("Your email is already verified.")).toBeVisible();
-  });
-
-  test("a 429 shows the wait the API sent", async ({ page }) => {
+test.describe("an address that is not verified", () => {
+  test("is marked, tells where the link went, and offers no button that sends another one", async ({ page }) => {
     await signedInMerchant(page, { unverified: true });
-    await page.route("**/client/auth/verify-email/resend", (route) =>
-      route.fulfill({
-        status: 429,
-        headers: { "content-type": "application/problem+json", "retry-after": "600" },
-        body: JSON.stringify({
-          type: "about:blank",
-          title: "You are sending requests too quickly.",
-          status: 429,
-          code: "RATE_LIMITED",
-          detail: "Too many requests. Try again in 600 seconds.",
-        }),
-      }),
-    );
-    await go(page, "/en/merchant/settings");
-    await page.getByRole("button", { name: "Resend verification email" }).click();
-    await expect(page.getByText("Too many attempts. Please wait and try again. Try again in about 10 min.")).toBeVisible();
-    // The button is usable again (a second try is the visitor's choice).
-    await expect(page.getByRole("button", { name: "Resend verification email" })).toBeEnabled();
+    await go(page, "/en/account/settings");
+    await expect(page.getByText("Not verified", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/not verified yet\. Open the link in the email we sent you/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Resend verification email" })).toHaveCount(0);
+  });
+
+  test("a verified address shows the Verified badge and the hint to contact support", async ({ page }) => {
+    await signedInMerchant(page);
+    await go(page, "/en/account/settings");
+    await expect(page.getByText("Verified", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("To change your email address, contact support.")).toBeVisible();
+    await expect(page.getByText("Not verified", { exact: true })).toHaveCount(0);
   });
 });
 
 test.describe("profile: address and tax id", () => {
   test("address and tax id are saved on their own, survive a reload, and a 301-character address is refused on its field", async ({ page }) => {
     await signedInMerchant(page);
-    await go(page, "/en/merchant/settings");
+    await go(page, "/en/account/settings");
     // The profile form hydrates a moment after the header's search box, which is all `go` waits for.
     await hydrated(page);
 
@@ -141,7 +85,7 @@ test.describe("API keys", () => {
     expect(own.status(), await own.text()).toBe(201);
     const ownName = ((await own.json()) as { key: { name: string } }).key.name;
 
-    await page.goto("/en/merchant/api-keys");
+    await page.goto("/en/account/settings/api-keys");
     const card = (name: string) => page.locator("article", { has: page.getByRole("heading", { name }) });
     await expect(card(supportKey.name)).toBeVisible();
     await expect(card(supportKey.name).getByText("Made by support")).toBeVisible();
@@ -153,7 +97,7 @@ test.describe("API keys", () => {
 test.describe("notification preferences: Announcements", () => {
   test("the row has the site's own title and one Email switch, and saving it answers 200", async ({ page }) => {
     await signedInMerchant(page);
-    await go(page, "/en/merchant/settings/notifications");
+    await go(page, "/en/account/settings/notifications");
 
     const announcements = page.getByRole("group", { name: "Announcements" });
     await expect(page.getByText("News, offers and updates from our team.")).toBeVisible();

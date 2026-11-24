@@ -1,19 +1,18 @@
-// EXCLUSIVE spec (plan F21, D7, BH §3.8): the customer wallet switched OFF. It flips `wallet.customer.enabled`, a setting that
-// every customer of the isolated backend sees, so it runs only with E2E_EXCLUSIVE=1, by the lead, with nothing else running:
+// EXCLUSIVE spec (plan F21, D7, BH §3.8): the store wallet switched OFF. It flips `wallet.customer.enabled`, a setting that
+// every retail account of the isolated backend sees, so it runs only with E2E_EXCLUSIVE=1, by hand, with nothing else running:
 //   E2E_EXCLUSIVE=1 E2E_RUN=$(date +%s) E2E_BASE_URL=http://localhost:5176 npx playwright test e2e/wallet-disabled.spec.ts --project=desktop
 // The setting is switched back on in `finally`, whatever the test did. Both customers are throwaway and are made while the wallet
 // is still on (a switched-off wallet takes no new credit).
 // What it asserts: a customer with $20 still sees the balance, the statement, the nav item and the pill, but no "Add funds" and no
 // balance choice in a checkout; a customer with nothing sees no nav item, no pill and no "Wallet" menu item.
 import type { Locator, Page } from "@playwright/test";
-import { adminCall, creditCustomer, customerIdByEmail } from "./admin";
+import { adminCall, creditAccount } from "./admin";
 import { expect, test } from "./fixtures";
-import { DEV_TURNSTILE_TOKEN, freshCustomer, go, signInCustomer } from "./helpers";
+import { DEV_TURNSTILE_TOKEN, freshAccount, go, signIn } from "./helpers";
 
 test.skip(() => process.env.E2E_EXCLUSIVE !== "1", "Exclusive: it switches the customer wallet off for every customer. Run it with E2E_EXCLUSIVE=1 and nothing else running.");
 test.skip(({ isMobile }) => isMobile, "One project is enough: the setting is global and the pages are the same.");
 
-const PASSWORD = "Orchard-Lantern-8841";
 const IMEI = "490154203237518";
 
 const main = (page: Page) => page.getByRole("main");
@@ -31,11 +30,11 @@ async function waitForEnabled(page: Page, enabled: boolean) {
 }
 
 test("a switched-off wallet still shows a balance and its statement, offers nothing to add or spend, and an empty wallet disappears", async ({ page }) => {
-  // Made while the wallet is on: one customer with $20 and one with nothing, both with a password to sign in again.
-  const empty = await freshCustomer(page, PASSWORD);
+  // Made while the wallet is on: one retail account with $20 and one with nothing, both with a password to sign in again.
+  const empty = await freshAccount(page, { signedIn: true });
   await page.context().clearCookies();
-  const rich = await freshCustomer(page, PASSWORD);
-  await creditCustomer(await customerIdByEmail(rich), "20.0000");
+  const rich = await freshAccount(page, { signedIn: true });
+  await creditAccount(rich.id, "20.0000");
 
   try {
     await setWallet(false);
@@ -61,10 +60,10 @@ test("a switched-off wallet still shows a balance and its statement, offers noth
     await expect(page.getByRole("link", { name: "Wallet", exact: true })).toHaveAttribute("href", "/en/account/wallet");
 
     // A checkout opened while signed in: no balance choice and no balance payment.
-    const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "csrf_token_store")?.value ?? "";
+    const csrf = (await page.context().cookies()).find((cookie) => cookie.name.startsWith("csrf_token_"))?.value ?? "";
     const created = await page.request.post("/store/v1/checkout-sessions", {
       headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-      data: { serviceId: 1, email: rich, country: "DE", currency: "USD", imei: IMEI },
+      data: { serviceId: 1, email: rich.email, country: "DE", currency: "USD", imei: IMEI },
     });
     expect(created.status(), await created.text()).toBe(201);
     const session = (await created.json()) as { token: string; balancePayable: boolean };
@@ -76,7 +75,7 @@ test("a switched-off wallet still shows a balance and its statement, offers noth
 
     // ── The customer with nothing: no nav item, no pill, no menu item; the page, reached by address, says it is paused.
     await page.context().clearCookies();
-    await signInCustomer(page, { email: empty, password: PASSWORD });
+    await signIn(page, empty);
     await go(page, "/en/account");
     await expect(page.getByRole("heading", { level: 1, name: /Welcome/ })).toBeVisible();
     await expect(page.getByRole("link", { name: "Wallet", exact: true })).toHaveCount(0);

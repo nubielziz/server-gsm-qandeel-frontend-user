@@ -24,7 +24,7 @@ import { useUiText } from "@/components/ui/ui-text";
 
 export type NewTicketFormProps = {
   t: Pick<SupportMessages, "form" | "sent">;
-  /** Prefill for a signed-in customer (email, name) and from `?order=`. */
+  /** Prefill for a signed-in account (email, name) and from `?order=`. */
   defaults: { email: string; name: string; order: string; signedIn: boolean };
 };
 

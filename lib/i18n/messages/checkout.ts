@@ -1,4 +1,4 @@
-// Strings of the customer checkout: opening a checkout (details), the review-and-pay page, the payment return page and
+// Strings of the shop checkout: opening a checkout (details), the review-and-pay page, the payment return page and
 // the abandoned-checkout resume page. Server Components import them and pass the pieces a Client Component needs as
 // props. API error texts live in ./errors.ts (by code); the ones below are checkout-specific.
 
@@ -22,9 +22,14 @@ export const checkout = {
     fileTitle: "This service cannot be bought online yet",
     fileText: "File services are handled by our team. Contact support to order it.",
     fileAction: "Contact support",
-    backToService: "Back to the service",
+    priceList: {
+      title: "The shop checkout is for retail buyers",
+      text: "Your account orders from its price list, at your own prices. Open this service there to order it.",
+      action: "Order at your price",
+      back: "Back to the service",
+    },
     signInTitle: "Sign in to buy",
-    signInText: "Checkout is open to signed-in customers only. Sign in or create an account to continue.",
+    signInText: "Checkout is open to signed-in accounts only. Sign in or create an account to continue.",
     signInAction: "Sign in",
     info: {
       title: "Service information",
@@ -48,7 +53,6 @@ export const checkout = {
       countryPlaceholder: "Select your country",
       countryHint: "Your country decides which tax applies to this order.",
       region: "Region",
-      regionPlaceholder: "Select your region",
       regionOther: "My region is not listed",
       currency: "Pay in",
       currencyHint: "Prices are shown in this currency.",
@@ -85,7 +89,6 @@ export const checkout = {
       estimate: "Estimated total",
       locked: "The final price, including tax, is locked for 30 minutes on the next step.",
       detailsRequired: "Service details: required",
-      detailsReady: "Service details: added",
       updating: "Updating the price…",
       continue: "Continue to payment",
       continuing: "Opening your checkout…",
@@ -195,6 +198,8 @@ export const checkout = {
       forbidden:
         "This checkout was opened by another account or as a guest, so it cannot be paid from your balance. Start a new checkout while signed in to use it.",
       insufficient: "Your store balance is lower than the total of this order. Add funds, or pay another way.",
+      rankRefused:
+        "Your account orders from its price list, so it has no store balance to pay with. Choose a payment method instead.",
     },
   },
 

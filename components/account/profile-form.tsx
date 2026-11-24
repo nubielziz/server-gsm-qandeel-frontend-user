@@ -1,5 +1,5 @@
 "use client";
-// ProfileForm: name, phone and country of the signed-in customer (`PATCH /store/v1/me`, BH §7.2). Only the keys that
+// ProfileForm: name, phone and country of a retail account (`PATCH /store/v1/me`). Only the keys that
 // changed are sent; an emptied phone is sent as `""` (that clears it); a name is 2 to 120 characters and cannot be
 // cleared; the country is one of the countries the shop has a tax rate for (`GET /store/v1/config` `taxRates`, chosen
 // by the page), and the API answers 422 `unsupported` on `country` for any other. A country change resets the account's
@@ -8,8 +8,9 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api/browser";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
 import { isApiError } from "@/lib/api/errors";
-import type { StoreMe, StoreMeInput } from "@/lib/api/types";
+import type { AccountMe, StoreMeInput } from "@/lib/api/types";
 import { CURRENCY_COOKIE } from "@/lib/currency-cookie";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
@@ -27,6 +28,24 @@ const NAME_MIN = 2;
 const NAME_MAX = 120;
 /** And a phone of at most 40. */
 const PHONE_MAX = 40;
+
+/** The three values a person edits. */
+export type StoreProfileValues = { name: string; phone: string; country: string };
+
+/**
+ * The body of the PATCH: only what differs from what the account holds. The API trims the name and the phone, so trimmed
+ * values are compared; an emptied phone is sent as "" (that clears it); an empty country is never sent (a saved country can be
+ * changed, not removed).
+ */
+export function changedStoreProfile(values: StoreProfileValues, saved: StoreProfileValues): StoreMeInput {
+  const changes: StoreMeInput = {};
+  const name = values.name.trim();
+  const phone = values.phone.trim();
+  if (name !== saved.name) changes.name = name;
+  if (phone !== saved.phone) changes.phone = phone;
+  if (values.country !== "" && values.country !== saved.country) changes.country = values.country;
+  return changes;
+}
 
 export type ProfileFormProps = {
   /** What the account holds now. `currency` is the account's own choice (null when none). */
@@ -69,13 +88,7 @@ export function ProfileForm({ initial, email, countries, t }: ProfileFormProps) 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
-    // Only what changed: the API trims the name and the phone, so compare trimmed values.
-    const changes: StoreMeInput = {};
-    const nextName = name.trim();
-    const nextPhone = phone.trim();
-    if (nextName !== saved.name) changes.name = nextName;
-    if (nextPhone !== saved.phone) changes.phone = nextPhone; // "" clears the phone
-    if (country !== "" && country !== saved.country) changes.country = country;
+    const changes = changedStoreProfile({ name, phone, country }, saved);
     if (Object.keys(changes).length === 0) {
       toast.info(t.nothingChanged);
       return;
@@ -87,7 +100,7 @@ export function ProfileForm({ initial, email, countries, t }: ProfileFormProps) 
     setBusy(true);
     setFeedback(NO_FEEDBACK);
     try {
-      const me = await api.patch<StoreMe>("/store/v1/me", changes);
+      const me = await api.patch<AccountMe>(FAMILY_ROUTES.store.profile, changes);
       const countryChanged = changes.country !== undefined;
       if (countryChanged) setCurrencyCookie(me.currency); // the API reset the currency to the country's default
       const currencyChanged = countryChanged && me.currency !== null && me.currency !== saved.currency;

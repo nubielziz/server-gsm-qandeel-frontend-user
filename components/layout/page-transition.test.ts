@@ -42,11 +42,8 @@ describe("PageTransition: every shop page plays the page enter on a client navig
 
 // Owner, 2026-11-15: the workspace pages get the same enter/exit as the shop's, with the rail, the header card and the
 // tab bar held still (named in globals.css).
-describe("PageTransition: every workspace page (customer area, merchant portal) plays it too", () => {
-  const areas = [
-    { name: "account", dir: path.join(APP, "account"), first: "page.tsx", min: 9 },
-    { name: "merchant", dir: path.join(APP, "(portal)/merchant"), first: "page.tsx", min: 17 },
-  ];
+describe("PageTransition: every page of the account area (one area for every rank) plays it too", () => {
+  const areas = [{ name: "account", dir: path.join(APP, "account"), first: "page.tsx", min: 19 }];
 
   for (const area of areas) {
     const list = pages(area.dir);
@@ -63,7 +60,7 @@ describe("PageTransition: every workspace page (customer area, merchant portal) 
 
   // React's streamed reveal animates a <ViewTransition> that is the first thing in a revealed boundary: a page streamed
   // behind the layout's session boundary would play its enter on the first load. An element in between prevents it.
-  for (const layout of ["account/layout.tsx", "(portal)/merchant/layout.tsx"]) {
+  for (const layout of ["account/layout.tsx"]) {
     it(`${layout}: an element sits between the page boundary and the page`, () => {
       const source = readFileSync(path.join(APP, layout), "utf8");
       expect(source).toMatch(/<Suspense fallback=\{<WorkspaceMainSkeleton \/>\}>\s*<div className="contents">/);

@@ -1,7 +1,8 @@
-// Support tickets: the public "contact support" form and the ticket conversation page (opened from the email link, or
-// from "My tickets" for a signed-in customer). A guest has no ticket list: the link in the ticket email is the way back, and
-// a signed-in customer also finds their tickets under "My tickets"; the public texts say both. The conversation is live (feature 28): `ticket.chat` is its own text, `list` and `newForm` serve
-// the ticket lists of a signed-in customer (`/account/tickets`) and merchant (`/merchant/support`).
+// Support tickets: the public "contact support" form and the ticket conversation page (opened from the email link, or from
+// the Support page of a signed-in account). A guest has no ticket list: the link in the ticket email is the way back, and a
+// signed-in account also finds its tickets under Support; the public texts say both. The conversation is live (feature 28):
+// `ticket.chat` is its own text, `list` and `newForm` serve the one Support page of every signed-in account
+// (`/account/support`).
 
 export const support = {
   metaTitle: "Contact support",
@@ -50,7 +51,7 @@ export const support = {
     track: { title: "Track an order", text: "See where an order is without signing in. You only need its tracking link.", action: "Track an order" },
     comeBack: {
       title: "Coming back later?",
-      text: "Use the link in your ticket email to read replies and answer. Signed in? Your tickets are also under My tickets in your account.",
+      text: "Use the link in your ticket email to read replies and answer. Signed in? Your tickets are also under Support in your account.",
     },
   },
 
@@ -125,7 +126,7 @@ export const support = {
     },
   },
 
-  // The ticket lists of a signed-in customer (`/account/tickets`) and merchant (`/merchant/support`).
+  // The ticket list of a signed-in account (`/account/support`), the same for every rank.
   list: {
     caption: "Your support tickets",
     columns: { ticket: "Ticket", subject: "Subject", topic: "Topic", status: "Status", activity: "Last activity" },
@@ -139,7 +140,7 @@ export const support = {
     emptyText: "Open a ticket and our team will answer here.",
     emptyAction: "Open a ticket",
   },
-  // The new-ticket form of a signed-in customer or merchant (the public form's fields, no email and no security check).
+  // The new-ticket form of a signed-in account (`/account/support/new`): the public form's fields, no email, no security check.
   newForm: {
     orderLabel: "Related order",
     orderNone: "No related order",

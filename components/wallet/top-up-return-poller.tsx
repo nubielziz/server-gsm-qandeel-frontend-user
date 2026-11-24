@@ -6,18 +6,19 @@
 // - it stops on a final state (`credited`, `rejected`, `cancelled`) and after two minutes, and then refreshes the page, so
 //   the balance cards and the top-ups list show what the API now says; the notice stays;
 // - every change of state is announced (the notice is a live region); a top-up that is not the customer's (404) says so;
-// - a signed-out answer refreshes the route (the layout then asks to sign in); any other failure just waits for the next read.
+// - a signed-out answer or a rank refusal refreshes the route (the layout then asks to sign in, or the page answers for the new rank);
+//   any other failure just waits for the next read.
 // The reason of a rejection comes from staff: it is a text node. No timer survives the page (the effect aborts and clears).
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { api, forgetCsrf } from "@/lib/api/browser";
+import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { TopUpDetail } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
 import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
 import { ltr } from "@/lib/merchant/format";
-import { isSignedOutError } from "@/lib/merchant/signed-out";
+import { leaveIfSignedOut } from "@/lib/merchant/signed-out";
 import { isFinalTopUp, pollDelayMs, shouldPollAgain } from "@/lib/wallet/top-up-errors";
 import { Alert, type AlertTone } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
@@ -79,11 +80,7 @@ export function TopUpReturnPoller({ id, href, labels: t }: TopUpReturnPollerProp
         }
       } catch (error) {
         if (controller.signal.aborted) return;
-        if (isSignedOutError(error)) {
-          forgetCsrf("store");
-          router.refresh();
-          return;
-        }
+        if (leaveIfSignedOut(error, router)) return;
         if (isApiError(error) && error.status === 404) {
           setState({ phase: "unavailable" });
           return;

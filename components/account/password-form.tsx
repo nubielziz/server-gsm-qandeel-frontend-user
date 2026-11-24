@@ -1,8 +1,11 @@
 "use client";
-// PasswordForm: change the password of a customer who has one (`POST /store/v1/me/password`). A wrong current password
-// is a 422 on `currentPassword` (never a 401, so nobody is signed out); a weak or unchanged password is WEAK_PASSWORD on
-// `newPassword`. The server ends the sessions on the customer's OTHER devices; this one stays signed in.
-import { useRef, useState, type FormEvent } from "react";
+// PasswordForm: change the password of an account that has one. One form for every rank: the page gives it the route of the
+// account's family (`FAMILY_ROUTES[family].password`). A wrong current password is a 422 on `currentPassword` (never a 401,
+// so nobody is signed out); a weak or unchanged password is WEAK_PASSWORD on `newPassword`. The server ends the sessions on
+// the account's OTHER devices; this one stays signed in. After a change the page is refreshed, so a gate that waited for a
+// new password (a temporary one given by support) reads the account again and lifts.
+import { useRouter } from "next/navigation";
+import { useRef, useState, useTransition, type FormEvent } from "react";
 import { api } from "@/lib/api/browser";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AccountMessages } from "@/lib/i18n/messages/account";
@@ -14,20 +17,36 @@ import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { toast } from "@/components/ui/toast";
 
-export function PasswordForm({ t }: { t: AccountMessages["settings"]["password"] }) {
+/** The body of the change: both route families take the same two keys. */
+export type PasswordChange = { currentPassword: string; newPassword: string };
+
+/** The one call the form makes: `POST <endpoint>` with the current and the new password. */
+export async function postPasswordChange(endpoint: string, change: PasswordChange): Promise<void> {
+  await api.post(endpoint, change);
+}
+
+export type PasswordFormProps = {
+  /** The family's own route (`FAMILY_ROUTES[family].password`). */
+  endpoint: string;
+  t: AccountMessages["settings"]["password"];
+};
+
+export function PasswordForm({ endpoint, t }: PasswordFormProps) {
+  const router = useRouter();
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
+  const [refreshing, startRefresh] = useTransition();
   const [done, setDone] = useState(false);
   const [feedback, setFeedback] = useState<FormFeedback>(NO_FEEDBACK);
   useFocusOnFeedback(feedback, form);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || refreshing) return;
     const required = errorText.field({ field: "", code: "required", message: "" }) ?? "";
     const missing: Record<string, string> = {};
     if (!current) missing.currentPassword = required;
@@ -41,12 +60,13 @@ export function PasswordForm({ t }: { t: AccountMessages["settings"]["password"]
     setFeedback(NO_FEEDBACK);
     setDone(false);
     try {
-      await api.post("/store/v1/me/password", { currentPassword: current, newPassword: next });
+      await postPasswordChange(endpoint, { currentPassword: current, newPassword: next });
       setCurrent("");
       setNext("");
       setConfirm("");
       setDone(true);
       toast.success(t.saved);
+      startRefresh(() => router.refresh());
     } catch (error) {
       setFeedback(feedbackFrom(error, errorText, ["currentPassword", "newPassword"], { currentPassword: t.wrongCurrent }));
     } finally {
@@ -71,6 +91,7 @@ export function PasswordForm({ t }: { t: AccountMessages["settings"]["password"]
           label={t.next}
           autoComplete="new-password"
           required
+          maxLength={128}
           value={next}
           onChange={(e) => setNext(e.target.value)}
           error={feedback.fields.newPassword}
@@ -80,6 +101,7 @@ export function PasswordForm({ t }: { t: AccountMessages["settings"]["password"]
           label={t.confirm}
           autoComplete="new-password"
           required
+          maxLength={128}
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           error={feedback.fields.confirm}
@@ -93,7 +115,7 @@ export function PasswordForm({ t }: { t: AccountMessages["settings"]["password"]
         </Alert>
       ) : null}
       <div>
-        <Button type="submit" loading={busy}>
+        <Button type="submit" loading={busy || refreshing}>
           {t.submit}
         </Button>
       </div>

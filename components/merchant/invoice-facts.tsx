@@ -7,12 +7,20 @@ import type { Invoice } from "@/lib/api/types";
 import { formatDate, formatPercent } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
 import { statusLabel, type CommonMessages } from "@/lib/i18n/messages/common";
-import type { MerchantMessages } from "@/lib/i18n/messages/merchant";
+import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
 import { labelOf } from "@/lib/merchant/format";
 
 const isZero = (text: string) => /^0+(\.0+)?$/.test(text.trim());
 
-export function InvoiceFacts({ invoice: inv, t, c }: { invoice: Invoice; t: MerchantMessages["invoices"]; c: CommonMessages }) {
+export function InvoiceFacts({
+  invoice: inv,
+  t,
+  c,
+}: {
+  invoice: Invoice;
+  t: TopUpsMessages["merchant"]["invoices"];
+  c: CommonMessages;
+}) {
   const kinds = t.kinds as Record<string, string>;
   const money = (amount: string) => <Money amount={amount} currency={inv.currency} />;
   return (

@@ -43,10 +43,10 @@ describe("polling", () => {
   it("polls at once when the server gave no count, then once a minute", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    const stop = store.subscribe("customer", () => {});
+    const stop = store.subscribe("store", () => {});
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchCount).toHaveBeenCalledTimes(1);
-    expect(store.getSnapshot("customer")).toBe(3);
+    expect(store.getSnapshot("store")).toBe(3);
 
     await vi.advanceTimersByTimeAsync(minute - 1);
     expect(fetchCount).toHaveBeenCalledTimes(1);
@@ -60,11 +60,11 @@ describe("polling", () => {
   it("does not ask when a seed follows the subscription in the same tick (the bell's own order)", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    const stop = store.subscribe("customer", () => {});
-    store.seed("customer", 2);
+    const stop = store.subscribe("store", () => {});
+    store.seed("store", 2);
     await vi.advanceTimersByTimeAsync(minute - 1);
     expect(fetchCount).not.toHaveBeenCalled();
-    expect(store.getSnapshot("customer")).toBe(2);
+    expect(store.getSnapshot("store")).toBe(2);
     await vi.advanceTimersByTimeAsync(1);
     expect(fetchCount).toHaveBeenCalledTimes(1);
     stop();
@@ -73,11 +73,11 @@ describe("polling", () => {
   it("does not poll right after the server's count (a seed starts the minute)", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 5);
-    const stop = store.subscribe("customer", () => {});
+    store.seed("store", 5);
+    const stop = store.subscribe("store", () => {});
     await vi.advanceTimersByTimeAsync(minute - 1);
     expect(fetchCount).not.toHaveBeenCalled();
-    expect(store.getSnapshot("customer")).toBe(5);
+    expect(store.getSnapshot("store")).toBe(5);
     await vi.advanceTimersByTimeAsync(1);
     expect(fetchCount).toHaveBeenCalledTimes(1);
     stop();
@@ -86,7 +86,7 @@ describe("polling", () => {
   it("does not poll while the tab is hidden, and polls when it comes back once the minute has passed", async () => {
     const { env, fetchCount, setVisible } = fakeEnv({ visible: false });
     const store = createUnreadStore(env);
-    const stop = store.subscribe("customer", () => {});
+    const stop = store.subscribe("store", () => {});
     await vi.advanceTimersByTimeAsync(10 * minute);
     expect(fetchCount).not.toHaveBeenCalled();
 
@@ -109,8 +109,8 @@ describe("polling", () => {
   it("waits for the rest of the minute when the tab comes back early", async () => {
     const { env, fetchCount, setVisible } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 1);
-    const stop = store.subscribe("customer", () => {});
+    store.seed("store", 1);
+    const stop = store.subscribe("store", () => {});
     await vi.advanceTimersByTimeAsync(20_000);
     setVisible(false);
     setVisible(true);
@@ -124,9 +124,9 @@ describe("polling", () => {
   it("stops polling and drops the visibility listener with the last subscriber", async () => {
     const { env, fetchCount, visibilityListeners } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 1);
-    const stopFirst = store.subscribe("customer", () => {});
-    const stopSecond = store.subscribe("customer", () => {});
+    store.seed("store", 1);
+    const stopFirst = store.subscribe("store", () => {});
+    const stopSecond = store.subscribe("store", () => {});
     expect(visibilityListeners()).toBe(1);
     stopFirst();
     expect(visibilityListeners()).toBe(1);
@@ -136,16 +136,16 @@ describe("polling", () => {
     expect(fetchCount).not.toHaveBeenCalled();
   });
 
-  it("keeps the two surfaces apart", async () => {
+  it("keeps the two families apart", async () => {
     const { env, fetchCount } = fakeEnv();
-    fetchCount.mockImplementation(async (surface) => (surface === "merchant" ? 7 : 2));
+    fetchCount.mockImplementation(async (family) => (family === "client" ? 7 : 2));
     const store = createUnreadStore(env);
-    const stop = store.subscribe("merchant", () => {});
+    const stop = store.subscribe("client", () => {});
     await vi.advanceTimersByTimeAsync(0);
-    expect(fetchCount).toHaveBeenCalledWith("merchant");
-    expect(fetchCount).not.toHaveBeenCalledWith("customer");
-    expect(store.getSnapshot("merchant")).toBe(7);
-    expect(store.getSnapshot("customer")).toBeNull();
+    expect(fetchCount).toHaveBeenCalledWith("client");
+    expect(fetchCount).not.toHaveBeenCalledWith("store");
+    expect(store.getSnapshot("client")).toBe(7);
+    expect(store.getSnapshot("store")).toBeNull();
     stop();
   });
 });
@@ -154,14 +154,14 @@ describe("refresh after an action", () => {
   it("asks at once, inside the minute, and tells the listeners", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 4);
+    store.seed("store", 4);
     const listener = vi.fn();
-    const stop = store.subscribe("customer", listener);
+    const stop = store.subscribe("store", listener);
     fetchCount.mockResolvedValueOnce(0);
 
-    await store.refresh("customer");
+    await store.refresh("store");
     expect(fetchCount).toHaveBeenCalledTimes(1);
-    expect(store.getSnapshot("customer")).toBe(0);
+    expect(store.getSnapshot("store")).toBe(0);
     expect(listener).toHaveBeenCalled();
 
     // The next poll comes a minute after the refresh, not a minute after the seed.
@@ -175,26 +175,26 @@ describe("refresh after an action", () => {
   it("never runs two requests at once: a second action waits and asks again once", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 5);
+    store.seed("store", 5);
     let finishFirst: (n: number) => void = () => {};
     fetchCount.mockImplementationOnce(() => new Promise<number>((resolve) => (finishFirst = resolve)));
     fetchCount.mockResolvedValueOnce(1);
 
-    const first = store.refresh("customer");
-    const second = store.refresh("customer");
-    const third = store.refresh("customer");
+    const first = store.refresh("store");
+    const second = store.refresh("store");
+    const third = store.refresh("store");
     expect(fetchCount).toHaveBeenCalledTimes(1);
     finishFirst(3);
     await Promise.all([first, second, third]);
     expect(fetchCount).toHaveBeenCalledTimes(2);
-    expect(store.getSnapshot("customer")).toBe(1);
+    expect(store.getSnapshot("store")).toBe(1);
   });
 
   it("does nothing while the tab is hidden for a poll, but an action still asks", async () => {
     const { env, fetchCount } = fakeEnv({ visible: false });
     const store = createUnreadStore(env);
-    store.seed("customer", 2);
-    await store.refresh("customer");
+    store.seed("store", 2);
+    await store.refresh("store");
     expect(fetchCount).toHaveBeenCalledTimes(1);
   });
 });
@@ -203,10 +203,10 @@ describe("reconcile (a count a server render brought)", () => {
   it("seeds when the store has no count yet, with no request", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    const stop = store.subscribe("customer", () => {});
-    store.reconcile("customer", 5);
+    const stop = store.subscribe("store", () => {});
+    store.reconcile("store", 5);
     await vi.advanceTimersByTimeAsync(minute - 1);
-    expect(store.getSnapshot("customer")).toBe(5);
+    expect(store.getSnapshot("store")).toBe(5);
     expect(fetchCount).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(fetchCount).toHaveBeenCalledTimes(1);
@@ -216,22 +216,22 @@ describe("reconcile (a count a server render brought)", () => {
   it("never overwrites a newer read: a stale count that differs makes the store ask again", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    const stop = store.subscribe("customer", () => {});
-    store.seed("customer", 2);
+    const stop = store.subscribe("store", () => {});
+    store.seed("store", 2);
     fetchCount.mockResolvedValue(0);
-    await store.refresh("customer");
-    expect(store.getSnapshot("customer")).toBe(0);
+    await store.refresh("store");
+    expect(store.getSnapshot("store")).toBe(0);
     expect(fetchCount).toHaveBeenCalledTimes(1);
 
     // A router.refresh that read the API before the action lands late with the old number.
-    store.reconcile("customer", 1);
-    expect(store.getSnapshot("customer")).toBe(0);
+    store.reconcile("store", 1);
+    expect(store.getSnapshot("store")).toBe(0);
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchCount).toHaveBeenCalledTimes(2);
-    expect(store.getSnapshot("customer")).toBe(0);
+    expect(store.getSnapshot("store")).toBe(0);
 
     // The same count as the store's own asks nothing.
-    store.reconcile("customer", 0);
+    store.reconcile("store", 0);
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchCount).toHaveBeenCalledTimes(2);
     stop();
@@ -240,37 +240,37 @@ describe("reconcile (a count a server render brought)", () => {
   it("takes the API's answer when the server count differs and the API agrees with the server", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    const stop = store.subscribe("customer", () => {});
-    store.seed("customer", 1);
+    const stop = store.subscribe("store", () => {});
+    store.seed("store", 1);
     fetchCount.mockResolvedValue(4);
-    store.reconcile("customer", 4);
+    store.reconcile("store", 4);
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchCount).toHaveBeenCalledTimes(1);
-    expect(store.getSnapshot("customer")).toBe(4);
+    expect(store.getSnapshot("store")).toBe(4);
     stop();
   });
 
   it("compares the capped count (250 from a server is 100)", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 100);
-    store.reconcile("customer", 250);
+    store.seed("store", 100);
+    store.reconcile("store", 250);
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchCount).not.toHaveBeenCalled();
-    expect(store.getSnapshot("customer")).toBe(UNREAD_CAP);
+    expect(store.getSnapshot("store")).toBe(UNREAD_CAP);
   });
 
   it("is a seed after a stop (the session works again)", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 2);
-    const stop = store.subscribe("customer", () => {});
+    store.seed("store", 2);
+    const stop = store.subscribe("store", () => {});
     fetchCount.mockRejectedValueOnce(new ApiError({ status: 401, code: "UNAUTHORIZED" }));
-    await store.refresh("customer");
+    await store.refresh("store");
     expect(fetchCount).toHaveBeenCalledTimes(1);
 
-    store.reconcile("customer", 9);
-    expect(store.getSnapshot("customer")).toBe(9);
+    store.reconcile("store", 9);
+    expect(store.getSnapshot("store")).toBe(9);
     await vi.advanceTimersByTimeAsync(minute);
     expect(fetchCount).toHaveBeenCalledTimes(2);
     stop();
@@ -279,14 +279,14 @@ describe("reconcile (a count a server render brought)", () => {
   it("does not ask during a 429 wait", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 1);
-    const stop = store.subscribe("customer", () => {});
+    store.seed("store", 1);
+    const stop = store.subscribe("store", () => {});
     fetchCount.mockRejectedValueOnce(new ApiError({ status: 429, code: "RATE_LIMITED", retryAfter: 300 }));
-    await store.refresh("customer");
-    store.reconcile("customer", 3);
+    await store.refresh("store");
+    store.reconcile("store", 3);
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchCount).toHaveBeenCalledTimes(1);
-    expect(store.getSnapshot("customer")).toBe(1);
+    expect(store.getSnapshot("store")).toBe(1);
     stop();
   });
 });
@@ -296,23 +296,23 @@ describe("counts", () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
     fetchCount.mockResolvedValueOnce(250);
-    await store.refresh("customer");
-    expect(store.getSnapshot("customer")).toBe(UNREAD_CAP);
-    store.seed("customer", -3);
-    expect(store.getSnapshot("customer")).toBe(0);
-    store.seed("customer", 100);
-    expect(store.getSnapshot("customer")).toBe(100);
+    await store.refresh("store");
+    expect(store.getSnapshot("store")).toBe(UNREAD_CAP);
+    store.seed("store", -3);
+    expect(store.getSnapshot("store")).toBe(0);
+    store.seed("store", 100);
+    expect(store.getSnapshot("store")).toBe(100);
   });
 
   it("does not notify when the count did not change", async () => {
     const { env } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 3);
+    store.seed("store", 3);
     const listener = vi.fn();
-    const stop = store.subscribe("customer", listener);
-    store.seed("customer", 3);
+    const stop = store.subscribe("store", listener);
+    store.seed("store", 3);
     expect(listener).not.toHaveBeenCalled();
-    store.seed("customer", 4);
+    store.seed("store", 4);
     expect(listener).toHaveBeenCalledTimes(1);
     stop();
   });
@@ -320,10 +320,10 @@ describe("counts", () => {
   it("ignores an answer that is not a number and keeps the last count", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 6);
+    store.seed("store", 6);
     fetchCount.mockResolvedValueOnce(undefined as unknown as number);
-    await store.refresh("customer");
-    expect(store.getSnapshot("customer")).toBe(6);
+    await store.refresh("store");
+    expect(store.getSnapshot("store")).toBe(6);
   });
 });
 
@@ -331,16 +331,16 @@ describe("failures", () => {
   it("stops for good after a 401", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 2);
-    const stop = store.subscribe("customer", () => {});
+    store.seed("store", 2);
+    const stop = store.subscribe("store", () => {});
     fetchCount.mockRejectedValueOnce(new ApiError({ status: 401, code: "UNAUTHORIZED" }));
 
-    await store.refresh("customer");
+    await store.refresh("store");
     expect(fetchCount).toHaveBeenCalledTimes(1);
-    expect(store.getSnapshot("customer")).toBe(2);
+    expect(store.getSnapshot("store")).toBe(2);
 
     await vi.advanceTimersByTimeAsync(30 * minute);
-    await store.refresh("customer");
+    await store.refresh("store");
     expect(fetchCount).toHaveBeenCalledTimes(1);
     stop();
   });
@@ -350,7 +350,7 @@ describe("failures", () => {
       const { env, fetchCount } = fakeEnv();
       const store = createUnreadStore(env);
       fetchCount.mockRejectedValueOnce(new ApiError({ status: 403, code }));
-      const stop = store.subscribe("merchant", () => {});
+      const stop = store.subscribe("client", () => {});
       await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(30 * minute);
       expect(fetchCount, code).toHaveBeenCalledTimes(1);
@@ -362,11 +362,11 @@ describe("failures", () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
     fetchCount.mockRejectedValueOnce(new ApiError({ status: 401, code: "UNAUTHORIZED" }));
-    const stop = store.subscribe("customer", () => {});
+    const stop = store.subscribe("store", () => {});
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchCount).toHaveBeenCalledTimes(1);
 
-    store.seed("customer", 9);
+    store.seed("store", 9);
     await vi.advanceTimersByTimeAsync(minute);
     expect(fetchCount).toHaveBeenCalledTimes(2);
     stop();
@@ -375,14 +375,14 @@ describe("failures", () => {
   it("waits for Retry-After after a 429, and not less than a minute", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 1);
-    const stop = store.subscribe("customer", () => {});
+    store.seed("store", 1);
+    const stop = store.subscribe("store", () => {});
     fetchCount.mockRejectedValueOnce(new ApiError({ status: 429, code: "RATE_LIMITED", retryAfter: 300 }));
-    await store.refresh("customer");
+    await store.refresh("store");
     expect(fetchCount).toHaveBeenCalledTimes(1);
 
     // An action during the wait does not ask either.
-    await store.refresh("customer");
+    await store.refresh("store");
     expect(fetchCount).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(300_000 - 1);
@@ -403,10 +403,10 @@ describe("failures", () => {
   it("never waits longer than the cap after a 429", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 1);
-    const stop = store.subscribe("customer", () => {});
+    store.seed("store", 1);
+    const stop = store.subscribe("store", () => {});
     fetchCount.mockRejectedValueOnce(new ApiError({ status: 429, code: "RATE_LIMITED", retryAfter: 86_400 }));
-    await store.refresh("customer");
+    await store.refresh("store");
     await vi.advanceTimersByTimeAsync(MAX_BACKOFF_MS);
     expect(fetchCount).toHaveBeenCalledTimes(2);
     stop();
@@ -415,25 +415,25 @@ describe("failures", () => {
   it("keeps the count and backs off after a network failure", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 8);
-    const stop = store.subscribe("customer", () => {});
+    store.seed("store", 8);
+    const stop = store.subscribe("store", () => {});
     fetchCount.mockRejectedValueOnce(new ApiError({ status: 0, code: "NETWORK_ERROR" }));
     fetchCount.mockRejectedValueOnce(new ApiError({ status: 503, code: "UNAVAILABLE" }));
     fetchCount.mockResolvedValue(2);
 
     await vi.advanceTimersByTimeAsync(minute); // poll 1 fails
     expect(fetchCount).toHaveBeenCalledTimes(1);
-    expect(store.getSnapshot("customer")).toBe(8);
+    expect(store.getSnapshot("store")).toBe(8);
 
     await vi.advanceTimersByTimeAsync(minute); // retry after a minute; poll 2 fails
     expect(fetchCount).toHaveBeenCalledTimes(2);
-    expect(store.getSnapshot("customer")).toBe(8);
+    expect(store.getSnapshot("store")).toBe(8);
 
     await vi.advanceTimersByTimeAsync(2 * minute - 1); // the second failure doubles the wait
     expect(fetchCount).toHaveBeenCalledTimes(2);
     await vi.advanceTimersByTimeAsync(1);
     expect(fetchCount).toHaveBeenCalledTimes(3);
-    expect(store.getSnapshot("customer")).toBe(2);
+    expect(store.getSnapshot("store")).toBe(2);
 
     await vi.advanceTimersByTimeAsync(minute); // success: back to the normal minute
     expect(fetchCount).toHaveBeenCalledTimes(4);
@@ -446,14 +446,14 @@ describe("live stream", () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
     const listener = vi.fn();
-    const stop = store.subscribe("customer", listener);
-    store.push("customer", 4);
-    expect(store.getSnapshot("customer")).toBe(4);
+    const stop = store.subscribe("store", listener);
+    store.push("store", 4);
+    expect(store.getSnapshot("store")).toBe(4);
     expect(listener).toHaveBeenCalledTimes(1);
-    store.push("customer", 4);
+    store.push("store", 4);
     expect(listener).toHaveBeenCalledTimes(1);
-    store.push("customer", 250);
-    expect(store.getSnapshot("customer")).toBe(UNREAD_CAP);
+    store.push("store", 250);
+    expect(store.getSnapshot("store")).toBe(UNREAD_CAP);
 
     await vi.advanceTimersByTimeAsync(minute - 1);
     expect(fetchCount).not.toHaveBeenCalled();
@@ -465,12 +465,12 @@ describe("live stream", () => {
   it("push lifts a stop: an event proves the session works", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    const stop = store.subscribe("customer", () => {});
+    const stop = store.subscribe("store", () => {});
     fetchCount.mockRejectedValueOnce(new ApiError({ status: 401, code: "UNAUTHORIZED" }));
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(10 * minute);
     expect(fetchCount).toHaveBeenCalledTimes(1);
-    store.push("customer", 2);
+    store.push("store", 2);
     await vi.advanceTimersByTimeAsync(minute);
     expect(fetchCount).toHaveBeenCalledTimes(2);
     stop();
@@ -479,9 +479,9 @@ describe("live stream", () => {
   it("polls only every five minutes while the stream is open, and every minute again after it closes", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 1);
-    const stop = store.subscribe("customer", () => {});
-    store.setLive("customer", true);
+    store.seed("store", 1);
+    const stop = store.subscribe("store", () => {});
+    store.setLive("store", true);
 
     await vi.advanceTimersByTimeAsync(LIVE_POLL_INTERVAL_MS - 1);
     expect(fetchCount).not.toHaveBeenCalled();
@@ -490,7 +490,7 @@ describe("live stream", () => {
     await vi.advanceTimersByTimeAsync(LIVE_POLL_INTERVAL_MS);
     expect(fetchCount).toHaveBeenCalledTimes(2);
 
-    store.setLive("customer", false);
+    store.setLive("store", false);
     await vi.advanceTimersByTimeAsync(minute - 1);
     expect(fetchCount).toHaveBeenCalledTimes(2);
     await vi.advanceTimersByTimeAsync(1);
@@ -501,12 +501,12 @@ describe("live stream", () => {
   it("asks at once when the stream closes after the short floor already passed", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    store.seed("customer", 1);
-    const stop = store.subscribe("customer", () => {});
-    store.setLive("customer", true);
+    store.seed("store", 1);
+    const stop = store.subscribe("store", () => {});
+    store.setLive("store", true);
     await vi.advanceTimersByTimeAsync(3 * minute);
     expect(fetchCount).not.toHaveBeenCalled();
-    store.setLive("customer", false);
+    store.setLive("store", false);
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchCount).toHaveBeenCalledTimes(1);
     stop();
@@ -515,11 +515,11 @@ describe("live stream", () => {
   it("an event while live pushes the next safety poll five minutes out", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    const stop = store.subscribe("customer", () => {});
-    store.setLive("customer", true);
-    store.push("customer", 1);
+    const stop = store.subscribe("store", () => {});
+    store.setLive("store", true);
+    store.push("store", 1);
     await vi.advanceTimersByTimeAsync(4 * minute);
-    store.push("customer", 2);
+    store.push("store", 2);
     await vi.advanceTimersByTimeAsync(4 * minute);
     expect(fetchCount).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(minute);
@@ -527,20 +527,20 @@ describe("live stream", () => {
     stop();
   });
 
-  it("an action's refresh still asks at once while live, and each surface has its own flag", async () => {
+  it("an action's refresh still asks at once while live, and each family has its own flag", async () => {
     const { env, fetchCount } = fakeEnv();
     const store = createUnreadStore(env);
-    const stopCustomer = store.subscribe("customer", () => {});
-    const stopMerchant = store.subscribe("merchant", () => {});
-    store.seed("customer", 1);
-    store.seed("merchant", 1);
-    store.setLive("customer", true);
-    await store.refresh("customer");
+    const stopStore = store.subscribe("store", () => {});
+    const stopClient = store.subscribe("client", () => {});
+    store.seed("store", 1);
+    store.seed("client", 1);
+    store.setLive("store", true);
+    await store.refresh("store");
     expect(fetchCount).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(minute);
-    expect(fetchCount).toHaveBeenCalledTimes(2); // the merchant slot is not live: its minute passed
-    expect(fetchCount).toHaveBeenLastCalledWith("merchant");
-    stopCustomer();
-    stopMerchant();
+    expect(fetchCount).toHaveBeenCalledTimes(2); // the client slot is not live: its minute passed
+    expect(fetchCount).toHaveBeenLastCalledWith("client");
+    stopStore();
+    stopClient();
   });
 });

@@ -1,5 +1,6 @@
-// The customer area: overview, orders and settings (profile, preferences, password, privacy). The workspace navigation
-// labels live in `portal.customerNav`.
+// The account area's own texts: overview, orders and the settings pages (profile, preferences, password, privacy),
+// which every rank shares. The texts only a merchant rank sees (notifications, API keys, the portal profile) are in
+// `merchant-settings.ts`. The workspace navigation labels live in `portal.ts`.
 
 export const account = {
   overview: {
@@ -78,34 +79,42 @@ export const account = {
     browse: "Browse services",
   },
 
-  // My tickets (feature 28): the signed-in customer's own ticket list and the new-ticket page. The conversation itself is
-  // the token page (`/support/tickets/<token>`, texts in `messages/support.ts`).
-  tickets: {
-    metaTitle: "My tickets",
-    title: "My tickets",
-    subtitle: "Your conversations with our support team. Replies appear here as they are written.",
-    newMetaTitle: "New ticket",
-    newTitle: "New ticket",
-    newSubtitle: "Tell us what happened. Our team answers in the conversation, and we email you if you miss a reply.",
-  },
-
   settings: {
-    metaTitle: "Settings",
     title: "Account settings",
-    subtitle: "Update your details, choose your currency, secure your account and manage your data.",
+    description: "Update your profile, secure your account and manage your data.",
+    navTitle: "Settings",
     navLabel: "Settings sections",
-    sections: { profile: "Profile", preferences: "Preferences", password: "Password", privacy: "Privacy" },
+    nav: { profile: "Profile", security: "Security", notifications: "Notifications", apiKeys: "API keys", privacy: "Privacy" },
     summary: {
       title: "Account summary",
-      customer: "Customer account",
-      memberSince: "Member since {date}",
+      memberSince: "Member since",
+      rank: "Rank",
+      discount: "{percent} discount",
+      status: "Status",
+      email: "Email",
       verified: "Verified",
       notVerified: "Not verified",
     },
+    quick: {
+      title: "Account security",
+      password: "Password settings",
+      twoFactor: "Two-step verification",
+      manage: "Manage security",
+      on: "On",
+      off: "Off",
+    },
     help: {
       title: "Need help?",
-      text: "Contact support for anything about your account or an order.",
-      contact: "Contact support",
+      text: "Our team can help with your account or an order.",
+      action: "Contact support",
+    },
+    details: {
+      title: "Account details",
+      description: "These details are managed by our team.",
+      username: "Username",
+      rank: "Rank",
+      memberSince: "Member since",
+      status: "Account status",
     },
 
     profile: {
@@ -153,9 +162,14 @@ export const account = {
       saved: "Password changed",
       savedText: "You were signed out on your other devices.",
       noneTitle: "You sign in with email links",
-      noneText:
-        "You have not chosen a password yet. Email yourself a link to set one, or keep signing in with email links.",
-      noneAction: "Set a password",
+      noneText: "You have not chosen a password yet. Email yourself a link to set one, or keep signing in with email links.",
+      noneAction: "Create a password",
+    },
+
+    // An account that has no password cannot turn on a second step, because the step is asked after the password.
+    twoFactorNeedsPassword: {
+      title: "Two-step verification",
+      text: "Two-step verification adds a code to password sign-in. Create a password first, then come back here to turn it on.",
     },
 
     privacy: {
@@ -176,6 +190,10 @@ export const account = {
           "We erase your name, email and device identifiers. You will not be able to sign in or follow your orders afterwards. Payment records are kept. Our team carries this out within 30 days and follows up by email.",
         confirm: "Yes, request deletion",
         cancel: "Keep my data",
+        // Shown in place of the button for a merchant rank (no request is sent): the same words the API answers with.
+        merchantRank:
+          "This account has a merchant rank. Ask us to move it to the retail rank first; then you can ask for erasure.",
+        merchantAction: "Contact support",
       },
       received: "Request received",
       requestKind: { export: "Data export", erasure: "Data deletion" },

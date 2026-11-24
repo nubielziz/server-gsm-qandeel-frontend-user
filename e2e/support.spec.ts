@@ -1,10 +1,10 @@
 // Support tickets: the public form, the conversation page opened from the link, replying, and the friendly
-// 404. Staff answers come from the admin API of the isolated backend (the seeded Support agent), because the customer
-// side cannot create them. Throwaway emails keep the "3 tickets per hour per email" limit away from the demo customers.
+// 404. Staff answers come from the admin API of the isolated backend (the seeded Support agent), because the requester's
+// side cannot create them. Throwaway emails keep the "3 tickets per hour per email" limit away from the demo accounts.
 import { createHmac } from "node:crypto";
 import { expect, test } from "./fixtures";
 import { type Page } from "@playwright/test";
-import { ACCOUNTS, signInCustomer } from "./helpers";
+import { ACCOUNTS, signIn } from "./helpers";
 
 const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 const API_ORIGIN = process.env.E2E_API_ORIGIN ?? "http://localhost:3100";
@@ -105,14 +105,14 @@ async function fillTicket(page: Page, values: { email?: string; subject: string;
 test.describe("new ticket form", () => {
   test.beforeEach(async ({ page }) => stubTurnstile(page));
 
-  test("shows the form, the side cards and points signed-in customers to My tickets", async ({ page }) => {
+  test("shows the form, the side cards and points signed-in accounts to Support", async ({ page }) => {
     await go(page, "/en/support");
     await expect(page.getByRole("heading", { level: 1, name: "Contact support" })).toBeVisible();
     await expect(page.locator('input[name="email"]')).toBeVisible();
     await expect(page.locator('select[name="category"] option')).toHaveCount(8);
     await expect(page.getByRole("link", { name: /Open the help center/ })).toHaveAttribute("href", "/en/help");
     await expect(page.getByRole("link", { name: /Track an order/ }).first()).toBeVisible();
-    await expect(page.getByText(/Your tickets are also under My tickets in your account/)).toBeVisible();
+    await expect(page.getByText(/Your tickets are also under Support in your account/)).toBeVisible();
     // Attachments are not supported by the API: no file inputs or attach buttons.
     await expect(page.locator('input[type="file"]')).toHaveCount(0);
   });
@@ -131,10 +131,16 @@ test.describe("new ticket form", () => {
     await expect(page.locator('input[name="email"]')).not.toHaveAttribute("required", "");
   });
 
-  test("a signed-in customer has the email prefilled", async ({ page }) => {
-    await signInCustomer(page);
+  test("a signed-in retail account has the email prefilled", async ({ page }) => {
+    await signIn(page, ACCOUNTS.retail);
     await go(page, "/en/support");
-    await expect(page.locator('input[name="email"]')).toHaveValue(ACCOUNTS.customer.email);
+    await expect(page.locator('input[name="email"]')).toHaveValue(ACCOUNTS.retail.email);
+  });
+
+  test("a signed-in merchant rank has the email prefilled too: the public form reads the one session", async ({ page }) => {
+    await signIn(page, ACCOUNTS.merchant);
+    await go(page, "/en/support");
+    await expect(page.locator('input[name="email"]')).toHaveValue(ACCOUNTS.merchant.email);
   });
 
   test("with an order link: ticket created, conversation opens, reply appears, staff answer arrives and the ticket closes", async ({ page }) => {

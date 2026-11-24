@@ -1,6 +1,6 @@
 "use client";
-// Cloudflare Turnstile (anti-bot) for the six store routes that require it (handoff §3.10): IMEI check, opening a
-// checkout, magic link, customer login, customer forgot-password and new tickets. The token goes in the
+// Cloudflare Turnstile (anti-bot) for the routes that require it (handoff §3.10): opening a checkout, the sign-in link,
+// sign-in, forgot password and new tickets. The token goes in the
 // `X-Turnstile-Token` header (lib/api/browser.ts `turnstileToken`). A token is single use and is spent even when the
 // request fails validation, so forms bump `resetKey` after EVERY submit to get a fresh one.
 // The script loads lazily, only on pages that render this component.

@@ -134,7 +134,7 @@ function makeTab(shared: Shared, options: { withDedupe?: boolean; events?: strin
   });
   const env: StreamEnv = {
     url: "/store/v1/me/stream",
-    lockName: "gsm-stream-customer",
+    lockName: "gsm-stream-store",
     createEventSource,
     locks: shared.locks,
     createChannel: (name) => shared.bus?.create(name) ?? null,
@@ -670,7 +670,7 @@ describe("several tabs", () => {
     await flush();
     expect(b.client.status().live).toBe(true);
     // The leader keeps hearing its server but its repeats no longer reach the follower (a stuck tab).
-    const [leaderChannel] = [...shared.bus!.channels.get("gsm-stream-customer")!];
+    const [leaderChannel] = [...shared.bus!.channels.get("gsm-stream-store")!];
     const mute = vi.spyOn(leaderChannel!, "postMessage").mockImplementation(() => undefined);
     await vi.advanceTimersByTimeAsync(30_000);
     a.source.frame("hb", 1);

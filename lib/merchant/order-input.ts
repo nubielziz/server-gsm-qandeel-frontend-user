@@ -4,6 +4,7 @@ import { isValidImei, normalizeImei } from "@/lib/format";
 import type { MerchantOrderInput, MerchantServiceDetail } from "@/lib/api/types";
 import type { FieldError } from "@/lib/api/errors";
 import { fromMerchantRule, isAllowedQuantity, parseQuantityInput, quantityMode } from "@/lib/quantity";
+import { sitePath } from "@/lib/site-path";
 
 /** At most this many IMEIs in one bulk order (`imeis` has 1–100 items). */
 export const MAX_BULK_IMEIS = 100;
@@ -170,6 +171,35 @@ export const MAX_IN_PROGRESS_RETRIES = 3;
 export function inProgressWaitMs(retryAfterSeconds: number | undefined): number {
   const seconds = typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : 1;
   return Math.min(Math.max(Math.ceil(seconds), 1), 10) * 1000;
+}
+
+// ── Where the form leads ───────────────────────────────────────────────────────────────────────────────────
+
+/** The pages the order form and its notices lead to. They are pages of the account area, which every rank shares. */
+export type OrderFormHrefs = {
+  /** The list of the account's orders (where a bulk order lands). */
+  orders: string;
+  /** The orders address; an order's own page is `<orderBase>/<id>`. */
+  orderBase: string;
+  /** The page that adds funds to the wallet (the notice for a balance that is too low). */
+  topUp: string;
+  /** The price list (the way back when a service is switched off). */
+  services: string;
+};
+
+/** The addresses the price list's pages give the order form. */
+export function orderFormHrefs(): OrderFormHrefs {
+  return {
+    orders: sitePath("/account/orders"),
+    orderBase: sitePath("/account/orders"),
+    topUp: sitePath("/account/wallet/add-funds"),
+    services: sitePath("/account/services"),
+  };
+}
+
+/** Where the form goes once the API accepted the order: the order's own page for one order, the orders list for a bulk order. */
+export function placedHref(orders: readonly { id: number }[], hrefs: Pick<OrderFormHrefs, "orders" | "orderBase">): string {
+  return orders.length === 1 ? `${hrefs.orderBase}/${orders[0].id}` : hrefs.orders;
 }
 
 // ── API field errors → form state ──────────────────────────────────────────────────────────────────────────

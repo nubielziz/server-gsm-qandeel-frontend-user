@@ -10,10 +10,11 @@ import {
   AUTH_DIR,
   FIXTURES_FILE,
   ensureCurrency,
-  ensureCustomerWallet,
   ensureListingImage,
   ensureQuantityRule,
   ensureStock,
+  ensureStoreWallet,
+  rankIds,
   serviceIdByCode,
   staff,
   storeService,
@@ -41,8 +42,12 @@ export default async function globalSetup(): Promise<void> {
   // 1. The staff session (cached in e2e/.auth/staff.json for every spec).
   await staff();
 
-  // 2. Customer wallet on, and the manual top-up gateway.
-  const { gatewayId } = await ensureCustomerWallet();
+  // 2. Store wallet on, and the manual top-up gateway.
+  const { gatewayId } = await ensureStoreWallet();
+
+  // 2b. The two ranks the account helpers use (the retail rank and the default merchant rank): fail here, with a clear
+  // message, when the demo data lacks one, rather than in the first spec that makes an account.
+  await rankIds();
 
   // 3. Quantity rules.
   const range = await ensureQuantityRule(SLUGS.range, { min: 2, max: 50 });

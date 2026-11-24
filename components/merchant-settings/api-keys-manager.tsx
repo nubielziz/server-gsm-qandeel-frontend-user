@@ -6,17 +6,17 @@
 import { useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Ban, Headset, KeyRound, Pencil, Plus } from "lucide-react";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import { pathOf } from "@/lib/api/query";
 import type { ApiKey, ApiKeyCreated } from "@/lib/api/types";
 import { fmt } from "@/lib/i18n/define";
 import type { MerchantSettingsMessages } from "@/lib/i18n/messages/merchant-settings";
-import { PageHeader } from "@/components/layout/container";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader } from "@/components/ui/card";
 import { Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Textarea } from "@/components/ui/input";
@@ -129,7 +129,10 @@ export function ApiKeysManager({ rows, liveCount, max, t, fieldTexts, optional }
   }
 
   async function create(values: { name: string; ips: string[]; date: string }) {
-    const created = await mutate(() => api.post<ApiKeyCreated>("/client/api-keys", newKeyBody(values)), ["name", "allowedIps", "expiresAt"]);
+    const created = await mutate(
+      () => api.post<ApiKeyCreated>(FAMILY_ROUTES.client.apiKeys, newKeyBody(values)),
+      ["name", "allowedIps", "expiresAt"],
+    );
     if (created) setModal({ kind: "secret", name: created.key.name, secret: created.secret });
   }
 
@@ -141,7 +144,10 @@ export function ApiKeysManager({ rows, liveCount, max, t, fieldTexts, optional }
       setModal(null);
       return;
     }
-    const saved = await mutate(() => api.patch<ApiKey>(pathOf("/client/api-keys/:id", { id: key.id }), body), ["name", "allowedIps"]);
+    const saved = await mutate(
+      () => api.patch<ApiKey>(pathOf(`${FAMILY_ROUTES.client.apiKeys}/:id`, { id: key.id }), body),
+      ["name", "allowedIps"],
+    );
     if (saved) {
       toast.success(t.saved);
       setModal(null);
@@ -150,7 +156,7 @@ export function ApiKeysManager({ rows, liveCount, max, t, fieldTexts, optional }
 
   async function revoke(key: KeyRow) {
     const done = await mutate(async () => {
-      await api.delete(pathOf("/client/api-keys/:id", { id: key.id }));
+      await api.delete(pathOf(`${FAMILY_ROUTES.client.apiKeys}/:id`, { id: key.id }));
       return true;
     }, []);
     if (done) {
@@ -159,20 +165,24 @@ export function ApiKeysManager({ rows, liveCount, max, t, fieldTexts, optional }
     }
   }
 
+  // The settings page above has the one h1; this card names the section with an h2 and holds the "New API key" button.
   const header = (
-    <PageHeader
-      variant="card"
-      title={t.title}
-      description={t.description}
-      actions={
-        <div className="flex flex-wrap items-center gap-3">
-          <p className="num text-small text-ink-subtle">{fmt(t.countOf, { live: liveCount, max })}</p>
-          <Button startIcon={<Plus aria-hidden="true" />} disabled={limitReached} onClick={openCreate}>
-            {t.create}
-          </Button>
-        </div>
-      }
-    />
+    <Card as="section">
+      <CardHeader
+        title={t.title}
+        titleAs="h2"
+        description={t.description}
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="num text-small text-ink-subtle">{fmt(t.countOf, { live: liveCount, max })}</p>
+            <Button startIcon={<Plus aria-hidden="true" />} disabled={limitReached} onClick={openCreate}>
+              {t.create}
+            </Button>
+          </div>
+        }
+        className="pb-5 sm:pb-6"
+      />
+    </Card>
   );
 
   return (
@@ -307,9 +317,9 @@ function KeyCard({ row, t, onEdit, onRevoke }: { row: KeyRow; t: Props["t"]; onE
       <Card as="article" tone="muted">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-3.5 sm:px-6">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-            <h2 className="text-body font-semibold text-ink-muted" dir="auto">
+            <h3 className="text-body font-semibold text-ink-muted" dir="auto">
               {row.name}
-            </h2>
+            </h3>
             <code dir="ltr" className="num rounded-badge bg-surface-sunken px-1.5 py-0.5 font-mono text-small text-ink-muted">
               {row.prefix}…
             </code>
@@ -330,9 +340,9 @@ function KeyCard({ row, t, onEdit, onRevoke }: { row: KeyRow; t: Props["t"]; onE
     <Card as="article" tone={row.expired ? "muted" : "default"}>
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 px-5 pt-5 sm:px-6 sm:pt-6">
         <div className="min-w-0">
-          <h2 className="text-subheading text-ink" dir="auto">
+          <h3 className="text-subheading text-ink" dir="auto">
             {row.name}
-          </h2>
+          </h3>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-small text-ink-subtle">
             <code dir="ltr" className="num rounded-badge bg-surface-sunken px-1.5 py-0.5 font-mono text-ink-muted">
               {row.prefix}…

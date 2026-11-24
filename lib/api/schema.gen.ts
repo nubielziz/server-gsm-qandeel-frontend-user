@@ -30,7 +30,6 @@ export type GetClientApiKeysResponse = Array<{
   clientId: Id;
   name: string;
   prefix: string;
-  scopes: string[];
   allowedIps: string[];
   rateLimitPerMin: number;
   lastUsedAt: IsoDateTime | null;
@@ -45,7 +44,6 @@ export type GetClientApiKeysResponse = Array<{
 // ── POST /client/api-keys — New API key
 export type PostClientApiKeysBody = {
   name: string;
-  scopes: string[];
   allowedIps?: string[];
   /** ISO 8601 UTC time with milliseconds. */
   expiresAt?: IsoDateTime;
@@ -59,7 +57,6 @@ export type PostClientApiKeysResponse = {
     clientId: Id;
     name: string;
     prefix: string;
-    scopes: string[];
     allowedIps: string[];
     rateLimitPerMin: number;
     lastUsedAt: IsoDateTime | null;
@@ -90,7 +87,6 @@ export type PatchClientApiKeysByIdResponse = {
   clientId: Id;
   name: string;
   prefix: string;
-  scopes: string[];
   allowedIps: string[];
   rateLimitPerMin: number;
   lastUsedAt: IsoDateTime | null;
@@ -131,34 +127,39 @@ export type PostClientAuthLoginResponse = {
 /** 204 */
 export type PostClientAuthLogoutResponse = void;
 
-// ── GET /client/auth/me — The merchant's details and client group
+// ── GET /client/auth/me — The merchant's account and rank
 /** 200 */
 export type GetClientAuthMeResponse = {
   /** Numeric record id. */
   id: Id;
-  username: string;
-  email: string;
   name: string;
-  company: string;
-  phone: string;
-  country: string;
-  status: "pending" | "active" | "suspended";
-  kycStatus: "none" | "pending" | "approved" | "rejected";
-  emailVerifiedAt: IsoDateTime | null;
-  twofaEnabled: boolean;
-  referralCode: string;
-  group: {
+  email: string;
+  status: "active" | "suspended" | "blocked" | "anonymized";
+  rank: {
     /** Numeric record id. */
     id: Id;
     name: string;
+    kind: "retail" | "merchant";
     /** Exact decimal number as a string. */
     discountPercent: Decimal;
   };
-  /** ISO 8601 UTC time with milliseconds. */
-  createdAt: IsoDateTime;
+  /** True once the account has a password; false for an account that signs in by link. */
+  hasPassword: boolean;
+  mustChangePassword: boolean;
+  twofaEnabled: boolean;
+  /** The ISO code of the currency prices are shown in; null when none is chosen. */
+  currency: string | null;
+  marketingOptIn: boolean;
+  company: string;
+  /** The Dhru username of a merchant rank; empty for a retail account. */
+  username: string;
+  phone: string;
+  country: string;
   address: string;
   taxId: string;
-  mustChangePassword: boolean;
+  emailVerifiedAt: IsoDateTime | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
 };
 
 // ── POST /client/auth/password/change — Replace a temporary password
@@ -185,20 +186,7 @@ export type PostClientAuthPasswordResetBody = {
 /** 204 */
 export type PostClientAuthPasswordResetResponse = void;
 
-// ── POST /client/auth/register — Register a new merchant
-export type PostClientAuthRegisterBody = {
-  name: string;
-  email: string;
-  password: string;
-  company?: string;
-  phone?: string;
-  country: string;
-  referralCode?: string;
-};
-/** 204 */
-export type PostClientAuthRegisterResponse = void;
-
-// ── POST /client/auth/sign-in — Sign in as a merchant or a customer with one form
+// ── POST /client/auth/sign-in — Sign in with one form
 export type PostClientAuthSignInBody = {
   email: string;
   password: string;
@@ -207,6 +195,12 @@ export type PostClientAuthSignInBody = {
 export type PostClientAuthSignInResponse = {
   kind: "merchant" | "customer";
   next: "password" | "totp" | "done";
+  rank: {
+    /** Numeric record id. */
+    id: Id;
+    name: string;
+    kind: "retail" | "merchant";
+  };
 };
 
 // ── POST /client/auth/verify-email — Verify the email with the token
@@ -219,41 +213,6 @@ export type PostClientAuthVerifyEmailResponse = void;
 // ── POST /client/auth/verify-email/resend — Resend the verification email
 /** 204 */
 export type PostClientAuthVerifyEmailResendResponse = void;
-
-// ── GET /client/commissions — My commissions
-export type GetClientCommissionsQuery = {
-  /** First row to return (0-based, inclusive). Default 0. */
-  _start?: number;
-  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 1000 rows. */
-  _end?: number;
-  /** Comma-separated sort fields. Allowed: createdAt, period, amount. Default: createdAt desc. */
-  _sort?: string;
-  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
-  _order?: string;
-  /** Keep rows where status equals (repeat the key for IN) the value. */
-  status?: Array<"accrued" | "approved" | "reversed">;
-  /** Keep rows where period equals (repeat the key for IN) the value. */
-  period?: string[];
-};
-/** 200 */
-export type GetClientCommissionsResponse = Array<{
-  /** Numeric record id. */
-  id: Id;
-  period: string;
-  merchant: {
-    name: string;
-  };
-  /** The order's revenue. */
-  basisAmount: Money;
-  /** Exact decimal number as a string. */
-  percent: Decimal;
-  /** `basisAmount x percent / 100`, 4 decimals, capped so that the commissions of one order never exceed its margin (revenue minus cost; decision 049). */
-  amount: Money;
-  status: "accrued" | "approved" | "reversed";
-  approvedAt: IsoDateTime | null;
-  /** ISO 8601 UTC time with milliseconds. */
-  createdAt: IsoDateTime;
-}>;
 
 // ── GET /client/dashboard — My dashboard
 /** 200 */
@@ -305,7 +264,6 @@ export type GetClientDashboardResponse = {
       fileId: Id | null;
     };
     verificationStatus: "requested" | "accepted" | "refunded" | null;
-    clientNote: string | null;
     inputFileId: Id | null;
     /** `POST /client/orders/:id/cancel` would be accepted now. */
     canCancel: boolean;
@@ -322,7 +280,7 @@ export type GetClientDashboardResponse = {
 export type PostClientFilesBody = FormData;
 /** 201 */
 export type PostClientFilesResponse = {
-  /** What a File service order takes as its input file (`fileId`), or a KYC submission or a receipt. */
+  /** What a File service order takes as its input file (`fileId`), or a receipt refers to. */
   id: Id;
   /** The base name of the file, without control characters, at most 200 characters. */
   filename: string;
@@ -361,9 +319,9 @@ export type GetClientInvoicesQuery = {
   /** Keep rows where status is not (repeat the key for NOT IN) the value. */
   status_ne?: Array<"open" | "paid" | "void">;
   /** Keep rows where kind equals (repeat the key for IN) the value. */
-  kind?: Array<"topup" | "manual" | "receipt" | "statement">;
+  kind?: Array<"topup" | "manual" | "receipt">;
   /** Keep rows where kind is not (repeat the key for NOT IN) the value. */
-  kind_ne?: Array<"topup" | "manual" | "receipt" | "statement">;
+  kind_ne?: Array<"topup" | "manual" | "receipt">;
   /** Keep rows where createdAt equals (repeat the key for IN) the value. */
   createdAt?: string[];
   /** Keep rows where createdAt is greater than or equal to the value. */
@@ -547,70 +505,12 @@ export type PostClientInvoicesByIdReceiptResponse = {
   createdAt: IsoDateTime;
 };
 
-// ── GET /client/kyc — My verification status
-/** 200 */
-export type GetClientKycResponse = {
-  /** The merchant's verification status: none, pending, approved or rejected. */
-  status: "none" | "pending" | "approved" | "rejected";
-  /** The latest request; null when the merchant never submitted. */
-  submission: {
-    /** Numeric record id. */
-    id: Id;
-    status: "pending" | "approved" | "rejected";
-    /** The staff note of a rejection; null otherwise. */
-    note: string | null;
-    documents: Array<{
-      /** Numeric record id. */
-      fileId: Id;
-      filename: string;
-      mime: string;
-      size: number;
-    }>;
-    /** ISO 8601 UTC time with milliseconds. */
-    submittedAt: IsoDateTime;
-    reviewedAt: IsoDateTime | null;
-  } | null;
-};
-
-// ── POST /client/kyc — Submit verification documents
-export type PostClientKycBody = {
-  fileIds: Id[];
-  note?: string;
-};
-/** 201 */
-export type PostClientKycResponse = {
-  /** The merchant's verification status: none, pending, approved or rejected. */
-  status: "none" | "pending" | "approved" | "rejected";
-  /** The latest request; null when the merchant never submitted. */
-  submission: {
-    /** Numeric record id. */
-    id: Id;
-    status: "pending" | "approved" | "rejected";
-    /** The staff note of a rejection; null otherwise. */
-    note: string | null;
-    documents: Array<{
-      /** Numeric record id. */
-      fileId: Id;
-      filename: string;
-      mime: string;
-      size: number;
-    }>;
-    /** ISO 8601 UTC time with milliseconds. */
-    submittedAt: IsoDateTime;
-    reviewedAt: IsoDateTime | null;
-  } | null;
-};
-
 // ── GET /client/notification-preferences — My notification preferences
 /** 200 */
 export type GetClientNotificationPreferencesResponse = {
   email: {
     /** The merchant's own email address; read only. */
     address: string;
-  };
-  telegram: {
-    /** True while a Telegram chat is linked. */
-    linked: boolean;
   };
   /** The available balance under which `wallet.low_balance` fires; `null` means no alert. */
   lowBalanceThreshold: Money | null;
@@ -619,7 +519,6 @@ export type GetClientNotificationPreferencesResponse = {
     event: string;
     label: string;
     email: boolean;
-    telegram: boolean;
   }>;
 };
 
@@ -629,7 +528,6 @@ export type PutClientNotificationPreferencesBody = {
   events?: Array<{
     event: string;
     email: boolean;
-    telegram: boolean;
   }>;
 };
 /** 200 */
@@ -638,10 +536,6 @@ export type PutClientNotificationPreferencesResponse = {
     /** The merchant's own email address; read only. */
     address: string;
   };
-  telegram: {
-    /** True while a Telegram chat is linked. */
-    linked: boolean;
-  };
   /** The available balance under which `wallet.low_balance` fires; `null` means no alert. */
   lowBalanceThreshold: Money | null;
   /** Every merchant event that can be switched on or off. The mails that sign you in (verification, reset, invitation) are always sent and not listed. */
@@ -649,7 +543,6 @@ export type PutClientNotificationPreferencesResponse = {
     event: string;
     label: string;
     email: boolean;
-    telegram: boolean;
   }>;
 };
 
@@ -774,7 +667,6 @@ export type GetClientOrdersResponse = Array<{
     fileId: Id | null;
   };
   verificationStatus: "requested" | "accepted" | "refunded" | null;
-  clientNote: string | null;
   inputFileId: Id | null;
   /** `POST /client/orders/:id/cancel` would be accepted now. */
   canCancel: boolean;
@@ -833,7 +725,6 @@ export type PostClientOrdersResponse = {
       fileId: Id | null;
     };
     verificationStatus: "requested" | "accepted" | "refunded" | null;
-    clientNote: string | null;
     inputFileId: Id | null;
     /** `POST /client/orders/:id/cancel` would be accepted now. */
     canCancel: boolean;
@@ -884,7 +775,6 @@ export type GetClientOrdersByIdResponse = {
     fileId: Id | null;
   };
   verificationStatus: "requested" | "accepted" | "refunded" | null;
-  clientNote: string | null;
   inputFileId: Id | null;
   /** `POST /client/orders/:id/cancel` would be accepted now. */
   canCancel: boolean;
@@ -982,52 +872,34 @@ export type PatchClientProfileBody = {
 export type PatchClientProfileResponse = {
   /** Numeric record id. */
   id: Id;
-  username: string;
-  email: string;
   name: string;
-  company: string;
-  phone: string;
-  country: string;
-  status: "pending" | "active" | "suspended";
-  kycStatus: "none" | "pending" | "approved" | "rejected";
-  emailVerifiedAt: IsoDateTime | null;
-  twofaEnabled: boolean;
-  referralCode: string;
-  group: {
+  email: string;
+  status: "active" | "suspended" | "blocked" | "anonymized";
+  rank: {
     /** Numeric record id. */
     id: Id;
     name: string;
+    kind: "retail" | "merchant";
     /** Exact decimal number as a string. */
     discountPercent: Decimal;
   };
-  /** ISO 8601 UTC time with milliseconds. */
-  createdAt: IsoDateTime;
+  /** True once the account has a password; false for an account that signs in by link. */
+  hasPassword: boolean;
+  mustChangePassword: boolean;
+  twofaEnabled: boolean;
+  /** The ISO code of the currency prices are shown in; null when none is chosen. */
+  currency: string | null;
+  marketingOptIn: boolean;
+  company: string;
+  /** The Dhru username of a merchant rank; empty for a retail account. */
+  username: string;
+  phone: string;
+  country: string;
   address: string;
   taxId: string;
-  mustChangePassword: boolean;
-};
-
-// ── GET /client/referrals — My referral link and referred merchants
-/** 200 */
-export type GetClientReferralsResponse = {
-  referralCode: string;
-  referralLink: string;
-  plan: {
-    name: string;
-    kind: "referral" | "rebate";
-    /** The rate in percent with 4 decimals. */
-    percent: Decimal;
-    basis: string;
-    period: string;
-    /** ISO 8601 UTC time with milliseconds. */
-    startsAt: IsoDateTime;
-  } | null;
-  referredCount: number;
-  referred: Array<{
-    name: string;
-    /** ISO 8601 UTC time with milliseconds. */
-    joinedAt: IsoDateTime;
-  }>;
+  emailVerifiedAt: IsoDateTime | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
 };
 
 // ── POST /client/security/2fa/disable — Disable 2FA with a code
@@ -1149,40 +1021,6 @@ export type GetClientServicesByIdResponse = {
   }>;
 };
 
-// ── GET /client/sessions — Active devices and sessions
-export type GetClientSessionsQuery = {
-  /** First row to return (0-based, inclusive). Default 0. */
-  _start?: number;
-  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 1000 rows. */
-  _end?: number;
-  /** Comma-separated sort fields. Allowed: createdAt, lastSeenAt. Default: createdAt desc. */
-  _sort?: string;
-  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
-  _order?: string;
-};
-/** 200 */
-export type GetClientSessionsResponse = Array<{
-  /** Numeric record id. */
-  id: Id;
-  ip: string;
-  userAgent: string;
-  /** ISO 8601 UTC time with milliseconds. */
-  lastSeenAt: IsoDateTime;
-  /** ISO 8601 UTC time with milliseconds. */
-  createdAt: IsoDateTime;
-  /** ISO 8601 UTC time with milliseconds. */
-  expiresAt: IsoDateTime;
-  current: boolean;
-}>;
-
-// ── DELETE /client/sessions/:id — End a session
-export type DeleteClientSessionsByIdParams = {
-  /** Numeric record id. */
-  id: Id;
-};
-/** 204 */
-export type DeleteClientSessionsByIdResponse = void;
-
 // ── GET /client/stream — My live event stream
 export type GetClientStreamQuery = {
   /** The last event id the page saw (`i9001`), for a new stream that should replay what it missed. */
@@ -1190,14 +1028,6 @@ export type GetClientStreamQuery = {
 };
 /** 200 text/event-stream */
 export type GetClientStreamResponse = Blob;
-
-// ── POST /client/telegram/link — A one-time link to connect Telegram
-/** 201 */
-export type PostClientTelegramLinkResponse = {
-  url: string;
-  /** ISO 8601 UTC time with milliseconds. */
-  expiresAt: IsoDateTime;
-};
 
 // ── GET /client/tickets — My support tickets
 export type GetClientTicketsQuery = {
@@ -1402,14 +1232,6 @@ export type PostClientTicketsByIdReadBody = {
 /** 204 */
 export type PostClientTicketsByIdReadResponse = void;
 
-// ── POST /client/tickets/:id/typing — Tell support the merchant is typing
-export type PostClientTicketsByIdTypingParams = {
-  /** The ticket. */
-  id: Id;
-};
-/** 204 */
-export type PostClientTicketsByIdTypingResponse = void;
-
 // ── GET /client/wallet — My wallet
 /** 200 */
 export type GetClientWalletResponse = {
@@ -1445,133 +1267,15 @@ export type GetClientWalletStatementResponse = Array<{
   /** The entry kind: deposit, order_hold, order_release, adjustment, commission, ... */
   kind: string;
   memo: string;
-  /** Signed from the merchant side: a deposit is positive, an order hold negative. */
+  /** The order the line is about, when it is one (the staff statement; absent on the merchant portal). */
+  orderId?: Id | null;
+  /** Signed from the account side: a deposit is positive, an order hold negative. */
   amount: Money;
-  /** The wallet balance right after the line, merchant side. */
+  /** The wallet balance right after the line, account side. */
   balanceAfter: Money;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
 }>;
-
-// ── GET /client/webhooks — My webhook endpoints
-export type GetClientWebhooksQuery = {
-  /** First row to return (0-based, inclusive). Default 0. */
-  _start?: number;
-  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 1000 rows. */
-  _end?: number;
-  /** Comma-separated sort fields. Allowed: createdAt, id. Default: createdAt desc. */
-  _sort?: string;
-  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
-  _order?: string;
-};
-/** 200 */
-export type GetClientWebhooksResponse = Array<{
-  /** Numeric record id. */
-  id: Id;
-  url: string;
-  events: Array<"order.status_changed" | "wallet.low_balance" | "invoice.paid" | "service.price_changed">;
-  isActive: boolean;
-  failureCount: number;
-  /** ISO 8601 UTC time with milliseconds. */
-  createdAt: IsoDateTime;
-  /** ISO 8601 UTC time with milliseconds. */
-  updatedAt: IsoDateTime;
-}>;
-
-// ── POST /client/webhooks — New webhook endpoint
-export type PostClientWebhooksBody = {
-  url: string;
-  events: Array<"order.status_changed" | "wallet.low_balance" | "invoice.paid" | "service.price_changed">;
-  isActive?: boolean;
-};
-/** 201 */
-export type PostClientWebhooksResponse = {
-  endpoint: {
-    /** Numeric record id. */
-    id: Id;
-    url: string;
-    events: Array<"order.status_changed" | "wallet.low_balance" | "invoice.paid" | "service.price_changed">;
-    isActive: boolean;
-    failureCount: number;
-    /** ISO 8601 UTC time with milliseconds. */
-    createdAt: IsoDateTime;
-    /** ISO 8601 UTC time with milliseconds. */
-    updatedAt: IsoDateTime;
-  };
-  secret: string;
-};
-
-// ── PATCH /client/webhooks/:id — Edit or pause an endpoint
-export type PatchClientWebhooksByIdParams = {
-  /** Numeric record id. */
-  id: Id;
-};
-export type PatchClientWebhooksByIdBody = {
-  url?: string;
-  events?: Array<"order.status_changed" | "wallet.low_balance" | "invoice.paid" | "service.price_changed">;
-  isActive?: boolean;
-};
-/** 200 */
-export type PatchClientWebhooksByIdResponse = {
-  /** Numeric record id. */
-  id: Id;
-  url: string;
-  events: Array<"order.status_changed" | "wallet.low_balance" | "invoice.paid" | "service.price_changed">;
-  isActive: boolean;
-  failureCount: number;
-  /** ISO 8601 UTC time with milliseconds. */
-  createdAt: IsoDateTime;
-  /** ISO 8601 UTC time with milliseconds. */
-  updatedAt: IsoDateTime;
-};
-
-// ── DELETE /client/webhooks/:id — Delete an endpoint
-export type DeleteClientWebhooksByIdParams = {
-  /** Numeric record id. */
-  id: Id;
-};
-/** 204 */
-export type DeleteClientWebhooksByIdResponse = void;
-
-// ── GET /client/webhooks/:id/deliveries — Delivery log of an endpoint
-export type GetClientWebhooksByIdDeliveriesQuery = {
-  /** First row to return (0-based, inclusive). Default 0. */
-  _start?: number;
-  /** Row after the last one to return (exclusive). Default _start + 25; a page holds at most 1000 rows. */
-  _end?: number;
-  /** Comma-separated sort fields. Allowed: createdAt, id. Default: createdAt desc. */
-  _sort?: string;
-  /** Comma-separated directions (asc or desc), one per sort field in the same order. */
-  _order?: string;
-};
-export type GetClientWebhooksByIdDeliveriesParams = {
-  /** Numeric record id. */
-  id: Id;
-};
-/** 200 */
-export type GetClientWebhooksByIdDeliveriesResponse = Array<{
-  /** Numeric record id. */
-  id: Id;
-  event: string;
-  attempt: number;
-  status: "pending" | "succeeded" | "failed";
-  responseCode: number;
-  error: string;
-  nextRetryAt: IsoDateTime | null;
-  /** ISO 8601 UTC time with milliseconds. */
-  createdAt: IsoDateTime;
-}>;
-
-// ── POST /client/webhooks/:id/test — Send a test event
-export type PostClientWebhooksByIdTestParams = {
-  /** Numeric record id. */
-  id: Id;
-};
-/** 202 */
-export type PostClientWebhooksByIdTestResponse = {
-  /** Numeric record id. */
-  deliveryId: Id;
-};
 
 // ── POST /store/v1/auth/login — Sign in with email and password
 export type PostStoreV1AuthLoginBody = {
@@ -1580,7 +1284,7 @@ export type PostStoreV1AuthLoginBody = {
 };
 /** 200 */
 export type PostStoreV1AuthLoginResponse = {
-  next: "password" | "done";
+  next: "password" | "totp" | "done";
 };
 
 // ── POST /store/v1/auth/logout — Sign out and end the session
@@ -1612,27 +1316,51 @@ export type PostStoreV1AuthPasswordSetResponse = void;
 // ── POST /store/v1/auth/verify — Exchange a sign-in link for a session
 export type PostStoreV1AuthVerifyBody = {
   token: string;
+  /** Move the orders of the guest row of this email onto the account (offered after the mailbox was proven); default false. */
+  claimGuestOrders?: boolean;
 };
 /** 200 */
 export type PostStoreV1AuthVerifyResponse = {
   /** Numeric record id. */
   id: Id;
-  email: string;
-  emailVerifiedAt: IsoDateTime | null;
   name: string;
-  phone: string;
-  country: string;
+  email: string;
+  status: "active" | "suspended" | "blocked" | "anonymized";
+  rank: {
+    /** Numeric record id. */
+    id: Id;
+    name: string;
+    kind: "retail" | "merchant";
+    /** Exact decimal number as a string. */
+    discountPercent: Decimal;
+  };
+  /** True once the account has a password; false for an account that signs in by link. */
+  hasPassword: boolean;
+  mustChangePassword: boolean;
+  twofaEnabled: boolean;
   /** The ISO code of the currency prices are shown in; null when none is chosen. */
   currency: string | null;
   marketingOptIn: boolean;
-  /** True once the customer has chosen a password. */
-  hasPassword: boolean;
+  company: string;
+  /** The Dhru username of a merchant rank; empty for a retail account. */
+  username: string;
+  phone: string;
+  country: string;
+  address: string;
+  taxId: string;
+  emailVerifiedAt: IsoDateTime | null;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
   /** True when this browser asked for the link (it carries the cookie of `POST /store/v1/auth/magic-link`); false for a link asked for in another browser or sent by the shop: the shop then shows whose account was opened (`maskedEmail`). */
   requestedHere: boolean;
   /** The address of the account the link opened, masked (`da•••@example.com`). */
   maskedEmail: string;
+  /** `totp` when two-step sign-in still wants a code (a `pending_totp` session: finish with `POST /client/auth/2fa`), `done` otherwise. */
+  next: "totp" | "done";
+  /** How many guest orders (and their records) moved onto the account; 0 when the box was not ticked or nothing matched. */
+  claimedOrders: number;
+  /** `busy` when the claim gave up because another request holds a row it needs: the sign-in still succeeded, ask for a new link later. */
+  claimSkipped?: "busy";
 };
 
 // ── GET /store/v1/categories — List the storefront categories
@@ -1654,7 +1382,7 @@ export type GetStoreV1CategoriesResponse = {
 export type PostStoreV1CheckoutSessionsBody = {
   /** The service page the buyer is on (`id` of `GET /store/v1/services`). */
   serviceId: Id;
-  /** Where the receipt and the tracking link go; with no account the email is the identity of a guest customer. */
+  /** Where the receipt and the tracking link go; signed out, the email names the guest record of the buyer (never the login account of that email). */
   email: string;
   /** The buyer's country: the tax of its window is locked on the session. While the shop has a tax window in force, it must be a country that has one (the `taxRates` of `GET /store/v1/config`). */
   country: string;
@@ -1670,7 +1398,7 @@ export type PostStoreV1CheckoutSessionsBody = {
   inputs?: {
     [key: string]: string;
   };
-  /** Where the buyer came from (the abandoned-checkouts report reads `source`). */
+  /** Where the buyer came from. */
   utm?: {
     source?: string;
     medium?: string;
@@ -1745,7 +1473,7 @@ export type PostStoreV1CheckoutSessionsResponse = {
     /** The public path of the logo staff uploaded; null when none, then show the bundled logo of `preset` (feature 32). */
     logoUrl: string | null;
   }>;
-  /** Feature 21: true when the store balance is switched on and this checkout was opened by a signed-in customer, so `POST /store/v1/checkout-sessions/:token/balance-payment` may pay it (with that customer signed in). Never the balance itself: read it from `GET /store/v1/me/wallet`. */
+  /** Feature 21: true when the store balance is switched on and this checkout was opened by a signed-in retail account, so `POST /store/v1/checkout-sessions/:token/balance-payment` may pay it (with that account signed in). Never the balance itself: read it from `GET /store/v1/me/wallet`. */
   balancePayable: boolean;
   /** The tracking token of the order this payment created (`GET /store/v1/orders/:token`); null until the checkout is paid. The holder of the checkout token is the buyer, so the shop can send them to their order without an account. */
   trackingToken: string | null;
@@ -1822,7 +1550,7 @@ export type GetStoreV1CheckoutSessionsByTokenResponse = {
     /** The public path of the logo staff uploaded; null when none, then show the bundled logo of `preset` (feature 32). */
     logoUrl: string | null;
   }>;
-  /** Feature 21: true when the store balance is switched on and this checkout was opened by a signed-in customer, so `POST /store/v1/checkout-sessions/:token/balance-payment` may pay it (with that customer signed in). Never the balance itself: read it from `GET /store/v1/me/wallet`. */
+  /** Feature 21: true when the store balance is switched on and this checkout was opened by a signed-in retail account, so `POST /store/v1/checkout-sessions/:token/balance-payment` may pay it (with that account signed in). Never the balance itself: read it from `GET /store/v1/me/wallet`. */
   balancePayable: boolean;
   /** The tracking token of the order this payment created (`GET /store/v1/orders/:token`); null until the checkout is paid. The holder of the checkout token is the buyer, so the shop can send them to their order without an account. */
   trackingToken: string | null;
@@ -1963,7 +1691,6 @@ export type GetStoreV1ConfigResponse = {
   policies: {
     guestCheckout: boolean;
     withdrawalWaiver: boolean;
-    imeiPrecheck: boolean;
   };
   legalDocuments: Array<{
     type: "terms" | "privacy" | "refund" | "cookies";
@@ -1977,7 +1704,7 @@ export type GetStoreV1ConfigResponse = {
 export type PostStoreV1FilesBody = FormData;
 /** 201 */
 export type PostStoreV1FilesResponse = {
-  /** What a File service order takes as its input file (`fileId`), or a KYC submission or a receipt. */
+  /** What a File service order takes as its input file (`fileId`), or a receipt refers to. */
   id: Id;
   /** The base name of the file, without control characters, at most 200 characters. */
   filename: string;
@@ -2053,38 +1780,6 @@ export type PostStoreV1HelpBySlugVoteBody = {
 /** 204 */
 export type PostStoreV1HelpBySlugVoteResponse = void;
 
-// ── POST /store/v1/imei/check — Check an IMEI
-export type PostStoreV1ImeiCheckBody = {
-  /** 15 digits; spaces and dashes are ignored. */
-  imei: string;
-  /** The service the buyer is about to order: a check before an order (`pre_order`). Without it the check is the free tool. */
-  serviceId?: Id;
-};
-/** 200 */
-export type PostStoreV1ImeiCheckResponse = {
-  /** The 15 digits, as read. */
-  imei: string;
-  /** `unknown` until the blacklist and lock lookup exists. */
-  status: "clean" | "blacklisted" | "locked" | "unknown";
-  checks: {
-    checksum: "valid";
-    /** Whether the catalogue knows the first 8 digits. */
-    tac: "known" | "unknown";
-  };
-  /** Null when the TAC is not in the catalogue. */
-  device: {
-    tac: string;
-    brand: string;
-    model: string;
-    marketingName: string;
-    releaseYear: number | null;
-  } | null;
-  /** True when a stored result was reused. Always false for this check: only the paid supplier check reuses results. */
-  cached: boolean;
-  /** When the result was produced. */
-  checkedAt: IsoDateTime;
-};
-
 // ── GET /store/v1/legacy-slugs/:kind/:slug — Resolve an old address
 export type GetStoreV1LegacySlugsByKindBySlugParams = {
   kind: "service" | "page" | "help";
@@ -2110,16 +1805,32 @@ export type PostStoreV1MarketingUnsubscribeByTokenResponse = void;
 export type GetStoreV1MeResponse = {
   /** Numeric record id. */
   id: Id;
-  email: string;
-  emailVerifiedAt: IsoDateTime | null;
   name: string;
-  phone: string;
-  country: string;
+  email: string;
+  status: "active" | "suspended" | "blocked" | "anonymized";
+  rank: {
+    /** Numeric record id. */
+    id: Id;
+    name: string;
+    kind: "retail" | "merchant";
+    /** Exact decimal number as a string. */
+    discountPercent: Decimal;
+  };
+  /** True once the account has a password; false for an account that signs in by link. */
+  hasPassword: boolean;
+  mustChangePassword: boolean;
+  twofaEnabled: boolean;
   /** The ISO code of the currency prices are shown in; null when none is chosen. */
   currency: string | null;
   marketingOptIn: boolean;
-  /** True once the customer has chosen a password. */
-  hasPassword: boolean;
+  company: string;
+  /** The Dhru username of a merchant rank; empty for a retail account. */
+  username: string;
+  phone: string;
+  country: string;
+  address: string;
+  taxId: string;
+  emailVerifiedAt: IsoDateTime | null;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
 };
@@ -2136,18 +1847,56 @@ export type PatchStoreV1MeBody = {
 export type PatchStoreV1MeResponse = {
   /** Numeric record id. */
   id: Id;
-  email: string;
-  emailVerifiedAt: IsoDateTime | null;
   name: string;
-  phone: string;
-  country: string;
+  email: string;
+  status: "active" | "suspended" | "blocked" | "anonymized";
+  rank: {
+    /** Numeric record id. */
+    id: Id;
+    name: string;
+    kind: "retail" | "merchant";
+    /** Exact decimal number as a string. */
+    discountPercent: Decimal;
+  };
+  /** True once the account has a password; false for an account that signs in by link. */
+  hasPassword: boolean;
+  mustChangePassword: boolean;
+  twofaEnabled: boolean;
   /** The ISO code of the currency prices are shown in; null when none is chosen. */
   currency: string | null;
   marketingOptIn: boolean;
-  /** True once the customer has chosen a password. */
-  hasPassword: boolean;
+  company: string;
+  /** The Dhru username of a merchant rank; empty for a retail account. */
+  username: string;
+  phone: string;
+  country: string;
+  address: string;
+  taxId: string;
+  emailVerifiedAt: IsoDateTime | null;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
+};
+
+// ── POST /store/v1/me/2fa/disable — Turn off two-step sign-in with a code
+export type PostStoreV1Me2faDisableBody = {
+  code: string;
+};
+/** 204 */
+export type PostStoreV1Me2faDisableResponse = void;
+
+// ── POST /store/v1/me/2fa/enable — Turn on two-step sign-in after confirming a code
+export type PostStoreV1Me2faEnableBody = {
+  code: string;
+};
+/** 204 */
+export type PostStoreV1Me2faEnableResponse = void;
+
+// ── POST /store/v1/me/2fa/setup — A new authenticator secret with a QR code
+/** 200 */
+export type PostStoreV1Me2faSetupResponse = {
+  secret: string;
+  otpauthUrl: string;
+  qrSvg: string;
 };
 
 // ── POST /store/v1/me/data-delete — Ask to be anonymized
@@ -2357,10 +2106,6 @@ export type PostStoreV1MeTicketsResponse = {
   /** ISO 8601 UTC time with milliseconds. */
   updatedAt: IsoDateTime;
   resolvedAt: IsoDateTime | null;
-  /** The rating the customer gave, once. */
-  csatScore: number | null;
-  /** True while the ticket is resolved and not yet rated. */
-  canRate: boolean;
   /** Oldest first, without internal notes. */
   messages: Array<{
     /** Numeric record id. */
@@ -3023,7 +2768,7 @@ export type GetStoreV1SearchSuggestResponse = {
   didYouMean: string | null;
   /** Popular searches, only while the text is empty. */
   popular: string[];
-  /** `imei`: the text is an IMEI: offer the IMEI check, no search ran. */
+  /** `imei`: the text is an IMEI: no search ran and nothing was recorded. */
   intent: "imei" | null;
 };
 
@@ -3235,10 +2980,6 @@ export type PostStoreV1TicketsResponse = {
   /** ISO 8601 UTC time with milliseconds. */
   updatedAt: IsoDateTime;
   resolvedAt: IsoDateTime | null;
-  /** The rating the customer gave, once. */
-  csatScore: number | null;
-  /** True while the ticket is resolved and not yet rated. */
-  canRate: boolean;
   /** Oldest first, without internal notes. */
   messages: Array<{
     /** Numeric record id. */
@@ -3291,67 +3032,6 @@ export type GetStoreV1TicketsByTokenResponse = {
   /** ISO 8601 UTC time with milliseconds. */
   updatedAt: IsoDateTime;
   resolvedAt: IsoDateTime | null;
-  /** The rating the customer gave, once. */
-  csatScore: number | null;
-  /** True while the ticket is resolved and not yet rated. */
-  canRate: boolean;
-  /** Oldest first, without internal notes. */
-  messages: Array<{
-    /** Numeric record id. */
-    id: Id;
-    /** `you` is the requester, `support` is the team. */
-    from: "you" | "support";
-    /** May be `''` when the message is files only. */
-    body: string;
-    /** ISO 8601 UTC time with milliseconds. */
-    createdAt: IsoDateTime;
-    /** The files of the message, oldest first; empty when it has none. Always sent; optional in the schema until the storefront merge. */
-    attachments?: Array<{
-      /** Numeric record id. */
-      id: Id;
-      /** The stored base name: the download is saved under it. Never shown inline. */
-      filename: string;
-      /** `application/pdf`, `image/jpeg` or `image/png`. */
-      mime: string;
-      /** Bytes, at most 5 MiB. */
-      size: number;
-    }>;
-  }>;
-  /** The newest support message the requester has seen (their own mark), or null. Always sent; optional in the schema until the storefront merge. */
-  seenByYou?: Id | null;
-  /** The newest message of the requester that support has seen, or null: show `Seen` under it and the older ones. Always sent; optional in the schema until the storefront merge. */
-  seenBySupport?: Id | null;
-  /** When support saw it, or null. Always sent; optional in the schema until the storefront merge. */
-  seenBySupportAt?: IsoDateTime | null;
-};
-
-// ── POST /store/v1/tickets/:token/csat — Rate a resolved support ticket
-export type PostStoreV1TicketsByTokenCsatParams = {
-  /** The ticket token. */
-  token: string;
-};
-export type PostStoreV1TicketsByTokenCsatBody = {
-  score: number;
-};
-/** 200 */
-export type PostStoreV1TicketsByTokenCsatResponse = {
-  /** The ticket number to quote, 'T-1042' style. */
-  number: string;
-  subject: string;
-  category: "refund" | "delay" | "failed_unlock" | "billing" | "wrong_imei" | "howto" | "presale" | "other";
-  /** `pending` means the team waits for the customer. */
-  status: "new" | "open" | "pending" | "resolved";
-  /** The order the ticket is about, when it has one. */
-  orderId: Id | null;
-  /** ISO 8601 UTC time with milliseconds. */
-  createdAt: IsoDateTime;
-  /** ISO 8601 UTC time with milliseconds. */
-  updatedAt: IsoDateTime;
-  resolvedAt: IsoDateTime | null;
-  /** The rating the customer gave, once. */
-  csatScore: number | null;
-  /** True while the ticket is resolved and not yet rated. */
-  canRate: boolean;
   /** Oldest first, without internal notes. */
   messages: Array<{
     /** Numeric record id. */
@@ -3472,14 +3152,6 @@ export type GetStoreV1TicketsByTokenStreamParams = {
 /** 200 text/event-stream */
 export type GetStoreV1TicketsByTokenStreamResponse = Blob;
 
-// ── POST /store/v1/tickets/:token/typing — Tell support the customer is typing
-export type PostStoreV1TicketsByTokenTypingParams = {
-  /** The ticket token. */
-  token: string;
-};
-/** 204 */
-export type PostStoreV1TicketsByTokenTypingResponse = void;
-
 /** Every /client and /store/v1 route: `ApiRoutes['GET /store/v1/services']['response']`. */
 export interface ApiRoutes {
   "GET /client/api-keys": { query: GetClientApiKeysQuery; params: never; body: never; response: GetClientApiKeysResponse; status: 200 };
@@ -3493,11 +3165,9 @@ export interface ApiRoutes {
   "POST /client/auth/password/change": { query: never; params: never; body: PostClientAuthPasswordChangeBody; response: PostClientAuthPasswordChangeResponse; status: 200 };
   "POST /client/auth/password/forgot": { query: never; params: never; body: PostClientAuthPasswordForgotBody; response: PostClientAuthPasswordForgotResponse; status: 204 };
   "POST /client/auth/password/reset": { query: never; params: never; body: PostClientAuthPasswordResetBody; response: PostClientAuthPasswordResetResponse; status: 204 };
-  "POST /client/auth/register": { query: never; params: never; body: PostClientAuthRegisterBody; response: PostClientAuthRegisterResponse; status: 204 };
   "POST /client/auth/sign-in": { query: never; params: never; body: PostClientAuthSignInBody; response: PostClientAuthSignInResponse; status: 200 };
   "POST /client/auth/verify-email": { query: never; params: never; body: PostClientAuthVerifyEmailBody; response: PostClientAuthVerifyEmailResponse; status: 204 };
   "POST /client/auth/verify-email/resend": { query: never; params: never; body: never; response: PostClientAuthVerifyEmailResendResponse; status: 204 };
-  "GET /client/commissions": { query: GetClientCommissionsQuery; params: never; body: never; response: GetClientCommissionsResponse; status: 200 };
   "GET /client/dashboard": { query: never; params: never; body: never; response: GetClientDashboardResponse; status: 200 };
   "POST /client/files": { query: never; params: never; body: PostClientFilesBody; response: PostClientFilesResponse; status: 201 };
   "GET /client/files/:id": { query: never; params: GetClientFilesByIdParams; body: never; response: GetClientFilesByIdResponse; status: 302 };
@@ -3505,8 +3175,6 @@ export interface ApiRoutes {
   "POST /client/invoices": { query: never; params: never; body: PostClientInvoicesBody; response: PostClientInvoicesResponse; status: 201 };
   "GET /client/invoices/:id": { query: never; params: GetClientInvoicesByIdParams; body: never; response: GetClientInvoicesByIdResponse; status: 200 };
   "POST /client/invoices/:id/receipt": { query: never; params: PostClientInvoicesByIdReceiptParams; body: PostClientInvoicesByIdReceiptBody; response: PostClientInvoicesByIdReceiptResponse; status: 201 };
-  "GET /client/kyc": { query: never; params: never; body: never; response: GetClientKycResponse; status: 200 };
-  "POST /client/kyc": { query: never; params: never; body: PostClientKycBody; response: PostClientKycResponse; status: 201 };
   "GET /client/notification-preferences": { query: never; params: never; body: never; response: GetClientNotificationPreferencesResponse; status: 200 };
   "PUT /client/notification-preferences": { query: never; params: never; body: PutClientNotificationPreferencesBody; response: PutClientNotificationPreferencesResponse; status: 200 };
   "GET /client/notifications": { query: GetClientNotificationsQuery; params: never; body: never; response: GetClientNotificationsResponse; status: 200 };
@@ -3522,32 +3190,21 @@ export interface ApiRoutes {
   "GET /client/payment-methods": { query: GetClientPaymentMethodsQuery; params: never; body: never; response: GetClientPaymentMethodsResponse; status: 200 };
   "GET /client/prices/export": { query: GetClientPricesExportQuery; params: never; body: never; response: GetClientPricesExportResponse; status: 200 };
   "PATCH /client/profile": { query: never; params: never; body: PatchClientProfileBody; response: PatchClientProfileResponse; status: 200 };
-  "GET /client/referrals": { query: never; params: never; body: never; response: GetClientReferralsResponse; status: 200 };
   "POST /client/security/2fa/disable": { query: never; params: never; body: PostClientSecurity2faDisableBody; response: PostClientSecurity2faDisableResponse; status: 204 };
   "POST /client/security/2fa/enable": { query: never; params: never; body: PostClientSecurity2faEnableBody; response: PostClientSecurity2faEnableResponse; status: 204 };
   "POST /client/security/2fa/setup": { query: never; params: never; body: never; response: PostClientSecurity2faSetupResponse; status: 200 };
   "POST /client/security/password": { query: never; params: never; body: PostClientSecurityPasswordBody; response: PostClientSecurityPasswordResponse; status: 204 };
   "GET /client/services": { query: GetClientServicesQuery; params: never; body: never; response: GetClientServicesResponse; status: 200 };
   "GET /client/services/:id": { query: never; params: GetClientServicesByIdParams; body: never; response: GetClientServicesByIdResponse; status: 200 };
-  "GET /client/sessions": { query: GetClientSessionsQuery; params: never; body: never; response: GetClientSessionsResponse; status: 200 };
-  "DELETE /client/sessions/:id": { query: never; params: DeleteClientSessionsByIdParams; body: never; response: DeleteClientSessionsByIdResponse; status: 204 };
   "GET /client/stream": { query: GetClientStreamQuery; params: never; body: never; response: GetClientStreamResponse; status: 200 };
-  "POST /client/telegram/link": { query: never; params: never; body: never; response: PostClientTelegramLinkResponse; status: 201 };
   "GET /client/tickets": { query: GetClientTicketsQuery; params: never; body: never; response: GetClientTicketsResponse; status: 200 };
   "POST /client/tickets": { query: never; params: never; body: PostClientTicketsBody; response: PostClientTicketsResponse; status: 201 };
   "GET /client/tickets/:id": { query: never; params: GetClientTicketsByIdParams; body: never; response: GetClientTicketsByIdResponse; status: 200 };
   "GET /client/tickets/:id/files/:fileId": { query: never; params: GetClientTicketsByIdFilesByFileIdParams; body: never; response: GetClientTicketsByIdFilesByFileIdResponse; status: 302 };
   "POST /client/tickets/:id/messages": { query: never; params: PostClientTicketsByIdMessagesParams; body: PostClientTicketsByIdMessagesBody; response: PostClientTicketsByIdMessagesResponse; status: 201 };
   "POST /client/tickets/:id/read": { query: never; params: PostClientTicketsByIdReadParams; body: PostClientTicketsByIdReadBody; response: PostClientTicketsByIdReadResponse; status: 204 };
-  "POST /client/tickets/:id/typing": { query: never; params: PostClientTicketsByIdTypingParams; body: never; response: PostClientTicketsByIdTypingResponse; status: 204 };
   "GET /client/wallet": { query: never; params: never; body: never; response: GetClientWalletResponse; status: 200 };
   "GET /client/wallet/statement": { query: GetClientWalletStatementQuery; params: never; body: never; response: GetClientWalletStatementResponse; status: 200 };
-  "GET /client/webhooks": { query: GetClientWebhooksQuery; params: never; body: never; response: GetClientWebhooksResponse; status: 200 };
-  "POST /client/webhooks": { query: never; params: never; body: PostClientWebhooksBody; response: PostClientWebhooksResponse; status: 201 };
-  "PATCH /client/webhooks/:id": { query: never; params: PatchClientWebhooksByIdParams; body: PatchClientWebhooksByIdBody; response: PatchClientWebhooksByIdResponse; status: 200 };
-  "DELETE /client/webhooks/:id": { query: never; params: DeleteClientWebhooksByIdParams; body: never; response: DeleteClientWebhooksByIdResponse; status: 204 };
-  "GET /client/webhooks/:id/deliveries": { query: GetClientWebhooksByIdDeliveriesQuery; params: GetClientWebhooksByIdDeliveriesParams; body: never; response: GetClientWebhooksByIdDeliveriesResponse; status: 200 };
-  "POST /client/webhooks/:id/test": { query: never; params: PostClientWebhooksByIdTestParams; body: never; response: PostClientWebhooksByIdTestResponse; status: 202 };
   "POST /store/v1/auth/login": { query: never; params: never; body: PostStoreV1AuthLoginBody; response: PostStoreV1AuthLoginResponse; status: 200 };
   "POST /store/v1/auth/logout": { query: never; params: never; body: never; response: PostStoreV1AuthLogoutResponse; status: 204 };
   "POST /store/v1/auth/magic-link": { query: never; params: never; body: PostStoreV1AuthMagicLinkBody; response: PostStoreV1AuthMagicLinkResponse; status: 204 };
@@ -3565,11 +3222,13 @@ export interface ApiRoutes {
   "GET /store/v1/help": { query: GetStoreV1HelpQuery; params: never; body: never; response: GetStoreV1HelpResponse; status: 200 };
   "GET /store/v1/help/:slug": { query: never; params: GetStoreV1HelpBySlugParams; body: never; response: GetStoreV1HelpBySlugResponse; status: 200 };
   "POST /store/v1/help/:slug/vote": { query: never; params: PostStoreV1HelpBySlugVoteParams; body: PostStoreV1HelpBySlugVoteBody; response: PostStoreV1HelpBySlugVoteResponse; status: 204 };
-  "POST /store/v1/imei/check": { query: never; params: never; body: PostStoreV1ImeiCheckBody; response: PostStoreV1ImeiCheckResponse; status: 200 };
   "GET /store/v1/legacy-slugs/:kind/:slug": { query: never; params: GetStoreV1LegacySlugsByKindBySlugParams; body: never; response: GetStoreV1LegacySlugsByKindBySlugResponse; status: 200 };
   "POST /store/v1/marketing/unsubscribe/:token": { query: never; params: PostStoreV1MarketingUnsubscribeByTokenParams; body: never; response: PostStoreV1MarketingUnsubscribeByTokenResponse; status: 204 };
   "GET /store/v1/me": { query: never; params: never; body: never; response: GetStoreV1MeResponse; status: 200 };
   "PATCH /store/v1/me": { query: never; params: never; body: PatchStoreV1MeBody; response: PatchStoreV1MeResponse; status: 200 };
+  "POST /store/v1/me/2fa/disable": { query: never; params: never; body: PostStoreV1Me2faDisableBody; response: PostStoreV1Me2faDisableResponse; status: 204 };
+  "POST /store/v1/me/2fa/enable": { query: never; params: never; body: PostStoreV1Me2faEnableBody; response: PostStoreV1Me2faEnableResponse; status: 204 };
+  "POST /store/v1/me/2fa/setup": { query: never; params: never; body: never; response: PostStoreV1Me2faSetupResponse; status: 200 };
   "POST /store/v1/me/data-delete": { query: never; params: never; body: never; response: PostStoreV1MeDataDeleteResponse; status: 201 };
   "POST /store/v1/me/data-export": { query: never; params: never; body: never; response: PostStoreV1MeDataExportResponse; status: 201 };
   "GET /store/v1/me/notifications": { query: GetStoreV1MeNotificationsQuery; params: never; body: never; response: GetStoreV1MeNotificationsResponse; status: 200 };
@@ -3600,11 +3259,9 @@ export interface ApiRoutes {
   "GET /store/v1/services/:slug": { query: GetStoreV1ServicesBySlugQuery; params: GetStoreV1ServicesBySlugParams; body: never; response: GetStoreV1ServicesBySlugResponse; status: 200 };
   "POST /store/v1/tickets": { query: never; params: never; body: PostStoreV1TicketsBody; response: PostStoreV1TicketsResponse; status: 201 };
   "GET /store/v1/tickets/:token": { query: never; params: GetStoreV1TicketsByTokenParams; body: never; response: GetStoreV1TicketsByTokenResponse; status: 200 };
-  "POST /store/v1/tickets/:token/csat": { query: never; params: PostStoreV1TicketsByTokenCsatParams; body: PostStoreV1TicketsByTokenCsatBody; response: PostStoreV1TicketsByTokenCsatResponse; status: 200 };
   "POST /store/v1/tickets/:token/files": { query: never; params: PostStoreV1TicketsByTokenFilesParams; body: PostStoreV1TicketsByTokenFilesBody; response: PostStoreV1TicketsByTokenFilesResponse; status: 201 };
   "GET /store/v1/tickets/:token/files/:fileId": { query: never; params: GetStoreV1TicketsByTokenFilesByFileIdParams; body: never; response: GetStoreV1TicketsByTokenFilesByFileIdResponse; status: 302 };
   "POST /store/v1/tickets/:token/messages": { query: never; params: PostStoreV1TicketsByTokenMessagesParams; body: PostStoreV1TicketsByTokenMessagesBody; response: PostStoreV1TicketsByTokenMessagesResponse; status: 201 };
   "POST /store/v1/tickets/:token/read": { query: never; params: PostStoreV1TicketsByTokenReadParams; body: PostStoreV1TicketsByTokenReadBody; response: PostStoreV1TicketsByTokenReadResponse; status: 204 };
   "GET /store/v1/tickets/:token/stream": { query: GetStoreV1TicketsByTokenStreamQuery; params: GetStoreV1TicketsByTokenStreamParams; body: never; response: GetStoreV1TicketsByTokenStreamResponse; status: 200 };
-  "POST /store/v1/tickets/:token/typing": { query: never; params: PostStoreV1TicketsByTokenTypingParams; body: never; response: PostStoreV1TicketsByTokenTypingResponse; status: 204 };
 }

@@ -1,12 +1,12 @@
-// Merchant settings and integrations: profile, security, notifications and API keys.
-// Server Components import it and pass the strings a Client Component needs as props.
+// The settings texts only a merchant rank sees: the portal profile (company, address, tax id), notifications and API keys,
+// plus the two-step card, which every rank shares. The shared pages (layout, navigation, password, privacy) are in
+// `account.ts`. Server Components import it and pass the strings a Client Component needs as props.
 
 export const merchantSettings = {
   /** Texts for field errors the shared error texts do not know (by the API's field error `code`). */
   fieldErrors: {
     invalid_ip: "This is not a valid IP address or range (like 203.0.113.0/24).",
     in_the_past: "Choose a date in the future.",
-    INVALID_PASSWORD: "That is not your current password.",
     invalid: "This value is not valid.",
   },
   optional: "(optional)",
@@ -14,36 +14,6 @@ export const merchantSettings = {
   never: "Never",
   none: "None",
   dash: "—",
-  pendingTitle: "Available after approval",
-
-  layout: {
-    title: "Account settings",
-    description: "Update your profile, secure your account and choose how we reach you.",
-    navTitle: "Settings",
-    navLabel: "Settings sections",
-    nav: { profile: "Profile", security: "Security", notifications: "Notifications" },
-    summary: {
-      title: "Account summary",
-      memberSince: "Member since",
-      group: "Group",
-      status: "Status",
-      discount: "{percent} discount",
-      roleFallback: "Merchant account",
-    },
-    quick: {
-      title: "Account security",
-      password: "Password settings",
-      twoFactor: "Two-step verification",
-      manage: "Manage security",
-      on: "On",
-      off: "Off",
-    },
-    help: {
-      title: "Need help?",
-      text: "Our team can help with your account or email address.",
-      action: "Contact support",
-    },
-  },
 
   profile: {
     title: "Personal information",
@@ -58,11 +28,7 @@ export const merchantSettings = {
     notVerified: "Not verified",
     emailHintVerified: "To change your email address, contact support.",
     emailHintUnverified:
-      "This address is not verified yet. Open the link in the email we sent you, or ask for a new one below.",
-    resend: "Resend verification email",
-    resending: "Sending…",
-    resendSent: "We sent a new link. Older links no longer work.",
-    alreadyVerified: "Your email is already verified.",
+      "This address is not verified yet. Open the link in the email we sent you, or contact support for a new one.",
     address: "Address",
     taxId: "Tax ID",
     nameRequired: "Enter your name.",
@@ -72,31 +38,9 @@ export const merchantSettings = {
     save: "Save changes",
     saving: "Saving…",
     saved: "Profile updated",
-    details: {
-      title: "Account details",
-      description: "These details are managed by our team.",
-      username: "Username",
-      group: "Client group",
-      memberSince: "Member since",
-      status: "Account status",
-    },
   },
 
   security: {
-    password: {
-      title: "Password",
-      description: "Choose a strong password you use nowhere else. Changing it signs you out of your other devices.",
-      current: "Current password",
-      next: "New password",
-      confirm: "Confirm new password",
-      nextHint: "10 to 128 characters, at least 5 different ones, no common words or parts of your name or email.",
-      mismatch: "The two passwords do not match.",
-      required: "Enter your current password.",
-      submit: "Change password",
-      submitting: "Changing…",
-      saved: "Password changed",
-      savedText: "Your other devices were signed out.",
-    },
     twoFactor: {
       title: "Two-step verification",
       on: "On",
@@ -125,10 +69,6 @@ export const merchantSettings = {
       disable: "Turn off",
       disabling: "Turning off…",
       disabledToast: "Two-step verification is off",
-    },
-    mustChange: {
-      title: "Choose a new password",
-      text: "Support gave you a temporary password. Set your own below to keep using your account.",
     },
   },
 
@@ -205,7 +145,6 @@ export const merchantSettings = {
       "This is the only time the key is shown. We cannot show it again. Store it somewhere safe, like a password manager.",
     secretName: "Key: {name}",
     secretDone: "I have copied the key",
-    secretCreated: "API key created",
     editTitle: "Edit API key",
     editText: "You can rename the key and change its allowed IP addresses. The expiry cannot change: create a new key for that.",
     save: "Save changes",
@@ -214,7 +153,6 @@ export const merchantSettings = {
     revokeTitle: "Revoke this key?",
     revokeText: "Software that uses “{name}” stops working immediately. This cannot be undone.",
     revokeSubmit: "Revoke key",
-    revoking: "Revoking…",
     revokedToast: "API key revoked",
     help: {
       title: "Using your key",

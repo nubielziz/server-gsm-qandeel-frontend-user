@@ -1,12 +1,12 @@
 // Contact support (public, in the shop frame): a new-ticket form with Turnstile and three side cards. The page frame
-// and the side cards are static; the form needs the signed-in customer's email and `?order=` (cookies and
+// and the side cards are static; the form needs the signed-in account's email and `?order=` (cookies and
 // searchParams), so it streams behind <Suspense> with a same-size skeleton. A guest has no ticket list: the way back to a
-// ticket is the link in its email; a signed-in customer also finds theirs under "My tickets". The page says both.
+// ticket is the link in its email; a signed-in account also finds its tickets under Support in its account. The page says both.
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ChevronRight, CircleHelp, Mail, PackageSearch } from "lucide-react";
-import { getCustomer } from "@/lib/api/session";
+import { getAccount } from "@/lib/api/session";
 import { sitePath } from "@/lib/site-path";
 import { support } from "@/lib/i18n/messages/support";
 import { NewTicketForm } from "@/components/support/new-ticket-form";
@@ -37,16 +37,16 @@ function FormSkeleton() {
 }
 
 async function TicketFormLoader({ searchParams }: { searchParams: PageProps<"/en/support">["searchParams"] }) {
-  const [sp, customer] = await Promise.all([
+  const [sp, me] = await Promise.all([
     searchParams,
-    getCustomer().catch(() => null),
+    getAccount().catch(() => null),
   ]);
   const t = support;
   const order = Array.isArray(sp.order) ? sp.order[0] : sp.order;
   return (
     <NewTicketForm
       t={{ form: t.form, sent: t.sent }}
-      defaults={{ email: customer?.email ?? "", name: customer?.name ?? "", order: (order ?? "").slice(0, 600), signedIn: Boolean(customer) }}
+      defaults={{ email: me?.email ?? "", name: me?.name ?? "", order: (order ?? "").slice(0, 600), signedIn: Boolean(me) }}
     />
   );
 }

@@ -8,11 +8,11 @@ Rules: `CLAUDE.md`. Images to add: `docs/IMAGE-PROMPTS.md`.
 |---|---|---|
 | M0 | Foundation: Next config + API rewrites, language routing (`proxy.ts`, `/en`, `/ar`, RTL), API layer (server, cached public reads, sessions, browser client with per-surface CSRF, Turnstile, Idempotency-Key), generated API types, i18n, formatters, isolated dev backend | done (2026-11-09) |
 | M1 | Design system: tokens (`app/globals.css`), 35 primitives (`components/ui`), shells (`components/layout`: store, auth, checkout, workspace), group layouts, merchant portal layout, file upload, UI kit at `/en/ui-kit` (dev only) | done (2026-11-09) |
-| M2 | Public store: home, catalog (search, brand/carrier/country filters, sort, paging), service page (slug per language, merchant price hint), IMEI check, help, content/legal pages, order tracking, robots + sitemap | done (2026-11-09) |
+| M2 | Public store: home, catalog (search, brand/carrier/country filters, sort, paging), service page (slug per language, rank price hint), IMEI check, help, content/legal pages, order tracking, robots + sitemap | done (2026-11-09) |
 | M3 | Customer checkout: details drawer, tax by country, locked session, consents, pay (Idempotency-Key), return polling, resume link | done (2026-11-09); paying stops at the gateway (demo keys are placeholders) |
-| M4 | Auth: sign-in (customer + merchant, 2FA, temporary password), sign-up, magic link, forgot/set password, verify email (both account types) | done (2026-11-09, `6bee86a`) |
-| M5 | Customer account (overview, orders, settings, privacy requests) and support tickets (new, conversation, rating; the rating was retired on 2026-11-23) | done (2026-11-09, `6bee86a`) |
-| M6 | Merchant portal: dashboard, catalog + ordering, orders, wallet, top-ups, invoices (`230b7b3`); settings, security/2FA/sessions, notifications, KYC, API keys, webhooks, referrals (`5e0a8d2`); KYC, the session list, webhooks and referrals were retired on 2026-11-23 | done (2026-11-09) |
+| M4 | Auth: sign-in (every account, 2FA, temporary password), sign-up, magic link, forgot/set password, verify email | done (2026-11-09, `6bee86a`; one account type since 2026-11-24) |
+| M5 | Account area of a retail rank (overview, orders, settings, privacy requests) and support tickets (new, conversation, rating; the rating was retired on 2026-11-23) | done (2026-11-09, `6bee86a`) |
+| M6 | Merchant pages (now under `/en/account`, decision 002): dashboard, catalog + ordering, orders, wallet, top-ups, invoices (`230b7b3`); settings, security/2FA/sessions, notifications, KYC, API keys, webhooks, referrals (`5e0a8d2`); KYC, the session list, webhooks and referrals were retired on 2026-11-23 | done (2026-11-09) |
 
 ## Backend handoff implementation (from 2026-11-13; plan: `IMPLEMENTATION-PLAN.md`)
 Everything in `../STOREFRONT-BACKEND-HANDOFF.md` (features 20–26) and the open items of `../STOREFRONT-HANDOFF.md`, in 16
@@ -38,7 +38,7 @@ isolated demo API (:3100, Mailpit); the owner's API (:3000) is never written to.
   `/store/v1/media/*` pictures) 200; no `.env` inside; runs as `node`.
 - **F03 e2e harness:** `e2e/admin.ts` (staff session with TOTP via node:crypto, cached in `e2e/.auth/`; ~25 admin helpers),
   `e2e/global-setup.ts` (idempotent; never switches anything off), `e2e/harness.spec.ts`; `helpers.ts` gains shared
-  helpers (`freshCustomer`, `freshMerchant`, `stubTurnstile` …). The e2e guard now decides dev/production env files by
+  helpers (`freshCustomer`, `freshMerchant`, `stubTurnstile` …; since 2026-11-24 `freshAccount`, `signIn`, `signUpByLink`). The e2e guard now decides dev/production env files by
   the port under test. **Demo DB (`gsm_storefront`) changes made by the setup** (a `dev-backend.sh reset` undoes them; the
   next e2e run recreates them): customer wallet on; manual gateway `cliq-e2e`; JOD with 2 decimals; quantity rules on
   services 8 (range 2–50), 9 (packs 5/10/25), 10 (exact 5); stock codes on services 4 (≥ 20) and 15 `SRV-Z3X-10`
@@ -78,7 +78,7 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
   sign-in (`lib/merchant/signup-locale.ts`). *(The register form and the saved language were removed on 2026-11-16: see
   "Merchant application on WhatsApp".)*
 - **F11 notifications:** bell with the unread count (99+) in both areas' headers, polled at most once a minute while the
-  tab is visible; `/en/account/notifications` and `/en/merchant/notifications` (All / Unread, mark one, mark all
+  tab is visible; `/en/account/notifications` and `/en/merchant/notifications` (both now `/en/account/notifications`; All / Unread, mark one, mark all
   with `upToId`, links prefixed with the language and checked by `notificationHref`, text rendered as text, `lang`/`dir`
   per item). **`/en/unsubscribe?token=`**: a confirm button (never automatic) → "no more marketing emails" or "link
   not valid" (fixes the 404 of the marketing mails' visible link).
@@ -163,7 +163,7 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
    closed; the open backend limitations of plan §8 plus three top-up notes found in W3).
 
 ## Merchant application on WhatsApp (2026-11-16, owner's request)
-- **What changed:** `/en/merchant/register` (same URL, still static and `noindex`) is no longer a form and sends
+- **What changed:** `/en/merchant/register` (now `/en/become-a-merchant`; same page, still static and `noindex`) is no longer a form and sends
   nothing. It says that merchant accounts are opened by the team, lists three steps and offers "Chat on WhatsApp"
   (a `wa.me` link in a new tab with a prefilled message in the page's language) and the number as selectable text. Staff
   then create the merchant in the admin console, which sends the set-password link; the backend and the console did not
@@ -183,7 +183,7 @@ Agent calls: Fable 1 (plan) + 12 (W0) + 12 (W1) + 12 (W2) + 12 (W3) = 49.
   `<Suspense>`) and `merchant-whatsapp-actions.tsx` (also the Suspense fallback: same button and number without the
   referral sentence). Removed: `merchant-register-form.tsx`, `lib/merchant/signup-locale.ts` (+ test) and its call in
   `sign-in-flow.tsx`, the form's `auth.register` strings. The site no longer calls `POST /client/auth/register`
-  (`docs/BACKEND-NEEDS.md` open item 2 is closed). The e2e helper `freshMerchant` stopped calling it on 2026-11-24: staff
+  (`docs/BACKEND-NEEDS.md` open item 2 is closed). The e2e helper `freshMerchant` (now `freshAccount`) stopped calling it on 2026-11-24: staff
   create the account through the admin API (`inviteMerchant`) and the merchant sets its password from the invitation mail.
 - **Retired 2026-11-23:** the `?ref=` handling, its note and `components/auth/merchant-whatsapp.tsx` went with the referral
   program (`docs/decisions/001-merchant-extras-retired.md`); the page is fully static and item 19 is closed.
@@ -429,7 +429,7 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
 - **In its place:** `components/store/home-balance.tsx` (drawn by `home-balance-view.tsx`, decided by `lib/wallet/home-balance.ts`):
   the available wallet balance of the signed-in visitor (the merchant's when a merchant is signed in and approved, else the
   customer's when the wallet shows) with "Add funds" and "Open wallet"; a visitor who is not signed in gets "Sign in". It shares
-  the header's reads (`readMerchantWallet`, `readCustomerWallet`), so it costs no API call of its own.
+  the header's reads (`readMerchantWallet`, `readCustomerWallet`; now `readAccountWallet`), so it costs no API call of its own.
 - **Also fixed:** a long service name in a "Featured collections" card widened the whole home page on phones (the card is a grid
   item and had no `min-w-0`).
 - **Checks:** typecheck, lint, 997 unit tests, a production build; the home page looked at in a browser at 1440 and 390 px (no
@@ -465,13 +465,39 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
   preferences, the bell (swing, badge pop, rolling number, title badge), the password and two-step cards and the rest of the
   dashboard.
 - **Old addresses:** `/en/merchant/referrals` → 308 `/en/merchant`; everything under `/en/merchant/webhooks` → 308
-  `/en/merchant/api-keys` (both also without `/en`, in `next.config.ts`).
+  `/en/merchant/api-keys` (both also without `/en`, in `next.config.ts`). Since decision 002 they end at `/en/account` and
+  `/en/account/settings/api-keys`, straight from `lib/account/legacy-paths.ts`.
 - **Release order:** the shop calls none of the retired routes and ignores the retired fields, so it runs against the backend
   before and after their removal; `docs/BACKEND-NEEDS.md` items 20 to 32 say what the removal must keep. `lib/api/schema.gen.ts`
   is regenerated after the backend removal; the decision lists the bridges that go then. Item 19 is closed. The order detail
   no longer reads `clientNote` and the invoices filter no longer offers the kind `statement` (items 31 and 32).
-- **Built** as five packages joined on `feat/accounts`. **Checks:** typecheck, lint, a production build. Unit and e2e tests were
-  written and updated, not run.
+- **Checks:** typecheck, lint, a production build, and the whole unit suite passes (983 tests). The browser specs were updated, not run.
+
+## One account (2026-11-24, owner's decision; `docs/decisions/002-one-account.md`, backend decision 064, console decision 023)
+- **What changed:** the customer area and the merchant portal are one account area at `/en/account`. An account has a rank, retail or
+  merchant: every account has the overview, orders, wallet, notifications, support and settings pages; a merchant rank adds the price
+  list, invoices, API keys and notification preferences. The folders `app/en/(portal)` and `app/en/(auth)/merchant` are gone.
+- **Session:** one reader (`getAccount`, `requireAccount`, `requireRank`, `signInPath` in `lib/api/session.ts`; one `AccountMe`), one
+  CSRF token in the browser client, the cookie names known to `lib/api/account-cookie.ts` only, `lib/account/{family,routes,capabilities}.ts`
+  for the family of routes and what a rank may see. A refusal for the rank (`RANK_NOT_ALLOWED`) never signs anybody out.
+- **Sign-in:** one form with no kind; sign-up by the email link; forgot, set password and verify email are one page each, with mailed
+  links at the shop root; `/en/become-a-merchant` (WhatsApp) replaces `/en/merchant/register`; the link page has the guest-orders box;
+  the retail two-step routes are `/store/v1/me/2fa/*`.
+- **Old addresses:** `lib/account/legacy-paths.ts` is the one table; `next.config.ts` redirects each row with and without `/en`;
+  `proxy.ts` knows no portal address; `legacyAccountPath` rewrites stored links. `lib/account/one-account.test.ts` fails when
+  another file names a CSRF cookie or links to `/merchant`.
+- **Clean-up:** the three browser specs that still used old helpers use `signIn`, `signUpByLink` and `freshAccount`; message groups no
+  page reads are gone (the merchant file's wallet, top-up and invoice groups, the old ticket-list texts, the portal support texts and
+  a few single keys); the ignored family argument of `csrfToken` and `forgetCsrf` is gone. `CLAUDE.md`, `README.md`, `docs/DEPLOY.md`,
+  `docs/BACKEND-NEEDS.md` and `scripts/dev-backend.sh` (`PORTAL_BASE_URL` is now the account address) say the new words.
+- **What replaced what:** `getMerchant`, `getCustomer`, `requireMerchant`, `requireCustomer` → `getAccount`, `requireAccount`, `requireRank`;
+  `readMerchantWallet`, `readCustomerWallet` → `readAccountWallet`; `MerchantBanner` → `RankBanner`; `MerchantPriceHint` → `RankPriceHint`;
+  `e2e` `signInCustomer`, `signInMerchant` → `signIn`; `freshCustomer`, `freshMerchant`, `inviteMerchant` → `freshAccount` (or `signUpByLink`);
+  `customerIdByEmail`, `merchantIdByEmail` → `accountIdByEmail`; `creditCustomer` → `creditAccount`; `smart-sign-in.spec.ts` → `sign-in.spec.ts`.
+  The entries of this file above and below keep the addresses and names of their date.
+- **Checks (2026-11-24):** typecheck: 0 errors in the whole shop; `npm run lint` clean (ESLint and the English guard); the whole unit suite
+  passes (153 files, 1,544 tests); `npm run gen:api:check` up to date against the merged backend's OpenAPI (110 operations); `npm run build`
+  passes against the isolated backend (:3100). The browser specs were written and type-checked, not run.
 
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
@@ -507,9 +533,12 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
   bucket `gsm-files-storefront`, mail to Mailpit). The owner's API on :3000 and its data are untouched.
 
 ## Test accounts (isolated backend on :3100 only)
-- Customers (demo seed): `daniel.whitmore@mail.example` / `demo-password` (4 orders) — see handoff §9.2 for more.
-- Merchants: `ops@zainmobilehub.example` (m1, active, vip) and `ops@algiersservice.example` (m18, pending), both with
-  password `Storefront-Test-4821` (set through forgot → Mailpit → reset on 2026-11-09).
+- Retail rank (demo seed): `daniel.whitmore@mail.example` / `demo-password` (4 orders) — see handoff §9.2 for more (`ACCOUNTS.retail`
+  in `e2e/helpers.ts`).
+- Merchant rank: `ops@zainmobilehub.example` (active, vip rank) with password `Storefront-Test-4821` (set through forgot → Mailpit →
+  reset on 2026-11-09; `ACCOUNTS.merchant`). Since decision 002 no account waits for approval, so the old pending merchant is gone.
+- A test that changes data makes its own account: `freshAccount(page, { rank: "merchant" })` (staff create it, the invitation sets the
+  password) or `signUpByLink(page)` (a retail account by the email link).
 
 ## Checks
 - **Final, 2026-11-09 (production build `next start` :5176 + isolated backend):** `npx playwright test` (desktop +

@@ -4,6 +4,7 @@
 // row: the form never offers it and sends back the value the GET showed (see `changedEventRows`); an API that does not
 // list it gets none. An event the site has no copy for keeps the API's label.
 import { useRef, useState, type FormEvent } from "react";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { NotificationPreferences } from "@/lib/api/types";
@@ -106,7 +107,7 @@ export function NotificationsForm({ initial, t, fieldTexts }: Props) {
     setRowErrors({});
     setSaving(true);
     try {
-      const saved = await api.put<NotificationPreferences>("/client/notification-preferences", body);
+      const saved = await api.put<NotificationPreferences>(FAMILY_ROUTES.client.notificationPreferences, body);
       const next = { threshold: trimMoney(saved.lowBalanceThreshold ?? ""), events: toEventMap(saved.events) };
       setBase(next);
       setThreshold(next.threshold);

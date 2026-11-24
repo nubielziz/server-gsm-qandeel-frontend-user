@@ -1,21 +1,16 @@
 "use client";
-// SignOutButton: ends the merchant or the customer session (they are separate, handoff §3.4), then refreshes the route
-// so every server-rendered part (header, protected pages) sees the signed-out state. A 401 counts as success.
+// SignOutButton: ends the session of the signed-in account (one session, one sign-out route for every rank), then refreshes
+// the route so every server-rendered part (header, protected pages) sees the signed-out state. A 401 counts as success.
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogOut } from "lucide-react";
+import { ACCOUNT_ROUTES } from "@/lib/account/routes";
 import { api, forgetCsrf } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/cn";
 import { Spinner } from "@/components/ui/spinner";
 
-export type SignOutSurface = "merchant" | "customer";
-
-const ENDPOINTS = { merchant: "/client/auth/logout", customer: "/store/v1/auth/logout" } as const;
-
 export type SignOutButtonProps = {
-  /** Which session to end. */
-  surface: SignOutSurface;
   /** Text, e.g. "Sign out". */
   label: string;
   /** Text while the request runs, e.g. "Signing out…". */
@@ -25,24 +20,33 @@ export type SignOutButtonProps = {
   className?: string;
 };
 
-/** Signs out of one surface (POST, no body), then `router.refresh()`. */
-export function SignOutButton({ surface, label, pendingLabel, variant = "menu", className }: SignOutButtonProps) {
+/**
+ * Posts the sign-out route (no body) and forgets the remembered CSRF token. A 401 means the session was already gone, which
+ * is the goal. Any other failure leaves the session and the token alone.
+ *
+ * @param post sends a POST to a path (the browser client's `api.post`)
+ * @param forget clears the remembered token
+ * @returns true when the visitor is signed out now
+ */
+export async function endSession(post: (path: string) => Promise<unknown>, forget: () => void): Promise<boolean> {
+  try {
+    await post(ACCOUNT_ROUTES.logout);
+  } catch (error) {
+    if (!(isApiError(error) && error.status === 401)) return false;
+  }
+  forget();
+  return true;
+}
+
+/** Signs out of the account (POST, no body), then `router.refresh()`. */
+export function SignOutButton({ label, pendingLabel, variant = "menu", className }: SignOutButtonProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
   async function signOut() {
     setPending(true);
-    try {
-      await api.post(ENDPOINTS[surface]);
-    } catch (error) {
-      // 401 = the session was already gone: the goal (signed out) is reached.
-      if (!(isApiError(error) && error.status === 401)) {
-        setPending(false);
-        return;
-      }
-    }
-    forgetCsrf(surface === "merchant" ? "client" : "store");
-    router.refresh();
+    const done = await endSession((path) => api.post(path), forgetCsrf);
+    if (done) router.refresh();
     setPending(false);
   }
 

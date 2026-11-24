@@ -1,18 +1,22 @@
 "use client";
-// SignedInTicketForm: opens a ticket for a signed-in customer (`POST /store/v1/me/tickets`) or merchant (`POST /client/tickets`)
-// (feature 28). The public form's fields without the email, the name and the security check (the session is the proof), and
-// an order picker with the person's own recent orders (optional; a foreign id is refused by the API as `unknown_order`).
-// Files go with a message in the thread, not here. After saving, a customer goes to the ticket's token page (the answer has
-// the token) and a merchant to the thread. 5 tickets an hour per account: a 429 says so.
+// SignedInTicketForm: opens a ticket for a signed-in account (feature 28): `POST /store/v1/me/tickets` for a retail account,
+// `POST /client/tickets` for a merchant rank (the family says which). The public form's fields without the email, the name
+// and the security check (the session is the proof), and an order picker with the person's own recent orders (optional; a
+// foreign id is refused by the API as `unknown_order`). Files go with a message in the thread, not here. After saving, a
+// retail account goes to the ticket's token page (the answer has the token) and a merchant rank to its thread
+// (`createdTicketHref`). 5 tickets an hour per account: a 429 says so.
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api/browser";
+import type { AccountFamily } from "@/lib/account/family";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
 import { isApiError } from "@/lib/api/errors";
 import type { ClientTicket, MyTicketCreated, SignedInTicketInput, Ticket } from "@/lib/api/types";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
 import { sitePath } from "@/lib/site-path";
+import { createdTicketHref } from "@/lib/support/new-ticket-link";
 import { FormAlert } from "@/components/auth/form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "@/components/auth/form-errors";
 import { useFocusOnFeedback } from "@/components/auth/use-focus-on-feedback";
@@ -20,7 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/input";
 
 export type SignedInTicketFormProps = {
-  area: "customer" | "merchant";
+  /** The family of the signed-in account: it picks the route that opens the ticket and the page that shows it. */
+  family: AccountFamily;
   t: Pick<SupportMessages, "form" | "newForm">;
   /** The person's orders for the picker, already named for their area (`SF-12 · Service · Nov 9, 2026`). */
   orders: { id: number; label: string }[];
@@ -32,7 +37,7 @@ const CATEGORIES: readonly Ticket["category"][] = ["refund", "delay", "failed_un
 const SUBJECT_MAX = 150;
 const MESSAGE_MAX = 4000;
 
-export function SignedInTicketForm({ area, t, orders, defaultOrderId = null }: SignedInTicketFormProps) {
+export function SignedInTicketForm({ family, t, orders, defaultOrderId = null }: SignedInTicketFormProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
@@ -70,15 +75,10 @@ export function SignedInTicketForm({ area, t, orders, defaultOrderId = null }: S
       ...(values.orderId ? { orderId: Number(values.orderId) } : {}),
     };
     try {
-      if (area === "customer") {
-        const ticket = await api.post<MyTicketCreated>("/store/v1/me/tickets", body);
-        leaving = true;
-        router.push(sitePath(`/support/tickets/${encodeURIComponent(ticket.token)}`));
-      } else {
-        const ticket = await api.post<ClientTicket>("/client/tickets", body);
-        leaving = true;
-        router.push(sitePath(`/merchant/support/${ticket.id}`));
-      }
+      const created = await api.post<MyTicketCreated | ClientTicket>(FAMILY_ROUTES[family].tickets, body);
+      leaving = true;
+      // The ticket exists: when the answer has no page to open (it should), the list is where it shows.
+      router.push(createdTicketHref(family, created) ?? sitePath("/account/support"));
     } catch (error) {
       setFeedback(
         isApiError(error) && error.status === 429

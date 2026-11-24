@@ -26,7 +26,6 @@ export const store = {
       signIn: "Sign in",
       noWalletText: "There is no wallet balance to show for this account.",
       myAccount: "My account",
-      merchantPortal: "Merchant portal",
     },
     whatsapp: {
       label: "Chat with us on WhatsApp",
@@ -38,10 +37,6 @@ export const store = {
       text: "Open the tracking link you saved after paying to see the status and the result.",
       cta: "Track an order",
       artAlt: "A smartphone being checked",
-    },
-    merchant: {
-      text: "You are signed in as a merchant. Your own prices are in the merchant portal.",
-      cta: "See my prices",
     },
     featured: {
       title: "Featured services",
@@ -169,11 +164,8 @@ export const store = {
   card: {
     orderNow: "Order now",
     delivery: "Delivery: {time}",
-    deliveryShort: "{time}",
-    viewService: "View {title}",
     orderService: "Order {title}",
     quickView: "Quick view: {title}",
-    priceFrom: "Price",
     inStock: "In stock",
   },
 
@@ -206,8 +198,9 @@ export const store = {
     fileTitle: "This service cannot be bought online yet",
     fileText: "File services are handled by our team. Contact support to order it.",
     fileCta: "Contact support",
-    merchantPrice: "Your merchant price",
-    merchantManage: "View in the merchant portal",
+    rankPrice: "Your price",
+    rankOrder: "Order at your price",
+    rankRetailOnly: "The shop checkout is for retail buyers.",
     notFoundTitle: "Service not found",
     loading: "Loading the service",
   },

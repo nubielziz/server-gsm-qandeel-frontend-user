@@ -91,12 +91,14 @@ several services, favourites, customer wallet (phase 2W), notification feed, soc
 
 ## Open (2026-11-15): backend limitations the site meets (`IMPLEMENTATION-PLAN.md` §8; report, do not work around)
 
-1. No smart forgot-password route: the forgot page keeps a Customer or Merchant choice, each with its own Turnstile token.
+1. ~~No smart forgot-password route: the forgot page keeps a Customer or Merchant choice, each with its own Turnstile token.~~
+   **Closed 2026-11-24:** one account type (`docs/decisions/002-one-account.md`): one forgot page, one route, one Turnstile token.
 2. ~~`POST /client/auth/register` takes no language: the first verification mail is English; the site saves the language
    after the first sign-in in the same browser.~~ **Closed 2026-11-16:** the site no longer calls the route. Merchants
    apply on WhatsApp (`NEXT_PUBLIC_MERCHANT_WHATSAPP`) and staff create the account in the admin console, which sends the
    set-password link; nothing is saved in the browser any more.
-3. An email that is both a merchant and a customer reaches the customer area only through the magic link.
+3. ~~An email that is both a merchant and a customer reaches the customer area only through the magic link.~~ **Closed 2026-11-24:** an
+   email belongs to one account (backend decision 064); a guest's orders reach it through the proven-mailbox claim at the sign-in link.
 4. Cards carry no `quantity`: no "From" price on cards, no price sort or filter by the smallest purchase.
 5. No stock count and no change signal: availability can be up to 5 minutes behind; `in_stock` speaks for the smallest
    order only.
@@ -138,11 +140,11 @@ The shop stopped calling these routes and reading these fields before the backen
 
 20. **Referrals and commissions.** `GET /client/referrals` and `GET /client/commissions` are no longer called; `referralCode`
     on `GET /client/auth/me` and the profile answers is no longer read; the site never calls `POST /client/auth/register`,
-    whose body has a `referralCode` (the e2e helper `freshMerchant` no longer calls it either: staff create the account through
+    whose body has a `referralCode` (the e2e helper `freshAccount` does not call it either: staff create the account through
     the admin API and the invitation sets the password). All of them still answer today. The backend may remove them; nothing in
     the shop breaks either way.
 21. **Statement kind `commission`.** Old ledger rows keep the kind; the merchant wallet statement keeps the label "Commission"
-    (`lib/i18n/messages/merchant.ts`), so they keep their stored word.
+    (`lib/i18n/messages/wallet.ts`), so they keep their stored word.
 22. **`POST /client/api-keys`.** The shop always sends `scopes: ["dhru"]` and never lets the merchant pick scopes. Today
     `scopes` is required: a non-empty subset of `dhru`, the REST scopes and their wildcards. When the REST API goes, the API
     must keep accepting `["dhru"]` (or make the field optional and ignore it), never reject it as unknown, until the shop stops

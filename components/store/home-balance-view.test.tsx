@@ -15,29 +15,34 @@ describe("HomeBalanceView", () => {
     expect(html).not.toContain("$");
   });
 
-  it("a customer sees the available amount, Add funds and the wallet", () => {
-    const html = draw({ kind: "balance", account: "customer", available: "12.5000", canAddFunds: true });
+  it("an account sees the available amount, Add funds and the wallet", () => {
+    const html = draw({ kind: "balance", available: "12.5000", canAddFunds: true });
     expect(html).toContain("12.50");
     expect(html).toContain('href="/en/account/wallet/add-funds"');
     expect(html).toContain('href="/en/account/wallet"');
   });
 
+  it("every rank adds funds at the one account address, and no address leads to a merchant area", () => {
+    // The state carries no rank: a merchant rank's balance and a retail rank's are drawn with the same addresses.
+    const html = draw({ kind: "balance", available: "250.0000", canAddFunds: true });
+    expect(html).toContain("250.00");
+    expect(html).toContain('href="/en/account/wallet/add-funds"');
+    expect(html).toContain('href="/en/account/wallet"');
+    expect(html).not.toContain("/merchant");
+  });
+
   it("no Add funds while the wallet is switched off", () => {
-    const html = draw({ kind: "balance", account: "customer", available: "3.0000", canAddFunds: false });
+    const html = draw({ kind: "balance", available: "3.0000", canAddFunds: false });
     expect(html).not.toContain("add-funds");
     expect(html).toContain('href="/en/account/wallet"');
   });
 
-  it("a merchant is led to the merchant wallet and its top-up page", () => {
-    const html = draw({ kind: "balance", account: "merchant", available: "250.0000", canAddFunds: true });
-    expect(html).toContain("250.00");
-    expect(html).toContain('href="/en/merchant/wallet/top-up"');
-    expect(html).toContain('href="/en/merchant/wallet"');
-  });
-
-  it("an account without a balance to show gets the way to its own area", () => {
-    expect(draw({ kind: "noWallet", account: "customer" })).toContain('href="/en/account"');
-    expect(draw({ kind: "noWallet", account: "merchant" })).toContain('href="/en/merchant"');
+  it("an account without a balance to show gets the way to its account, the same for every rank", () => {
+    const html = draw({ kind: "noWallet" });
+    expect(html).toContain('href="/en/account"');
+    expect(html).toContain("My account");
+    expect(html).not.toContain("Merchant portal");
+    expect(html).not.toContain("/merchant");
   });
 
   it("the skeleton keeps the heading while the session is read", () => {

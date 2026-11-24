@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { WorkspaceNavView, type WorkspaceNavItem } from "./workspace-nav-view";
+import { accountPageTitles, staticAccountNav, type AccountNavEntry } from "@/lib/account/nav";
+import { activeItem, headingItems, WorkspaceNavView, type WorkspaceNavItem } from "./workspace-nav-view";
 
 const items: WorkspaceNavItem[] = [
   { href: "/en/account", label: "Overview", icon: <i data-icon="overview" />, match: "exact" },
@@ -94,5 +97,85 @@ describe("WorkspaceNavView: the phone tab bar", () => {
     const html = renderToStaticMarkup(<WorkspaceNavView items={tabs} pathname={null} variant="tabs" />);
     for (const match of html.matchAll(/class="(tab-link [^"]*)"/g)) expect(match[1]).toContain("h-(--ws-tabbar-h)");
     expect(html).toContain("auto-cols-fr grid-flow-col");
+  });
+});
+
+describe("headingItems and activeItem: the header title", () => {
+  const withIcon = (entry: AccountNavEntry): WorkspaceNavItem => ({
+    href: entry.href,
+    label: entry.label,
+    title: entry.title,
+    match: entry.match,
+    icon: <i data-icon={entry.id} />,
+    badge: <b>3</b>,
+  });
+  const statics = staticAccountNav();
+  const nav = statics.nav.map(withIcon);
+  const footerNav = statics.footerNav.map(withIcon);
+
+  it("hands the heading the four fields it reads and nothing else: no icon, no badge", () => {
+    const items = headingItems(nav, footerNav);
+    for (const item of items) expect(Object.keys(item).sort()).toEqual(["href", "label", "match", "title"]);
+    expect(JSON.stringify(items)).not.toContain("data-icon");
+  });
+
+  it("puts the nav first, then the footer, then the pages that only name a title", () => {
+    const items = headingItems(nav, footerNav, accountPageTitles());
+    expect(items.map((item) => item.label)).toEqual([
+      "Overview",
+      "Orders",
+      "Wallet",
+      "Notifications",
+      "Support",
+      "Settings",
+      "Price list",
+      "Invoices",
+      "API keys",
+    ]);
+  });
+
+  it("the deepest address wins, and the overview owns only its own page", () => {
+    const items = headingItems(nav, footerNav, accountPageTitles());
+    expect(activeItem(items, "/en/account")?.label).toBe("Overview");
+    expect(activeItem(items, "/en/account/orders/42")?.label).toBe("Orders");
+    expect(activeItem(items, "/en/account/settings")?.label).toBe("Settings");
+    expect(activeItem(items, "/en/account/settings/security")?.label).toBe("Settings");
+    expect(activeItem(items, "/en/account/settings/api-keys")?.label).toBe("API keys");
+    expect(activeItem(items, "/en/account/support/new")?.label).toBe("Support");
+  });
+
+  it("a page nothing names, and an unknown pathname, have no active item", () => {
+    const items = headingItems(nav, footerNav, accountPageTitles());
+    expect(activeItem(items, "/en/services")).toBeUndefined();
+    expect(activeItem(items, null)).toBeUndefined();
+  });
+
+  it("the static shell alone leaves a merchant rank's own pages without a title; the titles name them", () => {
+    const staticOnly = headingItems(nav, footerNav);
+    expect(activeItem(staticOnly, "/en/account/services/12")).toBeUndefined();
+    expect(activeItem(staticOnly, "/en/account/invoices/5")).toBeUndefined();
+    const named = headingItems(nav, footerNav, accountPageTitles());
+    const prices = activeItem(named, "/en/account/services/12");
+    expect(prices?.label).toBe("Price list");
+    expect(prices?.title).toBe("Price list");
+    expect(activeItem(named, "/en/account/invoices/5")?.label).toBe("Invoices");
+  });
+
+  it("a title never replaces a nav item that has the same address", () => {
+    const items = headingItems(nav, footerNav, [{ href: "/en/account/orders", label: "Other" }]);
+    expect(activeItem(items, "/en/account/orders")?.label).toBe("Orders");
+  });
+});
+
+describe("the frame names no kind of account", () => {
+  const sources = ["workspace-shell.tsx", "workspace-nav.tsx", "workspace-nav-view.tsx"].map((file) =>
+    readFileSync(path.join(__dirname, file), "utf8"),
+  );
+
+  it("has no customer or portal wording: one frame for every account", () => {
+    for (const source of sources) {
+      expect(source).not.toMatch(/\bcustomers?\b/i);
+      expect(source).not.toMatch(/merchant (portal|account)/i);
+    }
   });
 });

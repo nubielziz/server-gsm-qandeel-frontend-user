@@ -1,0 +1,94 @@
+// One support ticket of a merchant rank, live (feature 28): the thread of messages with seen marks and files, on the portal
+// stream. The ticket is addressed by its id and the session is the credential: a foreign or unknown id is a 404 (shown in the
+// page, with the way back to the list). Only a merchant rank has tickets by id: a retail account's tickets are read on the
+// token page, so a retail account that opens this address is sent to the account home. The read is the first state of
+// `TicketView`; nothing here calls `router.refresh()`.
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { notFound } from "next/navigation";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
+import { apiSessionGet } from "@/lib/api/server";
+import { requireRank } from "@/lib/api/session";
+import { isApiError } from "@/lib/api/errors";
+import type { ClientTicket } from "@/lib/api/types";
+import { sitePath } from "@/lib/site-path";
+import { fmt } from "@/lib/i18n/define";
+import { common } from "@/lib/i18n/messages/common";
+import { support } from "@/lib/i18n/messages/support";
+import { supportPages } from "@/lib/i18n/messages/support-pages";
+import { newTicketHref } from "@/lib/support/new-ticket-link";
+import { settle } from "@/lib/merchant/load";
+import { PageHeader } from "@/components/layout/container";
+import { PageError } from "@/components/merchant/page-error";
+import { TicketView } from "@/components/support/ticket-view";
+import { ButtonLink } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageTransition } from "@/components/layout/page-transition";
+import { orderText } from "../order-choices";
+
+export function generateMetadata(): Metadata {
+  const t = supportPages;
+  return { title: t.thread.metaTitle, robots: { index: false, follow: false } };
+}
+
+function ThreadSkeleton() {
+  return (
+    <div aria-busy="true" className="grid gap-6">
+      <Skeleton className="h-24" />
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <Skeleton className="h-[34rem] rounded-card" />
+        <Skeleton className="h-72 rounded-card" />
+      </div>
+    </div>
+  );
+}
+
+async function Thread({ params }: { params: PageProps<"/en/account/support/[id]">["params"] }) {
+  const { id } = await params;
+  const p = supportPages;
+  const t = support;
+  const c = common;
+  if (!/^[1-9]\d{0,15}$/.test(id)) notFound();
+  const here = sitePath(`/account/support/${id}`);
+  await requireRank("merchant", here);
+  const result = await settle(apiSessionGet<ClientTicket>(`${FAMILY_ROUTES.client.tickets}/${id}`));
+  if (!result.ok) {
+    if (isApiError(result.error) && (result.error.status === 404 || result.error.status === 422)) {
+      return (
+        <PageHeader
+          title={p.thread.notFoundTitle}
+          description={p.thread.notFoundText}
+          actions={<ButtonLink href={sitePath("/account/support")}>{p.thread.backToList}</ButtonLink>}
+        />
+      );
+    }
+    return <PageError error={result.error} next={here} title={p.list.title} />;
+  }
+  const ticket = result.data;
+  return (
+    <TicketView
+      t={t}
+      c={c}
+      ticket={ticket}
+      access={{ kind: "client", id: ticket.id }}
+      breadcrumbs={[
+        { label: p.list.title, href: sitePath("/account/support") },
+        { label: fmt(t.ticket.number, { number: ticket.number }) },
+      ]}
+      order={
+        ticket.orderId ? { text: orderText("client", ticket.orderId), href: sitePath(`/account/orders/${ticket.orderId}`) } : null
+      }
+      newTicketHref={newTicketHref(true, ticket.orderId)}
+    />
+  );
+}
+
+export default function TicketThreadPage({ params }: PageProps<"/en/account/support/[id]">) {
+  return (
+    <PageTransition>
+      <Suspense fallback={<ThreadSkeleton />}>
+        <Thread params={params} />
+      </Suspense>
+    </PageTransition>
+  );
+}

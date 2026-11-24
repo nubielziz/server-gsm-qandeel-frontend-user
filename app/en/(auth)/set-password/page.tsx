@@ -1,4 +1,4 @@
-// Customer password link (`/set-password?token=` from the reset and invitation mails). Static page; the form reads the
+// Password link (`/set-password?token=` from the reset and invitation mails, for every account). Static page; the form reads the
 // token in the browser behind <Suspense>. Never indexed, and no Referer is sent (the token is in the URL).
 import type { Metadata } from "next";
 import { Suspense } from "react";
@@ -18,7 +18,7 @@ export default function SetPasswordPage() {
     <>
       <AuthHeading title={t.setPassword.title} subtitle={t.setPassword.subtitle} />
       <Suspense fallback={<FormSkeleton fields={2} hint />}>
-        <SetPasswordForm surface="customer" t={{ fields: t.fields, shared: t.shared, setPassword: t.setPassword }} />
+        <SetPasswordForm t={{ fields: t.fields, shared: t.shared, setPassword: t.setPassword }} />
       </Suspense>
     </>
   );

@@ -1,24 +1,26 @@
 // Live notifications (feature 27, plan §5.1): the bell, the toast and the notifications list change the moment staff send
-// a campaign, with no reload. The browser opens ONE stream per surface, shared by its tabs, and only where a bell is.
+// a campaign, with no reload. The browser opens ONE stream per family (the shop's for a retail account, the portal's for a merchant
+// rank), shared by its tabs, and only where a bell is.
 // Runs against the isolated demo backend (:3100) whose worker fans a campaign out within a few seconds; the live path
-// then has to deliver it in the open page. Written to be run by the lead (the lead's backend has the three stream routes).
-// Rules (F03): every test that changes data uses a throwaway customer or merchant; nothing global is switched.
+// then has to deliver it in the open page. Meant to be run by hand (the backend needs the three stream routes).
+// Rules (F03): every test that changes data uses a throwaway account; nothing global is switched.
 // A stream is "open" when the browser got the response of the stream route; the `ready` frame follows at once and the API
 // registers the connection before it answers, so a campaign sent after that reaches the page as a live event (a short
 // pause covers the frame itself). A campaign sent before would only arrive as a count, with no toast.
 // The wait for that response is armed BEFORE the page is opened: `waitForResponse` only sees responses that arrive after
 // the call, and the stream starts while the page hydrates, so a wait armed afterwards could miss it and time out.
 import type { Locator, Page, Request } from "@playwright/test";
-import { customerIdByEmail, merchantIdByEmail, sendCampaign } from "./admin";
+import { accountIdByEmail, sendCampaign } from "./admin";
 import { expect, test } from "./fixtures";
-import { freshCustomer, freshMerchant, signInMerchant } from "./helpers";
+import { freshAccount, signUpByLink } from "./helpers";
 
-type Surface = "customer" | "merchant";
+/** The API family of the account: a retail account reads the shop routes, a merchant rank the portal routes. */
+type Family = "store" | "client";
 
-const STREAM_PATH: Record<Surface, string> = { customer: "/store/v1/me/stream", merchant: "/client/stream" };
-const COUNT_PATH: Record<Surface, string> = {
-  customer: "/store/v1/me/notifications/unread-count",
-  merchant: "/client/notifications/unread-count",
+const STREAM_PATH: Record<Family, string> = { store: "/store/v1/me/stream", client: "/client/stream" };
+const COUNT_PATH: Record<Family, string> = {
+  store: "/store/v1/me/notifications/unread-count",
+  client: "/client/notifications/unread-count",
 };
 
 const tag = () => Math.random().toString(36).slice(2, 8);
@@ -34,11 +36,11 @@ const item = (page: Page, title: string) => items(page).filter({ hasText: title 
 const toastOf = (page: Page, title: string) => page.locator("[aria-live='polite']").filter({ hasText: title });
 
 /** Stream requests of every tab of the context (an EventSource shows up as a request), by path, with their query. */
-function watchStreams(page: Page, surface: Surface): string[] {
+function watchStreams(page: Page, family: Family): string[] {
   const queries: string[] = [];
   page.context().on("request", (request: Request) => {
     const url = new URL(request.url());
-    if (url.pathname === STREAM_PATH[surface]) queries.push(url.search);
+    if (url.pathname === STREAM_PATH[family]) queries.push(url.search);
   });
   return queries;
 }
@@ -47,19 +49,19 @@ function watchStreams(page: Page, surface: Surface): string[] {
  * Arms the wait for the stream's response (status 200). Call it BEFORE `page.goto`, then `await` the result after the page
  * is up and pause a moment (`waitForTimeout(500)`) so the first frame (`ready`) has been handled.
  */
-function streamOpened(page: Page, surface: Surface) {
-  return page.waitForResponse((response) => new URL(response.url()).pathname === STREAM_PATH[surface] && response.status() === 200);
+function streamOpened(page: Page, family: Family) {
+  return page.waitForResponse((response) => new URL(response.url()).pathname === STREAM_PATH[family] && response.status() === 200);
 }
 
-async function unreadCount(page: Page, surface: Surface): Promise<number> {
-  const res = await page.request.get(COUNT_PATH[surface]);
+async function unreadCount(page: Page, family: Family): Promise<number> {
+  const res = await page.request.get(COUNT_PATH[family]);
   expect(res.status(), await res.text()).toBe(200);
   return ((await res.json()) as { unread: number }).unread;
 }
 
 /** Waits until the API counts `n` unread items (the worker fans a campaign out within seconds). */
-async function waitForUnread(page: Page, surface: Surface, n: number) {
-  await expect.poll(() => unreadCount(page, surface), { timeout: 20_000, intervals: [500, 1_000] }).toBe(n);
+async function waitForUnread(page: Page, family: Family, n: number) {
+  await expect.poll(() => unreadCount(page, family), { timeout: 20_000, intervals: [500, 1_000] }).toBe(n);
 }
 
 /** Waits until React has attached to an element. */
@@ -77,11 +79,11 @@ async function expectNotReloaded(page: Page) {
   expect(await page.evaluate(() => (window as unknown as { __stayed?: boolean }).__stayed), "the page was reloaded").toBe(true);
 }
 
-test.describe("customer", () => {
+test.describe("retail account", () => {
   test("a campaign reaches the bell and a toast with no reload; the toast links to the item", async ({ page }) => {
-    const email = await freshCustomer(page);
+    const { email } = await signUpByLink(page);
     const title = `Live bell ${tag()}`;
-    const opened = streamOpened(page, "customer");
+    const opened = streamOpened(page, "store");
     await page.goto("/en/account");
     await hydrated(bell(page));
     await expect(bell(page)).toHaveAccessibleName("Notifications");
@@ -90,10 +92,10 @@ test.describe("customer", () => {
     await markPage(page);
 
     await sendCampaign({
-      to: { type: "customer", id: await customerIdByEmail(email) },
+      to: { type: "account", id: await accountIdByEmail(email) },
       title,
       body: "Line one\nLine two",
-      link: "/account/orders",
+      link: { customer: "/account/orders" },
     });
 
     // Without the stream this takes the one-minute poll; the stream brings it in a second or two, once the worker has fanned out.
@@ -112,9 +114,9 @@ test.describe("customer", () => {
   });
 
   test("the notifications page shows a new item without a reload, and makes no toast for it", async ({ page }) => {
-    const email = await freshCustomer(page);
+    const { email } = await signUpByLink(page);
     const title = `Live list ${tag()}`;
-    const opened = streamOpened(page, "customer");
+    const opened = streamOpened(page, "store");
     await page.goto("/en/account/notifications");
     await expect(page.getByRole("heading", { name: "No notifications yet" })).toBeVisible();
     await hydrated(bell(page));
@@ -122,7 +124,7 @@ test.describe("customer", () => {
     await page.waitForTimeout(500);
     await markPage(page);
 
-    await sendCampaign({ to: { type: "customer", id: await customerIdByEmail(email) }, title, body: "Appears in place" });
+    await sendCampaign({ to: { type: "account", id: await accountIdByEmail(email) }, title, body: "Appears in place" });
 
     await expect(item(page, title)).toHaveCount(1, { timeout: 20_000 });
     await expect(item(page, title).getByRole("heading", { name: title })).toBeVisible();
@@ -144,10 +146,10 @@ test.describe("customer", () => {
   });
 
   test("two tabs share one stream, both update, and the second tab takes over when the first closes", async ({ page }) => {
-    const email = await freshCustomer(page);
-    const id = await customerIdByEmail(email);
-    const streams = watchStreams(page, "customer");
-    const opened = streamOpened(page, "customer");
+    const { email } = await signUpByLink(page);
+    const id = await accountIdByEmail(email);
+    const streams = watchStreams(page, "store");
+    const opened = streamOpened(page, "store");
     await page.goto("/en/account");
     await hydrated(bell(page));
     await opened;
@@ -162,7 +164,7 @@ test.describe("customer", () => {
 
     const first = `Shared one ${tag()}`;
     await markPage(second);
-    await sendCampaign({ to: { type: "customer", id }, title: first, body: "both tabs" });
+    await sendCampaign({ to: { type: "account", id }, title: first, body: "both tabs" });
     await expect(bell(page)).toHaveAccessibleName("Notifications, 1 unread", { timeout: 20_000 });
     await expect(bell(second)).toHaveAccessibleName("Notifications, 1 unread");
     expect(streams).toHaveLength(1);
@@ -175,19 +177,19 @@ test.describe("customer", () => {
     await second.waitForTimeout(500);
 
     const next = `Shared two ${tag()}`;
-    await sendCampaign({ to: { type: "customer", id }, title: next, body: "after the hand-over" });
+    await sendCampaign({ to: { type: "account", id }, title: next, body: "after the hand-over" });
     await expect(bell(second)).toHaveAccessibleName("Notifications, 2 unread", { timeout: 20_000 });
     await expect(toastOf(second, next).getByText(next, { exact: true })).toBeVisible();
     await expectNotReloaded(second);
   });
 
   // Owner, 2026-11-15: the bell belongs in the shop header too. A signed-in visitor gets it (and its stream) on every shop page.
-  test("the shop header has the bell for a signed-in customer, and a campaign reaches it on the home page with no reload", async ({
+  test("the shop header has the bell for a signed-in retail account, and a campaign reaches it on the home page with no reload", async ({
     page,
   }) => {
-    const email = await freshCustomer(page);
+    const { email } = await signUpByLink(page);
     const title = `Home bell ${tag()}`;
-    const opened = streamOpened(page, "customer");
+    const opened = streamOpened(page, "store");
     await page.goto("/en");
     await hydrated(bell(page));
     await expect(bell(page)).toHaveAccessibleName("Notifications");
@@ -195,7 +197,7 @@ test.describe("customer", () => {
     await page.waitForTimeout(500);
     await markPage(page);
 
-    await sendCampaign({ to: { type: "customer", id: await customerIdByEmail(email) }, title, body: "From the home page" });
+    await sendCampaign({ to: { type: "account", id: await accountIdByEmail(email) }, title, body: "From the home page" });
 
     await expect(bell(page)).toHaveAccessibleName("Notifications, 1 unread", { timeout: 20_000 });
     await expect(toastOf(page, title).getByText(title, { exact: true })).toBeVisible();
@@ -203,7 +205,7 @@ test.describe("customer", () => {
   });
 
   test("a signed-out visitor gets no bell and opens no stream", async ({ page }) => {
-    const streams = watchStreams(page, "customer");
+    const streams = watchStreams(page, "store");
     await page.goto("/en/services");
     await page.waitForLoadState("load");
     await page.waitForTimeout(1_500);
@@ -212,10 +214,10 @@ test.describe("customer", () => {
   });
 
   test("a refused stream leaves the poll in charge: the bell still catches up", async ({ page }) => {
-    const email = await freshCustomer(page);
+    const { email } = await signUpByLink(page);
     // The browser store asks for the count once a minute: let its clock jump instead of waiting.
     await page.clock.install();
-    await page.route(`**${STREAM_PATH.customer}*`, (route) =>
+    await page.route(`**${STREAM_PATH.store}*`, (route) =>
       route.fulfill({ status: 503, contentType: "application/problem+json", body: JSON.stringify({ status: 503, code: "UNAVAILABLE", title: "Unavailable" }) }),
     );
     await page.goto("/en/account");
@@ -223,8 +225,8 @@ test.describe("customer", () => {
     await hydrated(link);
     await expect(link).toHaveAccessibleName("Notifications");
 
-    await sendCampaign({ to: { type: "customer", id: await customerIdByEmail(email) }, title: `Poll ${tag()}`, body: "no stream" });
-    await waitForUnread(page, "customer", 1);
+    await sendCampaign({ to: { type: "account", id: await accountIdByEmail(email) }, title: `Poll ${tag()}`, body: "no stream" });
+    await waitForUnread(page, "store", 1);
     await expect(async () => {
       await page.clock.fastForward(61_000);
       await expect(link).toHaveAccessibleName("Notifications, 1 unread", { timeout: 1_500 });
@@ -232,25 +234,43 @@ test.describe("customer", () => {
   });
 });
 
-test.describe("merchant", () => {
+test.describe("merchant rank", () => {
   test("a campaign reaches the merchant's bell and toast with no reload", async ({ page }) => {
-    const account = await freshMerchant(page);
-    await signInMerchant(page, account);
+    const account = await freshAccount(page, { rank: "merchant", signedIn: true });
     const title = `Live merchant ${tag()}`;
-    const opened = streamOpened(page, "merchant");
-    await page.goto("/en/merchant");
+    const opened = streamOpened(page, "client");
+    await page.goto("/en/account");
     await hydrated(bell(page));
     await expect(bell(page)).toHaveAccessibleName("Notifications");
     await opened;
     await page.waitForTimeout(500);
     await markPage(page);
 
-    await sendCampaign({ to: { type: "client", id: await merchantIdByEmail(account.email) }, title, body: "For the portal", link: "/merchant/settings/notifications" });
+    // The stored link is a portal address: the toast shows the page that replaced it.
+    await sendCampaign({ to: { type: "account", id: account.id }, title, body: "For the portal", link: { merchant: "/merchant/settings/notifications" } });
 
     await expect(bell(page)).toHaveAccessibleName("Notifications, 1 unread", { timeout: 20_000 });
     const toast = toastOf(page, title);
     await expect(toast.getByText(title, { exact: true })).toBeVisible();
-    await expect(toast.getByRole("link", { name: "View" })).toHaveAttribute("href", "/en/merchant/settings/notifications");
+    await expect(toast.getByRole("link", { name: "View" })).toHaveAttribute("href", "/en/account/settings/notifications");
+    await expectNotReloaded(page);
+  });
+
+  test("the notifications page of a merchant rank shows a new item without a reload", async ({ page }) => {
+    const account = await freshAccount(page, { rank: "merchant", signedIn: true });
+    const title = `Live merchant list ${tag()}`;
+    const opened = streamOpened(page, "client");
+    await page.goto("/en/account/notifications");
+    await expect(page.getByRole("heading", { name: "No notifications yet" })).toBeVisible();
+    await hydrated(bell(page));
+    await opened;
+    await page.waitForTimeout(500);
+    await markPage(page);
+
+    await sendCampaign({ to: { type: "account", id: account.id }, title, body: "Appears in place" });
+
+    await expect(item(page, title)).toHaveCount(1, { timeout: 20_000 });
+    await expect(bell(page)).toHaveAccessibleName("Notifications, 1 unread");
     await expectNotReloaded(page);
   });
 });

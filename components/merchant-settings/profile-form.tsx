@@ -1,11 +1,12 @@
 "use client";
-// Profile (PATCH /client/profile): name, company, phone, country, address (300) and tax id (40) are editable; the email
-// is shown read-only with its verification badge (no route changes it) and, while it is not verified, a "Resend
-// verification email" button. Only the changed keys are sent, then the page refreshes.
+// Profile of a merchant rank (PATCH /client/profile): name, company, phone, country, address (300) and tax id (40) are
+// editable; the email is shown read-only with its verification badge (no route changes it). Only the changed keys are sent,
+// then the page refreshes.
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/browser";
-import type { MerchantMe, MerchantProfileInput } from "@/lib/api/types";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
+import type { AccountMe, MerchantProfileInput } from "@/lib/api/types";
 import type { MerchantSettingsMessages } from "@/lib/i18n/messages/merchant-settings";
 import { cn } from "@/lib/cn";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,6 @@ import { Field } from "@/components/ui/field";
 import { Input, Select, Textarea, controlClasses } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { ProblemAlert, useFocusFirstInvalid, useFormProblem } from "./form-problem";
-import { VerifyEmailResend } from "./verify-email-resend";
 
 export type ProfileValues = {
   name: string;
@@ -79,7 +79,7 @@ export function ProfileForm({ countries, initial, email, emailVerified, t, field
     clear();
     setSaving(true);
     try {
-      await api.patch<MerchantMe>("/client/profile", changed);
+      await api.patch<AccountMe>(FAMILY_ROUTES.client.profile, changed);
       toast.success(t.saved);
       startRefresh(() => router.refresh());
     } catch (error) {
@@ -90,7 +90,7 @@ export function ProfileForm({ countries, initial, email, emailVerified, t, field
   }
 
   return (
-    <Card as="section">
+    <Card as="section" id="profile">
       <form ref={formRef} onSubmit={onSubmit} noValidate aria-busy={busy || undefined} className="flex min-w-0 flex-col">
         <CardHeader title={t.title} description={t.description} divided />
         <CardBody className="grid gap-5">
@@ -105,26 +105,23 @@ export function ProfileForm({ countries, initial, email, emailVerified, t, field
             onChange={(e) => set("name")(e.target.value)}
             error={problem?.fields.name}
           />
-          <div className="grid gap-3">
-            <Field label={t.email} id="profile-email" hint={emailVerified ? t.emailHintVerified : t.emailHintUnverified}>
-              {(control) => (
-                <div dir="ltr" className="relative flex items-center">
-                  <input
-                    {...control}
-                    type="email"
-                    dir="ltr"
-                    readOnly
-                    value={email}
-                    className={cn(controlClasses, "h-11 pe-32 text-start")}
-                  />
-                  <span className="absolute inset-y-0 end-2 flex items-center">
-                    {emailVerified ? <Badge tone="success">{t.verified}</Badge> : <Badge tone="warning">{t.notVerified}</Badge>}
-                  </span>
-                </div>
-              )}
-            </Field>
-            <VerifyEmailResend verified={emailVerified} t={t} />
-          </div>
+          <Field label={t.email} id="profile-email" hint={emailVerified ? t.emailHintVerified : t.emailHintUnverified}>
+            {(control) => (
+              <div dir="ltr" className="relative flex items-center">
+                <input
+                  {...control}
+                  type="email"
+                  dir="ltr"
+                  readOnly
+                  value={email}
+                  className={cn(controlClasses, "h-11 pe-32 text-start")}
+                />
+                <span className="absolute inset-y-0 end-2 flex items-center">
+                  {emailVerified ? <Badge tone="success">{t.verified}</Badge> : <Badge tone="warning">{t.notVerified}</Badge>}
+                </span>
+              </div>
+            )}
+          </Field>
           <div className="grid gap-5 sm:grid-cols-2">
             <Input
               label={t.company}

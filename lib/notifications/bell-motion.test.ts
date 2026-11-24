@@ -51,34 +51,34 @@ afterEach(() => {
 describe("when the bell rings", () => {
   it("rings and pops for a live item in a visible tab, and never for a replayed one", () => {
     const motion = createBellMotion(fakeEnv().env);
-    motion.arrival("customer", 3, false);
-    expect(motion.getSnapshot("customer")).toBe(IDLE_MOTION);
+    motion.arrival("store", 3, false);
+    expect(motion.getSnapshot("store")).toBe(IDLE_MOTION);
 
-    motion.arrival("customer", 4, true);
-    expect(motion.getSnapshot("customer")).toEqual({ rings: 1, change: { seq: 1, to: 4, pop: true } });
-    // The other surface is not touched.
-    expect(motion.getSnapshot("merchant")).toBe(IDLE_MOTION);
+    motion.arrival("store", 4, true);
+    expect(motion.getSnapshot("store")).toEqual({ rings: 1, change: { seq: 1, to: 4, pop: true } });
+    // The other family is not touched.
+    expect(motion.getSnapshot("client")).toBe(IDLE_MOTION);
   });
 
   it("rings at most once every 3 s; the number still rolls for every item", () => {
     const motion = createBellMotion(fakeEnv().env);
-    motion.arrival("customer", 1, true);
+    motion.arrival("store", 1, true);
     vi.advanceTimersByTime(1_000);
-    motion.arrival("customer", 2, true);
+    motion.arrival("store", 2, true);
     vi.advanceTimersByTime(RING_WINDOW_MS - 1_001);
-    motion.arrival("customer", 3, true);
-    expect(motion.getSnapshot("customer")).toEqual({ rings: 1, change: { seq: 3, to: 3, pop: false } });
+    motion.arrival("store", 3, true);
+    expect(motion.getSnapshot("store")).toEqual({ rings: 1, change: { seq: 3, to: 3, pop: false } });
 
     vi.advanceTimersByTime(1);
-    motion.arrival("customer", 4, true);
-    expect(motion.getSnapshot("customer")).toEqual({ rings: 2, change: { seq: 4, to: 4, pop: true } });
+    motion.arrival("store", 4, true);
+    expect(motion.getSnapshot("store")).toEqual({ rings: 2, change: { seq: 4, to: 4, pop: true } });
   });
 
   it("leaves no timer behind", () => {
     const motion = createBellMotion(fakeEnv().env);
-    const stop = motion.subscribe("customer", () => {});
-    motion.arrival("customer", 1, true);
-    motion.read("customer", 0);
+    const stop = motion.subscribe("store", () => {});
+    motion.arrival("store", 1, true);
+    motion.read("store", 0);
     stop();
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -86,36 +86,36 @@ describe("when the bell rings", () => {
   it("plays nothing with reduced motion: the number just changes", () => {
     const browser = fakeEnv({ reduced: true });
     const motion = createBellMotion(browser.env);
-    motion.arrival("customer", 1, true);
-    motion.read("customer", 0);
-    expect(motion.getSnapshot("customer")).toBe(IDLE_MOTION);
+    motion.arrival("store", 1, true);
+    motion.read("store", 0);
+    expect(motion.getSnapshot("store")).toBe(IDLE_MOTION);
     // Nor on return to a tab that missed an item.
     browser.setVisible(false);
-    motion.subscribe("customer", () => {});
-    motion.arrival("customer", 1, true);
+    motion.subscribe("store", () => {});
+    motion.arrival("store", 1, true);
     browser.setVisible(true);
-    expect(motion.getSnapshot("customer")).toBe(IDLE_MOTION);
+    expect(motion.getSnapshot("store")).toBe(IDLE_MOTION);
   });
 
   it("rolls the number down for a read and never rings for it", () => {
     const motion = createBellMotion(fakeEnv().env);
-    motion.read("customer", 2);
-    expect(motion.getSnapshot("customer")).toEqual({ rings: 0, change: { seq: 1, to: 2, pop: false } });
+    motion.read("store", 2);
+    expect(motion.getSnapshot("store")).toEqual({ rings: 0, change: { seq: 1, to: 2, pop: false } });
   });
 
   it("caps the count like the store (100 is shown as 99+)", () => {
     const motion = createBellMotion(fakeEnv().env);
-    motion.arrival("customer", 250, true);
-    expect(motion.getSnapshot("customer").change?.to).toBe(100);
+    motion.arrival("store", 250, true);
+    expect(motion.getSnapshot("store").change?.to).toBe(100);
   });
 
   it("tells its listeners and keeps the same snapshot object between cues", () => {
     const motion = createBellMotion(fakeEnv().env);
     const listener = vi.fn();
-    motion.subscribe("customer", listener);
-    motion.arrival("customer", 1, true);
+    motion.subscribe("store", listener);
+    motion.arrival("store", 1, true);
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(motion.getSnapshot("customer")).toBe(motion.getSnapshot("customer"));
+    expect(motion.getSnapshot("store")).toBe(motion.getSnapshot("store"));
   });
 });
 
@@ -123,38 +123,38 @@ describe("a hidden tab", () => {
   it("does not ring while hidden, and rings once when the visitor comes back", () => {
     const browser = fakeEnv({ visible: false });
     const motion = createBellMotion(browser.env);
-    motion.subscribe("customer", () => {});
-    motion.arrival("customer", 1, true);
-    motion.arrival("customer", 2, true);
-    expect(motion.getSnapshot("customer")).toBe(IDLE_MOTION);
+    motion.subscribe("store", () => {});
+    motion.arrival("store", 1, true);
+    motion.arrival("store", 2, true);
+    expect(motion.getSnapshot("store")).toBe(IDLE_MOTION);
 
     browser.setVisible(true);
-    expect(motion.getSnapshot("customer")).toEqual({ rings: 1, change: null });
+    expect(motion.getSnapshot("store")).toEqual({ rings: 1, change: null });
     browser.setVisible(false);
     browser.setVisible(true);
-    expect(motion.getSnapshot("customer").rings).toBe(1);
+    expect(motion.getSnapshot("store").rings).toBe(1);
   });
 
   it("does not ring on return when only replays came, or when everything was read meanwhile", () => {
     const browser = fakeEnv({ visible: false });
     const motion = createBellMotion(browser.env);
-    motion.subscribe("customer", () => {});
-    motion.arrival("customer", 1, false);
+    motion.subscribe("store", () => {});
+    motion.arrival("store", 1, false);
     browser.setVisible(true);
-    expect(motion.getSnapshot("customer")).toBe(IDLE_MOTION);
+    expect(motion.getSnapshot("store")).toBe(IDLE_MOTION);
 
     browser.setVisible(false);
-    motion.arrival("customer", 1, true);
-    motion.read("customer", 0);
+    motion.arrival("store", 1, true);
+    motion.read("store", 0);
     browser.setVisible(true);
-    expect(motion.getSnapshot("customer")).toBe(IDLE_MOTION);
+    expect(motion.getSnapshot("store")).toBe(IDLE_MOTION);
   });
 
   it("watches the visibility only while a bell listens", () => {
     const browser = fakeEnv();
     const motion = createBellMotion(browser.env);
-    const stopOne = motion.subscribe("customer", () => {});
-    const stopTwo = motion.subscribe("customer", () => {});
+    const stopOne = motion.subscribe("store", () => {});
+    const stopTwo = motion.subscribe("store", () => {});
     expect(browser.visibilityListeners()).toBe(1);
     stopOne();
     expect(browser.visibilityListeners()).toBe(1);
@@ -196,8 +196,8 @@ describe("what the bell plays", () => {
 
   it("rolls a read action's cue at the first lower count, whichever lands first, and drops it on a rise", () => {
     const motion = createBellMotion(fakeEnv().env);
-    motion.read("customer", null);
-    const action = motion.getSnapshot("customer");
+    motion.read("store", null);
+    const action = motion.getSnapshot("store");
     expect(action.change).toEqual({ seq: 1, to: null, pop: false });
 
     const view = initialBellView(3, "3", IDLE_MOTION);

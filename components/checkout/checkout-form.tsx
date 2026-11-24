@@ -20,9 +20,11 @@ import { Turnstile } from "@/components/turnstile";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { CheckoutSession, CheckoutSessionInput, StoreConfig, StoreServiceDetail } from "@/lib/api/types";
+import { priceListHref, type CheckoutBuyer } from "@/lib/checkout/access";
 import { formatDateTime, formatNumber, formatPercent, isValidImei, normalizeImei } from "@/lib/format";
 import { fmt, plural } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { isRankRefusal } from "@/lib/merchant/signed-out";
 import { sitePath } from "@/lib/site-path";
 import type { CheckoutMessages } from "@/lib/i18n/messages/checkout";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
@@ -38,6 +40,7 @@ import {
 } from "@/lib/quantity";
 import { deliveryLine, stockHint } from "@/lib/store/delivery";
 import { multiplyMoney, isPositiveMoney } from "./money-math";
+import { PriceListCard } from "./price-list-card";
 import { focusQuantityControl, INVALID_SELECTOR, QuantityControl } from "./quantity-control";
 
 type Labels = CheckoutMessages["start"];
@@ -71,8 +74,8 @@ export type CheckoutFormProps = {
   currency: string;
   taxRates: StoreConfig["taxRates"];
   countries: { code: string; name: string }[];
-  /** The signed-in customer: their email is locked, their country prefilled. */
-  customer: { email: string; country: string } | null;
+  /** The signed-in account of a retail rank: its email is locked, its country prefilled. Null for a guest checkout. */
+  account: CheckoutBuyer | null;
   signInHref: string;
   supportHref: string;
   /** `utm_*` values of the landing URL (the abandoned-checkout report reads `source`). */
@@ -119,7 +122,7 @@ export function CheckoutForm({
   currency: defaultCurrency,
   taxRates,
   countries,
-  customer,
+  account,
   signInHref,
   supportHref,
   utm,
@@ -144,8 +147,8 @@ export function CheckoutForm({
   const controlled = hasControl(rule);
   const needsDetails = service.isImei || fields.length > 0 || controlled;
 
-  const [email, setEmail] = useState(customer?.email ?? "");
-  const [country, setCountry] = useState(customer?.country ?? "");
+  const [email, setEmail] = useState(account?.email ?? "");
+  const [country, setCountry] = useState(account?.country ?? "");
   const [region, setRegion] = useState("");
   const [currency, setCurrency] = useState(defaultCurrency);
   const [imei, setImei] = useState("");
@@ -158,6 +161,9 @@ export function CheckoutForm({
   const [token, setToken] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
   const [busy, setBusy] = useState(false);
+  // The API refused the session because the account's rank orders from its price list (403 RANK_NOT_ALLOWED): the page never
+  // mounts this form for such an account, so this is a rank that changed after the page loaded. The same card takes its place.
+  const [priceListOnly, setPriceListOnly] = useState(false);
 
   // ── The service as the API has it now (rule, availability, delivery, price): one read for the effect below and for
   // a server refusal. Currency, country and region change the price; the rule and the delivery come along.
@@ -357,6 +363,11 @@ export function CheckoutForm({
       router.push(sitePath(`/checkout/${encodeURIComponent(session.token)}`));
       return; // stay busy while the next page opens
     } catch (error) {
+      if (isRankRefusal(error)) {
+        setPriceListOnly(true);
+        setBusy(false);
+        return;
+      }
       const { fields: fieldsOut, form: formOut } = describe(error);
       let form = formOut;
       if (refusesQuantity(error)) {
@@ -429,6 +440,16 @@ export function CheckoutForm({
   const gross = multiplyMoney(price.gross, qtyNumber);
   const taxKnown = Boolean(country);
   const taxApplies = taxKnown && isPositiveMoney(price.tax);
+
+  if (priceListOnly) {
+    return (
+      <PriceListCard
+        labels={labels.priceList}
+        priceListHref={priceListHref(service.id)}
+        serviceHref={sitePath(`/services/${encodeURIComponent(service.slug)}`)}
+      />
+    );
+  }
 
   return (
     <>
@@ -508,14 +529,14 @@ export function CheckoutForm({
                 type="email"
                 name="email"
                 label={labels.you.email}
-                hint={customer ? labels.you.emailSignedIn : labels.you.emailHint}
+                hint={account ? labels.you.emailSignedIn : labels.you.emailHint}
                 error={errors.email}
                 value={email}
                 onChange={(event) => {
                   setEmail(event.target.value);
                   clearError("email");
                 }}
-                readOnly={Boolean(customer)}
+                readOnly={Boolean(account)}
                 autoComplete="email"
                 required
               />
@@ -560,7 +581,7 @@ export function CheckoutForm({
                 onChange={(event) => setCurrency(event.target.value)}
                 options={currencies.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}` }))}
               />
-              {!customer ? (
+              {!account ? (
                 <p className="text-small text-ink-subtle sm:col-span-2">
                   {labels.you.haveAccount}{" "}
                   <Link href={signInHref} className="font-semibold text-ink underline underline-offset-4">

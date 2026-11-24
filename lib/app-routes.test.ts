@@ -3,6 +3,8 @@
 // `next start`. A page of the site at one of those paths could never be served, so no folder of `app/` may define one.
 // Plan A14 / F02: the first URL segment of the site is never `client` or `store`, and no folder directly under
 // `app/en` (route groups, parallel slots and intercepting prefixes looked through) is named `client` or `store`.
+// There is one account area (`/en/account`): every old portal address is redirected by next.config.ts before any page is
+// looked up, so no folder under `app/en` may add the segment `merchant` (a page there could never be served).
 import { readdirSync } from "node:fs";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,6 +58,16 @@ function reservedFolders(folders: string[][]): string[] {
     .map((path) => path.join("/"));
 }
 
+/**
+ * The folders under `en` that add the URL segment `segment` (route groups, parallel slots and private folders add none, an
+ * intercepting folder adds its name). A deeper page lives inside such a folder, which is reported itself.
+ */
+function foldersAdding(folders: string[][], segment: string): string[] {
+  return folders
+    .filter((path) => path[0] === "en" && urlSegmentOf(path[path.length - 1]) === segment)
+    .map((path) => path.join("/"));
+}
+
 const folder = (path: string) => path.split("/");
 
 describe("the site defines no page under the API's prefixes", () => {
@@ -68,7 +80,57 @@ describe("the site defines no page under the API's prefixes", () => {
     expect(folders).toContain("en");
     // `(store)` is a route group: looked through, never a `/store` segment.
     expect(folders).toContain(join("en", "(store)"));
-    expect(folders).toContain(join("en", "(portal)", "merchant"));
+    expect(folders).toContain(join("en", "account"));
+  });
+});
+
+describe("the site has one account area", () => {
+  it("has no folder under app/en that adds the segment merchant", () => {
+    expect(foldersAdding(folderPaths(APP_DIR), "merchant")).toEqual([]);
+  });
+});
+
+describe("foldersAdding", () => {
+  it("flags a folder named merchant under en, at any depth and behind route groups", () => {
+    expect(
+      foldersAdding(
+        [
+          folder("en/merchant"),
+          folder("en/(portal)/merchant"),
+          folder("en/(auth)/merchant"),
+          folder("en/account/merchant"),
+          folder("en/(store)/@modal/(.)merchant"),
+        ],
+        "merchant",
+      ),
+    ).toEqual([
+      "en/merchant",
+      "en/(portal)/merchant",
+      "en/(auth)/merchant",
+      "en/account/merchant",
+      "en/(store)/@modal/(.)merchant",
+    ]);
+  });
+
+  it("accepts the account area, groups that add no segment, private folders and look-alike names", () => {
+    expect(
+      foldersAdding(
+        [
+          folder("en"),
+          folder("en/(portal)"),
+          folder("en/(auth)/become-a-merchant"),
+          folder("en/account"),
+          folder("en/account/orders"),
+          folder("en/_merchant"),
+          folder("en/merchants"),
+          folder("en/merchant-notes"),
+          folder("en/[merchant]"),
+          folder("en/@merchant"),
+          folder("merchant"),
+        ],
+        "merchant",
+      ),
+    ).toEqual([]);
   });
 });
 
@@ -96,13 +158,7 @@ describe("reservedFolders", () => {
         folder("en/(portal)/(deep)/client"),
         folder("en/(store)/@modal/(.)store"),
       ]),
-    ).toEqual([
-      "en/client",
-      "en/store",
-      "en/(store)/store",
-      "en/(portal)/(deep)/client",
-      "en/(store)/@modal/(.)store",
-    ]);
+    ).toEqual(["en/client", "en/store", "en/(store)/store", "en/(portal)/(deep)/client", "en/(store)/@modal/(.)store"]);
   });
 
   it("accepts the real shape of the site", () => {
@@ -112,7 +168,7 @@ describe("reservedFolders", () => {
         folder("en/(store)"),
         folder("en/(store)/services"),
         folder("en/(store)/@modal/(.)quick-view"),
-        folder("en/(portal)/merchant"),
+        folder("en/account"),
         folder("en/account/orders"),
       ]),
     ).toEqual([]);
@@ -125,8 +181,8 @@ describe("reservedFolders", () => {
         folder("stores"),
         folder("_client"),
         folder("en/_store"),
-        folder("en/merchant/store"),
-        folder("en/(portal)/merchant/client"),
+        folder("en/account/store"),
+        folder("en/account/settings/client"),
         folder("[client]"),
       ]),
     ).toEqual([]);

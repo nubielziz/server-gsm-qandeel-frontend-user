@@ -1,6 +1,6 @@
 // The shop currency of the current visitor: the `gsm_currency` cookie when the API offers that currency
 // (`GET /store/v1/config` currencies), else the base currency (USD). Reads a cookie: call it inside <Suspense>.
-// The header's currency switcher writes the cookie (and, for a signed-in customer, PATCH /store/v1/me {currency}).
+// The header's currency switcher writes the cookie (and, for a signed-in retail account, PATCH /store/v1/me {currency}).
 import { cookies } from "next/headers";
 import { CURRENCY_COOKIE } from "@/lib/currency-cookie";
 import { getStoreConfig } from "@/lib/api/public";

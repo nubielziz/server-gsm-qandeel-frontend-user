@@ -1,24 +1,26 @@
 // The notification stream's names and data (feature 27; the contract is backend docs/contract/realtime-events.md, plan §3.5).
 // Hand-written on purpose: the OpenAPI describes the three stream routes but not the frames. Safe to import anywhere.
 import type { NotificationItem } from "@/lib/api/types";
-import { NOTIFICATION_API, type NotificationSurface } from "@/lib/notifications/link";
+import type { AccountFamily } from "@/lib/account/family";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
+import { NOTIFICATION_API } from "@/lib/notifications/link";
 import { isRecord, parseBaseFrame, parseJson, type BaseEvents } from "./stream-client";
 
-/** The stream route of each surface (same origin; Next rewrites `/client/*` and `/store/v1/*` to the API). */
-export const STREAM_API: Record<NotificationSurface, string> = {
-  customer: "/store/v1/me/stream",
-  merchant: "/client/stream",
+/** The stream route of each family (same origin; Next rewrites `/client/*` and `/store/v1/*` to the API). */
+export const STREAM_API: Record<AccountFamily, string> = {
+  store: FAMILY_ROUTES.store.stream,
+  client: FAMILY_ROUTES.client.stream,
 };
 
-/** The route the client asks after a refused stream: the surface's own unread count (401/403 end it, 429 slows it). */
-export const STREAM_PROBE_API: Record<NotificationSurface, string> = {
-  customer: `${NOTIFICATION_API.customer}/unread-count`,
-  merchant: `${NOTIFICATION_API.merchant}/unread-count`,
+/** The route the client asks after a refused stream: the family's own unread count (401/403 end it, 429 slows it). */
+export const STREAM_PROBE_API: Record<AccountFamily, string> = {
+  store: `${NOTIFICATION_API.store}/unread-count`,
+  client: `${NOTIFICATION_API.client}/unread-count`,
 };
 
-/** The name of the lock and of the broadcast channel of a surface: one stream per browser and surface. */
-export function streamLockName(surface: NotificationSurface): string {
-  return `gsm-stream-${surface}`;
+/** The name of the lock and of the broadcast channel of a family: one stream per browser and family. */
+export function streamLockName(family: AccountFamily): string {
+  return `gsm-stream-${family}`;
 }
 
 /** The events a notification stream sends besides the base ones (`ready`, `hb`, `resync`, `bye`). */

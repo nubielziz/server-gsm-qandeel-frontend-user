@@ -1,11 +1,12 @@
 "use client";
-// Cancel and Verify on an order (handoff §4.6). The buttons exist only when the API says the action would be accepted
+// Cancel and Verify on an order of a merchant rank (handoff §4.6). The buttons exist only when the API says the action would be accepted
 // (`canCancel` / `canVerify`). Cancel asks for confirmation in a modal; both end with `router.refresh()` so the page
 // shows the new state. A "stale state" answer (ORDER_NOT_OPEN, ALREADY_SENT, INVALID_TRANSITION, ORDER_NOT_COMPLETED)
 // refreshes too: the buttons then disappear because the order has moved on.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BadgeCheck, Ban } from "lucide-react";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import { useErrorText } from "@/lib/i18n/error-text";
@@ -36,7 +37,7 @@ export function OrderActions({ orderId, canCancel, canVerify, labels }: { orderI
     setBusy("cancel");
     setError(null);
     try {
-      await api.post(`/client/orders/${orderId}/cancel`, {});
+      await api.post(`${FAMILY_ROUTES.client.orders}/${orderId}/cancel`, {});
       setConfirming(false);
       toast.success(labels.cancelled, labels.cancelledText);
       router.refresh();
@@ -51,7 +52,7 @@ export function OrderActions({ orderId, canCancel, canVerify, labels }: { orderI
     setBusy("verify");
     setError(null);
     try {
-      await api.post(`/client/orders/${orderId}/verify`, {});
+      await api.post(`${FAMILY_ROUTES.client.orders}/${orderId}/verify`, {});
       toast.success(labels.verified);
       router.refresh();
     } catch (e) {

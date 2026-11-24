@@ -1,16 +1,16 @@
 "use client";
-// MagicLinkForm: asks for an email and sends a customer sign-in link (`POST /store/v1/auth/magic-link`, Turnstile).
-// An unknown email creates the account (self-signup), so the same form serves "sign in" and "sign up". The answer is
+// MagicLinkForm: asks for an email and sends a sign-in link (`POST /store/v1/auth/magic-link`, Turnstile). An unknown
+// email creates an account of the retail rank (self sign-up), so the same form serves "sign in" and "sign up". The answer is
 // always the same neutral "check your email": the page never says whether the address has an account.
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Mail } from "lucide-react";
-import { api } from "@/lib/api/browser";
 import { useErrorText } from "@/lib/i18n/error-text";
 import { fmt } from "@/lib/i18n/define";
 import { Turnstile } from "@/components/turnstile";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { requestSignInLink } from "./auth-requests";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "./form-errors";
 import { FormAlert } from "./form-alert";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
@@ -62,7 +62,7 @@ export function MagicLinkForm({ strings: s, defaultEmail = "", children }: Magic
         setFeedback({ fields: {}, message: s.securityCheckWait, reference: null });
         return;
       }
-      await api.post("/store/v1/auth/magic-link", { email: address }, { turnstileToken });
+      await requestSignInLink(address, turnstileToken);
       setSentTo(address);
     } catch (error) {
       setFeedback(feedbackFrom(error, errorText, ["email"]));

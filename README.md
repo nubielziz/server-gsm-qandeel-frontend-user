@@ -1,12 +1,13 @@
 # IMEI-HUB — public website
 
-One site for **customers** (shop, IMEI check, checkout, order tracking, support) and **merchants** (portal: prices,
-orders from the wallet, top-ups and invoices, API keys, security), in English only (decision 039).
+One site for the shop (catalog, checkout, order tracking, support) and for **one account area**, `/en/account`: an account has a rank,
+retail or merchant (decision 002). Every account has orders, a wallet, notifications, support and settings; a merchant rank adds a price
+list, orders from the wallet, invoices and API keys. English only (decision 039).
 Next.js 16.4 (App Router, Cache Components), React 19, Tailwind CSS 4. The API is the GSM backend in `../backend`.
 
 - Plan and backend facts: `../STOREFRONT-HANDOFF.md`
 - Rules for contributors and AI agents: `CLAUDE.md` (+ `AGENTS.md`)
-- Status, decisions, test accounts: `PROGRESS.md`
+- Status, decisions, test accounts: `PROGRESS.md`; decisions of the shop: `docs/decisions/`
 - Images to add (prompts and file names): `docs/IMAGE-PROMPTS.md`
 
 ## Run it

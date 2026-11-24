@@ -6,9 +6,11 @@ import {
   defaultQuantityOf,
   inProgressWaitMs,
   mapOrderFieldErrors,
+  orderFormHrefs,
   orderSignature,
   parseImeiLines,
   parseQuantity,
+  placedHref,
   quantityRule,
   safeRegExp,
   summarizeImeiLines,
@@ -199,5 +201,26 @@ describe("mapOrderFieldErrors", () => {
     expect(out.fileId).toBe("T:custom");
     expect(out.imeis).toBe("T:too_big");
     expect(out.other).toEqual(["T:custom"]);
+  });
+});
+
+describe("where the order form leads", () => {
+  it("every address is a page of the account area, none is under the old portal folder", () => {
+    const hrefs = orderFormHrefs();
+    expect(hrefs).toEqual({
+      orders: "/en/account/orders",
+      orderBase: "/en/account/orders",
+      topUp: "/en/account/wallet/add-funds",
+      services: "/en/account/services",
+    });
+    for (const href of Object.values(hrefs)) expect(href).not.toContain("/merchant");
+  });
+
+  it("after one order the form links to that order's page in the account area", () => {
+    expect(placedHref([{ id: 42 }], orderFormHrefs())).toBe("/en/account/orders/42");
+  });
+
+  it("after a bulk order the form links to the list of orders in the account area", () => {
+    expect(placedHref([{ id: 42 }, { id: 43 }], orderFormHrefs())).toBe("/en/account/orders");
   });
 });

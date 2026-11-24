@@ -6,6 +6,11 @@ notification sound, the rating and the typing line of a ticket, the per-device s
 merchant dashboard. The backend removes their routes and data later and the admin console drops its own side of them. This is
 the first numbered decision of the shop: a bare "decision 039" elsewhere in this repository is a backend decision.
 
+**Update 2026-11-24.** Decision 002 moved the merchant pages under `/en/account`. The addresses and page names below are the ones this
+decision was made with: the merchant application page is now `/en/become-a-merchant`, the API keys page is `/en/account/settings/api-keys`, the
+settings are `/en/account/settings`, and the old addresses of this decision (referrals, webhooks, the verification page) answer a 308
+straight to `/en/account`, `/en/account/settings/api-keys` and `/en/account/settings`.
+
 **Decision.** The shop removes each feature completely and keeps what is named below.
 
 1. **Referrals and commissions.** Gone: the merchant Referrals page (referral code and link, commission plan, referred

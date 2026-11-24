@@ -99,8 +99,8 @@ describe("attachments are plain download links", () => {
     expect(html).not.toContain("<iframe");
   });
 
-  it("a merchant's file links to the ticket's own route by id", () => {
-    const html = render({ access: { kind: "merchant", id: 42 } });
+  it("a signed-in thread's file links to the ticket's own route by id", () => {
+    const html = render({ access: { kind: "client", id: 42 } });
     expect(html).toContain('href="/client/tickets/42/files/9"');
   });
 
@@ -126,7 +126,7 @@ describe("an older backend that still sends the retired rating keys", () => {
   // `canRate` and `csatScore` are no longer part of the ticket types: this answer is what the API sent before it dropped them.
   const older = { ...source({ status: "resolved", resolvedAt: "2026-11-15T10:08:00.000Z" }), canRate: true, csatScore: 4 };
 
-  it("shows no rating form and no thanks to a customer", () => {
+  it("shows no rating form and no thanks on a token page", () => {
     const html = render({ source: older });
     expect(html).not.toContain("How was our support?");
     expect(html).not.toContain("Send rating");
@@ -134,8 +134,8 @@ describe("an older backend that still sends the retired rating keys", () => {
     expect(html).toContain("This ticket is closed");
   });
 
-  it("shows none to a merchant either", () => {
-    const html = render({ access: { kind: "merchant", id: 7 }, source: older });
+  it("shows none in a signed-in thread either", () => {
+    const html = render({ access: { kind: "client", id: 7 }, source: older });
     expect(html).not.toContain("Send rating");
     expect(html).not.toContain("Thank you for rating");
   });
@@ -164,7 +164,7 @@ describe("the reply box", () => {
 
 describe("a resolved ticket is closed: the notice instead of the reply box", () => {
   it("has no reply box, no attach control and no send button, but the closed notice with the way to a new ticket", () => {
-    const html = render({ source: source({ status: "resolved", resolvedAt: "2026-11-15T10:08:00.000Z" }), newTicketHref: "/en/account/tickets/new?order=12" });
+    const html = render({ source: source({ status: "resolved", resolvedAt: "2026-11-15T10:08:00.000Z" }), newTicketHref: "/en/account/support/new?order=12" });
     expect(html).not.toContain('name="body"');
     expect(html).not.toContain('type="file"');
     expect(html).not.toContain("Send reply");
@@ -172,7 +172,7 @@ describe("a resolved ticket is closed: the notice instead of the reply box", () 
     expect(html).toMatch(/<div aria-live="polite"><div tabindex="-1" role="group" aria-labelledby="[^"]+"/);
     expect(html).toContain("This ticket is closed</h3>");
     expect(html).toContain("If you still need help, open a new ticket.");
-    expect(html).toMatch(/<a[^>]*href="\/en\/account\/tickets\/new\?order=12"[^>]*>Open a new ticket/);
+    expect(html).toMatch(/<a[^>]*href="\/en\/account\/support\/new\?order=12"[^>]*>Open a new ticket/);
     // Nothing was being written: no word about a discarded draft, no unsent text.
     expect(html).not.toContain("was not sent");
     expect(html).not.toContain('name="unsent"');
@@ -185,9 +185,9 @@ describe("a resolved ticket is closed: the notice instead of the reply box", () 
     expect(html).toContain('href="/store/v1/tickets/tok/files/9"');
   });
 
-  it("a merchant's closed thread offers the portal's new-ticket form", () => {
-    const html = render({ access: { kind: "merchant", id: 7 }, source: source({ status: "resolved" }), newTicketHref: "/en/merchant/support/new" });
-    expect(html).toMatch(/href="\/en\/merchant\/support\/new"[^>]*>Open a new ticket/);
+  it("a signed-in thread that is closed offers the new-ticket form of the account", () => {
+    const html = render({ access: { kind: "client", id: 7 }, source: source({ status: "resolved" }), newTicketHref: "/en/account/support/new" });
+    expect(html).toMatch(/href="\/en\/account\/support\/new"[^>]*>Open a new ticket/);
     expect(html).not.toContain('name="body"');
   });
 });

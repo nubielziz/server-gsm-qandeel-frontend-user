@@ -3,15 +3,14 @@
 // cover stays pending and the page promises no time; a staff reply with words stays one block.
 // Real browser → Next → the isolated demo backend (:3100). The service is the packs fixture of the global setup (packs of
 // 5, 10 and 25; e2e/global-setup.ts → e2e/.auth/fixtures.json): codes are taken only when the order is created and only when
-// they cover the whole quantity, never reserved. The customer, the codes it buys and the orders are this test's own.
+// they cover the whole quantity, never reserved. The account, the codes it buys and the orders are this test's own.
 import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import { store } from "../lib/i18n/messages/store";
-import { availableCodes, completeOrder, creditCustomer, customerIdByEmail, ensureStock } from "./admin";
+import { availableCodes, completeOrder, creditAccount, ensureStock } from "./admin";
 import { expect, test } from "./fixtures";
-import { DEV_TURNSTILE_TOKEN, fixtures, freshCustomer } from "./helpers";
+import { DEV_TURNSTILE_TOKEN, fixtures, freshAccount } from "./helpers";
 
-const PASSWORD = "Orchard-Lantern-8841";
 const IMEI = "490154203237518";
 
 /** Words and digits that would promise a time (the plain "as soon as it is ready" does not). */
@@ -30,7 +29,7 @@ async function expectNoHorizontalOverflow(page: Page) {
 const clipboard = (page: Page) => page.evaluate(() => navigator.clipboard.readText());
 
 /**
- * As the signed-in customer: opens a checkout, records every consent it asks for and pays it from the store balance
+ * As the signed-in account: opens a checkout, records every consent it asks for and pays it from the store balance
  * (`POST …/balance-payment`: no body, no Content-Type, its own Idempotency-Key). Returns the order.
  */
 async function buyFromBalance(page: Page, email: string, serviceId: number, quantity: number): Promise<{ id: number; trackingToken: string }> {
@@ -41,7 +40,7 @@ async function buyFromBalance(page: Page, email: string, serviceId: number, quan
   });
   expect(opened.status(), await opened.text()).toBe(201);
   const session = (await opened.json()) as { token: string; balancePayable: boolean; consent: { required: string[] } };
-  expect(session.balancePayable, "a signed-in customer's checkout can be paid from the balance").toBe(true);
+  expect(session.balancePayable, "a signed-in account's checkout can be paid from the balance").toBe(true);
 
   const consents = await page.request.post(`/store/v1/checkout-sessions/${session.token}/consents`, {
     headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
@@ -61,9 +60,9 @@ test("a stocked order completes at once, its codes are listed with a Copy button
   const { packs } = fixtures();
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
 
-  // 1 to 3. A fresh customer with a password and a balance; five codes on the packs service.
-  const email = await freshCustomer(page, PASSWORD);
-  await creditCustomer(await customerIdByEmail(email), 300, "e2e stock delivery");
+  // 1 to 3. A fresh retail account with a password and a balance; five codes on the packs service.
+  const { email, id } = await freshAccount(page, { signedIn: true });
+  await creditAccount(id, 300, "e2e stock delivery");
   await ensureStock(packs.id, 5, "E2ESD");
 
   // 4. Five units from stock: the order is completed when it is created.

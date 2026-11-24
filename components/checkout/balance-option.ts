@@ -1,6 +1,7 @@
 // What the review page offers about paying from the store balance (plan F30, D9), as one pure function: no React, no
-// cookies, no requests. The page reads who is signed in and the wallet on the server and passes the facts; the view
-// draws whatever state comes back. Money is compared as 4-decimal strings (BigInt inside `compareMoney`), never as numbers.
+// cookies, no requests. The page reads who is signed in and the wallet on the server and passes the facts (an account of a
+// merchant rank has no store balance: `lib/checkout/balance-context.ts`); the view draws whatever state comes back. Money is
+// compared as 4-decimal strings (BigInt inside `compareMoney`), never as numbers.
 import { compareMoney } from "@/lib/format";
 
 /** The parts of `GET /store/v1/me/wallet` the choice needs. The wallet is always US dollars. */
@@ -14,13 +15,13 @@ export type BalanceWallet = {
 };
 
 export type BalanceOptionInput = {
-  /** `session.balancePayable`: the balance is switched on and this checkout was opened by a signed-in customer. */
+  /** `session.balancePayable`: the balance is switched on and this checkout was opened by a signed-in account. */
   balancePayable: boolean;
   /** `session.amounts.usd.gross`: what the payment takes from the balance, whatever currency the checkout shows. */
   usdGross: string;
-  /** A customer is signed in right now (read on the server for this request). */
+  /** An account is signed in right now (read on the server for this request). */
   signedIn: boolean;
-  /** The signed-in customer's wallet; null when nobody is signed in or the read failed. */
+  /** The signed-in account's store balance; null when nobody is signed in, the account has a merchant rank, or the read failed. */
   wallet: BalanceWallet | null;
 };
 
@@ -40,6 +41,9 @@ export type BalanceOption =
 
 export type BalanceOptionKind = BalanceOption["kind"];
 
+/** What the server read for one request: whether an account is signed in and its store balance (null when there is none to show). */
+export type BalanceContext = { signedIn: boolean; wallet: BalanceWallet | null };
+
 /** True when `available` covers `total`. An amount that is not a money string covers nothing (the page must not break). */
 function covers(available: string, total: string): boolean {
   try {
@@ -52,14 +56,14 @@ function covers(available: string, total: string): boolean {
 /**
  * The state of the "Store balance" choice.
  *
- * - Not payable (the checkout was opened as a guest, or the balance is off): `reopen` for a signed-in customer whose
+ * - Not payable (the checkout was opened as a guest, or the balance is off): `reopen` for a signed-in account whose
  *   wallet is on, else `hidden`.
  * - Payable, nobody signed in now: `sign-in`.
  * - Payable, signed in, wallet unreadable or switched off: `hidden`.
  * - Payable, signed in: `frozen`, `insufficient` (available below the USD gross) or `ready`.
  *
- * Whether the signed-in customer is the one who opened the checkout is not known here (the session does not say): the
- * payment answers `403 FORBIDDEN` for another customer and the view then offers a new checkout.
+ * Whether the signed-in account is the one who opened the checkout is not known here (the session does not say): the
+ * payment answers `403 FORBIDDEN` for another account and the view then offers a new checkout.
  */
 export function balanceOption(input: BalanceOptionInput): BalanceOption {
   const { balancePayable, usdGross, signedIn, wallet } = input;

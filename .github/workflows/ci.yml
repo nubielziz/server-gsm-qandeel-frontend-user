@@ -44,6 +44,9 @@ jobs:
 
   # lib/api/schema.gen.ts is generated from the backend's contract (npm run gen:api). This job fails when the file is behind, so a
   # change of the contract enters the website on purpose: generate the file again, and the type check shows what the change touches.
+  # The contract it compares with is the one of the backend branch named in ci/backend-ref (one line). It is `main` and stays `main`;
+  # a pull request that depends on a change of the backend names that branch there, so the two pull requests prove each other before
+  # either reaches main. A push to main with any other ref fails the job: set the file back to `main` before the merge.
   api-types:
     name: API types match the backend's contract
     runs-on: ubuntu-latest
@@ -54,10 +57,33 @@ jobs:
         with:
           path: storefront
           persist-credentials: false
+      - name: Read the backend ref
+        id: backend-ref
+        working-directory: storefront
+        run: |
+          set -euo pipefail
+          if [ ! -f ci/backend-ref ]; then
+            echo "::error file=ci/backend-ref::The file is missing. It holds one line: the backend branch to compare with (main)."
+            exit 1
+          fi
+          ref="$(tr -d '\r' < ci/backend-ref)"
+          if ! [[ "$ref" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || [[ "$ref" == *..* ]]; then
+            echo "::error file=ci/backend-ref::The file must hold exactly one branch name of the backend repository, with no spaces."
+            exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - name: Refuse another backend ref on a push to main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.backend-ref.outputs.ref != 'main'
+        env:
+          BACKEND_REF: ${{ steps.backend-ref.outputs.ref }}
+        run: |
+          echo "::error file=ci/backend-ref::A push to main compares with the backend's main, not with '$BACKEND_REF'. Set the file back to main."
+          exit 1
       - name: Check out the backend next to it
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: nubielziz/server-gsm-qandeel-backend
+          ref: ${{ steps.backend-ref.outputs.ref }}
           path: backend
           persist-credentials: false
       - name: Install Node

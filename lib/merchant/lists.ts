@@ -187,7 +187,7 @@ export function countQuery(filters: QueryInput = {}): QueryInput {
   return listQuery({ start: 0, end: 1 }, filters);
 }
 
-/** `hrefWith("/en/merchant/orders", { status: "pending", q: "" })` → `/en/merchant/orders?status=pending` (empty values are left out). */
+/** `hrefWith("/en/account/orders", { status: "pending", q: "" })` → `/en/account/orders?status=pending` (empty values are left out). */
 export function hrefWith(basePath: string, params: Record<string, string | undefined>): string {
   const sp = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) if (value) sp.set(key, value);

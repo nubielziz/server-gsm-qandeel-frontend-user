@@ -1,5 +1,8 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+// Relative imports on purpose: a config file cannot use the `@/` alias, and both files import nothing themselves.
+import { LEGACY_PATHS } from "./lib/account/legacy-paths";
+import { sitePath } from "./lib/site-path";
 
 // Where the GSM API listens. The browser never calls it directly: `/client/*` and `/store/v1/*` are proxied here,
 // so the site and the API share one origin and the API's SameSite=Lax, host-only cookies work (handoff §2.8, §3.6).
@@ -10,6 +13,19 @@ const apiOrigin = (process.env.GSM_API_ORIGIN ?? "http://localhost:3000").replac
 // `GSM_API_REWRITE_ORIGIN` is that run-time address; unset or empty it is the API origin. Server reads at run time
 // use `GSM_API_ORIGIN` (lib/api/server.ts), which the container sets itself.
 const rewriteOrigin = (process.env.GSM_API_REWRITE_ORIGIN || apiOrigin).replace(/\/+$/, "");
+
+/** One permanent redirect (308); the query of the request is passed on by Next. */
+type PermanentRedirect = { source: string; destination: string; permanent: true };
+
+/**
+ * The old portal and ticket addresses, two rows for each line of the table in `lib/account/legacy-paths.ts`: the address
+ * with the language prefix and the bare address (an emailed link has none), both to the prefixed new address. The rows keep
+ * the order of the table, which is part of it (a fixed last segment before its parameter row, the catch-all last).
+ */
+const legacyRedirects: PermanentRedirect[] = LEGACY_PATHS.flatMap((row): PermanentRedirect[] => [
+  { source: sitePath(row.from), destination: sitePath(row.to), permanent: true },
+  { source: row.from, destination: sitePath(row.to), permanent: true },
+]);
 
 const nextConfig: NextConfig = {
   experimental: {
@@ -67,22 +83,14 @@ const nextConfig: NextConfig = {
   // under /en with its query, so indexed and bookmarked Arabic links and the token links of old mails keep working.
   // Redirects run before proxy.ts and the filesystem (Next docs, proxy.md "Execution order"). robots.ts must not
   // disallow /ar: a crawler has to fetch an old address to see its redirect.
-  // The merchant "Verification" page was retired (merchant accounts are created by the team and no documents are
-  // collected): its old address, with and without /en, opens the settings page instead of a 404.
-  // The merchant "Referrals" page was retired with the program it showed: its old address, with and without /en, opens
-  // the merchant overview (bookmarks and stored notification links keep working).
-  // The merchant "Webhooks" pages (the list and the delivery log of an endpoint) were retired too (an API key is a Dhru
-  // credential only): every old address under them, with and without /en, opens the API keys page.
+  // There is one account area, `/account`. Every old portal address (the pages under `/merchant`, the old ticket list, and the
+  // retired verification, referrals and webhooks pages) answers a 308 to its new place, with and without /en, before any
+  // sign-in check, so a bookmark, an emailed link and a stored notification link keep working. The rows are built from the
+  // table of `lib/account/legacy-paths.ts` (the same table `legacyAccountPath` reads); proxy.ts knows no portal address.
+  // The old Arabic row stays first: it sends an old address under it to /en, and a path that is also an old portal address
+  // takes one more hop.
   async redirects() {
-    return [
-      { source: "/ar/:path*", destination: "/en/:path*", permanent: true },
-      { source: "/en/merchant/settings/verification", destination: "/en/merchant/settings", permanent: true },
-      { source: "/merchant/settings/verification", destination: "/en/merchant/settings", permanent: true },
-      { source: "/en/merchant/referrals", destination: "/en/merchant", permanent: true },
-      { source: "/merchant/referrals", destination: "/en/merchant", permanent: true },
-      { source: "/en/merchant/webhooks/:path*", destination: "/en/merchant/api-keys", permanent: true },
-      { source: "/merchant/webhooks/:path*", destination: "/en/merchant/api-keys", permanent: true },
-    ];
+    return [{ source: "/ar/:path*", destination: "/en/:path*", permanent: true }, ...legacyRedirects];
   },
   async rewrites() {
     return {

@@ -6,11 +6,11 @@
 // limits, a fee that eats the amount: lib/wallet/top-up-errors.ts), because the route's limiter counts refusals too.
 // The request carries an `Idempotency-Key` from `createIdempotencyKeys`: the same key for the same amount and method (a
 // double click, a retry), a new one when either changes, forgotten after a success and after 409 IDEMPOTENCY_KEY_REUSED.
-// A signed-out answer refreshes the route (the account layout then asks to sign in); every other refusal is shown, never
-// a sign-out.
+// A signed-out answer or a rank refusal refreshes the route (the account layout then asks to sign in, or the page answers for the
+// new rank); every other refusal is shown, never a sign-out.
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
-import { api, forgetCsrf } from "@/lib/api/browser";
+import { api } from "@/lib/api/browser";
 import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { TopUpDetail, TopUpMethod } from "@/lib/api/types";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
@@ -18,7 +18,7 @@ import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
 import { isHttpUrl, ltr } from "@/lib/merchant/format";
-import { isSignedOutError } from "@/lib/merchant/signed-out";
+import { leaveIfSignedOut } from "@/lib/merchant/signed-out";
 import { parseAmountInput } from "@/lib/merchant/money-math";
 import {
   amountProblemText,
@@ -160,11 +160,9 @@ export function TopUpForm({ methods, limits, frozen, detailBase, labels: t, erro
     } catch (error) {
       inFlight.current = false;
       setSubmitting(false);
-      if (isSignedOutError(error)) {
-        forgetCsrf("store");
-        router.refresh();
-        return;
-      }
+      // The session ended, or the rank has no store balance any more (a rank change in another tab): the route is refreshed and its
+      // page answers.
+      if (leaveIfSignedOut(error, router)) return;
       const result = topUpErrorText(error, { action: "create", generic: errorText, t: errors, method, limits });
       if (result.forgetKey) keys.reset();
       if (result.field === "amount" || result.field === "gatewayId") {

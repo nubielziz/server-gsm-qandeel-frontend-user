@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { merchantAdapter, messageBody, tokenAdapter, type TicketHttp } from "./ticket-api";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
+import { clientAdapter, messageBody, tokenAdapter, type TicketHttp } from "./ticket-api";
 
 function fakeHttp() {
   const calls: { method: string; path: string; body?: unknown }[] = [];
@@ -32,7 +33,7 @@ describe("messageBody", () => {
   });
 });
 
-describe("tokenAdapter (the customer's page)", () => {
+describe("tokenAdapter (the token page)", () => {
   const token = "tok/with+odd chars";
   const base = `/store/v1/tickets/${encodeURIComponent(token)}`;
 
@@ -78,10 +79,10 @@ describe("tokenAdapter (the customer's page)", () => {
   });
 });
 
-describe("merchantAdapter (the portal thread)", () => {
+describe("clientAdapter (the signed-in thread)", () => {
   it("addresses calls by the ticket id; the session is the credential", async () => {
     const { http, calls } = fakeHttp();
-    const adapter = merchantAdapter(42, http);
+    const adapter = clientAdapter(42, http);
     await adapter.send({ body: "hello", fileIds: [] });
     await adapter.read(8);
     await adapter.refetch();
@@ -92,18 +93,24 @@ describe("merchantAdapter (the portal thread)", () => {
     ]);
   });
 
-  it("uploads with the portal's own route, downloads through the ticket, and listens on the merchant stream", async () => {
+  it("uploads to the client family's file route, the one of the route table", async () => {
     const { http, calls } = fakeHttp();
-    const adapter = merchantAdapter(42, http);
-    await adapter.upload(new File(["abc"], "scan.pdf"));
+    const adapter = clientAdapter(42, http);
+    const uploaded = await adapter.upload(new File(["abc"], "scan.pdf", { type: "application/pdf" }));
     expect(calls).toEqual([{ method: "UPLOAD", path: "/client/files", body: "scan.pdf" }]);
+    expect(FAMILY_ROUTES.client.files).toBe("/client/files");
+    expect(uploaded).toEqual({ id: 77, filename: "scan.pdf", size: 3, mime: "application/pdf" });
+  });
+
+  it("downloads through the ticket, and listens on the stream of the client family", () => {
+    const adapter = clientAdapter(42, fakeHttp().http);
     expect(adapter.fileHref(5)).toBe("/client/tickets/42/files/5");
-    expect(adapter.stream).toEqual({ kind: "surface", surface: "merchant" });
+    expect(adapter.stream).toEqual({ kind: "family", family: "client" });
     expect(adapter.ticketId).toBe(42);
   });
 
   it("has no typing call either", () => {
-    expect(Object.keys(merchantAdapter(42, fakeHttp().http)).sort()).toEqual(
+    expect(Object.keys(clientAdapter(42, fakeHttp().http)).sort()).toEqual(
       ["fileHref", "read", "refetch", "send", "stream", "ticketId", "upload"].sort(),
     );
   });

@@ -10,7 +10,7 @@ vi.mock("@/lib/payment-logo-sizes.json", () => ({ default: listed.files }));
 import type { PaymentMethod } from "@/lib/api/types";
 import { ErrorTextProvider } from "@/lib/i18n/error-text";
 import { errors } from "@/lib/i18n/messages/errors";
-import { merchant } from "@/lib/i18n/messages/merchant";
+import { topUps } from "@/lib/i18n/messages/top-ups";
 import { TopUpForm } from "./top-up-form";
 
 const UPLOADED = "/store/v1/media/7db48410b0249faa175969aa2caa6d316adf34466f57a071ce6ad60e7bb1e022.png";
@@ -37,7 +37,7 @@ const method = (id: number, extra: Partial<PaymentMethod>): PaymentMethod => ({
 const render = (methods: PaymentMethod[]) =>
   renderToStaticMarkup(
     <ErrorTextProvider messages={errors}>
-      <TopUpForm methods={methods} invoiceBase="/en/merchant/invoices" labels={merchant.topUp} />
+      <TopUpForm methods={methods} invoiceBase="/en/account/invoices" labels={topUps.merchant.add} />
     </ErrorTextProvider>,
   );
 
@@ -95,5 +95,25 @@ describe("merchant top-up form: the logo of each method", () => {
     expect(html.match(/type="radio"/g)).toHaveLength(4);
     expect(html).not.toContain("<img");
     for (const icon of ["landmark", "credit-card", "banknote", "coins"]) expect(html, icon).toContain(`lucide-${icon}`);
+  });
+});
+
+describe("merchant top-up form: the page around the request", () => {
+  it("is one form with a submit button, a radio per method and the summary", () => {
+    const html = render([
+      method(1, { name: "Bank transfer" }),
+      method(2, { name: "Card", kind: "automatic", methodType: "card" }),
+    ]);
+    expect(html.match(/<form/g)).toHaveLength(1);
+    expect(html).toContain('type="submit"');
+    expect(html.match(/type="radio"/g)).toHaveLength(2);
+    expect(html).toContain(topUps.merchant.add.previewTitle);
+    expect(html).toContain(topUps.merchant.add.submit);
+  });
+
+  it("preselects the only method and says nothing about the old portal folder", () => {
+    const html = render([method(1, { name: "Bank transfer" })]);
+    expect(html).toMatch(/checked/);
+    expect(html).not.toContain("/merchant/");
   });
 });

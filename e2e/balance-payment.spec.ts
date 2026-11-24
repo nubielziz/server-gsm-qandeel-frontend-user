@@ -1,15 +1,16 @@
 // Pay a checkout from the store balance (plan F30, D9; BH §3.4, §11, SH traps 13 and 18). Real browser → Next → the
 // isolated demo backend (:3100). The demo card gateway cannot take a payment, so the balance is the only complete payment
 // path here: these tests really pay, and check the order that results.
-// Rules (F03): every test that changes data uses a throwaway customer (`freshCustomer`); nothing global is switched; staff
+// Rules (F03): every test that changes data uses a throwaway retail account (`signUpByLink`); nothing global is switched; staff
 // credit and freeze through e2e/admin.ts. The wallet is switched on by the global setup (e2e/global-setup.ts).
 // What is mocked at the browser boundary: answers that cannot be provoked on demand (401 on the payment, 402, 503, the
 // two idempotency conflicts). What is real: the 403 of another customer's checkout and the 409 of a wallet put on hold
 // after the page loaded.
+import { randomUUID } from "node:crypto";
 import type { APIRequestContext, Locator, Page, Request } from "@playwright/test";
-import { creditCustomer, customerIdByEmail, freezeCustomerWallet } from "./admin";
+import { accountIdByEmail, creditAccount, freezeWallet } from "./admin";
 import { expect, test } from "./fixtures";
-import { DEV_TURNSTILE_TOKEN, freshCustomer, stubTurnstile } from "./helpers";
+import { DEV_TURNSTILE_TOKEN, freshAccount, signIn, signUpByLink, stubTurnstile } from "./helpers";
 
 /** Service 1: an IMEI service sold at $3.99 net, one at a time. */
 const SLUG = "icloud-clean-lost-check";
@@ -60,18 +61,18 @@ function usd(amount: string): string {
 
 // ── Accounts and checkouts through the API ───────────────────────────────────────────────────────────────────────────
 
-/** A throwaway customer, signed in on this page, with `amount` credited when given. */
+/** A throwaway retail account, signed in on this page, with `amount` credited when given. */
 async function customerWith(page: Page, amount?: string): Promise<{ email: string; id: number }> {
-  const email = await freshCustomer(page);
-  const id = await customerIdByEmail(email);
-  if (amount) await creditCustomer(id, amount);
+  const { email } = await signUpByLink(page);
+  const id = await accountIdByEmail(email);
+  if (amount) await creditAccount(id, amount);
   return { email, id };
 }
 
-/** The readable store CSRF cookie of the signed-in customer (the browser client sends it as a header). */
+/** The readable CSRF cookie of the signed-in retail account (the browser client sends it as a header). */
 async function storeCsrf(page: Page): Promise<string> {
   const cookie = (await page.context().cookies()).find((c) => c.name === "csrf_token_store");
-  expect(cookie, "the customer has no store session").toBeTruthy();
+  expect(cookie, "the account has no store session").toBeTruthy();
   return decodeURIComponent(cookie!.value);
 }
 
@@ -291,7 +292,7 @@ test.describe("pay from the store balance", () => {
     await expect(main(page).getByText("Sign in to pay from your store balance.")).toBeVisible();
     await expect(balanceRadio(page)).toHaveCount(0);
     const link = main(page).getByRole("link", { name: "Sign in" });
-    await expect(link).toHaveAttribute("href", `/en/sign-in?as=customer&next=${encodeURIComponent(`/en/checkout/${session.token}`)}`);
+    await expect(link).toHaveAttribute("href", `/en/sign-in?next=${encodeURIComponent(`/en/checkout/${session.token}`)}`);
     await expect(cardRadio(page)).toBeChecked();
   });
 
@@ -320,7 +321,7 @@ test.describe("pay from the store balance", () => {
     await expect(payError(page)).toBeFocused();
     await expect(payError(page).getByRole("link", { name: "Sign in" })).toHaveAttribute(
       "href",
-      `/en/sign-in?as=customer&next=${encodeURIComponent(`/en/checkout/${session.token}`)}`,
+      `/en/sign-in?next=${encodeURIComponent(`/en/checkout/${session.token}`)}`,
     );
     await expect(page).toHaveURL(new RegExp(`/en/checkout/${session.token}$`));
     // The 401 was a mock: the real session is untouched, and the page did not drop it either.
@@ -330,10 +331,10 @@ test.describe("pay from the store balance", () => {
     await expect(payButton(page)).toBeEnabled();
   });
 
-  test("another customer's checkout answers 403 FORBIDDEN: a new checkout is offered and nobody is signed out", async ({ page }) => {
+  test("another account's checkout answers 403 FORBIDDEN: a new checkout is offered and nobody is signed out", async ({ page }) => {
     const owner = await customerWith(page, "20.0000");
     const session = await openCustomerSession(page, owner.email);
-    // A second customer signs in on the same browser and opens the first one's checkout link.
+    // A second account signs in on the same browser and opens the first one's checkout link.
     await page.context().clearCookies();
     await customerWith(page, "20.0000");
     await openReview(page, session.token);
@@ -378,7 +379,7 @@ test.describe("pay from the store balance", () => {
     // 409 WALLET_FROZEN, for real: staff put the balance on hold after the page loaded. The page says so, reads the wallet
     // again, shows the choice disabled and falls back to the card.
     reply = null;
-    await freezeCustomerWallet(id);
+    await freezeWallet(id);
     await expect(payButton(page)).toBeEnabled();
     await payButton(page).click();
     await expect(payError(page).getByText(/Your store balance is on hold, so it cannot be used for this right now/)).toBeVisible();
@@ -424,5 +425,28 @@ test.describe("pay from the store balance", () => {
     await expectNoHorizontalOverflow(page);
     await expectInsideViewport(page, main(page).locator("label:has(input[value='balance'])"));
     await expectInsideViewport(page, payButton(page));
+  });
+});
+
+test.describe("a merchant rank and the store balance", () => {
+  test("is offered the payment methods only, and the API refuses a balance payment from it", async ({ page, request }) => {
+    // A checkout opened as a guest: the balance could not pay it for anyone, and an account of a merchant rank has none at all.
+    const session = await openGuestSession(request);
+    const account = await freshAccount(page, { rank: "merchant" });
+    const csrf = await signIn(page, account);
+    await openReview(page, session.token);
+    await expect(balanceRadio(page)).toHaveCount(0);
+    await expect(main(page).getByText(/store balance/i)).toHaveCount(0);
+    await expect(main(page).getByText("Sign in to pay from your store balance.")).toHaveCount(0);
+    await expect(cardRadio(page)).toBeChecked();
+    await expect(payButton(page)).toBeEnabled();
+
+    const refused = await page.request.post(`/store/v1/checkout-sessions/${session.token}/balance-payment`, {
+      headers: { "X-CSRF-Token": csrf, "Idempotency-Key": randomUUID() },
+    });
+    expect(refused.status(), await refused.text()).toBe(403);
+    expect(((await refused.json()) as { code?: string }).code).toBe("RANK_NOT_ALLOWED");
+    // Nothing was paid and the account is still signed in.
+    expect((await page.request.get("/client/auth/me")).status()).toBe(200);
   });
 });

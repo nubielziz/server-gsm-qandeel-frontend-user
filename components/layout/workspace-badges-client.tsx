@@ -11,7 +11,8 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { fmt } from "@/lib/i18n/define";
 import { cn } from "@/lib/cn";
-import { unreadText, type NotificationSurface } from "@/lib/notifications/link";
+import type { AccountFamily } from "@/lib/account/family";
+import { unreadText } from "@/lib/notifications/link";
 import { unreadStore } from "@/lib/notifications/unread-store";
 import { unreadTickets } from "@/lib/support/unread-tickets-browser";
 import { CountBadge } from "@/components/notifications/count-badge";
@@ -19,7 +20,7 @@ import { useBellMotion } from "@/components/notifications/use-bell-motion";
 import { NAV_BADGE } from "./nav-badge";
 
 export type NavUnreadBadgeProps = {
-  surface: NotificationSurface;
+  family: AccountFamily;
   /** The unread count the server just read (the same request read as the bell's); null when it could not. */
   initialCount: number | null;
   /** The name suffix with a `{count}` placeholder (", {count} unread"). */
@@ -27,20 +28,20 @@ export type NavUnreadBadgeProps = {
 };
 
 /** The unread count on the Notifications item: the bell's number, live. Nothing at zero. */
-export function NavUnreadBadge({ surface, initialCount, suffix }: NavUnreadBadgeProps) {
-  const subscribe = useCallback((listener: () => void) => unreadStore.subscribe(surface, listener), [surface]);
+export function NavUnreadBadge({ family, initialCount, suffix }: NavUnreadBadgeProps) {
+  const subscribe = useCallback((listener: () => void) => unreadStore.subscribe(family, listener), [family]);
   const polled = useSyncExternalStore(
     subscribe,
-    () => unreadStore.getSnapshot(surface),
+    () => unreadStore.getSnapshot(family),
     () => null,
   );
   useEffect(() => {
     // The bell hands over the same count; a second reconcile of an equal count does nothing.
-    if (initialCount !== null) unreadStore.reconcile(surface, initialCount);
-  }, [surface, initialCount]);
+    if (initialCount !== null) unreadStore.reconcile(family, initialCount);
+  }, [family, initialCount]);
   const count = polled ?? initialCount ?? 0;
   const text = unreadText(count);
-  const { view, onAnimationEnd } = useBellMotion(surface, count, text);
+  const { view, onAnimationEnd } = useBellMotion(family, count, text);
   if (count <= 0) return null;
   return (
     <>
@@ -53,25 +54,25 @@ export function NavUnreadBadge({ surface, initialCount, suffix }: NavUnreadBadge
 }
 
 export type NavSupportDotProps = {
-  surface: NotificationSurface;
+  family: AccountFamily;
   /** The numbers of the tickets with an unseen reply, as the server read them; null when it could not. */
   initial: string[] | null;
   /** The name suffix (", new reply"). */
   label: string;
 };
 
-/** The dot on Support / My tickets while support wrote something the visitor has not seen. */
-export function NavSupportDot({ surface, initial, label }: NavSupportDotProps) {
-  const subscribe = useCallback((listener: () => void) => unreadTickets.subscribe(surface, listener), [surface]);
+/** The dot on Support while support wrote something the visitor has not seen. */
+export function NavSupportDot({ family, initial, label }: NavSupportDotProps) {
+  const subscribe = useCallback((listener: () => void) => unreadTickets.subscribe(family, listener), [family]);
   const live = useSyncExternalStore(
     subscribe,
-    () => unreadTickets.getSnapshot(surface),
+    () => unreadTickets.getSnapshot(family),
     () => null,
   );
   useEffect(() => {
-    if (initial !== null) unreadTickets.reconcile(surface, initial);
-    else void unreadTickets.refresh(surface);
-  }, [surface, initial]);
+    if (initial !== null) unreadTickets.reconcile(family, initial);
+    else void unreadTickets.refresh(family);
+  }, [family, initial]);
 
   // A client navigation reads the list again (the store keeps a floor between reads); the first render does not.
   const pathname = usePathname();
@@ -79,8 +80,8 @@ export function NavSupportDot({ surface, initial, label }: NavSupportDotProps) {
   useEffect(() => {
     if (seenPath.current === pathname) return;
     seenPath.current = pathname;
-    void unreadTickets.refresh(surface);
-  }, [pathname, surface]);
+    void unreadTickets.refresh(family);
+  }, [pathname, family]);
 
   const on = live ?? (initial !== null && initial.length > 0);
   // Pops in only when it appears after the first paint (React's "storing information from previous renders").

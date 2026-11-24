@@ -1,12 +1,12 @@
 // The unsubscribe page behind the link of marketing emails (plan F11, BH §4.2, §4.4). Before this page the mail's visible
 // link (`STORE_BASE_URL/unsubscribe?token=…`) answered 404. Runs against the isolated demo backend (:3100) and Mailpit
-// (:8025); the throwaway customer is the only account whose data changes.
+// (:8025); the throwaway account is the only one whose data changes.
 // The page must never submit by itself (mail scanners open links): every test that has a good token first checks that the
-// customer is still subscribed, and only a press on the button changes that.
+// account is still subscribed, and only a press on the button changes that.
 import type { Page } from "@playwright/test";
-import { customerIdByEmail, sendCampaign } from "./admin";
+import { accountIdByEmail, sendCampaign } from "./admin";
 import { expect, test } from "./fixtures";
-import { freshCustomer, go, tokenOf, waitForLink } from "./helpers";
+import { go, signUpByLink, tokenOf, waitForLink } from "./helpers";
 
 /** A token the API cannot have issued: well-formed (10 or more characters), but wrong. */
 const WRONG_TOKEN = "zzzz.0123456789abcdef0123456789abcdef";
@@ -18,15 +18,15 @@ async function marketingOptIn(page: Page): Promise<boolean> {
 }
 
 test("the emailed link opens the page, which asks first; the button turns marketing email off", async ({ page }) => {
-  const email = await freshCustomer(page);
+  const { email } = await signUpByLink(page);
 
-  // Opt in (the customer's own PATCH, with the store surface's CSRF token), then staff send a marketing campaign by email.
+  // Opt in (the account's own PATCH, with its CSRF token), then staff send a marketing campaign by email.
   const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "csrf_token_store")?.value;
   const optIn = await page.request.patch("/store/v1/me", { headers: { "X-CSRF-Token": csrf ?? "" }, data: { marketingOptIn: true } });
   expect(optIn.status(), await optIn.text()).toBe(200);
   expect(await marketingOptIn(page)).toBe(true);
   await sendCampaign({
-    to: { type: "customer", id: await customerIdByEmail(email) },
+    to: { type: "account", id: await accountIdByEmail(email) },
     title: "Spring offers",
     body: "Big offers this week",
     purpose: "marketing",

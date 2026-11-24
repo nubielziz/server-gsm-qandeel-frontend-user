@@ -1,14 +1,15 @@
-// The wallet pages (plan F21, BH §3.1, §3.2, §3.6): the customer wallet page with its balance cards, notices and dated
-// statement, the header pill and the nav item, the narrow header, and the merchant wallet page that now
-// shares its cards and statement with it. Runs against the isolated demo backend (:3100) with the customer wallet switched
-// on by the global setup (e2e/global-setup.ts).
-// Rules (F03): every test that changes data uses a throwaway customer (`freshCustomer`); nothing global is switched; staff
-// credit and freeze through e2e/admin.ts. `wallet-disabled.spec.ts` is the exclusive spec that switches the wallet off.
-// Amounts are checked on the English page ("$20.00").
+// The wallet page at /en/account/wallet, one address for every account (plan F21, BH §3.1, §3.2, §3.6): the store balance of a
+// retail rank with its balance cards, notices and dated statement, the header pill and the nav item, the narrow header, and the
+// wallet of a merchant rank that shares its cards and statement with it; each rank is kept off the other's pages, and the page
+// follows an account whose rank changes. Runs against the isolated demo backend (:3100) with the store wallet switched on by the
+// global setup (e2e/global-setup.ts).
+// Rules (F03): every test that changes data uses a throwaway account (`signUpByLink`, `freshAccount`); nothing global is
+// switched; staff credit, freeze and change a rank through e2e/admin.ts. `wallet-disabled.spec.ts` is the exclusive spec that
+// switches the wallet off. Amounts are checked on the English page ("$20.00").
 import type { Locator, Page } from "@playwright/test";
-import { creditCustomer, customerIdByEmail, freezeCustomerWallet } from "./admin";
+import { accountIdByEmail, changeRank, creditAccount, freezeWallet } from "./admin";
 import { expect, test } from "./fixtures";
-import { freshCustomer, go, signInMerchant } from "./helpers";
+import { ACCOUNTS, freshAccount, go, signIn, signUpByLink } from "./helpers";
 
 const main = (page: Page) => page.getByRole("main");
 
@@ -40,12 +41,11 @@ function utcDay(offset = 0): string {
   return new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** A throwaway customer with a balance, signed in. */
+/** A throwaway retail account with a balance, signed in. */
 async function customerWith(page: Page, amount: string, reason?: string): Promise<number> {
-  const email = await freshCustomer(page);
-  const id = await customerIdByEmail(email);
-  if (reason) await creditCustomer(id, amount, reason);
-  else await creditCustomer(id, amount);
+  const { email } = await signUpByLink(page);
+  const id = await accountIdByEmail(email);
+  await creditAccount(id, amount, reason);
   return id;
 }
 
@@ -65,9 +65,9 @@ async function expectInsideViewport(page: Page, locator: Locator) {
   expect(box!.x + box!.width).toBeLessThanOrEqual(width);
 }
 
-test.describe("customer wallet", () => {
+test.describe("wallet of a retail rank", () => {
   test("a new customer with a zero balance has the nav item, the page, Add funds and an empty statement", async ({ page, isMobile }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     await go(page, "/en/account");
     if (isMobile) {
       await go(page, "/en/account/wallet");
@@ -97,7 +97,7 @@ test.describe("customer wallet", () => {
 
   // F33 (W3) shows a notice for the returning top-up; an id that is not the customer's must not break the wallet page.
   test("the return address of an online top-up (?topUp=) with an unknown id still shows the wallet", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     await go(page, "/en/account/wallet?topUp=123");
     await expect(page.getByRole("heading", { level: 1, name: "Wallet" })).toBeVisible();
     await expect(card(page, "Available balance")).toContainText("$0.00");
@@ -189,7 +189,7 @@ test.describe("customer wallet", () => {
 
   test("a balance on hold shows the hold and zero available, never the reason", async ({ page, isMobile }) => {
     const id = await customerWith(page, "20.0000");
-    await freezeCustomerWallet(id, "Secret hold reason 4821");
+    await freezeWallet(id, "Secret hold reason 4821");
     await go(page, "/en/account/wallet");
 
     const notice = main(page).getByRole("alert").filter({ hasText: "Your balance is on hold" });
@@ -218,17 +218,27 @@ test.describe("customer wallet", () => {
   });
 
   test("GET /store/v1/me/wallet is never cached", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     const res = await page.request.get("/store/v1/me/wallet");
     expect(res.status(), await res.text()).toBe(200);
     expect(res.headers()["cache-control"] ?? "").toContain("no-store");
     expect(await res.json()).toMatchObject({ enabled: true, currency: "USD", balance: "0.0000" });
   });
 
-  test("a signed-out visit goes to the customer sign-in and comes back to the wallet", async ({ page }) => {
+  test("a signed-out visit goes to the one sign-in page and comes back to the wallet", async ({ page }) => {
     await page.goto("/en/account/wallet");
-    await expect(page).toHaveURL(/\/en\/sign-in\?.*as=customer/);
-    expect(new URL(page.url()).searchParams.get("next")).toBe("/en/account/wallet");
+    await expect(page).toHaveURL(/\/en\/sign-in\?/);
+    const query = new URL(page.url()).searchParams;
+    expect(query.get("next")).toBe("/en/account/wallet");
+    expect(query.has("as"), "there is one sign-in, whatever the account").toBe(false);
+  });
+
+  test("the pages of a merchant rank send a retail account to the account home", async ({ page }) => {
+    await signUpByLink(page);
+    for (const path of ["/en/account/invoices", "/en/account/invoices/1"]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/en\/account$/);
+    }
   });
 });
 
@@ -254,10 +264,13 @@ test.describe("narrow screens", () => {
   });
 });
 
-test.describe("merchant wallet (regression of the shared cards and statement)", () => {
-  test("still shows its four cards, its notes, the CSV button and the statement lines", async ({ page }) => {
-    await signInMerchant(page);
-    await go(page, "/en/merchant/wallet");
+test.describe("wallet of a merchant rank (the same page, the same cards and statement)", () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page, ACCOUNTS.merchant);
+  });
+
+  test("shows its four cards, its notes, the CSV button and the statement lines", async ({ page }) => {
+    await go(page, "/en/account/wallet");
     await expect(page.getByRole("heading", { level: 1, name: "Wallet" })).toBeVisible();
 
     const usd = (amount: string) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(amount));
@@ -272,11 +285,11 @@ test.describe("merchant wallet (regression of the shared cards and statement)", 
       await expect(card(page, label)).toContainText(hint);
     }
     await expect(main(page).getByText("If you just paid online")).toBeVisible();
-    await expect(main(page).getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/en/merchant/wallet/top-up");
+    await expect(main(page).getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/en/account/wallet/add-funds");
     await expect(main(page).getByRole("button", { name: "Download statement (CSV)" })).toBeVisible();
 
     await expect(main(page).getByRole("heading", { level: 2, name: "Account statement" })).toBeVisible();
-    // The newest line of the API, with its description (the merchant statement keeps its memo column).
+    // The newest line of the API, with its description (the statement of a merchant rank keeps its memo column).
     const lines = (await (await page.request.get("/client/wallet/statement?_start=0&_end=1")).json()) as { kind: string; memo: string; amount: string }[];
     if (lines.length === 0) {
       await expect(main(page).getByRole("heading", { name: "No transactions yet" })).toBeVisible();
@@ -287,11 +300,32 @@ test.describe("merchant wallet (regression of the shared cards and statement)", 
 
   test("the table has its five columns from md up", async ({ page, isMobile }) => {
     test.skip(isMobile, "The table shows from md up; phones get the compact list.");
-    await signInMerchant(page);
-    await go(page, "/en/merchant/wallet");
+    await go(page, "/en/account/wallet");
     const lines = (await (await page.request.get("/client/wallet/statement?_start=0&_end=1")).json()) as unknown[];
     test.skip(lines.length === 0, "The demo merchant has no statement lines.");
     const columns = main(page).getByRole("columnheader");
     await expect(columns).toHaveText(["Date", "Type", "Description", "Amount", "Balance after"]);
+  });
+
+  test("the store balance routes refuse a merchant rank and its top-up page leads to the invoices", async ({ page }) => {
+    const res = await page.request.get("/store/v1/me/wallet");
+    expect(res.status(), await res.text()).toBe(403);
+    expect(((await res.json()) as { code: string }).code).toBe("RANK_NOT_ALLOWED");
+    await page.goto("/en/account/wallet/top-ups/1");
+    await expect(page).toHaveURL(/\/en\/account\/invoices$/);
+  });
+});
+
+test.describe("the wallet follows the rank", () => {
+  test("a merchant that becomes retail finds its balance in the store wallet, with the move named", async ({ page }) => {
+    const account = await freshAccount(page, { rank: "merchant" });
+    await creditAccount(account.id, "20.0000");
+    // The move ends the sessions of the account: it signs in again and meets the page of its new rank at the same address.
+    await changeRank(account.id, "retail");
+    await signIn(page, account);
+    await go(page, "/en/account/wallet");
+    await expect(card(page, "Available balance")).toContainText("$20.00");
+    await expect(card(page, "Reserved")).toHaveCount(0);
+    await expect(vis(statementCard(page, "Statement").getByText("Balance transfer", { exact: true }))).toHaveCount(1);
   });
 });

@@ -1,12 +1,12 @@
-// Merchant portal core, end to end against the isolated demo backend (m1 ops@zainmobilehub.example is active with a
-// wallet; m18 ops@algiersservice.example is pending approval). The flows place REAL orders and invoices in the
-// isolated database: IMEIs are generated per run so a second run never trips the "duplicate open order" rule.
-// The backend can end a session at any time (other test runs sign in as the same merchant), so every navigation goes
-// through `go()`, which signs in again when it lands on the sign-in page.
+// The merchant rank's pages of the account area, end to end against the isolated demo backend (ops@zainmobilehub.example is
+// an active merchant with a wallet). The flows place REAL orders and invoices in the isolated database: IMEIs are
+// generated per run so a second run never trips the "duplicate open order" rule. The backend can end a session at any
+// time (other test runs sign in as the same merchant), so every navigation goes through `go()`, which signs in again when
+// it lands on the sign-in page. A retail account has none of these pages: the last group checks it is sent home.
 import { expect, test } from "./fixtures";
 import { type Locator, type Page } from "@playwright/test";
 import fs from "node:fs/promises";
-import { ACCOUNTS, BASE_URL, fixtures, signInMerchant } from "./helpers";
+import { ACCOUNTS, BASE_URL, fixtures, signIn } from "./helpers";
 
 /** A valid 1x1 PNG: a stand-in for a bank receipt. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==", "base64");
@@ -29,7 +29,7 @@ function randomImei(): string {
 async function go(page: Page, path: string, account: { email: string; password: string } = ACCOUNTS.merchant) {
   await page.goto(path);
   if (new URL(page.url()).pathname.endsWith("/sign-in")) {
-    await signInMerchant(page, account);
+    await signIn(page, account);
     await page.goto(path);
   }
 }
@@ -66,12 +66,12 @@ function usdTotal(price: string, quantity: number): string {
 }
 
 test.beforeEach(async ({ page }) => {
-  await signInMerchant(page);
+  await signIn(page, ACCOUNTS.merchant);
 });
 
 test.describe("dashboard", () => {
   test("shows the wallet balance, the order counts and the latest orders from the API", async ({ page }) => {
-    await go(page, "/en/merchant");
+    await go(page, "/en/account");
     const dash = await (await page.request.get("/client/dashboard")).json();
     const usd = (amount: string) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(amount));
 
@@ -79,8 +79,8 @@ test.describe("dashboard", () => {
     await expect(main(page).getByText(usd(dash.wallet.available)).first()).toBeVisible();
     const total = dash.counts.pending + dash.counts.processing + dash.counts.completed + dash.counts.rejected;
     await expect(main(page).getByRole("link", { name: new RegExp(`Total orders\\s*${total}`) })).toBeVisible();
-    await expect(main(page).getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/en/merchant/wallet/top-up");
-    await expect(main(page).getByRole("link", { name: "New order" })).toHaveAttribute("href", "/en/merchant/services");
+    await expect(main(page).getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/en/account/wallet/add-funds");
+    await expect(main(page).getByRole("link", { name: "New order" })).toHaveAttribute("href", "/en/account/services");
     await expect(vis(main(page).getByRole("link", { name: /^Open order \d+$/ })).first()).toBeVisible();
     // The quick-order box, the status summary and the "order again" cards are gone: the header search (outside the main
     // landmark) and the orders page do their jobs.
@@ -95,9 +95,9 @@ test.describe("dashboard", () => {
     // below the rail, white on the light page.
     for (const height of [657, 620]) {
       await page.setViewportSize({ width: 1366, height });
-      await go(page, "/en/merchant");
+      await go(page, "/en/account");
       const rail = vis(page.getByRole("navigation", { name: "Workspace navigation" }));
-      await expect(rail.getByRole("link")).toHaveCount(9); // eight plus Settings
+      await expect(rail.getByRole("link")).toHaveCount(8); // seven plus Settings
       const fit = await rail.evaluate((nav) => ({
         panelBottom: nav.parentElement!.getBoundingClientRect().bottom,
         lowestLink: Math.max(...[...nav.querySelectorAll("a")].map((a) => a.getBoundingClientRect().bottom)),
@@ -111,7 +111,7 @@ test.describe("dashboard", () => {
 
 test.describe("catalog", () => {
   test("lists the merchant's prices and filters by search, type and category", async ({ page }) => {
-    await go(page, "/en/merchant/services");
+    await go(page, "/en/account/services");
     const all = await (await page.request.get("/client/services?_end=1000")).json();
     await expect(main(page).getByText(`${all.length} results`)).toBeVisible();
 
@@ -124,14 +124,14 @@ test.describe("catalog", () => {
     await expect(page).toHaveURL(/q=vodafone/);
     await expect(main(page).getByText("1 result")).toBeVisible();
 
-    await go(page, "/en/merchant/services");
+    await go(page, "/en/account/services");
     await main(page).getByRole("link", { name: "File service", exact: true }).click();
     await expect(page).toHaveURL(/type=file/);
     await expect(main(page).getByText("4 results")).toBeVisible();
   });
 
   test("exports the price list as CSV", async ({ page }) => {
-    await go(page, "/en/merchant/services?type=imei");
+    await go(page, "/en/account/services?type=imei");
     const [download] = await Promise.all([page.waitForEvent("download"), main(page).getByRole("button", { name: "Export prices (CSV)" }).click()]);
     expect(download.suggestedFilename()).toBe("price-list.csv"); // the name the API sends in Content-Disposition
     const text = await fs.readFile((await download.path())!, "utf8");
@@ -144,7 +144,7 @@ test.describe("catalog", () => {
 test.describe("ordering", () => {
   test("places an IMEI order, finds it in orders and the statement, and cancels it when the API allows", async ({ page }) => {
     const imei = randomImei();
-    await go(page, "/en/merchant/services/1");
+    await go(page, "/en/account/services/1");
     const input = main(page).getByRole("textbox", { name: /^IMEI/ });
     const place = main(page).getByRole("button", { name: /^Place order/ });
 
@@ -158,7 +158,7 @@ test.describe("ordering", () => {
     await expect(main(page).getByText("This IMEI is valid.")).toBeVisible();
     await expect(place).toContainText("$0.10");
     await place.click();
-    await page.waitForURL(/\/en\/merchant\/orders\/(\d+)$/);
+    await page.waitForURL(/\/en\/account\/orders\/(\d+)$/);
     const id = page.url().match(/orders\/(\d+)$/)![1];
 
     await expect(main(page).getByRole("heading", { level: 1 })).toHaveText(`Order #${id}`);
@@ -166,21 +166,21 @@ test.describe("ordering", () => {
     await expect(vis(main(page).getByText("$0.10")).first()).toBeVisible();
 
     // The same open order again: the API refuses a duplicate (409 DUPLICATE_ORDER) and we link to the first one.
-    await go(page, "/en/merchant/services/1");
+    await go(page, "/en/account/services/1");
     await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(imei);
     await main(page).getByRole("button", { name: /^Place order/ }).click();
     await expect(main(page).getByText("You already have this order open")).toBeVisible();
-    await expect(main(page).getByRole("link", { name: `View order #${id}` })).toHaveAttribute("href", `/en/merchant/orders/${id}`);
+    await expect(main(page).getByRole("link", { name: `View order #${id}` })).toHaveAttribute("href", `/en/account/orders/${id}`);
     await expect(main(page).getByRole("button", { name: /^Place order/ })).toBeEnabled(); // usable again after an error
 
     // It is in the orders list and in the statement.
-    await go(page, `/en/merchant/orders?q=${imei}`);
+    await go(page, `/en/account/orders?q=${imei}`);
     await expect(vis(main(page).getByRole("link", { name: `Open order ${id}` })).first()).toBeVisible();
-    await go(page, "/en/merchant/wallet");
+    await go(page, "/en/account/wallet");
     await expect(vis(main(page).getByText(`Hold for ORD-${id}`)).first()).toBeVisible();
 
     // Cancel: the button exists only while the API says the order can still be cancelled.
-    await go(page, `/en/merchant/orders/${id}`);
+    await go(page, `/en/account/orders/${id}`);
     const cancel = main(page).getByRole("button", { name: "Cancel order" });
     if (await cancel.isVisible()) {
       await cancel.click();
@@ -194,7 +194,7 @@ test.describe("ordering", () => {
 
   test("bulk IMEIs: per-line errors, an exact live total, all orders placed together", async ({ page }) => {
     const [a, b] = [randomImei(), randomImei()];
-    await go(page, "/en/merchant/services/1");
+    await go(page, "/en/account/services/1");
     await main(page).getByRole("radio", { name: "Several IMEIs" }).click();
     const list = main(page).getByRole("textbox", { name: /^IMEI list/ });
     await list.fill(`${a}\n\n12345\n${b}`);
@@ -208,14 +208,14 @@ test.describe("ordering", () => {
     const place = main(page).getByRole("button", { name: /^Place order/ });
     await expect(place).toContainText("$0.20"); // 2 × $0.10, exact
     await place.click();
-    await page.waitForURL(/\/en\/merchant\/orders$/);
+    await page.waitForURL(/\/en\/account\/orders$/);
     await expect(vis(main(page).getByText(a)).first()).toBeVisible();
     await expect(vis(main(page).getByText(b)).first()).toBeVisible();
   });
 
   test("custom field: required, then the result code of an instant order", async ({ page }) => {
     const account = `e2e-${Date.now()}@example.com`;
-    await go(page, "/en/merchant/services/15");
+    await go(page, "/en/account/services/15");
     const field = main(page).getByRole("textbox", { name: /^Z3X account/ });
     const place = main(page).getByRole("button", { name: /^Place order/ });
     await place.click();
@@ -223,21 +223,21 @@ test.describe("ordering", () => {
     await expect(field).toBeFocused();
     await field.fill(account);
     await place.click();
-    await page.waitForURL(/\/en\/merchant\/orders\/\d+$/);
+    await page.waitForURL(/\/en\/account\/orders\/\d+$/);
     await expect(main(page).getByText("Details you provided")).toBeVisible();
     await expect(main(page).getByText(account).first()).toBeVisible();
     await expect(main(page).getByText(/Z3X-\d+/).first()).toBeVisible(); // filled from stock: the result is there at once
   });
 
   test("file service: the upload is required and travels as the input file", async ({ page }) => {
-    await go(page, "/en/merchant/services/24");
+    await go(page, "/en/account/services/24");
     const place = main(page).getByRole("button", { name: /^Place order/ });
     await place.click();
     await expect(main(page).getByText("Attach the file this service needs.").first()).toBeVisible();
     await main(page).locator('input[type="file"]').setInputFiles({ name: `combo-${Date.now()}.png`, mimeType: "image/png", buffer: PNG });
     await expect(main(page).getByText(/combo-\d+\.png/)).toBeVisible();
     await place.click();
-    await page.waitForURL(/\/en\/merchant\/orders\/\d+$/);
+    await page.waitForURL(/\/en\/account\/orders\/\d+$/);
     const link = main(page).getByRole("link", { name: "Download file" }).first();
     await expect(link).toHaveAttribute("href", /^\/client\/files\/\d+$/);
   });
@@ -249,7 +249,7 @@ test.describe("quantity rules (the three services the global setup configured, n
   test("packs: the page says the packs, the form offers only them and totals the chosen pack", async ({ page }) => {
     const { packs } = fixtures();
     const price = await priceOf(page, packs.id);
-    await go(page, `/en/merchant/services/${packs.id}`);
+    await go(page, `/en/account/services/${packs.id}`);
     await expect(main(page).getByText("Packs of 5, 10, 25")).toBeVisible();
     await formReady(page);
 
@@ -270,7 +270,7 @@ test.describe("quantity rules (the three services the global setup configured, n
     page.on("request", (request) => {
       if (request.method() === "POST" && new URL(request.url()).pathname === "/client/orders") posts.push(request.url());
     });
-    await go(page, `/en/merchant/services/${range.id}`);
+    await go(page, `/en/account/services/${range.id}`);
     await expect(main(page).getByText("2 to 50 per order")).toHaveCount(2); // the details card and the hint under the box
     await formReady(page);
 
@@ -292,7 +292,7 @@ test.describe("quantity rules (the three services the global setup configured, n
   test("an exact N: nothing to choose, the total is N units", async ({ page }) => {
     const { exact } = fixtures();
     const price = await priceOf(page, exact.id);
-    await go(page, `/en/merchant/services/${exact.id}`);
+    await go(page, `/en/account/services/${exact.id}`);
     await expect(main(page).getByText("5 per order")).toBeVisible();
     await formReady(page);
     await expect(main(page).getByRole("combobox", { name: /^Quantity/ })).toHaveCount(0);
@@ -303,7 +303,7 @@ test.describe("quantity rules (the three services the global setup configured, n
 
 test.describe("orders", () => {
   test("tabs, search and the CSV export use only what the API declares", async ({ page }) => {
-    await go(page, "/en/merchant/orders");
+    await go(page, "/en/account/orders");
     await main(page).getByRole("link", { name: "Completed", exact: true }).click();
     await expect(page).toHaveURL(/status=completed/);
     // The total under the list is the API's total for this filter.
@@ -312,7 +312,7 @@ test.describe("orders", () => {
     await expect(vis(main(page).getByRole("link", { name: /^Open order \d+$/ })).first()).toBeVisible();
 
     // Filter row: type + date range + search all reach the API (a wrong parameter would be a 422 error page).
-    await go(page, "/en/merchant/orders?status=completed&type=imei&from=2020-01-01&to=2030-01-01&q=unlock&sort=total_desc");
+    await go(page, "/en/account/orders?status=completed&type=imei&from=2020-01-01&to=2030-01-01&q=unlock&sort=total_desc");
     await expect(main(page).getByRole("heading", { level: 1, name: "Orders" })).toBeVisible();
     await expect(main(page).getByText("We could not load this page")).toHaveCount(0);
 
@@ -323,16 +323,16 @@ test.describe("orders", () => {
   });
 
   test("an order of another merchant or a bad id is a 404", async ({ page }) => {
-    await go(page, "/en/merchant/orders/1");
+    await go(page, "/en/account/orders/1");
     await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
-    await go(page, "/en/merchant/orders/abc");
+    await go(page, "/en/account/orders/abc");
     await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
   });
 });
 
 test.describe("wallet, top-up and invoices", () => {
   test("wallet shows the balances and the statement, and downloads it as CSV", async ({ page }) => {
-    await go(page, "/en/merchant/wallet");
+    await go(page, "/en/account/wallet");
     const wallet = await (await page.request.get("/client/wallet")).json();
     const usd = (amount: string) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(amount));
     await expect(main(page).getByText(usd(wallet.balance)).first()).toBeVisible();
@@ -345,7 +345,7 @@ test.describe("wallet, top-up and invoices", () => {
   });
 
   test("manual top-up: exact preview, invoice with instructions, receipt upload, payment pending", async ({ page }) => {
-    await go(page, "/en/merchant/wallet/top-up");
+    await go(page, "/en/account/wallet/add-funds");
     await main(page).getByText("Bank transfer", { exact: true }).click();
     await expect(main(page).getByRole("radio", { name: /Bank transfer/ })).toBeChecked();
     const amount = main(page).getByRole("textbox", { name: /^Amount/ });
@@ -358,7 +358,7 @@ test.describe("wallet, top-up and invoices", () => {
     await expect(main(page).getByText("$250.50").first()).toBeVisible(); // bank has no fee: amount = net
     await main(page).getByRole("button", { name: "Continue" }).click();
 
-    await page.waitForURL(/\/en\/merchant\/invoices\/\d+$/);
+    await page.waitForURL(/\/en\/account\/invoices\/\d+$/);
     await expect(main(page).getByRole("heading", { level: 1 })).toContainText("Invoice INV-");
     await expect(main(page).getByText("Payment instructions")).toBeVisible();
     await expect(main(page).getByText("Unpaid").first()).toBeVisible();
@@ -382,12 +382,12 @@ test.describe("wallet, top-up and invoices", () => {
   });
 
   test("invoices: counts per status, filters, preview and detail", async ({ page }) => {
-    await go(page, "/en/merchant/invoices");
+    await go(page, "/en/account/invoices");
     const count = async (status: string) => Number((await page.request.get(`/client/invoices?_start=0&_end=1&status=${status}`)).headers()["x-total-count"]);
     await expect(main(page).getByRole("link", { name: new RegExp(`Paid invoices\\s*${await count("paid")}`) })).toBeVisible();
     await expect(main(page).getByRole("link", { name: new RegExp(`Voided invoices\\s*${await count("void")}`) })).toBeVisible();
 
-    await go(page, "/en/merchant/invoices?status=paid&kind=topup&sort=total_desc&q=INV");
+    await go(page, "/en/account/invoices?status=paid&kind=topup&sort=total_desc&q=INV");
     await expect(main(page).getByText("We could not load this page")).toHaveCount(0);
     await expect(vis(main(page).getByRole("link", { name: /INV-\d+/ })).first()).toBeVisible();
 
@@ -420,7 +420,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
 
   test("PRICE_CHANGED shows both prices and offers to reload the price", async ({ page }) => {
     await refuse(page, "**/client/orders", 409, { code: "PRICE_CHANGED", listedPrice: "0.1000", currentPrice: "0.1100" });
-    await go(page, "/en/merchant/services/1");
+    await go(page, "/en/account/services/1");
     await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
     await place(page).click();
     await expect(alert(page, "The price changed")).toContainText(/You saw \u2066?\$0\.10/); // amounts are wrapped in bidi isolates
@@ -431,16 +431,16 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
   });
 
   test("INSUFFICIENT_FUNDS links to the top-up page; SERVICE_DISABLED links back to the catalog", async ({ page }) => {
-    await go(page, "/en/merchant/services/1");
+    await go(page, "/en/account/services/1");
     await refuse(page, "**/client/orders", 402, { code: "INSUFFICIENT_FUNDS" });
     await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
     await place(page).click();
-    await expect(alert(page, "Your balance is too low").getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/en/merchant/wallet/top-up");
+    await expect(alert(page, "Your balance is too low").getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/en/account/wallet/add-funds");
 
     await page.unroute("**/client/orders");
     await refuse(page, "**/client/orders", 409, { code: "SERVICE_DISABLED" });
     await place(page).click();
-    await expect(alert(page, "This service is unavailable").getByRole("link", { name: "Back to services" })).toHaveAttribute("href", "/en/merchant/services");
+    await expect(alert(page, "This service is unavailable").getByRole("link", { name: "Back to services" })).toHaveAttribute("href", "/en/account/services");
   });
 
   test("a 422 on imeis.N lands on the right textarea line, and inputs.<key> on its field", async ({ page }) => {
@@ -448,7 +448,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
       code: "VALIDATION_FAILED",
       errors: [{ field: "imeis.1", code: "invalid_imei", message: "English text from the API" }],
     });
-    await go(page, "/en/merchant/services/1");
+    await go(page, "/en/account/services/1");
     await main(page).getByRole("radio", { name: "Several IMEIs" }).click();
     await main(page).getByRole("textbox", { name: /^IMEI list/ }).fill(`${randomImei()}\n\n${randomImei()}`);
     await place(page).click();
@@ -457,7 +457,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
 
     await page.unroute("**/client/orders");
     await refuse(page, "**/client/orders", 422, { code: "VALIDATION_FAILED", errors: [{ field: "inputs.account", code: "custom", message: "x" }] });
-    await go(page, "/en/merchant/services/15");
+    await go(page, "/en/account/services/15");
     await main(page).getByRole("textbox", { name: /^Z3X account/ }).fill("someone@example.com");
     await place(page).click();
     await expect(main(page).getByText("This value is not valid.")).toBeVisible();
@@ -470,7 +470,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
       code: "VALIDATION_FAILED",
       errors: [{ field: "quantity", code: "invalid_quantity", message: "Choose one of the quantities this service sells: 5, 10, 25." }],
     });
-    await go(page, `/en/merchant/services/${packs.id}`);
+    await go(page, `/en/account/services/${packs.id}`);
     await formReady(page);
     await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
     await place(page).click();
@@ -486,7 +486,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
   });
 
   test("top-up: a gateway error keeps the form and shows the reference; an automatic method goes to the payment page", async ({ page }) => {
-    await go(page, "/en/merchant/wallet/top-up");
+    await go(page, "/en/account/wallet/add-funds");
     await main(page).getByText("Crypto gateway", { exact: true }).click();
     await main(page).getByRole("textbox", { name: /^Amount/ }).fill("100");
     await expect(main(page).getByText("$1.00").first()).toBeVisible(); // 1% of $100, exact
@@ -510,11 +510,11 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
   });
 
   test("a receipt the API refuses (409 CONFLICT) is explained", async ({ page }) => {
-    await go(page, "/en/merchant/wallet/top-up");
+    await go(page, "/en/account/wallet/add-funds");
     await main(page).getByText("Wise", { exact: true }).click();
     await main(page).getByRole("textbox", { name: /^Amount/ }).fill("75");
     await main(page).getByRole("button", { name: "Continue" }).click();
-    await page.waitForURL(/\/en\/merchant\/invoices\/\d+$/);
+    await page.waitForURL(/\/en\/account\/invoices\/\d+$/);
     await refuse(page, "**/client/invoices/*/receipt", 409, { code: "CONFLICT" });
     await main(page).locator('input[type="file"]').setInputFiles({ name: "receipt.png", mimeType: "image/png", buffer: PNG });
     await expect(main(page).getByText("receipt.png")).toBeVisible();
@@ -523,26 +523,18 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
   });
 });
 
-test.describe("a merchant waiting for approval", () => {
+test.describe("a retail account has none of these pages", () => {
   test.beforeEach(async ({ page }) => {
-    await signInMerchant(page, ACCOUNTS.pendingMerchant);
+    // The session of the other rank is dropped first: one browser holds one session.
+    await page.context().clearCookies();
+    await signIn(page, ACCOUNTS.retail);
   });
 
-  test("the dashboard is a waiting area with links to settings", async ({ page }) => {
-    await go(page, "/en/merchant", ACCOUNTS.pendingMerchant);
-    await expect(main(page).getByRole("heading", { name: "While you wait for approval" })).toBeVisible();
-    await expect(main(page).getByRole("link", { name: "Complete your profile" })).toHaveAttribute("href", "/en/merchant/settings");
-    await expect(main(page).getByRole("link", { name: "Secure your account" })).toHaveAttribute("href", "/en/merchant/settings/security");
-    await expect(main(page).getByRole("link", { name: /verification/i })).toHaveCount(0);
-    await expect(main(page).getByRole("link", { name: "New order" })).toHaveCount(0);
-  });
-
-  for (const path of ["/en/merchant/services", "/en/merchant/orders", "/en/merchant/wallet", "/en/merchant/wallet/top-up", "/en/merchant/invoices"]) {
-    test(`${path} shows the "opens after approval" notice and keeps the session`, async ({ page }) => {
-      await go(page, path, ACCOUNTS.pendingMerchant);
-      await expect(main(page).getByText("Available after approval")).toBeVisible();
-      await expect(page).toHaveURL(new RegExp(`${path}$`)); // not signed out
-      await expect(page.getByText("Waiting for approval").first()).toBeVisible();
+  for (const path of ["/en/account/services", "/en/account/services/1", "/en/account/services?type=imei"]) {
+    test(`${path} sends it to the account home and keeps the session`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/en\/account$/); // not the sign-in page: the session is fine, the rank has no price list
+      await expect(main(page).getByRole("button", { name: /^Place order/ })).toHaveCount(0);
     });
   }
 });
@@ -554,9 +546,9 @@ test.describe("a merchant waiting for approval", () => {
 
 test.describe("lists: one table for every screen", () => {
   const lists = [
-    { name: "orders", path: "/en/merchant/orders" },
-    { name: "services", path: "/en/merchant/services" },
-    { name: "invoices", path: "/en/merchant/invoices" },
+    { name: "orders", path: "/en/account/orders" },
+    { name: "services", path: "/en/account/services" },
+    { name: "invoices", path: "/en/account/invoices" },
   ];
 
   for (const list of lists) {
@@ -606,7 +598,7 @@ test.describe("workspace frame", () => {
       aborted += 1;
       return route.abort();
     });
-    await page.goto("/en/merchant/orders");
+    await page.goto("/en/account/orders");
     expect(aborted, "no client script was blocked").toBeGreaterThan(0);
 
     const button = page.getByRole("button", { name: "Open navigation", exact: true });
@@ -615,7 +607,7 @@ test.describe("workspace frame", () => {
     const drawer = page.getByRole("dialog", { name: "Workspace navigation", exact: true });
     await expect(drawer).toBeVisible();
     expect(await drawer.evaluate((element) => element.matches(":modal"))).toBe(true);
-    // All eight links and Settings: the merchant's own list (the static one shows the same before it is read).
+    // The merchant rank's own list (the static one shows the same before it is read), with Settings at the foot.
     await expect(drawer.getByRole("link", { name: "Invoices", exact: true })).toBeVisible();
     await expect(drawer.getByRole("link", { name: "Settings", exact: true })).toBeVisible();
 
@@ -636,17 +628,15 @@ test.describe("workspace frame", () => {
     // `next dev` renders the shell and the session parts in one pass: the split below needs a production build.
     test.skip(new URL(BASE_URL).port === "5175", "needs the production build (E2E_BASE_URL=http://localhost:5176)");
     const me = (await (await page.request.get("/client/auth/me")).json()) as { name?: string; email: string; company?: string };
-    const html = await (await page.request.get("/en/merchant/orders")).text();
+    const html = await (await page.request.get("/en/account/orders")).text();
     // The session parts stream after the shell as hidden segments that a script moves into place.
     const streamed = html.search(/<div hidden id="S:\d+"/);
     expect(streamed, "the personal parts stream after the shell").toBeGreaterThan(0);
     const shell = html.slice(0, streamed);
 
     expect(shell).toContain('aria-label="Workspace navigation"');
-    expect(shell).toContain("Merchant portal"); // the breadcrumb's area label
     expect(shell).toMatch(/<p class="[^"]*text-heading[^"]*">Orders<\/p>/); // the section title
     expect(shell).toContain('<main id="main"');
-    expect(shell).toContain("Merchant account"); // the role, where the name will be
     expect(shell).toContain('aria-label="Open navigation"');
 
     // The merchant is in the streamed parts only.
@@ -670,7 +660,7 @@ test.describe("rail and tab bar", () => {
     test.skip(isMobile, "the rail shows from lg up");
     // Regression (2026-11-15): the frame was centred at 110rem, leaving a strip of about 70px before the rail at 1920px.
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await go(page, "/en/merchant");
+    await go(page, "/en/account");
     const edges = await rail(page).evaluate((nav) => {
       const panel = nav.parentElement!.getBoundingClientRect();
       const width = document.documentElement.clientWidth;
@@ -684,7 +674,7 @@ test.describe("rail and tab bar", () => {
   test("a hovered icon shows its label beside the rail, and the selection moves to the page a click opens", async ({ page, isMobile }) => {
     test.skip(isMobile, "the rail shows from lg up");
     await page.setViewportSize({ width: 1440, height: 900 });
-    await go(page, "/en/merchant");
+    await go(page, "/en/account");
     const nav = rail(page);
     // The indicator took over from the CSS-only look once the script ran.
     await expect(nav).toHaveAttribute("data-indicator", "");
@@ -700,7 +690,7 @@ test.describe("rail and tab bar", () => {
     expect(tipBox!.x).toBeGreaterThan(panelBox);
 
     await invoices.click();
-    await expect(page).toHaveURL(/\/en\/merchant\/invoices$/);
+    await expect(page).toHaveURL(/\/en\/account\/invoices$/);
     await expect(invoices).toHaveAttribute("aria-current", "page");
     // The indicator ends on the new link (it slid there; the test reads where it rests).
     await expect
@@ -717,26 +707,26 @@ test.describe("rail and tab bar", () => {
 
   test("the Orders item names the orders in progress when there are any", async ({ page, isMobile }) => {
     test.skip(isMobile, "the rail shows from lg up");
-    await go(page, "/en/merchant/invoices");
+    await go(page, "/en/account/invoices");
     const orders = rail(page).getByRole("link", { name: /^Orders/ });
-    await expect(orders).toHaveAttribute("href", "/en/merchant/orders");
+    await expect(orders).toHaveAttribute("href", "/en/account/orders");
     // The badge words are their own visually hidden span, so the name joins with a space before the comma.
     await expect(orders).toHaveAccessibleName(/^Orders(\s*, (\d+|99\+) in progress)?$/);
   });
 
   test("phone: a tab bar with the key destinations, the current one marked, 44px targets, never over the page", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await go(page, "/en/merchant/orders");
+    await go(page, "/en/account/orders");
     const bar = page.getByRole("navigation", { name: "Shortcuts", exact: true });
     await expect(bar).toBeVisible();
     const links = bar.getByRole("link");
     await expect(links).toHaveCount(5);
     expect(await links.evaluateAll((all) => all.map((a) => a.getAttribute("href")))).toEqual([
-      "/en/merchant",
-      "/en/merchant/orders",
-      "/en/merchant/services",
-      "/en/merchant/wallet",
-      "/en/merchant/support",
+      "/en/account",
+      "/en/account/orders",
+      "/en/account/services",
+      "/en/account/wallet",
+      "/en/account/support",
     ]);
     await expect(bar.getByRole("link", { name: /^Orders/ })).toHaveAttribute("aria-current", "page");
     for (const height of await links.evaluateAll((all) => all.map((a) => a.getBoundingClientRect().height))) {

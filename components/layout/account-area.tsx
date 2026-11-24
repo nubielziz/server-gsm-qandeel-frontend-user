@@ -1,75 +1,76 @@
-// AccountArea: the signed-in state in the header: "Sign in" button, or wallet pill + account menu.
+// AccountArea: the signed-in state in the header: "Sign in" button, or the bell, the wallet pill and the account menu.
 // It reads the session cookies, so it must be rendered inside <Suspense fallback={<AccountAreaSkeleton />}>.
-// A merchant and a customer can be signed in at once: the menu then lists both, and the pill is the merchant's.
-// The customer's pill and "Wallet" menu item show when the customer wallet does (`walletCapabilities().show`, plan D7).
-import { cache, Suspense } from "react";
-import { cookies } from "next/headers";
-import { ClipboardList, LayoutDashboard, LogIn, UserRound, Wallet } from "lucide-react";
-import { ApiError } from "@/lib/api/errors";
-import { apiSessionGet } from "@/lib/api/server";
-import { getCustomer, getMerchant, MERCHANT_CSRF_COOKIE, STORE_CSRF_COOKIE } from "@/lib/api/session";
-import type { CustomerWallet, MerchantWallet } from "@/lib/api/types";
-import { formatMoney } from "@/lib/format";
-import { sitePath } from "@/lib/site-path";
+// There is one account type: the menu is the same for every rank, with a row more or less (the price list is a merchant
+// rank's, the wallet row of a retail rank shows only while its store balance does). The rows come from
+// `accountMenuItems` (lib/account/account-menu.ts); the wallet is the request's one shared read (`readAccountWallet`).
+import { Fragment, Suspense, type ReactNode } from "react";
+import { ClipboardList, LogIn, Settings, Tag, UserRound, Wallet } from "lucide-react";
+import Link from "next/link";
+import { accountMenuItems, walletRowShows, type AccountMenuLink, type AccountMenuRow } from "@/lib/account/account-menu";
+import { capabilitiesOf } from "@/lib/account/capabilities";
+import { readAccountWallet } from "@/lib/account/wallet-read";
+import { getAccount } from "@/lib/api/session";
 import { common } from "@/lib/i18n/messages/common";
-import { settle, type Settled } from "@/lib/merchant/load";
-import { walletCapabilities } from "@/lib/wallet/view";
+import { sitePath } from "@/lib/site-path";
 import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/menu";
-import { Money } from "@/components/ui/money";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BellSkeleton, BellSlot } from "@/components/notifications/bell-slot";
-import Link from "next/link";
+import { WalletPillLink, walletPillOf } from "./wallet-pill";
 import { SignOutButton } from "./sign-out-button";
-
-/**
- * The merchant's wallet (`GET /client/wallet`), or null when it cannot be shown (pending approval, signed out, error). Once
- * per request. No merchant session can exist without the readable CSRF cookie: the call is skipped for everyone else, so a
- * visitor who is signed out (or a customer) costs no API call, which lets the header start this read together with `me`.
- * The home page's balance box asks too (components/store/home-balance.tsx): one read for both.
- */
-export const readMerchantWallet = cache(async (): Promise<MerchantWallet | null> => {
-  if (!(await cookies()).has(MERCHANT_CSRF_COOKIE)) return null;
-  try {
-    return await apiSessionGet<MerchantWallet>("/client/wallet");
-  } catch {
-    // 403 ACCOUNT_PENDING_APPROVAL and every other failure: no wallet pill; the header must never break the page.
-    return null;
-  }
-});
-
-/**
- * The customer's wallet (`GET /store/v1/me/wallet`, always USD) as this request's one read, kept as a result so a caller
- * can tell "no wallet to show" (a header: ignore a failure) from "could not load" (the wallet page: show the reference).
- * No-store, reads cookies: render the caller inside <Suspense>. Deduplicated per request: the account layout's pill and
- * nav item, the store header's pill and the wallet page ask once together.
- */
-export const readCustomerWallet = cache(async (): Promise<Settled<CustomerWallet>> => {
-  // No customer session can exist without the readable CSRF cookie: skip the call for a visitor who is signed out.
-  if (!(await cookies()).has(STORE_CSRF_COOKIE)) return { ok: false, error: new ApiError({ status: 401, code: "UNAUTHORIZED" }) };
-  return settle(apiSessionGet<CustomerWallet>("/store/v1/me/wallet"));
-});
 
 /** A same-size placeholder for the account area while the session is read. */
 export function AccountAreaSkeleton({ compact }: { compact?: boolean }) {
   return compact ? <Skeleton className="size-11 rounded-full" /> : <Skeleton className="size-11 rounded-control sm:w-24" />;
 }
 
-async function AccountAreaContent({ compact }: { compact?: boolean }) {
-  // The wallet reads start together with the session reads (plan P1.3): one API round trip instead of two. Each is skipped
-  // by itself when its surface has no session cookie, and dropped below when the session turns out signed out (401) or the
-  // merchant is pending. Personal reads stay no-store and per request. The compact shop header of a checkout (avatar only)
-  // never reads the customer's wallet.
-  const [merchant, customer, merchantWallet, customerRead] = await Promise.all([
-    getMerchant().catch(() => null),
-    getCustomer().catch(() => null),
-    readMerchantWallet(),
-    compact ? null : readCustomerWallet(),
+/** What each page row shows: its label and its icon. */
+const ROWS: Record<AccountMenuLink["id"], { label: string; icon: ReactNode }> = {
+  account: { label: common.header.myAccount, icon: <UserRound aria-hidden="true" /> },
+  orders: { label: common.header.myOrders, icon: <ClipboardList aria-hidden="true" /> },
+  wallet: { label: common.header.myWallet, icon: <Wallet aria-hidden="true" /> },
+  priceList: { label: common.header.priceList, icon: <Tag aria-hidden="true" /> },
+  settings: { label: common.header.settings, icon: <Settings aria-hidden="true" /> },
+};
+
+/**
+ * The rows of the avatar menu: the page rows, then a separator and the one Sign out row. Draws what
+ * `accountMenuItems` decided; it reads nothing.
+ */
+export function AccountMenuRows({ rows }: { rows: AccountMenuRow[] }) {
+  const t = common;
+  return (
+    <>
+      {rows.map((row) =>
+        row.id === "signOut" ? (
+          <Fragment key={row.id}>
+            <MenuSeparator />
+            <SignOutButton label={t.header.signOut} pendingLabel={t.header.signingOut} />
+          </Fragment>
+        ) : (
+          <MenuItem key={row.id} href={sitePath(row.path)} icon={ROWS[row.id].icon}>
+            {ROWS[row.id].label}
+          </MenuItem>
+        ),
+      )}
+    </>
+  );
+}
+
+/** The area for this request's visitor. Exported for its test; the page renders `AccountArea`, which adds the Suspense. */
+export async function AccountAreaContent({ compact }: { compact?: boolean }) {
+  // The account and its wallet are the request's shared reads: the home box, the frame and the pages ask the same
+  // questions, so the header costs no call of its own. A failed read gives the signed-out button or no pill: the header must
+  // never break its page. The compact shop header of a checkout (avatar only) never reads the wallet.
+  const [me, wallet] = await Promise.all([
+    getAccount().catch(() => null),
+    compact ? null : readAccountWallet().catch(() => null),
   ]);
   const t = common;
 
-  if (!merchant && !customer) {
+  if (!me) {
     const signIn = sitePath("/sign-in");
     return (
       <>
@@ -94,44 +95,23 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
     );
   }
 
-  const wallet = merchant && merchant.status !== "pending" ? merchantWallet : null;
-  const customerWallet = customer && customerRead?.ok ? customerRead.data : null;
-  const customerShows = customerWallet ? walletCapabilities(customerWallet).show : false;
-  const name = merchant?.name || customer?.name || merchant?.email || customer?.email || "";
-  const email = merchant?.email ?? customer?.email ?? "";
-  const both = Boolean(merchant && customer);
+  const capabilities = capabilitiesOf(me);
+  const pill = walletPillOf(wallet);
+  const rows = accountMenuItems(capabilities, walletRowShows(me, wallet));
+  const name = me.name || me.email;
 
   return (
     <div className="flex items-center gap-2">
       {/* The notification bell of the signed-in visitor (owner, 2026-11-15: the bell belongs in the shop header too, not only
-          in /account and /merchant). It mounts the live stream (feature 27), so a stream opens wherever a signed-in visitor
-          sees a bell; a signed-out visitor gets neither. A customer's bell when a customer is signed in, else the merchant's.
-          Its own Suspense: the unread count streams in without holding back the rest of the account area. Not in the compact
-          checkout header. */}
+          in the account area). It mounts the live stream, so a stream opens wherever a signed-in visitor sees a bell; a
+          signed-out visitor gets neither. The inbox is the one of the account's family. Its own Suspense: the unread count
+          streams in without holding back the rest of the account area. Not in the compact checkout header. */}
       {compact ? null : (
         <Suspense fallback={<BellSkeleton />}>
-          <BellSlot surface={customer ? "customer" : "merchant"} />
+          <BellSlot family={capabilities.family} />
         </Suspense>
       )}
-      {wallet ? (
-        <Link
-          href={sitePath("/merchant/wallet")}
-          aria-label={`${t.header.wallet}: ${wallet.available} USD`}
-          className="btn-motion btn-lift-soft hidden h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold hover:border-ink sm:inline-flex"
-        >
-          <Wallet aria-hidden="true" className="size-[18px]" />
-          <Money amount={wallet.available} currency="USD" />
-        </Link>
-      ) : customerWallet && customerShows ? (
-        <Link
-          href={sitePath("/account/wallet")}
-          aria-label={`${t.header.storeBalance}: ${formatMoney(customerWallet.available, "USD")}`}
-          className="btn-motion btn-lift-soft hidden h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold hover:border-ink sm:inline-flex"
-        >
-          <Wallet aria-hidden="true" className="size-[18px]" />
-          <Money amount={customerWallet.available} currency="USD" />
-        </Link>
-      ) : null}
+      {pill ? <WalletPillLink pill={pill} variant="header" /> : null}
       <Menu
         label={t.header.accountMenu}
         align="end"
@@ -145,55 +125,27 @@ async function AccountAreaContent({ compact }: { compact?: boolean }) {
       >
         <MenuLabel>
           <p className="truncate text-body font-bold text-ink">{name}</p>
-          {email ? <p className="truncate text-small text-ink-subtle">{email}</p> : null}
+          {me.email ? <p className="truncate text-small text-ink-subtle">{me.email}</p> : null}
+          {/* The rank chip: the account's own rank name, the same place for every account. */}
+          {me.rank?.name ? (
+            <Badge tone="neutral" className="mt-1.5">
+              {me.rank.name}
+            </Badge>
+          ) : null}
         </MenuLabel>
         <MenuSeparator />
-        {merchant ? (
-          <MenuItem href={sitePath("/merchant")} icon={<LayoutDashboard aria-hidden="true" />}>
-            {t.header.merchantPortal}
-          </MenuItem>
-        ) : null}
-        {customer ? (
-          <>
-            <MenuItem href={sitePath("/account")} icon={<UserRound aria-hidden="true" />}>
-              {t.header.myAccount}
-            </MenuItem>
-            <MenuItem href={sitePath("/account/orders")} icon={<ClipboardList aria-hidden="true" />}>
-              {t.header.myOrders}
-            </MenuItem>
-            {customerShows ? (
-              <MenuItem href={sitePath("/account/wallet")} icon={<Wallet aria-hidden="true" />}>
-                {t.header.myWallet}
-              </MenuItem>
-            ) : null}
-          </>
-        ) : null}
-        <MenuSeparator />
-        {merchant ? (
-          <SignOutButton
-            surface="merchant"
-            label={both ? t.header.signOutMerchant : t.header.signOut}
-            pendingLabel={t.header.signingOut}
-          />
-        ) : null}
-        {customer ? (
-          <SignOutButton
-            surface="customer"
-            label={both ? t.header.signOutCustomer : t.header.signOut}
-            pendingLabel={t.header.signingOut}
-          />
-        ) : null}
+        <AccountMenuRows rows={rows} />
       </Menu>
     </div>
   );
 }
 
 export type AccountAreaProps = {
-  /** Compact (checkout header): avatar only, no wallet pill, no chevron. */
+  /** Compact (checkout header): avatar only, no bell, no wallet pill, no chevron. */
   compact?: boolean;
 };
 
-/** Sign in button, or wallet pill + account menu. Wraps itself in <Suspense> with a same-size skeleton. */
+/** Sign in button, or bell, wallet pill and account menu. Wraps itself in <Suspense> with a same-size skeleton. */
 export function AccountArea({ compact }: AccountAreaProps) {
   return (
     <Suspense fallback={<AccountAreaSkeleton compact={compact} />}>

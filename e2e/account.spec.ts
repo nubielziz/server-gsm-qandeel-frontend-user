@@ -1,79 +1,43 @@
-// The customer area against the isolated demo backend. Read-only checks use the demo customer (Daniel, 4 orders). Anything
-// that changes data (preferences, password, privacy requests) runs on a throwaway customer created through the email link,
-// so the shared demo accounts stay as every other test expects them.
+// The account area against the isolated demo backend: the overview and the orders of a retail account and of a merchant rank
+// (one address for both, a different body for each kind), the settings pages of a retail account, and the frame around them.
+// Read-only checks use the demo accounts (Daniel, retail, 4 orders; the demo merchant). Anything that changes data
+// (preferences, password, privacy requests) runs on a throwaway account made through the email link or by staff, so the shared
+// demo accounts stay as every other test expects them.
 import { expect, test } from "./fixtures";
 import { type Page } from "@playwright/test";
-import { ACCOUNTS, BASE_URL, signInCustomer } from "./helpers";
+import { ACCOUNTS, BASE_URL, DEV_TURNSTILE_TOKEN, FRESH_ACCOUNT_PASSWORD, freshAccount, go, signIn, signUpByLink } from "./helpers";
 
-const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
+/** What the "me" routes answer that these tests read: the rank's name and the sign-in state. */
+type Me = { currency: string | null; marketingOptIn: boolean; hasPassword: boolean; rank: { name: string; kind: "retail" | "merchant" } };
 
-/** `page.goto`, then wait until the first form control is hydrated: React resets a controlled input that was filled before hydration. */
-async function go(page: Page, url: string) {
-  await page.goto(url);
-  await page.waitForFunction(() => {
-    const control = document.querySelector("form input, form textarea, form select");
-    return !control || Object.keys(control).some((key) => key.startsWith("__reactProps"));
-  });
-}
-
-function uniqueEmail(prefix: string) {
-  return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@example.test`;
-}
-
-async function waitForLink(page: Page, address: string, pathPattern: RegExp): Promise<string> {
-  const deadline = Date.now() + 25_000;
-  while (Date.now() < deadline) {
-    const list = await page.request.get(`http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:${address}`)}&limit=10`);
-    const body = (await list.json()) as { messages?: { ID: string }[] };
-    for (const { ID } of body.messages ?? []) {
-      const message = (await (await page.request.get(`http://localhost:8025/api/v1/message/${ID}`)).json()) as { Text?: string; HTML?: string };
-      const text = `${message.Text ?? ""}\n${message.HTML ?? ""}`.replace(/&amp;/g, "&");
-      for (const match of text.matchAll(/https?:\/\/localhost:5175(\/[^\s"'<>)\]]+)/g)) {
-        if (pathPattern.test(match[1])) return match[1];
-      }
-    }
-    await page.waitForTimeout(500);
-  }
-  throw new Error(`no mail to ${address} with a link matching ${pathPattern}`);
-}
-
-/** A brand-new customer, signed in through the magic link (API). `withPassword` also gives them a password. */
-async function freshCustomer(page: Page, withPassword?: string): Promise<string> {
-  const email = uniqueEmail("acct");
-  await page.request.post("/store/v1/auth/magic-link", { headers: { "X-Turnstile-Token": DEV_TOKEN }, data: { email } });
-  const link = await waitForLink(page, email, /\/sign-in\?token=/);
-  const verified = await page.request.post("/store/v1/auth/verify", { data: { token: new URL(link, "http://x").searchParams.get("token") } });
-  expect(verified.status()).toBe(200);
-  if (withPassword) {
-    await page.request.post("/store/v1/auth/password/forgot", { headers: { "X-Turnstile-Token": DEV_TOKEN }, data: { email } });
-    const reset = await waitForLink(page, email, /\/set-password\?token=/);
-    const set = await page.request.post("/store/v1/auth/password/set", {
-      data: { token: new URL(reset, "http://x").searchParams.get("token"), password: withPassword },
-    });
-    expect(set.status()).toBe(204);
-    // Setting a password ends every session: sign in again.
-    const login = await page.request.post("/store/v1/auth/login", {
-      headers: { "X-Turnstile-Token": DEV_TOKEN },
-      data: { email, password: withPassword },
-    });
-    expect(login.status()).toBe(200);
-  }
-  return email;
-}
-
-async function me(page: Page) {
+/** The retail account's own record (`GET /store/v1/me`). */
+async function me(page: Page): Promise<Me> {
   const res = await page.request.get("/store/v1/me");
   expect(res.status()).toBe(200);
-  return (await res.json()) as { currency: string | null; marketingOptIn: boolean; hasPassword: boolean };
+  return (await res.json()) as Me;
 }
 
-test.describe("overview and orders (demo customer, read only)", () => {
-  test.beforeEach(async ({ page }) => signInCustomer(page));
+/** The merchant rank's own record (`GET /client/auth/me`: the same keys). */
+async function clientMe(page: Page): Promise<Me> {
+  const res = await page.request.get("/client/auth/me");
+  expect(res.status()).toBe(200);
+  return (await res.json()) as Me;
+}
 
-  test("overview shows the profile with a link to edit it, recent orders with track links and quick links", async ({ page }) => {
+test.describe("overview and orders (demo retail account, read only)", () => {
+  test.beforeEach(async ({ page }) => signIn(page));
+
+  test("overview shows the rank, the profile with a link to edit it, recent orders with track links and quick links", async ({ page }) => {
     await go(page, "/en/account");
     await expect(page.getByRole("heading", { level: 1, name: /Welcome back/ })).toBeVisible();
-    await expect(page.getByText(ACCOUNTS.customer.email).first()).toBeVisible();
+    // The rank is named beside the greeting.
+    await expect(
+      page
+        .getByRole("main")
+        .getByText((await me(page)).rank.name, { exact: true })
+        .first(),
+    ).toBeVisible();
+    await expect(page.getByText(ACCOUNTS.retail.email).first()).toBeVisible();
     await expect(page.getByText("Verified").first()).toBeVisible();
     // The profile is edited in the settings (customer-profile.spec.ts); only the email is left to support.
     await expect(page.getByRole("link", { name: "Edit profile" })).toHaveAttribute("href", "/en/account/settings#profile");
@@ -85,6 +49,9 @@ test.describe("overview and orders (demo customer, read only)", () => {
     await expect(page.getByRole("link", { name: "Help center" })).toBeVisible();
     // The overview itself has no inputs: editing happens on the settings page.
     await expect(page.locator('input[name="name"], input[name="phone"], input[name="email"]')).toHaveCount(0);
+    // None of the dashboard of a merchant rank.
+    await expect(page.getByText("Total orders")).toHaveCount(0);
+    await expect(page.getByText("Available balance", { exact: true })).toHaveCount(0);
   });
 
   test("orders: tabs filter by status through the URL and the amount column is honest about VAT and currency", async ({ page }) => {
@@ -93,11 +60,18 @@ test.describe("overview and orders (demo customer, read only)", () => {
     await expect(page.getByRole("columnheader", { name: "Amount (USD, before VAT)" })).toBeVisible();
     const all = await page.getByRole("cell", { name: /SF-\d+$/ }).count();
     expect(all).toBeGreaterThan(0);
+    // Every row opens its tracking page (the token is the credential); none opens a page of the account area.
+    const hrefs = await page.getByRole("link", { name: /^Track order SF-\d+$/ }).evaluateAll((links) => links.map((a) => a.getAttribute("href")));
+    expect(hrefs.length).toBeGreaterThan(0);
+    for (const href of hrefs) expect(href).toMatch(/^\/en\/track\/t_/);
 
     await page.getByRole("link", { name: "Completed", exact: true }).click();
     await expect(page).toHaveURL(/\/en\/account\/orders\?status=completed$/);
     await expect(page.getByRole("link", { name: "Completed", exact: true })).toHaveAttribute("aria-current", "page");
-    const statuses = await page.getByRole("cell").filter({ hasText: /^(Completed|Rejected|Pending|Processing)$/ }).allInnerTexts();
+    const statuses = await page
+      .getByRole("cell")
+      .filter({ hasText: /^(Completed|Rejected|Pending|Processing)$/ })
+      .allInnerTexts();
     expect(statuses.length).toBeGreaterThan(0);
     expect(new Set(statuses.map((s) => s.trim()))).toEqual(new Set(["Completed"]));
 
@@ -115,10 +89,13 @@ test.describe("overview and orders (demo customer, read only)", () => {
     await expect(page.getByRole("cell", { name: /SF-\d+$/ }).first()).toBeVisible();
   });
 
-  test("the workspace never scrolls sideways: the wide orders table scrolls in its card, no blank strip beside the frame", async ({
-    page,
-    isMobile,
-  }) => {
+  test("an order page is for a merchant rank: a retail account that opens one goes to its own orders", async ({ page }) => {
+    await page.goto("/en/account/orders/1");
+    await expect(page).toHaveURL(/\/en\/account\/orders$/);
+    await expect(page.getByRole("heading", { level: 1, name: "My orders" })).toBeVisible();
+  });
+
+  test("the workspace never scrolls sideways: the wide orders table scrolls in its card, no blank strip beside the frame", async ({ page, isMobile }) => {
     test.skip(isMobile, "sets its own window sizes");
     // Regression (2026-11-15): the orders table's visually hidden "Track" header escaped the table's scroll box and made
     // the document wider than the window at 768-1024px: the rail was cut.
@@ -129,30 +106,78 @@ test.describe("overview and orders (demo customer, read only)", () => {
         await page.setViewportSize({ width, height: 800 });
         // Above zero means the page scrolls sideways; the reserved scrollbar gutter can make the difference negative.
         await expect
-          .poll(
-            () =>
-              page.evaluate(() =>
-                Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
-              ),
-            { message: `${path} at ${width}px` },
-          )
+          .poll(() => page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth)), {
+            message: `${path} at ${width}px`,
+          })
           .toBe(0);
       }
       await page.setViewportSize({ width: 1440, height: 900 });
     }
   });
 
-  test("signing out from the menu returns to the sign-in page", async ({ page }) => {
+  test("signing out from the menu returns to the sign-in page, which asks for no account type", async ({ page }) => {
     await go(page, "/en/account");
     await page.getByRole("button", { name: "Account menu" }).click();
     await page.getByRole("button", { name: "Sign out" }).click();
-    await expect(page).toHaveURL(/\/en\/sign-in\?as=customer/);
+    await expect(page).toHaveURL(/\/en\/sign-in(\?|$)/);
+    expect(new URL(page.url()).searchParams.has("as")).toBe(false);
   });
 });
 
-test.describe("settings (throwaway customer)", () => {
-  test("a new customer sees an empty orders state and the account page without a name", async ({ page }) => {
-    await freshCustomer(page);
+test.describe("overview and orders (demo merchant rank, read only)", () => {
+  test.beforeEach(async ({ page }) => signIn(page, ACCOUNTS.merchant));
+
+  test("the overview is the dashboard of the rank: the rank, the wallet, the order counts, the way to a new order", async ({ page }) => {
+    await go(page, "/en/account");
+    const main = page.getByRole("main");
+    const dash = await (await page.request.get("/client/dashboard")).json();
+    const usd = (amount: string) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(amount));
+
+    await expect(main.getByRole("heading", { level: 1 })).toContainText("Welcome back,");
+    await expect(main.getByText((await clientMe(page)).rank.name, { exact: true }).first()).toBeVisible();
+    await expect(main.getByText(usd(dash.wallet.available)).first()).toBeVisible();
+    const total = dash.counts.pending + dash.counts.processing + dash.counts.completed + dash.counts.rejected;
+    await expect(main.getByRole("link", { name: new RegExp(`Total orders\\s*${total}`) })).toHaveAttribute("href", "/en/account/orders");
+    await expect(main.getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/en/account/wallet/add-funds");
+    await expect(main.getByRole("link", { name: "New order" })).toHaveAttribute("href", "/en/account/services");
+    // None of the retail overview: no profile card to edit, no list of shop orders with track links.
+    await expect(main.getByRole("link", { name: "Edit profile" })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: /^Track order/ })).toHaveCount(0);
+  });
+
+  test("the orders list opens each order on its own page in the account area, which a retail account cannot read", async ({ page }) => {
+    const rows = (await (await page.request.get("/client/orders?_start=0&_end=1&_sort=createdAt&_order=desc")).json()) as { id: number }[];
+    test.skip(rows.length === 0, "the demo merchant has no order yet");
+    const id = rows[0].id;
+
+    await go(page, "/en/account/orders");
+    const main = page.getByRole("main");
+    await expect(main.getByRole("heading", { level: 1, name: "Orders" })).toBeVisible();
+    await expect(main.getByRole("button", { name: "Export CSV" })).toBeVisible();
+    await expect(main.getByRole("link", { name: "New order" })).toHaveAttribute("href", "/en/account/services");
+    // No row opens a tracking page: the tracking pages are the shop's, for retail orders.
+    await expect(main.locator('a[href^="/en/track/"]')).toHaveCount(0);
+
+    const link = main.getByRole("link", { name: `Open order ${id}`, exact: true });
+    await expect(link).toHaveAttribute("href", `/en/account/orders/${id}`);
+    await link.click();
+    await expect(page).toHaveURL(new RegExp(`/en/account/orders/${id}$`));
+    await expect(main.getByRole("heading", { level: 1, name: `Order #${id}` })).toBeVisible();
+    await expect(main.getByRole("link", { name: "Orders", exact: true })).toHaveAttribute("href", "/en/account/orders");
+  });
+
+  test("a status tab keeps the one address and filters by the API's declared status", async ({ page }) => {
+    await go(page, "/en/account/orders?status=completed");
+    const main = page.getByRole("main");
+    await expect(main.getByRole("link", { name: "Completed", exact: true })).toHaveAttribute("aria-current", "page");
+    const listed = (await (await page.request.get("/client/orders?status=completed&_start=0&_end=1")).json()) as unknown[];
+    if (listed.length > 0) await expect(main.getByRole("link", { name: /^Open order \d+$/ }).first()).toBeVisible();
+  });
+});
+
+test.describe("settings pages of a retail account (throwaway account)", () => {
+  test("a new account sees an empty orders state and the account page without a name", async ({ page }) => {
+    await signUpByLink(page);
     await go(page, "/en/account");
     await expect(page.getByRole("heading", { level: 1, name: "Welcome back" })).toBeVisible();
     await expect(page.getByText("No orders yet")).toBeVisible();
@@ -161,7 +186,7 @@ test.describe("settings (throwaway customer)", () => {
   });
 
   test("preferences: only changed keys are saved and the currency cookie follows", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     await go(page, "/en/account/settings");
     await expect(page.getByRole("heading", { level: 1, name: "Account settings" })).toBeVisible();
 
@@ -189,18 +214,18 @@ test.describe("settings (throwaway customer)", () => {
     await expect(page.getByRole("switch", { name: /Marketing emails/ })).toBeChecked();
   });
 
-  test("a customer without a password is pointed to the email link instead of a form", async ({ page }) => {
-    await freshCustomer(page);
-    await go(page, "/en/account/settings");
+  test("an account without a password is pointed to the password link instead of a form", async ({ page }) => {
+    await signUpByLink(page);
+    await go(page, "/en/account/settings/security");
     await expect(page.getByText("You sign in with email links")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Set a password" })).toHaveAttribute("href", "/en/forgot-password?as=customer");
+    await expect(page.getByRole("link", { name: /^(Set|Create) a password$/ })).toHaveAttribute("href", "/en/forgot-password");
     await expect(page.locator('input[name="currentPassword"]')).toHaveCount(0);
   });
 
   test("change password: wrong current is refused on its field, weak is refused, a good one works", async ({ page }) => {
-    const first = "Harbor-Violet-3317";
-    const email = await freshCustomer(page, first);
-    await go(page, "/en/account/settings");
+    const first = FRESH_ACCOUNT_PASSWORD;
+    const account = await freshAccount(page, { signedIn: true });
+    await go(page, "/en/account/settings/security");
 
     await page.locator('input[name="currentPassword"]').fill("not-my-password-1");
     await page.locator('input[name="newPassword"]').fill("Quartz-Meadow-9082");
@@ -226,16 +251,18 @@ test.describe("settings (throwaway customer)", () => {
 
     // The new password signs in; the old one does not.
     await page.context().clearCookies();
-    const ok = await page.request.post("/store/v1/auth/login", { headers: { "X-Turnstile-Token": DEV_TOKEN }, data: { email, password: next } });
-    expect(ok.status()).toBe(200);
+    await signIn(page, { email: account.email, password: next });
     await page.context().clearCookies();
-    const old = await page.request.post("/store/v1/auth/login", { headers: { "X-Turnstile-Token": DEV_TOKEN }, data: { email, password: first } });
+    const old = await page.request.post("/client/auth/sign-in", {
+      headers: { Origin: new URL(BASE_URL).origin, "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "Content-Type": "application/json" },
+      data: { email: account.email, password: first },
+    });
     expect(old.status()).toBe(401);
   });
 
   test("privacy: export request shows its status and due date; deletion needs the confirmation", async ({ page }) => {
-    await freshCustomer(page);
-    await go(page, "/en/account/settings");
+    await signUpByLink(page);
+    await go(page, "/en/account/settings/privacy");
 
     await page.getByRole("button", { name: "Request data export" }).click();
     const received = page.getByRole("status").filter({ hasText: "Request received: Data export" });
@@ -257,26 +284,31 @@ test.describe("settings (throwaway customer)", () => {
     await expect(page.getByRole("status").filter({ hasText: "Request received: Data deletion" })).toBeVisible();
   });
 
-  test("the settings section links jump to their cards", async ({ page }) => {
-    await signInCustomer(page);
+  test("the settings navigation moves between the settings pages", async ({ page }) => {
+    await signIn(page);
     await go(page, "/en/account/settings");
+    await page.getByRole("link", { name: "Security", exact: true }).click();
+    await expect(page).toHaveURL(/\/en\/account\/settings\/security$/);
     await page.getByRole("link", { name: "Privacy", exact: true }).click();
-    await expect(page).toHaveURL(/#privacy$/);
-    await expect(page.getByRole("heading", { name: "Privacy and data" })).toBeInViewport();
+    await expect(page).toHaveURL(/\/en\/account\/settings\/privacy$/);
+    await expect(page.getByRole("heading", { name: "Privacy and data" })).toBeVisible();
   });
 });
 
-// ── The workspace frame (plan P1.2, P1.4) ─────────────────────────────────────────────────────────────────────────────
-// The customer area's frame is part of the static shell: the rail, the header with the section title, the menu button and
+// ── The workspace frame ───────────────────────────────────────────────────────────────────────────────────────────────
+// The account area's frame is part of the static shell: the rail, the header with the section title, the menu button and
 // its drawer are in the HTML before anything personal is read, and the phone menu opens from that HTML (a native
-// `show-modal` command) before React hydrates. Read-only: the demo customer is only looked at.
+// `show-modal` command) before React hydrates. Read-only: the demo account is only looked at.
 
 /** Whether React has attached its props to the element (it has hydrated). */
 const hydrated = (page: Page, selector: string) =>
-  page.locator(selector).first().evaluate((element) => Object.keys(element).some((key) => key.startsWith("__reactProps")));
+  page
+    .locator(selector)
+    .first()
+    .evaluate((element) => Object.keys(element).some((key) => key.startsWith("__reactProps")));
 
-test.describe("workspace frame (demo customer, read only)", () => {
-  test.beforeEach(async ({ page }) => signInCustomer(page));
+test.describe("workspace frame (demo retail account, read only)", () => {
+  test.beforeEach(async ({ page }) => signIn(page));
 
   test("phone: the menu button opens the drawer before React hydrates, Esc and the close button close it, focus returns", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -346,7 +378,7 @@ test.describe("workspace frame (demo customer, read only)", () => {
     expect(start, "room before the rail").toBeLessThanOrEqual(16.5);
   });
 
-  test("phone: the tab bar holds Overview, Orders, the wallet when it shows, Notifications and My tickets", async ({ page }) => {
+  test("phone: the tab bar holds Overview, Orders, the wallet when it shows, Notifications and Support", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await go(page, "/en/account/orders");
     const bar = page.getByRole("navigation", { name: "Shortcuts", exact: true });
@@ -356,10 +388,10 @@ test.describe("workspace frame (demo customer, read only)", () => {
       "/en/account",
       "/en/account/orders",
       "/en/account/notifications",
-      "/en/account/tickets",
+      "/en/account/support",
     ]);
     await expect(bar.getByRole("link", { name: /^Orders/ })).toHaveAttribute("aria-current", "page");
-    await expect(bar.getByRole("link", { name: /^Alerts/ })).toHaveAttribute("href", "/en/account/notifications");
+    await expect(bar.locator('a[href="/en/account/notifications"]')).toBeVisible();
     await page.setViewportSize({ width: 1280, height: 900 });
     await expect(bar).toBeHidden();
   });
@@ -369,7 +401,7 @@ test.describe("workspace frame (demo customer, read only)", () => {
   test.fixme("the static shell carries the frame and the section title and nothing personal", async ({ page }) => {
     // `next dev` renders the shell and the session parts in one pass: the split below needs a production build.
     test.skip(new URL(BASE_URL).port === "5175", "needs the production build (E2E_BASE_URL=http://localhost:5176)");
-    const me = (await (await page.request.get("/store/v1/me")).json()) as { name?: string; email: string };
+    const account = (await (await page.request.get("/store/v1/me")).json()) as { name?: string; email: string; rank: { name: string } };
     const html = await (await page.request.get("/en/account/orders")).text();
     // The session parts stream after the shell as hidden segments that a script moves into place.
     const streamed = html.search(/<div hidden id="S:\d+"/);
@@ -380,12 +412,11 @@ test.describe("workspace frame (demo customer, read only)", () => {
     expect(shell).toContain("My account"); // the breadcrumb's area label
     expect(shell).toMatch(/<p class="[^"]*text-heading[^"]*">Orders<\/p>/); // the section title
     expect(shell).toContain('<main id="main"');
-    expect(shell).toContain("Customer account"); // the role, where the name will be
     expect(shell).toContain('aria-label="Open navigation"');
 
     // The person is in the streamed parts only.
-    expect(html).toContain(me.name || me.email);
-    expect(shell).not.toContain(me.email);
-    if (me.name) expect(shell).not.toContain(me.name);
+    expect(html).toContain(account.name || account.email);
+    expect(shell).not.toContain(account.email);
+    if (account.name) expect(shell).not.toContain(account.name);
   });
 });

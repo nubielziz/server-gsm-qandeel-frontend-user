@@ -7,7 +7,7 @@
 // dependency (not approved).
 import type { Page, Request, Route } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { BASE_URL, signInCustomer, stubTurnstile } from "./helpers";
+import { BASE_URL, signIn, stubTurnstile } from "./helpers";
 
 test.skip(new URL(BASE_URL).port === "5175", "prefetching is only enabled in production: run against the production build");
 
@@ -116,9 +116,9 @@ test.describe("content in the prefetch (P3.1, P3.2, P3.3)", () => {
     await release();
   });
 
-  test("Buy now (signed-in customer): the customer is never in the prefetch; the form follows the click", async ({ page }) => {
+  test("Buy now (signed in): the account is never in the prefetch; the form follows the click", async ({ page }) => {
     await stubTurnstile(page);
-    await signInCustomer(page);
+    await signIn(page);
     const rsc = trackRsc(page);
     await page.goto("/en/services/atandt-usa-premier-unlock");
     const buy = page.getByRole("link", { name: "Buy now" });
@@ -130,12 +130,12 @@ test.describe("content in the prefetch (P3.1, P3.2, P3.3)", () => {
     await expect(page).toHaveURL(/\/en\/checkout\?service=atandt-usa-premier-unlock$/);
     const main = page.locator("main");
     await expect(main.getByRole("heading", { level: 1, name: "Secure checkout" })).toBeVisible();
-    // The customer read (`/store/v1/me`, no-store) holds the form back: its skeleton shows, no email field yet.
+    // The account read (`/store/v1/me`, no-store) holds the form back: its skeleton shows, no email field yet.
     await expect(visibleSkeletons(page).first()).toBeVisible();
     await expect(main.getByLabel("Email")).toHaveCount(0);
 
     await release();
-    // The signed-in customer's email is locked in the form.
+    // The signed-in account's email is locked in the form.
     await expect(main.getByLabel("Email")).toHaveAttribute("readonly", "");
     await expect(visibleSkeletons(page)).toHaveCount(0);
   });

@@ -20,7 +20,6 @@ export const common = {
     trackOrder: "Track an order",
     help: "Help center",
     support: "Support",
-    merchants: "For merchants",
     menu: "Menu",
     allCategories: "All categories",
     categories: "Categories",
@@ -32,21 +31,15 @@ export const common = {
     openSearch: "Open search",
     closeSearch: "Close search",
     openMenu: "Open menu",
-    closeMenu: "Close menu",
     signIn: "Sign in",
     accountMenu: "Account menu",
     myAccount: "My account",
     myOrders: "My orders",
-    merchantPortal: "Merchant portal",
+    priceList: "Price list",
+    settings: "Settings",
     signOut: "Sign out",
-    signOutMerchant: "Sign out of merchant account",
-    signOutCustomer: "Sign out of customer account",
     signingOut: "Signing out…",
-    wallet: "Wallet balance",
     currency: "Currency",
-    signedInAsCustomer: "Customer",
-    signedInAsMerchant: "Merchant",
-    notifications: "Notifications",
     storeBalance: "Store balance",
     myWallet: "Wallet",
   },
@@ -60,7 +53,6 @@ export const common = {
     privacy: "Privacy policy",
     refund: "Refund policy",
     cookies: "Cookie policy",
-    portal: "Merchant portal",
     becomeMerchant: "Become a merchant",
     rights: "© {year} IMEI-HUB. All rights reserved.",
     payments: "Payment methods",
@@ -77,11 +69,16 @@ export const common = {
   workspace: {
     navLabel: "Workspace navigation",
     openNav: "Open navigation",
-    closeNav: "Close navigation",
     breadcrumbLabel: "Breadcrumb",
     accountMenu: "Account menu",
     /** The phone tab bar's landmark (never "Workspace navigation": that names the rail and the drawer). */
     tabsLabel: "Shortcuts",
+  },
+
+  /** The home page's pointer to the price list of a merchant rank (components/store/rank-banner.tsx). */
+  rankBanner: {
+    text: "You are signed in with a merchant rank. Your own prices are in your price list.",
+    cta: "See my prices",
   },
 
   /** Left panel of the sign-in and sign-up pages. */

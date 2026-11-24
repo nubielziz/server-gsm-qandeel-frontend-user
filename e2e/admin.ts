@@ -1,6 +1,6 @@
 // Staff-side helpers of the e2e suite: the admin API of the ISOLATED demo backend (http://localhost:3100).
 // Used by e2e/global-setup.ts (demo data the specs expect) and by specs that need what only staff can do: credit a
-// wallet, approve a top-up, create a merchant, send a notification, hand out a temporary password.
+// wallet, approve a top-up, create an account of either rank, change its rank, send a notification, hand out a temporary password.
 //
 // Rules this file keeps:
 // - It talks to the API directly with Node's fetch (not through the site), as the seeded Owner, from 127.0.0.1: the admin
@@ -36,7 +36,7 @@ export interface FixtureService {
 
 /** `e2e/.auth/fixtures.json`, written by the global setup. */
 export interface E2eFixtures {
-  /** The manual top-up gateway `cliq-e2e` (customer wallet). */
+  /** The manual top-up gateway `cliq-e2e` (the store wallet of a retail account). */
   gatewayId: number;
   /** Quantity range 2 to 50. */
   range: FixtureService;
@@ -320,7 +320,7 @@ export interface AdminReply<T> {
  * One admin call as the Owner. A status outside 2xx throws an `AdminApiError` unless it is in `allow`.
  * A 401 (the API ended the session) signs in again once and repeats the call.
  *
- * @param path the admin path with its query, such as `/admin/customers?q=a%40b.test`
+ * @param path the admin path with its query, such as `/admin/clients?q=a%40b.test`
  * @param options `json` is the body (`{}` when absent on a POST or PATCH); `form` a multipart body
  */
 export async function adminCall<T = unknown>(
@@ -420,11 +420,12 @@ interface GatewayRow {
 }
 
 /**
- * Switches the customer wallet on (never off) and makes sure the manual gateway `cliq-e2e` exists and is active.
+ * Switches the store wallet (the retail rank's balance, setting `wallet.customer.enabled`) on (never off) and makes sure the manual gateway
+ * `cliq-e2e` exists and is active.
  *
  * @returns the gateway id
  */
-export async function ensureCustomerWallet(): Promise<{ gatewayId: number }> {
+export async function ensureStoreWallet(): Promise<{ gatewayId: number }> {
   const settings = await adminCall<Record<string, unknown>>("GET", "/admin/settings");
   if (settings.body["wallet.customer.enabled"] !== true) {
     await adminCall("PATCH", "/admin/settings", { json: { "wallet.customer.enabled": true } });
@@ -475,48 +476,189 @@ export async function ensureCurrency(code = "JOD", decimals = 2): Promise<{ id: 
   return { id: currency.id };
 }
 
-// ── Customers and their wallet ───────────────────────────────────────────────────────────────────────────────────────
+// ── Ranks and accounts ───────────────────────────────────────────────────────────────────────────────────────────────
 
-interface CustomerRow {
+/** The kind of a rank (the wire's word): a merchant rank has a price list, an API and invoices; a retail rank buys in the shop. */
+export type RankKind = "retail" | "merchant";
+
+/** A row of `GET /admin/client-groups`: the rank, with its kind as `rankKind` (the stored `kind` stays beside it). */
+export interface RankRow {
   id: number;
-  email: string;
+  name: string;
+  rankKind: RankKind;
+  isDefault: boolean;
 }
 
-/** The staff id of a customer by exact email (the store `GET /me` id is the same number). */
-export async function customerIdByEmail(email: string): Promise<number> {
-  const rows = (await adminCall<CustomerRow[]>("GET", `/admin/customers?q=${encodeURIComponent(email)}&_start=0&_end=25`)).body;
-  const row = rows.find((r) => r.email.toLowerCase() === email.toLowerCase());
-  if (!row) throw new Error(`No customer with the email ${email}.`);
-  return row.id;
+/** The ranks the helpers use by kind: the one retail rank, and the merchant rank that new merchants start in. */
+export interface RankIds {
+  retail: number;
+  merchant: number;
 }
 
 /**
- * Adds money to a customer's balance by hand (in USD, the wallet currency). The API takes at most $500 per call without
- * a second approver, so a larger amount is sent as several calls, each with its own `Idempotency-Key`.
+ * Picks the two ranks the helpers use out of the rank list: the retail rank with the lowest id, and the default merchant rank
+ * (the lowest-id merchant rank when none is marked). Pure.
+ *
+ * @throws when the list has no retail rank or no merchant rank
+ */
+export function pickRanks(ranks: readonly RankRow[]): RankIds {
+  const byId = [...ranks].sort((a, b) => a.id - b.id);
+  const retail = byId.find((rank) => rank.rankKind === "retail");
+  const merchants = byId.filter((rank) => rank.rankKind === "merchant");
+  const merchant = merchants.find((rank) => rank.isDefault) ?? merchants[0];
+  if (!retail) throw new Error("The demo data has no retail rank (GET /admin/client-groups).");
+  if (!merchant) throw new Error("The demo data has no merchant rank (GET /admin/client-groups).");
+  return { retail: retail.id, merchant: merchant.id };
+}
+
+let ranksPromise: Promise<RankIds> | undefined;
+
+/** The ids of the retail rank and the default merchant rank, read once per process. */
+export async function rankIds(): Promise<RankIds> {
+  ranksPromise ??= adminCall<RankRow[]>("GET", "/admin/client-groups?_start=0&_end=200")
+    .then((reply) => pickRanks(reply.body))
+    .catch((error: unknown) => {
+      ranksPromise = undefined;
+      throw error;
+    });
+  return ranksPromise;
+}
+
+/** What the helpers read of a row of `GET /admin/clients`. */
+export interface AccountRow {
+  id: number;
+  email: string;
+  name: string;
+  status: "active" | "suspended" | "blocked" | "anonymized";
+  /** False for a guest row (a buyer who never made a login). */
+  hasAccount: boolean;
+  rank: { id: number; name: string; kind: RankKind };
+}
+
+/**
+ * The staff id of an account by exact email. A login row and a guest row may share an email, so the lookup names which one:
+ * the login row by default, the guest row with `guest: true`. The shop's `GET /me` id is the same number.
+ */
+export async function accountIdByEmail(email: string, options: { guest?: boolean } = {}): Promise<number> {
+  const query = `q=${encodeURIComponent(email)}&hasAccount=${options.guest ? "false" : "true"}&_start=0&_end=25`;
+  const rows = (await adminCall<AccountRow[]>("GET", `/admin/clients?${query}`)).body;
+  const row = rows.find((r) => r.email.toLowerCase() === email.toLowerCase());
+  if (!row) throw new Error(`No ${options.guest ? "guest" : "account"} with the email ${email}.`);
+  return row.id;
+}
+
+/** Country of a retail account staff create: it needs a tax window (the demo has one for the US, at 0 %), and the US shows dollars. */
+const RETAIL_COUNTRY = "US";
+/** Country of a merchant account staff create. */
+const MERCHANT_COUNTRY = "JO";
+
+/**
+ * Staff create an account (`POST /admin/clients`) as the Owner. The account is active at once and has no password: an
+ * invitation link is mailed to the address and the person sets a password from it (`freshAccount` does that).
+ *
+ * A retail account is what the route makes when no rank is named; a merchant rank is the Owner's to give, and the seeded staff
+ * member is the Owner. A merchant account gets the default merchant rank unless a rank id is passed.
+ *
+ * @param options `rank`: a kind, or the id of a rank; `country`: ISO-2 (a retail account needs one with a tax window)
+ * @returns the staff id of the new account
+ */
+export async function createAccount(options: { email: string; name?: string; rank?: RankKind | number; country?: string }): Promise<number> {
+  const rank = options.rank ?? "retail";
+  const body: Record<string, unknown> = {
+    name: options.name ?? (rank === "retail" ? "E2E Account" : "E2E Merchant"),
+    email: options.email,
+    country: options.country ?? (rank === "retail" ? RETAIL_COUNTRY : MERCHANT_COUNTRY),
+  };
+  if (rank !== "retail") body.groupId = typeof rank === "number" ? rank : (await rankIds()).merchant;
+  const created = (await adminCall<AccountRow>("POST", "/admin/clients", { json: body })).body;
+  if (created.status !== "active") throw new Error(`The new account ${created.id} reads ${created.status}, not active.`);
+  return created.id;
+}
+
+/**
+ * Moves an account to another rank (`POST /admin/clients/:id/rank`, the Owner's route, keyed by an `Idempotency-Key`). The balance
+ * moves to the wallet of the new kind, the sessions and the API keys of the account end, so the person signs in again.
+ * A blocker (an open order, a held balance, an open checkout) answers 409 with its code: it throws an `AdminApiError`.
+ *
+ * @param to a kind (the retail rank, or the default merchant rank) or the id of a rank
+ * @param options `creditLimit` for a rank that allows credit; `key` to replay a call
+ * @returns the account row after the change
+ */
+export async function changeRank(accountId: number, to: RankKind | number, options: { creditLimit?: string; key?: string } = {}): Promise<AccountRow> {
+  const groupId = typeof to === "number" ? to : (await rankIds())[to];
+  const reply = await adminCall<AccountRow>("POST", `/admin/clients/${accountId}/rank`, {
+    headers: { "Idempotency-Key": options.key ?? randomUUID() },
+    json: { groupId, ...(options.creditLimit === undefined ? {} : { creditLimit: toMoney4(options.creditLimit) }) },
+  });
+  return reply.body;
+}
+
+/**
+ * Staff change an account's address (`PATCH /admin/clients/:id` with `email`). The verification is cleared and a verification link
+ * is mailed to the new address; the old address gets a notice and every session of the account ends. It is the way an account
+ * with an unverified email is made: an invitation always verifies.
+ */
+export async function changeAccountEmail(accountId: number, email: string): Promise<void> {
+  await adminCall("PATCH", `/admin/clients/${accountId}`, { json: { email } });
+}
+
+/** Staff suspend an account (a reason of 3 to 140 characters) or lift the suspension. A suspended account cannot sign in. */
+export async function setAccountStatus(accountId: number, status: "active" | "suspended", reason = "e2e fixture suspension"): Promise<void> {
+  await adminCall("PATCH", `/admin/clients/${accountId}`, { json: status === "suspended" ? { status, reason } : { status } });
+}
+
+/** Gives an account a temporary password (the next sign-in answers `next: "password"`). Any account with a login. */
+export async function temporaryPassword(accountId: number): Promise<string> {
+  const reply = await adminCall<{ temporaryPassword: string }>("POST", `/admin/clients/${accountId}/password`, { json: { mode: "temporary_password" } });
+  return reply.body.temporaryPassword;
+}
+
+/** Makes an API key for a merchant-rank account as staff (its list then marks it `createdByStaff`). The secret is shown once. A retail account answers 409. */
+export async function staffApiKeyFor(accountId: number, name: string): Promise<{ id: number; name: string; prefix: string; secret: string }> {
+  const reply = await adminCall<{ key: { id: number; prefix: string }; secret: string }>("POST", `/admin/clients/${accountId}/api-keys`, {
+    json: { name, scopes: ["dhru"] },
+  });
+  return { id: reply.body.key.id, name, prefix: reply.body.key.prefix, secret: reply.body.secret };
+}
+
+// ── The wallet of an account ─────────────────────────────────────────────────────────────────────────────────────────
+
+/** The live wallet of an account, as `GET /admin/clients/:id/wallet` answers: the kind follows the rank. */
+export interface AccountWallet {
+  kind: "merchant" | "store";
+  balance: string;
+  available: string;
+  frozen: { at: string; reason: string } | null;
+}
+
+/** The live wallet of an account of either kind (all zero while it has none). */
+export async function accountWallet(accountId: number): Promise<AccountWallet> {
+  return (await adminCall<AccountWallet>("GET", `/admin/clients/${accountId}/wallet`)).body;
+}
+
+/**
+ * Adds money to the live wallet of an account by hand (in USD, the wallet currency), whichever its kind. The API takes a limited
+ * amount per call without a second approver, so a larger amount is sent as several calls of at most $500, each with its own
+ * `Idempotency-Key` (the header is required for both kinds).
  *
  * @param amount "20", "20.5" or "20.0000" (at most 4 decimals)
  * @returns the balance after the last call, as the API prints it
  */
-export async function creditCustomer(customerId: number, amount: string | number, reason = "e2e fixture credit"): Promise<string> {
-  let balance = "";
+export async function creditAccount(accountId: number, amount: string | number, reason = "e2e fixture credit"): Promise<string> {
   for (const part of splitMoney(amount)) {
-    const reply = await adminCall<{ wallet: { balance: string } }>("POST", `/admin/customers/${customerId}/wallet/adjust`, {
-      headers: withKey(),
-      json: { amount: part, direction: "credit", reason },
-    });
-    balance = reply.body.wallet.balance;
+    await adminCall("POST", `/admin/clients/${accountId}/wallet/adjust`, { headers: withKey(), json: { amount: part, direction: "credit", reason } });
   }
-  return balance;
+  return (await accountWallet(accountId)).balance;
 }
 
-/** Puts a customer's balance on hold (the store answers `frozen: { at }`). Freezing a frozen balance is a no-op. */
-export async function freezeCustomerWallet(customerId: number, reason = "e2e wallet freeze"): Promise<void> {
-  await adminCall("POST", `/admin/customers/${customerId}/wallet/freeze`, { headers: withKey(), json: { reason } });
+/** Puts the live wallet of an account on hold (a store wallet answers `frozen: { at }`). Freezing a frozen wallet is a no-op. */
+export async function freezeWallet(accountId: number, reason = "e2e wallet freeze"): Promise<void> {
+  await adminCall("POST", `/admin/clients/${accountId}/wallet/freeze`, { headers: withKey(), json: { reason } });
 }
 
-/** Lifts the hold. Unfreezing a balance that is not frozen is a no-op. */
-export async function unfreezeCustomerWallet(customerId: number, reason = "e2e wallet unfreeze"): Promise<void> {
-  await adminCall("POST", `/admin/customers/${customerId}/wallet/unfreeze`, { headers: withKey(), json: { reason } });
+/** Lifts the hold. Unfreezing a wallet that is not frozen is a no-op. */
+export async function unfreezeWallet(accountId: number, reason = "e2e wallet unfreeze"): Promise<void> {
+  await adminCall("POST", `/admin/clients/${accountId}/wallet/unfreeze`, { headers: withKey(), json: { reason } });
 }
 
 interface PaymentRow {
@@ -527,109 +669,34 @@ interface PaymentRow {
   amount: string;
 }
 
-/** The pending top-up payment of a customer (the manual review queue), waiting briefly for a receipt that was just sent. */
-async function pendingTopUp(customerId: number, invoiceId?: number): Promise<PaymentRow> {
+/** The pending top-up payment of an account (the manual review queue), waiting briefly for a receipt that was just sent. */
+async function pendingTopUp(accountId: number, invoiceId?: number): Promise<PaymentRow> {
   const deadline = Date.now() + 10_000;
   for (;;) {
-    const rows = (await adminCall<PaymentRow[]>("GET", `/admin/payments?customerId=${customerId}&status=pending`)).body;
+    const rows = (await adminCall<PaymentRow[]>("GET", `/admin/payments?accountId=${accountId}&status=pending`)).body;
     const match = rows.filter((p) => p.purpose === "topup" && (invoiceId === undefined || p.invoiceId === invoiceId)).sort((a, b) => b.id - a.id)[0];
     if (match) return match;
-    if (Date.now() > deadline) throw new Error(`Customer ${customerId} has no pending top-up payment${invoiceId ? ` for top-up ${invoiceId}` : ""} (is the receipt sent?).`);
+    if (Date.now() > deadline)
+      throw new Error(`Account ${accountId} has no pending top-up payment${invoiceId ? ` for top-up ${invoiceId}` : ""} (is the receipt sent?).`);
     await sleep(500);
   }
 }
 
 /**
- * Approves the newest pending top-up of a customer (or the one with this top-up id: the `id` the store prints).
- * The customer's balance is credited and the top-up reads `credited`.
+ * Approves the newest pending top-up of an account (or the one with this top-up id: the `id` the shop prints).
+ * The balance is credited and the top-up reads `credited`.
  */
-export async function approveTopUp(customerId: number, topUpId?: number): Promise<{ paymentId: number }> {
-  const payment = await pendingTopUp(customerId, topUpId);
+export async function approveTopUp(accountId: number, topUpId?: number): Promise<{ paymentId: number }> {
+  const payment = await pendingTopUp(accountId, topUpId);
   await adminCall("POST", `/admin/payments/${payment.id}/approve`, { json: {} });
   return { paymentId: payment.id };
 }
 
-/** Rejects the newest pending top-up of a customer (or the one with this top-up id) with a reason the customer sees. */
-export async function rejectTopUp(customerId: number, reason: string, topUpId?: number): Promise<{ paymentId: number }> {
-  const payment = await pendingTopUp(customerId, topUpId);
+/** Rejects the newest pending top-up of an account (or the one with this top-up id) with a reason the account holder sees. */
+export async function rejectTopUp(accountId: number, reason: string, topUpId?: number): Promise<{ paymentId: number }> {
+  const payment = await pendingTopUp(accountId, topUpId);
   await adminCall("POST", `/admin/payments/${payment.id}/reject`, { json: { reason } });
   return { paymentId: payment.id };
-}
-
-/** Gives a customer a temporary password (they must choose their own at the next sign-in: `next: "password"`). */
-export async function temporaryCustomerPassword(customerId: number): Promise<string> {
-  const reply = await adminCall<{ temporaryPassword: string }>("POST", `/admin/customers/${customerId}/password`, { json: { mode: "temporary_password" } });
-  return reply.body.temporaryPassword;
-}
-
-// ── Merchants ────────────────────────────────────────────────────────────────────────────────────────────────────────
-
-interface MerchantRow {
-  id: number;
-  email: string;
-  status: "pending" | "active" | "suspended";
-}
-
-/** The staff id of a merchant by exact email. */
-export async function merchantIdByEmail(email: string): Promise<number> {
-  const rows = (await adminCall<MerchantRow[]>("GET", `/admin/clients?q=${encodeURIComponent(email)}&_start=0&_end=25`)).body;
-  const row = rows.find((r) => r.email.toLowerCase() === email.toLowerCase());
-  if (!row) throw new Error(`No merchant with the email ${email}.`);
-  return row.id;
-}
-
-/**
- * Staff create a merchant account, as the console's invite does (`POST /admin/clients`). The account is active at once and has no
- * password: an invitation link is mailed to the address and the merchant sets a password from it (`freshMerchant` does that).
- * The backend before the approval step went away makes the account `pending`; it is activated here, so both backends hand out
- * the same account.
- *
- * @returns the staff id of the new merchant
- */
-export async function inviteMerchant(email: string, name = "E2E Merchant"): Promise<number> {
-  const created = (await adminCall<MerchantRow>("POST", "/admin/clients", { json: { name, email, country: "JO", invite: true } })).body;
-  if (created.status === "pending") await adminCall("PATCH", `/admin/clients/${created.id}`, { json: { status: "active" } });
-  return created.id;
-}
-
-/**
- * Staff change a merchant's address (`PATCH /admin/clients/:id` with `email`). The verification is cleared and a verification link
- * is mailed to the new address; the old address gets a notice and every session of the merchant ends. It is the way a merchant
- * with an unverified email is made now: an invitation always verifies.
- */
-export async function changeMerchantEmail(merchantId: number, email: string): Promise<void> {
-  await adminCall("PATCH", `/admin/clients/${merchantId}`, { json: { email } });
-}
-
-/**
- * Adds money to a merchant's wallet by hand (USD), in calls of at most $500 like `creditCustomer`.
- *
- * @returns the balance after the last call, as the API prints it
- */
-export async function creditMerchant(merchantId: number, amount: string | number, reason = "e2e fixture credit"): Promise<string> {
-  let balance = "";
-  for (const part of splitMoney(amount)) {
-    const reply = await adminCall<{ wallet: { balance: string } }>("POST", `/admin/clients/${merchantId}/wallet/adjust`, {
-      headers: withKey(),
-      json: { amount: part, direction: "credit", reason },
-    });
-    balance = reply.body.wallet.balance;
-  }
-  return balance;
-}
-
-/** Gives a merchant a temporary password (their next sign-in answers `next: "password"`). */
-export async function temporaryMerchantPassword(merchantId: number): Promise<string> {
-  const reply = await adminCall<{ temporaryPassword: string }>("POST", `/admin/clients/${merchantId}/password`, { json: { mode: "temporary_password" } });
-  return reply.body.temporaryPassword;
-}
-
-/** Makes an API key for a merchant as staff (the merchant's list then marks it `createdByStaff`). The secret is shown once. */
-export async function staffApiKeyFor(merchantId: number, name: string): Promise<{ id: number; name: string; prefix: string; secret: string }> {
-  const reply = await adminCall<{ key: { id: number; prefix: string }; secret: string }>("POST", `/admin/clients/${merchantId}/api-keys`, {
-    json: { name, scopes: ["dhru"] },
-  });
-  return { id: reply.body.key.id, name, prefix: reply.body.key.prefix, secret: reply.body.secret };
 }
 
 /** Completes an open order with its result text (`POST /admin/orders/:id/reply`; 409 ORDER_NOT_OPEN when it is closed). */
@@ -748,10 +815,16 @@ export async function ensureListingImage(slug: string, publicFile: string): Prom
 
 // ── Notifications ────────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** Who a campaign goes to: one customer, or one merchant (`client` is the API's word for a merchant). */
+/** Who a campaign goes to: one account, of either rank. */
 export interface CampaignTarget {
-  type: "customer" | "client";
+  type: "account";
   id: number;
+}
+
+/** A link per audience, as the campaign route takes it (the wire keys keep their names). */
+export interface CampaignLinks {
+  customer?: string;
+  merchant?: string;
 }
 
 export interface CampaignOptions {
@@ -759,15 +832,21 @@ export interface CampaignOptions {
   title: string;
   /** Plain text; a line break shows as a line break. */
   body: string;
-  /** A root-relative path for the target's area (`/account/orders`, `/merchant/orders`), or a link per area. */
-  link?: string | { customer?: string; merchant?: string };
+  /** A root-relative path (both ranks use the same pages under `/account`: `/account/orders`), or a link per audience. */
+  link?: string | CampaignLinks;
   purpose?: "service" | "marketing";
   /** Default `["in_app"]`. */
   channels?: ("in_app" | "email")[];
 }
 
+/** The `link` of a campaign body: a plain path is given to both audiences, since an account is either and both open `/account`. Pure. */
+export function campaignLink(link: string | CampaignLinks | undefined): CampaignLinks | undefined {
+  if (link === undefined) return undefined;
+  return typeof link === "string" ? { customer: link, merchant: link } : link;
+}
+
 /**
- * Sends a notification campaign to one person: audience preview, create, send. The in-app item shows in the person's
+ * Sends a notification campaign to one account: audience preview, create, send. The in-app item shows in the account's
  * notification feed within a few seconds (the worker fans it out).
  *
  * @returns the campaign id
@@ -777,9 +856,9 @@ export async function sendCampaign(options: CampaignOptions): Promise<{ id: numb
   const channels = options.channels ?? ["in_app"];
   const purpose = options.purpose ?? "service";
   const preview = await adminCall<{ reachable: number }>("POST", "/admin/notification-campaigns/audience-preview", { json: { audience, channels, purpose } });
-  if (preview.body.reachable < 1) throw new Error(`The campaign would reach nobody: ${options.to.type} ${options.to.id} is not eligible on ${channels.join(", ")}.`);
+  if (preview.body.reachable < 1) throw new Error(`The campaign would reach nobody: account ${options.to.id} is not eligible on ${channels.join(", ")}.`);
 
-  const link = typeof options.link === "string" ? (options.to.type === "customer" ? { customer: options.link } : { merchant: options.link }) : options.link;
+  const link = campaignLink(options.link);
   const created = await adminCall<{ id: number }>("POST", "/admin/notification-campaigns", {
     json: {
       name: `e2e ${new Date().toISOString()}`,

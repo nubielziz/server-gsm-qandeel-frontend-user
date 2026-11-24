@@ -1,19 +1,24 @@
 "use client";
-// Add funds (handoff §4.8): pick a payment method, type an amount, see the fee and the net exactly, then create the
-// invoice. Manual methods go to the invoice page (instructions + receipt upload); automatic ones go straight to the
-// payment provider (`paymentUrl`). `POST /client/invoices` has no idempotency key: one request at a time, no retries.
+// Add funds of a merchant rank (handoff §4.8): pick a payment method, type an amount, see the fee and the net exactly, then
+// create the invoice. Manual methods go to the invoice page (instructions + receipt upload); automatic ones go straight to the
+// payment provider (`paymentUrl`).
+// `POST /client/invoices` carries an `Idempotency-Key` (lib/wallet/invoice-request.ts): the same key for the same amount and
+// method (a double click, a retry), a new one when either changes, forgotten after a success and after 409
+// IDEMPOTENCY_KEY_REUSED, so one press of the button never makes two invoices.
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
+import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { InvoiceCreated, PaymentMethod } from "@/lib/api/types";
 import { compareMoney, formatMoney, formatPercent, subtractMoney } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
-import type { MerchantMessages } from "@/lib/i18n/messages/merchant";
-import { isHttpUrl, ltr } from "@/lib/merchant/format";
+import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
+import { ltr } from "@/lib/merchant/format";
 import { leaveIfSignedOut } from "@/lib/merchant/signed-out";
 import { parseAmountInput, topUpFee } from "@/lib/merchant/money-math";
+import { forgetsInvoiceKey, submitInvoice } from "@/lib/wallet/invoice-request";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,12 +40,14 @@ export function TopUpForm({
   labels,
 }: {
   methods: PaymentMethod[];
-  /** `/en/merchant/invoices` */
+  /** `/en/account/invoices`: the page of a new invoice is `${invoiceBase}/${id}`. */
   invoiceBase: string;
-  labels: MerchantMessages["topUp"];
+  labels: TopUpsMessages["merchant"]["add"];
 }) {
   const router = useRouter();
   const errorText = useErrorText();
+  const [keys] = useState(() => createIdempotencyKeys());
+  const inFlight = useRef(false);
   const t = labels;
   const [methodId, setMethodId] = useState<number | null>(methods.length === 1 ? methods[0].id : null);
   const [amountText, setAmountText] = useState("");
@@ -93,7 +100,8 @@ export function TopUpForm({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting) return;
+    // A ref, not state: a second click can arrive before React has re-rendered the disabled button.
+    if (inFlight.current) return;
     setSubmitted(true);
     setError(null);
     setFieldErrors({});
@@ -105,24 +113,33 @@ export function TopUpForm({
       document.getElementById("topup-amount")?.focus();
       return;
     }
+    inFlight.current = true;
     setSubmitting(true);
     try {
-      const res = await api.post<InvoiceCreated>("/client/invoices", { amount, gatewayId: method.id });
-      if (res.paymentUrl) {
-        if (!isHttpUrl(res.paymentUrl)) {
-          setSubmitting(false);
-          showError(t.invalidPaymentUrl);
-          return;
-        }
+      const { created: res, next } = await submitInvoice(
+        (path, body, options) => api.post<InvoiceCreated>(path, body, options),
+        keys,
+        { amount, gatewayId: method.id },
+        invoiceBase,
+      );
+      if (next.kind === "unsafe-url") {
+        inFlight.current = false;
+        setSubmitting(false);
+        showError(t.invalidPaymentUrl);
+        return;
+      }
+      if (next.kind === "pay") {
         setStatus("redirecting");
-        window.location.assign(res.paymentUrl);
+        window.location.assign(next.url);
         return; // stay disabled: the browser is leaving the page
       }
       toast.success(res.invoice.number);
-      router.push(`${invoiceBase}/${res.invoice.id}`);
+      router.push(next.href);
       router.refresh();
     } catch (e) {
+      inFlight.current = false;
       setSubmitting(false);
+      if (forgetsInvoiceKey(e)) keys.reset();
       if (leaveIfSignedOut(e, router)) return;
       if (isApiError(e) && e.status === 422 && e.fieldErrors.length > 0) {
         const next: { amount?: string; gatewayId?: string } = {};

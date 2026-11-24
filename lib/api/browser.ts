@@ -2,59 +2,41 @@
 // (`/client/...`, `/store/v1/...`) and reach the API through the Next rewrite, so the session cookies just work.
 // What it does for every call (handoff §3):
 // - JSON in and out; no body AND no Content-Type on no-body routes (logout, 2fa/setup, data-export …);
-// - the CSRF token OF THE CALLED SURFACE on non-GET requests (`csrf_token_client` for /client,
-//   `csrf_token_store` for /store/v1), from the readable cookie or the last `X-CSRF-Token` header of that surface;
-// - optional `X-Turnstile-Token` (the 7 protected store routes, and merchant register, forgot-password, login and the
-//   smart sign-in) and `Idempotency-Key` (checkout pay, balance payment, wallet writes, merchant orders; see
-//   lib/api/idempotency.ts for the key rules);
+// - the one CSRF token of the signed-in account on every non-GET to either prefix, from the readable cookie (whichever
+//   of the two names exists, see lib/api/account-cookie.ts) or the last `X-CSRF-Token` header of any answer;
+// - optional `X-Turnstile-Token` (the protected shop routes, forgot-password and sign-in) and `Idempotency-Key`
+//   (checkout pay, balance payment, wallet writes, invoices, portal orders; see lib/api/idempotency.ts for the key rules);
 // - any non-2xx becomes an ApiError (problem+json, codes kept).
-// The smart sign-in (`api.signIn`) is the one call whose CSRF token is stored by the ANSWER (`kind`), not by the path.
 // Import only from Client Components.
+import { accountCsrfFrom } from "./account-cookie";
 import { ApiError, isAbortError, networkError, parseProblem } from "./errors";
 import { newIdempotencyKey } from "./idempotency";
 import { toQueryString, type QueryInput } from "./query";
-import type { SmartSignInInput, SmartSignInResult } from "./types";
+import type { SignInResult, SmartSignInInput } from "./types";
+import { ACCOUNT_ROUTES, familyOfPath } from "@/lib/account/routes";
 
 export { newIdempotencyKey };
 
-type Surface = "client" | "store";
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
-/** One path serves both areas: its answer's CSRF token belongs to the surface `kind` names (plan D2). */
-const SIGN_IN_PATH = "/client/auth/sign-in";
+/** The step a sign-in answer may name; anything else is refused. */
+const SIGN_IN_STEPS = new Set(["password", "totp", "done"]);
 
-const CSRF_COOKIES: Record<Surface, string> = { client: "csrf_token_client", store: "csrf_token_store" };
-const remembered: Partial<Record<Surface, string>> = {};
+/** The CSRF token the last answer sent. A fallback for when the readable cookie is not there. */
+let remembered: string | undefined;
 
-function surfaceOf(path: string): Surface | null {
-  if (path.startsWith("/client/")) return "client";
-  if (path.startsWith("/store/v1/")) return "store";
-  return null;
+/**
+ * The CSRF token of the signed-in account, or undefined when there is no session. There is one token for both families of
+ * routes: the readable cookie (either name) wins, else the last `X-CSRF-Token` header of any answer.
+ */
+export function csrfToken(): string | undefined {
+  const fromCookie = typeof document === "undefined" ? undefined : accountCsrfFrom(document.cookie);
+  return fromCookie ?? remembered;
 }
 
-function readCookie(name: string): string | undefined {
-  if (typeof document === "undefined") return undefined;
-  for (const part of document.cookie.split(";")) {
-    const eq = part.indexOf("=");
-    if (eq < 0 || part.slice(0, eq).trim() !== name) continue;
-    const value = part.slice(eq + 1).trim();
-    try {
-      return decodeURIComponent(value) || undefined;
-    } catch {
-      return value || undefined;
-    }
-  }
-  return undefined;
-}
-
-/** The CSRF token of a surface, or undefined when there is no session on it. */
-export function csrfToken(surface: Surface): string | undefined {
-  return readCookie(CSRF_COOKIES[surface]) ?? remembered[surface];
-}
-
-/** Forgets a surface's remembered token (after sign-out). */
-export function forgetCsrf(surface: Surface): void {
-  delete remembered[surface];
+/** Forgets the remembered token (after sign-out). */
+export function forgetCsrf(): void {
+  remembered = undefined;
 }
 
 export type RequestOptions = {
@@ -77,11 +59,12 @@ export type RequestOptions = {
   keepalive?: boolean;
 };
 
-async function send(method: Method, path: string, options: RequestOptions = {}): Promise<Response> {
-  const surface = surfaceOf(path);
-  // The smart sign-in is a pre-auth call on a path of the client surface: it sends no CSRF token and its answer's token
-  // is stored by `api.signIn` under the surface of `kind`, never by the path.
-  const smartSignIn = path === SIGN_IN_PATH;
+/**
+ * One request. `remember: false` leaves the answer's CSRF token unkept (the sign-in checks its answer before it keeps one).
+ * A path outside both prefixes is not the API and gets no token.
+ */
+async function send(method: Method, path: string, options: RequestOptions = {}, remember = true): Promise<Response> {
+  const family = familyOfPath(path);
   const headers = new Headers({ Accept: options.accept ?? "application/json" });
   let payload: BodyInit | undefined;
   if (options.body !== undefined) {
@@ -92,8 +75,8 @@ async function send(method: Method, path: string, options: RequestOptions = {}):
       headers.set("Content-Type", "application/json");
     }
   }
-  if (method !== "GET" && surface && !smartSignIn) {
-    const token = csrfToken(surface);
+  if (method !== "GET" && family) {
+    const token = csrfToken();
     if (token) headers.set("X-CSRF-Token", token);
   }
   if (options.turnstileToken) headers.set("X-Turnstile-Token", options.turnstileToken);
@@ -115,7 +98,7 @@ async function send(method: Method, path: string, options: RequestOptions = {}):
     throw networkError(error);
   }
   const token = res.headers.get("x-csrf-token");
-  if (token && surface && !smartSignIn) remembered[surface] = token;
+  if (token && family && remember) remembered = token;
   if (!res.ok) throw await parseProblem(res);
   return res;
 }
@@ -173,20 +156,19 @@ export const api = {
     return readJson<T>(await send("DELETE", path, options));
   },
   /**
-   * `POST /client/auth/sign-in`: one form for merchants and customers (Turnstile required). The answer's `kind` picks
-   * the area; its `X-CSRF-Token` header is kept for that surface only (`client` for a merchant, `store` for a
-   * customer), so the token of an already signed-in other area is never overwritten. A 401 means "wrong email or
-   * password" and never ends a session.
+   * `POST /client/auth/sign-in`: the one sign-in form for every account (Turnstile required). The answer says which step is
+   * still to do (`next`: `password`, `totp` or `done`); an answer without a known step is refused instead of guessed, and keeps
+   * no token. The answer's `X-CSRF-Token` header is kept as the one token. A 401 means "wrong email or password" and never
+   * ends a session.
    */
-  async signIn(body: SmartSignInInput, turnstileToken: string): Promise<SmartSignInResult> {
-    const res = await send("POST", SIGN_IN_PATH, { body, turnstileToken });
-    const result = await readJson<SmartSignInResult | undefined>(res);
-    // Without a known `kind` there is no surface to keep the token for: refuse the answer instead of guessing.
-    if (result?.kind !== "merchant" && result?.kind !== "customer") {
+  async signIn(body: SmartSignInInput, turnstileToken: string): Promise<SignInResult> {
+    const res = await send("POST", ACCOUNT_ROUTES.signIn, { body, turnstileToken }, false);
+    const result = await readJson<SignInResult | undefined>(res);
+    if (!result || typeof result.next !== "string" || !SIGN_IN_STEPS.has(result.next)) {
       throw new ApiError({ status: res.status, code: "INVALID_RESPONSE", title: "Unreadable response" });
     }
     const token = res.headers.get("x-csrf-token");
-    if (token) remembered[result.kind === "merchant" ? "client" : "store"] = token;
+    if (token) remembered = token;
     return result;
   },
   /** A list route: rows from the body, total from `x-total-count`. */

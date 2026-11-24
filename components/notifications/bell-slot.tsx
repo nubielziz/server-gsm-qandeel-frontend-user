@@ -8,18 +8,19 @@ import { apiSessionGet } from "@/lib/api/server";
 import type { UnreadCount } from "@/lib/api/types";
 import { sitePath } from "@/lib/site-path";
 import { notifications } from "@/lib/i18n/messages/notifications";
-import { NOTIFICATION_API, NOTIFICATIONS_PAGE, type NotificationSurface } from "@/lib/notifications/link";
+import type { AccountFamily } from "@/lib/account/family";
+import { NOTIFICATION_API, NOTIFICATIONS_PAGE } from "@/lib/notifications/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Bell } from "./bell";
 import { NotificationStream } from "./notification-stream";
 
 /**
- * The unread count of a surface for this request (0 or more, the API caps it at 100), or null when it cannot be read.
+ * The unread count of a family for this request (0 or more, the API caps it at 100), or null when it cannot be read.
  * Deduplicated per request: the layout's bell and the notifications page ask once together.
  */
-export const readUnreadCount = cache(async (surface: NotificationSurface): Promise<number | null> => {
+export const readUnreadCount = cache(async (family: AccountFamily): Promise<number | null> => {
   try {
-    const answer = await apiSessionGet<UnreadCount>(`${NOTIFICATION_API[surface]}/unread-count`);
+    const answer = await apiSessionGet<UnreadCount>(`${NOTIFICATION_API[family]}/unread-count`);
     const unread = answer?.unread;
     return typeof unread === "number" && Number.isFinite(unread) ? Math.max(0, Math.trunc(unread)) : null;
   } catch {
@@ -31,14 +32,14 @@ export function BellSkeleton() {
   return <Skeleton className="size-11 shrink-0 rounded-control" />;
 }
 
-export async function BellSlot({ surface }: { surface: NotificationSurface }) {
-  const initialCount = await readUnreadCount(surface);
+export async function BellSlot({ family }: { family: AccountFamily }) {
+  const initialCount = await readUnreadCount(family);
   const t = notifications;
-  const href = sitePath(NOTIFICATIONS_PAGE[surface]);
+  const href = sitePath(NOTIFICATIONS_PAGE);
   return (
     <>
-      <Bell surface={surface} href={href} initialCount={initialCount} labels={{ bell: t.bell, bellNone: t.bellNone }} />
-      <NotificationStream surface={surface} href={href} labels={{ view: t.live.view, many: t.live.many }} />
+      <Bell family={family} href={href} initialCount={initialCount} labels={{ bell: t.bell, bellNone: t.bellNone }} />
+      <NotificationStream family={family} href={href} labels={{ view: t.live.view, many: t.live.many }} />
     </>
   );
 }

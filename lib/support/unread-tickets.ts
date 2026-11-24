@@ -1,10 +1,10 @@
-// The support badge of the workspace navigation (owner, 2026-11-15): a dot on Support / My tickets while a ticket has a
-// reply from support that the visitor has not seen. One small external store per surface (customer, merchant), read
+// The support badge of the workspace navigation (owner, 2026-11-15): a dot on Support while a ticket has a
+// reply from support that the visitor has not seen. One small external store per family (store, client), read
 // with `useSyncExternalStore`, the same shape as the bell's unread store (lib/notifications/unread-store.ts):
 // - the server passes the first list (the numbers of the tickets with `hasUnread` among the 50 most recently active), so
 //   the dot is right in the first paint; a later server list never overwrites a newer read of the store, it makes the
 //   store ask when the two differ (`reconcile`);
-// - live: the ticket events of the surface's shared ticket stream (lib/support/ticket-stream.ts) keep it current while a
+// - live: the ticket events of the family's shared ticket stream (lib/support/ticket-stream.ts) keep it current while a
 //   ticket page has that stream open: `ticket.updated` says a ticket's `hasUnread`, the visitor's own `ticket.read`
 //   (`by: "you"`, this or another device) clears it, `stream.refetch` asks again. The badge only watches that stream: it
 //   never opens one, because the bell's stream (lib/realtime) does not hand ticket events to the shell and a second
@@ -14,17 +14,18 @@
 // Pure (safe anywhere, the server reads the first list with the same constants); `createUnreadTickets` takes its
 // dependencies so the tests need no browser. The browser's instance is `unreadTickets` in unread-tickets-browser.ts.
 import { isApiError } from "@/lib/api/errors";
-import type { NotificationSurface } from "@/lib/notifications/link";
+import type { AccountFamily } from "@/lib/account/family";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
 
 /** The least time between two reads caused by navigations. */
 export const NAVIGATION_FLOOR_MS = 15_000;
 /** How many of the most recently active tickets are looked at (the list routes' largest page). */
 export const UNREAD_SCAN = 50;
 
-/** The list route of each surface (`GET`, newest activity first by default). */
-export const TICKET_LIST_API: Record<NotificationSurface, string> = {
-  customer: "/store/v1/me/tickets",
-  merchant: "/client/tickets",
+/** The list route of each family (`GET`, newest activity first by default), from the one route table. */
+export const TICKET_LIST_API: Record<AccountFamily, string> = {
+  store: FAMILY_ROUTES.store.tickets,
+  client: FAMILY_ROUTES.client.tickets,
 };
 
 /** The numbers ("T-1042") of the tickets in `rows` that have a reply the visitor has not seen. */
@@ -43,21 +44,21 @@ export type TicketWatch = {
 
 export type UnreadTicketsEnv = {
   /** The numbers of the tickets with an unseen reply; rejects with an `ApiError`. */
-  fetchUnread(surface: NotificationSurface): Promise<string[]>;
-  /** Listens to the surface's ticket events without opening a stream; returns the function that stops listening. */
-  watch(surface: NotificationSurface, handlers: TicketWatch): () => void;
+  fetchUnread(family: AccountFamily): Promise<string[]>;
+  /** Listens to the family's ticket events without opening a stream; returns the function that stops listening. */
+  watch(family: AccountFamily, handlers: TicketWatch): () => void;
   now(): number;
 };
 
 export type UnreadTickets = {
   /** For `useSyncExternalStore`. The first listener starts watching the ticket events, the last one stops. */
-  subscribe(surface: NotificationSurface, listener: () => void): () => void;
+  subscribe(family: AccountFamily, listener: () => void): () => void;
   /** True while a ticket has an unseen reply; `null` before the store knows. */
-  getSnapshot(surface: NotificationSurface): boolean | null;
+  getSnapshot(family: AccountFamily): boolean | null;
   /** A list a server render brought: taken as is when the store knows nothing yet, else a reason to ask when it differs. */
-  reconcile(surface: NotificationSurface, numbers: readonly string[]): void;
+  reconcile(family: AccountFamily, numbers: readonly string[]): void;
   /** A client navigation: asks the API, at most once every `NAVIGATION_FLOOR_MS` and never twice at once. */
-  refresh(surface: NotificationSurface): Promise<void>;
+  refresh(family: AccountFamily): Promise<void>;
 };
 
 type Slot = {
@@ -77,7 +78,7 @@ type Slot = {
 const sameSet = (a: ReadonlySet<string>, b: readonly string[]) => a.size === new Set(b).size && b.every((n) => a.has(n));
 
 export function createUnreadTickets(env: UnreadTicketsEnv): UnreadTickets {
-  const slots: Record<NotificationSurface, Slot> = { customer: newSlot(), merchant: newSlot() };
+  const slots: Record<AccountFamily, Slot> = { store: newSlot(), client: newSlot() };
 
   function newSlot(): Slot {
     return { unread: null, snapshot: null, listeners: new Set(), stopWatch: undefined, lastAt: null, inFlight: false, again: false, stopped: false };
@@ -96,8 +97,8 @@ export function createUnreadTickets(env: UnreadTicketsEnv): UnreadTickets {
     publish(slot);
   }
 
-  async function run(surface: NotificationSurface, force: boolean): Promise<void> {
-    const slot = slots[surface];
+  async function run(family: AccountFamily, force: boolean): Promise<void> {
+    const slot = slots[family];
     if (slot.stopped) return;
     if (!force && slot.lastAt !== null && env.now() - slot.lastAt < NAVIGATION_FLOOR_MS) return;
     if (slot.inFlight) {
@@ -106,7 +107,7 @@ export function createUnreadTickets(env: UnreadTicketsEnv): UnreadTickets {
     }
     slot.inFlight = true;
     try {
-      seed(slot, await env.fetchUnread(surface));
+      seed(slot, await env.fetchUnread(family));
     } catch (error) {
       // The last known value stays on screen; the floor still counts from this try.
       slot.lastAt = env.now();
@@ -116,14 +117,14 @@ export function createUnreadTickets(env: UnreadTicketsEnv): UnreadTickets {
     }
     if (slot.again && !slot.stopped) {
       slot.again = false;
-      await run(surface, true);
+      await run(family, true);
     }
     slot.again = false;
   }
 
-  function startWatch(surface: NotificationSurface) {
-    const slot = slots[surface];
-    slot.stopWatch = env.watch(surface, {
+  function startWatch(family: AccountFamily) {
+    const slot = slots[family];
+    slot.stopWatch = env.watch(family, {
       updated(number, hasUnread) {
         if (slot.unread === null) return; // nothing known yet: the first read decides
         if (hasUnread) slot.unread.add(number);
@@ -136,16 +137,16 @@ export function createUnreadTickets(env: UnreadTicketsEnv): UnreadTickets {
         publish(slot);
       },
       refetch() {
-        void run(surface, true);
+        void run(family, true);
       },
     });
   }
 
   return {
-    subscribe(surface, listener) {
-      const slot = slots[surface];
+    subscribe(family, listener) {
+      const slot = slots[family];
       slot.listeners.add(listener);
-      if (slot.listeners.size === 1) startWatch(surface);
+      if (slot.listeners.size === 1) startWatch(family);
       return () => {
         slot.listeners.delete(listener);
         if (slot.listeners.size > 0) return;
@@ -153,20 +154,20 @@ export function createUnreadTickets(env: UnreadTicketsEnv): UnreadTickets {
         slot.stopWatch = undefined;
       };
     },
-    getSnapshot(surface) {
-      return slots[surface].snapshot;
+    getSnapshot(family) {
+      return slots[family].snapshot;
     },
-    reconcile(surface, numbers) {
-      const slot = slots[surface];
+    reconcile(family, numbers) {
+      const slot = slots[family];
       if (slot.unread === null || slot.stopped) {
         slot.stopped = false;
         seed(slot, numbers);
       } else if (!sameSet(slot.unread, numbers)) {
-        void run(surface, true);
+        void run(family, true);
       }
     },
-    refresh(surface) {
-      return run(surface, false);
+    refresh(family) {
+      return run(family, false);
     },
   };
 }

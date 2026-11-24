@@ -1,19 +1,20 @@
-// Add funds (plan F33, BH §3.3, §3.6): the form with its limits and checks, a manual top-up from the instructions to the
-// receipt, the staff decision (credited, rejected), cancel, the unpaid limit, the double-click guard, the return of an online
-// payment with its poller, the file checks, the other customer's top-up and the narrow screens.
-// Runs against the isolated demo backend (:3100) with the customer wallet switched on and the manual gateway "CliQ transfer
+// Add funds at /en/account/wallet/add-funds (plan F33, BH §3.3, §3.6): the form of a retail rank with its limits and checks, a
+// manual top-up from the instructions to the receipt, the staff decision (credited, rejected), cancel, the unpaid limit, the
+// double-click guard, the return of an online payment with its poller, the file checks, the other account's top-up and the narrow
+// screens; and the invoice a merchant rank creates from the same address, with the key it sends.
+// Runs against the isolated demo backend (:3100) with the store wallet switched on and the manual gateway "CliQ transfer
 // (e2e)" made by the global setup (e2e/global-setup.ts).
-// Rules (F03): every test uses a throwaway customer (`freshCustomer`): the `wallet-topup` limiter allows 10 attempts per 10
-// minutes per customer, and refusals count. Nothing global is switched; staff credit and reject through e2e/admin.ts. The
+// Rules (F03): every retail test uses a throwaway account (`signUpByLink`): the `wallet-topup` limiter allows 10 attempts per 10
+// minutes per account, and refusals count. Nothing global is switched; staff credit and reject through e2e/admin.ts. The
 // customers' setup (create, receipt) goes through the site's own API paths (`page.request`), so what the UI is asked is the
 // part under test. The poller's answers are mocked in the browser (`page.route`): no demo gateway is online.
 // Amounts are checked on the English pages ("$25.00").
 // An amount inside a sentence is wrapped in Unicode isolates: sentences are matched in parts.
 import { randomUUID } from "node:crypto";
 import type { Locator, Page, Request } from "@playwright/test";
-import { approveTopUp, customerIdByEmail, freezeCustomerWallet, rejectTopUp } from "./admin";
+import { accountIdByEmail, approveTopUp, freezeWallet, rejectTopUp } from "./admin";
 import { expect, test } from "./fixtures";
-import { fixtures, freshCustomer, go } from "./helpers";
+import { ACCOUNTS, fixtures, go, signIn, signUpByLink } from "./helpers";
 
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==", "base64");
 
@@ -34,10 +35,10 @@ const region = (page: Page, name: string) => main(page).getByRole("region", { na
 
 type TopUpRow = { id: number; number: string; status: string };
 
-/** The readable CSRF cookie of the customer session (what the site's own client sends as `X-CSRF-Token`). */
+/** The readable CSRF cookie of the session (what the site's own client sends as `X-CSRF-Token`), whichever name the rank gives it. */
 async function storeCsrf(page: Page): Promise<string> {
-  const cookie = (await page.context().cookies()).find((c) => c.name === "csrf_token_store");
-  expect(cookie, "the customer is not signed in").toBeTruthy();
+  const cookie = (await page.context().cookies()).find((c) => c.name.startsWith("csrf_token_"));
+  expect(cookie, "the account is not signed in").toBeTruthy();
   return cookie!.value;
 }
 
@@ -109,7 +110,7 @@ async function expectInsideViewport(page: Page, locator: Locator) {
 
 test.describe("Add funds: the form", () => {
   test("lists the method and the limits, refuses $2 with the minimum, and $25 creates a top-up with the instructions", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     const posts: string[] = [];
     page.on("request", (request) => {
       if (request.method() === "POST" && request.url().includes("/store/v1/me/wallet/top-ups")) posts.push(request.url());
@@ -166,7 +167,7 @@ test.describe("Add funds: the form", () => {
   });
 
   test("a text that is no amount and an amount above the maximum are refused on the field", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     await go(page, "/en/account/wallet/add-funds");
     const form = main(page).locator("form");
     const amount = form.getByRole("textbox", { name: "Amount" });
@@ -189,7 +190,7 @@ test.describe("Add funds: the form", () => {
   });
 
   test("a fourth unpaid top-up is refused by the API with a plain sentence", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     for (const amount of ["10", "11", "12"]) await createTopUp(page, amount);
     await go(page, "/en/account/wallet/add-funds");
     await chooseMethod(page);
@@ -208,7 +209,7 @@ test.describe("Add funds: the form", () => {
   });
 
   test("a double click sends one request with one key and creates one top-up", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     const posts: Request[] = [];
     await page.route("**/store/v1/me/wallet/top-ups", async (route) => {
       if (route.request().method() === "POST") {
@@ -237,8 +238,8 @@ test.describe("Add funds: the form", () => {
   });
 
   test("a balance on hold still offers the bank transfer", async ({ page }) => {
-    const email = await freshCustomer(page);
-    await freezeCustomerWallet(await customerIdByEmail(email));
+    const { email } = await signUpByLink(page);
+    await freezeWallet(await accountIdByEmail(email));
     await go(page, "/en/account/wallet/add-funds");
     await expect(main(page).getByRole("alert").filter({ hasText: "Your balance is on hold" })).toBeVisible();
     await chooseMethod(page);
@@ -252,7 +253,7 @@ test.describe("Add funds: the form", () => {
 
 test.describe("A manual top-up", () => {
   test("a receipt with a reference moves it to In review", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     const topUp = await createTopUp(page, "25");
     await go(page, `/en/account/wallet/top-ups/${topUp.id}`);
     await expect(vis(main(page).getByText(INSTRUCTIONS))).toBeVisible();
@@ -277,8 +278,8 @@ test.describe("A manual top-up", () => {
   });
 
   test("staff approving it shows Credited, the wallet shows $25, and the list and the statement name it", async ({ page }) => {
-    const email = await freshCustomer(page);
-    const customerId = await customerIdByEmail(email);
+    const { email } = await signUpByLink(page);
+    const customerId = await accountIdByEmail(email);
     const topUp = await createTopUp(page, "25");
     await sendReceipt(page, topUp.id);
     await approveTopUp(customerId, topUp.id);
@@ -301,7 +302,7 @@ test.describe("A manual top-up", () => {
   });
 
   test("cancelling one top-up closes it, and a 409 on a second cancel says it can no longer be changed", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     await createTopUp(page, "10"); // stays open
     const second = await createTopUp(page, "11");
     await go(page, `/en/account/wallet/top-ups/${second.id}`);
@@ -341,8 +342,8 @@ test.describe("A manual top-up", () => {
   });
 
   test("a rejected top-up shows the staff's reason as text, never as markup", async ({ page }) => {
-    const email = await freshCustomer(page);
-    const customerId = await customerIdByEmail(email);
+    const { email } = await signUpByLink(page);
+    const customerId = await accountIdByEmail(email);
     const topUp = await createTopUp(page, "15");
     await sendReceipt(page, topUp.id);
     const reason = "Receipt not readable <b>retake it</b>";
@@ -361,7 +362,7 @@ test.describe("A manual top-up", () => {
   });
 
   test("a reference that was already used is refused under the reference field", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     const reference = `E2E-DUP-${Date.now()}`;
     const first = await createTopUp(page, "10");
     await sendReceipt(page, first.id, reference);
@@ -383,7 +384,7 @@ test.describe("A manual top-up", () => {
   });
 
   test("a file over 5 MB or of the wrong type is refused before anything is uploaded", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     const topUp = await createTopUp(page, "25");
     const uploads: string[] = [];
     page.on("request", (request) => {
@@ -400,11 +401,11 @@ test.describe("A manual top-up", () => {
     await expect(main(page).getByText("big.png")).toHaveCount(0);
   });
 
-  test("another customer's top-up is not found", async ({ page }) => {
-    await freshCustomer(page);
+  test("another account's top-up is not found", async ({ page }) => {
+    await signUpByLink(page);
     const mine = await createTopUp(page, "25");
     await page.context().clearCookies();
-    await freshCustomer(page);
+    await signUpByLink(page);
     await page.goto(`/en/account/wallet/top-ups/${mine.id}`);
     await expect(page.getByText(/not found/i).first()).toBeVisible();
     await expect(page.getByText(mine.number)).toHaveCount(0);
@@ -414,7 +415,7 @@ test.describe("A manual top-up", () => {
 test.describe("The return of an online payment", () => {
   test("follows the top-up through waiting, in review and credited, then refreshes the page", async ({ page }) => {
     test.setTimeout(120_000);
-    await freshCustomer(page);
+    await signUpByLink(page);
     const topUp = await createTopUp(page, "25");
     const replies = ["awaiting_payment", "in_review", "credited"];
     let reads = 0;
@@ -447,7 +448,7 @@ test.describe("The return of an online payment", () => {
   });
 
   test("a rejected online top-up shows the reason as text", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     const topUp = await createTopUp(page, "25");
     await page.route(`**/store/v1/me/wallet/top-ups/${topUp.id}`, (route) =>
       route.request().method() === "GET"
@@ -465,7 +466,7 @@ test.describe("The return of an online payment", () => {
   });
 
   test("a top-up that is not yours, or a value that is no id, shows no payment", async ({ page }) => {
-    await freshCustomer(page);
+    await signUpByLink(page);
     // 404: said once, politely, and the wallet is still there.
     await go(page, "/en/account/wallet?topUp=1");
     await expect(main(page).getByText("We could not find this top-up")).toBeVisible();
@@ -487,7 +488,7 @@ test.describe("narrow screens", () => {
 
   test("the Add funds form, the top-up page and the wallet's list have no horizontal overflow at 360 px", async ({ page }) => {
     const labels = { amount: "Amount", next: "Continue", receipt: "Send receipt" };
-    await freshCustomer(page);
+    await signUpByLink(page);
     await go(page, "/en/account/wallet/add-funds");
     await chooseMethod(page);
     const form = main(page).locator("form");
@@ -521,5 +522,67 @@ test.describe("narrow screens", () => {
     await go(page, "/en/account/wallet");
     await expect(main(page).getByRole("link", { name: /INV-/ }).first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
+  });
+});
+
+test.describe("Add funds of a merchant rank: an invoice, made once", () => {
+  /** The refusal the API gives a payment provider that does not answer: the form keeps what was typed. */
+  const refuseCreate = (page: Page, keys: string[]) =>
+    page.route("**/client/invoices", (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      keys.push(route.request().headers()["idempotency-key"] ?? "");
+      return route.fulfill({
+        status: 502,
+        contentType: "application/problem+json",
+        body: JSON.stringify({ type: "about:blank", title: "Bad Gateway", status: 502, code: "GATEWAY_ERROR" }),
+      });
+    });
+
+  test.beforeEach(async ({ page }) => {
+    await signIn(page, ACCOUNTS.merchant);
+  });
+
+  test("a manual method makes one invoice, with a key, and lands on its page in the account area", async ({ page }) => {
+    const posts: Request[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST" && new URL(request.url()).pathname === "/client/invoices") posts.push(request);
+    });
+    await go(page, "/en/account/wallet/add-funds");
+    await expect(page.getByRole("heading", { level: 1, name: "Add funds" })).toBeVisible();
+    await main(page).getByText("Bank transfer", { exact: true }).click();
+    await expect(main(page).getByRole("radio", { name: /Bank transfer/ })).toBeChecked();
+    const amount = main(page).getByRole("textbox", { name: /^Amount/ });
+    await amount.fill("250.5");
+    await expect(main(page).getByText("Added to your wallet")).toBeVisible();
+    await main(page).getByRole("button", { name: "Continue" }).click();
+
+    await page.waitForURL(/\/en\/account\/invoices\/\d+$/);
+    await expect(main(page).getByRole("heading", { level: 1 })).toContainText("Invoice INV-");
+    await expect(main(page).getByText("Payment instructions")).toBeVisible();
+    expect(posts, "one press makes one request").toHaveLength(1);
+    expect(posts[0].headers()["idempotency-key"], "the request carries a key").toMatch(/^[\x21-\x7e]{1,100}$/);
+  });
+
+  test("a retry after a refusal sends the same key, and a changed amount a new one", async ({ page }) => {
+    const keys: string[] = [];
+    await go(page, "/en/account/wallet/add-funds");
+    await refuseCreate(page, keys);
+    await main(page).getByText("Bank transfer", { exact: true }).click();
+    const amount = main(page).getByRole("textbox", { name: /^Amount/ });
+    await amount.fill("100");
+    const submit = main(page).getByRole("button", { name: "Continue" });
+
+    await submit.click();
+    await expect(main(page).getByRole("alert")).toContainText("The payment provider did not respond");
+    await expect(submit).toBeEnabled();
+    await submit.click();
+    await expect.poll(() => keys.length).toBe(2);
+    expect(keys[1], "the same request is the same key").toBe(keys[0]);
+    expect(keys[0]).not.toBe("");
+
+    await amount.fill("120");
+    await submit.click();
+    await expect.poll(() => keys.length).toBe(3);
+    expect(keys[2], "another amount is another request").not.toBe(keys[0]);
   });
 });

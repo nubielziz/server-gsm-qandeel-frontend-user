@@ -318,7 +318,7 @@ type Banner = {
 /** Three banners to the other parts of the site: merchants, help center, support. */
 export function DestinationBanners({ t }: { t: Home["explore"] }) {
   const banners: Banner[] = [
-    { key: "merchants", tone: "inverse", file: "home-merchants.jpg", icon: Store, href: sitePath("/merchant/register") },
+    { key: "merchants", tone: "inverse", file: "home-merchants.jpg", icon: Store, href: sitePath("/become-a-merchant") },
     { key: "help", tone: "light", file: "home-help.jpg", icon: LifeBuoy, href: sitePath("/help") },
     { key: "support", tone: "light", file: "home-support.jpg", icon: Headset, href: sitePath("/support") },
   ];

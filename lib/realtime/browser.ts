@@ -1,12 +1,12 @@
 // The browser's side of the stream client: builds the real `StreamEnv` (EventSource, Web Locks, BroadcastChannel, page
 // lifecycle, the refusal probe through the API client) around the pure client of `stream-client.ts`.
-// - `streamFor(surface)`: the notification stream of the customer area or the merchant portal, one shared instance.
+// - `streamFor(family)`: the notification stream of an account's family (shop or portal), one shared instance.
 //   Only a bell opens it (`components/notifications/notification-stream.tsx`): public pages never do.
 // - `createStream({ url, lockName })`: any other stream (the ticket chat of feature 28). Same rules, own lock and channel.
 // Import only from Client Components. Nothing here touches the browser until `start()` is called.
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
-import type { NotificationSurface } from "@/lib/notifications/link";
+import type { AccountFamily } from "@/lib/account/family";
 import {
   dedupeKeyOf,
   NOTIFICATION_EVENT_NAMES,
@@ -31,7 +31,7 @@ export type StreamOptions = {
   /** The name of the lock and of the broadcast channel: one per browser and stream, for example `gsm-stream-ticket-42`. */
   lockName: string;
   /**
-   * A cheap authenticated `GET` of the same surface, asked after a refused stream: 401 or 403 stops the stream, 429 slows
+   * A cheap authenticated `GET` of the same family, asked after a refused stream: 401 or 403 stops the stream, 429 slows
    * it. Without one a refusal only backs off.
    */
   probePath?: string;
@@ -119,14 +119,14 @@ export function createStream<M extends BaseEvents = BaseEvents>(options: StreamO
   return createStreamClient<M>(browserEnv(options));
 }
 
-const notificationStreams: Partial<Record<NotificationSurface, StreamClient<NotificationEvents>>> = {};
+const notificationStreams: Partial<Record<AccountFamily, StreamClient<NotificationEvents>>> = {};
 
-/** The notification stream of a surface: one instance per page load, shared by the bell and the notifications list. */
-export function streamFor(surface: NotificationSurface): StreamClient<NotificationEvents> {
-  return (notificationStreams[surface] ??= createStream<NotificationEvents>({
-    url: STREAM_API[surface],
-    lockName: streamLockName(surface),
-    probePath: STREAM_PROBE_API[surface],
+/** The notification stream of a family: one instance per page load, shared by the bell and the notifications list. */
+export function streamFor(family: AccountFamily): StreamClient<NotificationEvents> {
+  return (notificationStreams[family] ??= createStream<NotificationEvents>({
+    url: STREAM_API[family],
+    lockName: streamLockName(family),
+    probePath: STREAM_PROBE_API[family],
     events: NOTIFICATION_EVENT_NAMES,
     parseEvent: parseFrame,
     dedupeKey: dedupeKeyOf,

@@ -4,7 +4,7 @@ import { whatsAppLink } from "@/lib/contact/whatsapp";
 import { auth } from "@/lib/i18n/messages/auth";
 import { MerchantWhatsAppActions } from "./merchant-whatsapp-actions";
 
-const en = auth.register;
+const en = auth.becomeMerchant;
 const href = whatsAppLink("12025550100", en.message);
 
 describe("MerchantWhatsAppActions", () => {
@@ -30,7 +30,7 @@ describe("MerchantWhatsAppActions", () => {
   });
 });
 
-describe("merchant register messages", () => {
+describe("become-a-merchant messages", () => {
   it("has the three steps and a plain prefilled message", () => {
     expect(en.steps).toHaveLength(3);
     expect(en.message).not.toContain("{");

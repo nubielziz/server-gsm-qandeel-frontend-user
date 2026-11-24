@@ -6,32 +6,34 @@
 // The browser parts (live updates) are in workspace-badges-client.tsx.
 import { cache, Suspense } from "react";
 import { apiSessionList } from "@/lib/api/server";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
 import { listQuery } from "@/lib/api/query";
 import { formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
 import { portal } from "@/lib/i18n/messages/portal";
-import { UNREAD_CAP, type NotificationSurface } from "@/lib/notifications/link";
+import type { AccountFamily } from "@/lib/account/family";
+import { UNREAD_CAP } from "@/lib/notifications/link";
 import { TICKET_LIST_API, UNREAD_SCAN, unreadNumbers } from "@/lib/support/unread-tickets";
 import { readUnreadCount } from "@/components/notifications/bell-slot";
 import { NAV_BADGE } from "./nav-badge";
 import { NavSupportDot, NavUnreadBadge } from "./workspace-badges-client";
 
-/** The order list of each surface. */
-const ORDERS_API: Record<NotificationSurface, string> = {
-  customer: "/store/v1/me/orders",
-  merchant: "/client/orders",
+/** The order list of each family. */
+const ORDERS_API: Record<AccountFamily, string> = {
+  store: FAMILY_ROUTES.store.orders,
+  client: FAMILY_ROUTES.client.orders,
 };
 
 /** The statuses that count as "in progress": accepted and not finished yet. */
 export const IN_PROGRESS = ["pending", "processing"] as const;
 
 /**
- * How many orders of the visitor are in progress (`x-total-count` of a one-row read), or null when it cannot be read (a
- * merchant waiting for approval gets 403). Once per request; no-store (lib/api/server.ts).
+ * How many orders of the visitor are in progress (`x-total-count` of a one-row read), or null when it cannot be read.
+ * Once per request; no-store (lib/api/server.ts).
  */
-export const readOrdersInProgress = cache(async (surface: NotificationSurface): Promise<number | null> => {
+export const readOrdersInProgress = cache(async (family: AccountFamily): Promise<number | null> => {
   try {
-    const { total } = await apiSessionList(ORDERS_API[surface], { query: listQuery({ start: 0, end: 1 }, { status: [...IN_PROGRESS] }) });
+    const { total } = await apiSessionList(ORDERS_API[family], { query: listQuery({ start: 0, end: 1 }, { status: [...IN_PROGRESS] }) });
     return Number.isFinite(total) && total > 0 ? Math.trunc(total) : 0;
   } catch {
     return null;
@@ -42,9 +44,9 @@ export const readOrdersInProgress = cache(async (surface: NotificationSurface): 
  * The numbers of the visitor's tickets with a reply from support they have not seen, among the 50 most recently active
  * (a reply makes a ticket the most recent one), or null when the list cannot be read. Once per request; no-store.
  */
-export const readUnreadTickets = cache(async (surface: NotificationSurface): Promise<string[] | null> => {
+export const readUnreadTickets = cache(async (family: AccountFamily): Promise<string[] | null> => {
   try {
-    const { data } = await apiSessionList<{ number: string; hasUnread: boolean }>(TICKET_LIST_API[surface], {
+    const { data } = await apiSessionList<{ number: string; hasUnread: boolean }>(TICKET_LIST_API[family], {
       query: listQuery({ start: 0, end: UNREAD_SCAN }),
     });
     return unreadNumbers(data);
@@ -58,38 +60,38 @@ function countText(count: number): string {
   return count >= UNREAD_CAP ? `${UNREAD_CAP - 1}+` : formatNumber(count);
 }
 
-async function NotificationsBadgeRead({ surface }: { surface: NotificationSurface }) {
-  const count = await readUnreadCount(surface);
+async function NotificationsBadgeRead({ family }: { family: AccountFamily }) {
+  const count = await readUnreadCount(family);
   const t = portal;
-  return <NavUnreadBadge surface={surface} initialCount={count} suffix={t.navBadges.unread} />;
+  return <NavUnreadBadge family={family} initialCount={count} suffix={t.navBadges.unread} />;
 }
 
 /** The unread count on the Notifications item: live through the bell's store. */
-export function NotificationsNavBadge({ surface }: { surface: NotificationSurface }) {
+export function NotificationsNavBadge({ family }: { family: AccountFamily }) {
   return (
     <Suspense fallback={null}>
-      <NotificationsBadgeRead surface={surface} />
+      <NotificationsBadgeRead family={family} />
     </Suspense>
   );
 }
 
-async function SupportDotRead({ surface }: { surface: NotificationSurface }) {
-  const initial = await readUnreadTickets(surface);
+async function SupportDotRead({ family }: { family: AccountFamily }) {
+  const initial = await readUnreadTickets(family);
   const t = portal;
-  return <NavSupportDot surface={surface} initial={initial} label={t.navBadges.newReply} />;
+  return <NavSupportDot family={family} initial={initial} label={t.navBadges.newReply} />;
 }
 
-/** The dot on Support / My tickets: live while a ticket page holds the ticket stream, else read again on navigation. */
-export function SupportNavBadge({ surface }: { surface: NotificationSurface }) {
+/** The dot on Support: live while a ticket page holds the ticket stream, else read again on navigation. */
+export function SupportNavBadge({ family }: { family: AccountFamily }) {
   return (
     <Suspense fallback={null}>
-      <SupportDotRead surface={surface} />
+      <SupportDotRead family={family} />
     </Suspense>
   );
 }
 
-async function OrdersBadgeRead({ surface }: { surface: NotificationSurface }) {
-  const count = await readOrdersInProgress(surface);
+async function OrdersBadgeRead({ family }: { family: AccountFamily }) {
+  const count = await readOrdersInProgress(family);
   const t = portal;
   if (!count) return null;
   const text = countText(count);
@@ -104,10 +106,10 @@ async function OrdersBadgeRead({ surface }: { surface: NotificationSurface }) {
 }
 
 /** The number of orders in progress on the Orders item: read with the page, no live update. */
-export function OrdersNavBadge({ surface }: { surface: NotificationSurface }) {
+export function OrdersNavBadge({ family }: { family: AccountFamily }) {
   return (
     <Suspense fallback={null}>
-      <OrdersBadgeRead surface={surface} />
+      <OrdersBadgeRead family={family} />
     </Suspense>
   );
 }

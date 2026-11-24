@@ -1,10 +1,10 @@
-// The customer's profile card in the account settings (plan F23, BH §7.2): name, phone and country are edited with
+// The profile card of a retail account in the account settings: name, phone and country are edited with
 // `PATCH /store/v1/me`, only the changed keys are sent, `""` clears the phone, a country change refreshes the shop
-// currency from the answer, and the 422 texts sit on their fields. Every test uses a throwaway customer (the shared demo
-// accounts stay as the other specs expect them). Runs against the isolated demo backend (:3100) only.
+// currency from the answer, and the 422 texts sit on their fields. Every test uses a throwaway retail account (the shared
+// demo accounts stay as the other specs expect them). Runs against the isolated demo backend (:3100) only.
 import type { Page, Request } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { freshCustomer, go } from "./helpers";
+import { freshAccount, go, signIn } from "./helpers";
 
 type Me = { name: string; phone: string; country: string; currency: string | null; email: string };
 
@@ -14,7 +14,7 @@ async function me(page: Page): Promise<Me> {
   return (await res.json()) as Me;
 }
 
-/** The profile card of the settings page. */
+/** The profile card of the settings page (the retail rank's: its name, phone, country and the read-only email). */
 const profile = (page: Page) => page.locator("section#profile");
 const field = (page: Page, name: "name" | "phone" | "email") => profile(page).locator(`input[name="${name}"]`);
 const countrySelect = (page: Page) => profile(page).locator('select[name="country"]');
@@ -34,10 +34,10 @@ async function shopCurrencyCookie(page: Page): Promise<string | undefined> {
 }
 
 test("saving the name and the phone sends only those keys, shows the toast, and a reload keeps them", async ({ page }) => {
-  await freshCustomer(page);
+  await freshAccount(page, { signedIn: true });
   await go(page, "/en/account/settings");
   await expect(profile(page).getByRole("heading", { name: "Profile" })).toBeVisible();
-  // The section links must not widen the page: no sideways scroll at phone width (they scroll inside their own row).
+  // The settings navigation must not widen the page: no sideways scroll at phone width (it scrolls inside its own row).
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   await expect(field(page, "email")).toHaveAttribute("readonly", "");
   await expect(profile(page).getByText("To change your email address, contact support.")).toBeVisible();
@@ -67,7 +67,7 @@ test("saving the name and the phone sends only those keys, shows the toast, and 
 });
 
 test("a one-letter name is refused on its field, with focus on it, and nothing is sent", async ({ page }) => {
-  await freshCustomer(page);
+  await freshAccount(page, { signedIn: true });
   await go(page, "/en/account/settings");
   const patches = recordPatches(page);
 
@@ -100,7 +100,7 @@ test("a one-letter name is refused on its field, with focus on it, and nothing i
 });
 
 test("a country change lists the shop's countries, saves, and moves the currency select and the cookie to the answer's currency", async ({ page }) => {
-  await freshCustomer(page);
+  await freshAccount(page, { signedIn: true });
   const config = (await (await page.request.get("/store/v1/config")).json()) as { taxRates: { country: string }[] };
   const sellable = [...new Set(config.taxRates.map((rate) => rate.country))].sort();
   expect(sellable).toContain("GB");
@@ -133,7 +133,7 @@ test("a country change lists the shop's countries, saves, and moves the currency
 });
 
 test("a country the shop does not sell to (422 unsupported) is explained on the country field and changes nothing else", async ({ page }) => {
-  await freshCustomer(page);
+  await freshAccount(page, { signedIn: true });
   await go(page, "/en/account/settings");
   await page.route("**/store/v1/me", (route) =>
     route.request().method() === "PATCH"
@@ -155,8 +155,9 @@ test("a country the shop does not sell to (422 unsupported) is explained on the 
 });
 
 test("emptying the phone sends an empty string, and the API clears it", async ({ page }) => {
-  await freshCustomer(page);
-  const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "csrf_token_store")?.value ?? "";
+  const account = await freshAccount(page);
+  // The sign-in answer carries the token the API calls below send back.
+  const csrf = await signIn(page, account);
   const seeded = await page.request.patch("/store/v1/me", { headers: { "X-CSRF-Token": csrf }, data: { phone: "+962 79 111 2222" } });
   expect(seeded.status(), await seeded.text()).toBe(200);
 
@@ -173,11 +174,11 @@ test("emptying the phone sends an empty string, and the API clears it", async ({
   await expect(field(page, "phone")).toHaveValue("");
 });
 
-// Group C (plan 30 §9.1): a name typed in Arabic script is data. It is saved and read back as typed on the English page
+// A name typed in Arabic script is data. It is saved and read back as typed on the English page
 // (the escapes are the letters of an Arabic name; no Arabic script in this file).
 test("a name typed in Arabic script is saved as typed, and a one-letter one is refused like any other", async ({ page }) => {
   const arabicName = "\u0623\u0645\u0644 \u062D\u062F\u0627\u062F";
-  await freshCustomer(page);
+  await freshAccount(page, { signedIn: true });
   await go(page, "/en/account/settings");
   await field(page, "name").fill(arabicName);
   await field(page, "phone").fill("+962790000000");

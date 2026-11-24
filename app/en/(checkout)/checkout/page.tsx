@@ -1,10 +1,12 @@
 // Opening a checkout: `/checkout?service=<slug>`. The page shell is static; the service (priced in the visitor's currency)
-// and the URL stream in behind one <Suspense> with a same-size skeleton, and the signed-in customer behind a second one
-// inside it. The customer read is personal and uncached (`no-store`): a prefetch stops at it. Kept in its own boundary,
+// and the URL stream in behind one <Suspense> with a same-size skeleton, and the signed-in account behind a second one
+// inside it. The account read is personal and uncached (`no-store`): a prefetch stops at it. Kept in its own boundary,
 // it leaves everything else to the per-link prefetch of "Buy now" (`prefetch={true}`, plan P3.1): the service's own
-// states (moved, missing, file service) and, for a visitor without a customer session (no read at all),
-// the whole form. The form itself needs the customer when it mounts, so for a signed-in customer it streams in after the
+// states (moved, missing, file service) and, for a visitor without an account session (no read at all),
+// the whole form. The form itself needs the account when it mounts, so for a signed-in account it streams in after the
 // click, behind the same skeleton.
+// The rank decides what the account sees (`checkoutAccess`): a retail rank gets the form with its email locked; a merchant
+// rank orders from its price list, so the form is never mounted for it and no checkout session is created.
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
@@ -16,11 +18,13 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CheckoutForm, type CheckoutFormProps } from "@/components/checkout/checkout-form";
+import { PriceListCard, type PriceListCardProps } from "@/components/checkout/price-list-card";
 import { resolveService } from "@/components/store/resolve-service";
 import { firstParam, intParam, type SearchParams } from "@/components/store/search-params";
 import { ServiceArt } from "@/components/store/service-art";
 import { getStoreConfig } from "@/lib/api/public";
-import { getCustomer } from "@/lib/api/session";
+import { getAccount } from "@/lib/api/session";
+import { checkoutAccess, checkoutBuyerOf, checkoutSignInHref, priceListHref } from "@/lib/checkout/access";
 import { countryOptions } from "@/lib/countries";
 import { getCurrency } from "@/lib/currency";
 import { checkout } from "@/lib/i18n/messages/checkout";
@@ -59,7 +63,7 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
   const quantityQuery = wanted === null ? "" : `&quantity=${wanted}`;
   const p = (path: string) => sitePath(path);
   const nextPath = `${p("/checkout")}?service=${encodeURIComponent(slug)}${quantityQuery}`;
-  const signInHref = `${p("/sign-in")}?as=customer&next=${encodeURIComponent(nextPath)}`;
+  const signInHref = checkoutSignInHref(nextPath);
 
   if (!slug) {
     return (
@@ -118,7 +122,7 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
     if (value) utm[key] = value;
   }
 
-  const form: Omit<CheckoutFormProps, "customer"> = {
+  const form: Omit<CheckoutFormProps, "account"> = {
     labels: t.start,
     quantityLabels: c.quantity,
     deliveryLabels: c.delivery,
@@ -148,45 +152,56 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
 
   return (
     <Suspense fallback={<CheckoutSkeleton />}>
-      <CustomerCheckout
+      <AccountCheckout
         // A new service or a new quantity in the URL starts the form over (no rule, details or notice of the last one).
         formKey={`${service.id}:${wanted ?? ""}`}
         form={form}
         guestCheckout={config.policies.guestCheckout}
         signIn={{ title: t.start.signInTitle, text: t.start.signInText, action: t.start.signInAction, href: signInHref }}
+        priceList={{
+          labels: t.start.priceList,
+          priceListHref: priceListHref(service.id),
+          serviceHref: p(`/services/${encodeURIComponent(service.slug)}`),
+        }}
       />
     </Suspense>
   );
 }
 
 /**
- * The part of the checkout that needs the signed-in customer (`GET /store/v1/me`, per request, never cached): the form
- * (their email locked, their country prefilled) or, with guest checkout switched off and nobody signed in, the way to
- * sign in. Render it inside its own <Suspense> so the rest of the page stays in the prefetch.
+ * The part of the checkout that needs the signed-in account (`GET /store/v1/me` or `GET /client/auth/me`, by the account's own
+ * session, per request, never cached). `checkoutAccess` decides from the account's rank:
+ * - the form, with a retail account's email locked and its country prefilled (or empty, for a guest checkout);
+ * - with guest checkout switched off and nobody signed in, the way to sign in;
+ * - for a merchant rank, the notice that leads to its price list. The form is never mounted, so no session is created.
+ * Render it inside its own <Suspense> so the rest of the page stays in the prefetch.
  */
-async function CustomerCheckout({
+async function AccountCheckout({
   formKey,
   form,
   guestCheckout,
   signIn,
+  priceList,
 }: {
   formKey: string;
-  form: Omit<CheckoutFormProps, "customer">;
+  form: Omit<CheckoutFormProps, "account">;
   guestCheckout: boolean;
   signIn: { title: string; text: string; action: string; href: string };
+  priceList: PriceListCardProps;
 }) {
-  const customer = await getCustomer();
+  const me = await getAccount();
+  const access = checkoutAccess(me, guestCheckout);
 
-  // Guest checkout switched off: only a signed-in customer can open a checkout.
-  if (!guestCheckout && !customer) {
+  if (access === "sign-in") {
     return (
       <Card>
         <EmptyState title={signIn.title} description={signIn.text} action={<ButtonLink href={signIn.href}>{signIn.action}</ButtonLink>} />
       </Card>
     );
   }
+  if (access === "price-list") return <PriceListCard {...priceList} />;
 
-  return <CheckoutForm key={formKey} {...form} customer={customer ? { email: customer.email, country: customer.country } : null} />;
+  return <CheckoutForm key={formKey} {...form} account={checkoutBuyerOf(me)} />;
 }
 
 /** Same layout as the form: two cards on the left, the summary on the right. */

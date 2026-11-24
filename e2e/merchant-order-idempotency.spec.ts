@@ -1,14 +1,14 @@
 // One Idempotency-Key per merchant order submission (plan F23, BH §7.1): the order form sends a key, keeps it while the
 // same body is sent again (a lost answer, a double click, a wait for 409 IDEMPOTENCY_IN_PROGRESS) and takes a new one as
 // soon as the body changes or the API says the key was used for another body. Runs against the isolated demo backend
-// (:3100) as the demo merchant, on service 1 ($0.10 an order): the tests that place a real order say so, and try to
+// (:3100) as the demo merchant account, on service 1 ($0.10 an order): the tests that place a real order say so, and try to
 // cancel it afterwards (the worker usually picks it up first, then the API answers 409 and the order stays).
 // The refusals are mocked in the browser, so they cost nothing.
 import type { Page, Request } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { go, signInMerchant } from "./helpers";
+import { ACCOUNTS, go, signIn } from "./helpers";
 
-const SERVICE = "/en/merchant/services/1";
+const SERVICE = "/en/account/services/1";
 const ORDERS = "**/client/orders";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -32,14 +32,14 @@ const imeiBox = (page: Page) => main(page).getByRole("textbox", { name: /^IMEI/ 
 const place = (page: Page) => main(page).getByRole("button", { name: /^Place order/ });
 
 test.beforeEach(async ({ page }) => {
-  await signInMerchant(page);
+  await signIn(page, ACCOUNTS.merchant);
 });
 
 /** Opens the order form of service 1; the API can end the session at any time (other runs sign in as the same merchant). */
 async function openForm(page: Page) {
   await go(page, SERVICE);
   if (new URL(page.url()).pathname.endsWith("/sign-in")) {
-    await signInMerchant(page);
+    await signIn(page, ACCOUNTS.merchant);
     await go(page, SERVICE);
   }
   await expect(imeiBox(page)).toBeVisible();
@@ -83,7 +83,8 @@ async function ordersForImei(page: Page, imei: string): Promise<number> {
 
 /** Cancels an order when the API still allows it; a worker usually picked it up already (409), and that is fine. */
 async function cancelIfPossible(page: Page, orderId: string) {
-  const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "csrf_token_client")?.value ?? "";
+  // The session's one token, whichever of the two cookie names the account's family set.
+  const csrf = (await page.context().cookies()).find((cookie) => cookie.name.startsWith("csrf_token_"))?.value ?? "";
   const res = await page.request.post(`/client/orders/${orderId}/cancel`, { headers: { "X-CSRF-Token": csrf }, data: {} });
   expect([200, 204, 409], await res.text()).toContain(res.status());
 }
@@ -98,7 +99,7 @@ test("the order request carries an Idempotency-Key, and a double click sends one
   await expect(main(page).getByText("This IMEI is valid.")).toBeVisible();
 
   await place(page).dblclick();
-  await page.waitForURL(/\/en\/merchant\/orders\/\d+$/);
+  await page.waitForURL(/\/en\/account\/orders\/\d+$/);
   const id = orderIdOf(page.url());
 
   expect(sent).toHaveLength(1);
@@ -132,7 +133,7 @@ test("a lost answer: the second click sends the same key and gets the same order
 
   // Same form, same body: the API replays the first answer.
   await place(page).click();
-  await page.waitForURL(/\/en\/merchant\/orders\/\d+$/);
+  await page.waitForURL(/\/en\/account\/orders\/\d+$/);
   expect(orderIdOf(page.url())).toBe(firstOrderId);
 
   expect(sent).toHaveLength(2);
@@ -186,7 +187,7 @@ test("409 IDEMPOTENCY_IN_PROGRESS: the form waits Retry-After, says so, and send
   await imeiBox(page).fill(imei);
   await place(page).click();
   await expect(main(page).getByText("Your order is still being processed.")).toBeVisible();
-  await page.waitForURL(/\/en\/merchant\/orders\/\d+$/);
+  await page.waitForURL(/\/en\/account\/orders\/\d+$/);
   const id = orderIdOf(page.url());
 
   expect(sent).toHaveLength(2);

@@ -1,9 +1,9 @@
-// TicketList: a signed-in customer's tickets (`/account/tickets`) or a merchant's (`/merchant/support`), newest activity
+// TicketList: the tickets of a signed-in account (`/account/support`, the same page for every rank), newest activity
 // first (feature 28). One markup for every screen (speed plan P1.1): a `compact` table is the real table from `md` up and short
 // list rows on phones (line 1: number, status; line 2: subject; then the last activity). The number link covers the whole row
 // on phones. A row with a reply the visitor has not seen has a dot and says so to screen readers in the link's name.
 // Rows do not prefetch: a ticket page is personal and reads the API when it opens, so a prefetch per row would buy nothing
-// (and for a customer each read counts against the per-address limit of the ticket token). Server component.
+// (and for a token page each read counts against the per-address limit of the ticket token). Server component.
 import Link from "next/link";
 import type { Ticket } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
@@ -13,7 +13,7 @@ import type { SupportMessages } from "@/lib/i18n/messages/support";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 
-/** A row of either list, with the link its number opens (the token page for a customer, the thread for a merchant). */
+/** A row of the list, with the link its number opens (the token page of a retail ticket, the thread of a merchant rank's). */
 export type TicketListRow = {
   key: string | number;
   href: string;

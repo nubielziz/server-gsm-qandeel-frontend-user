@@ -4,8 +4,8 @@
 // sort, pages: its state is in the home URL) and banners to the rest of the site. A section whose list is empty is left out.
 // The hero, promo, steps and banners are static. Everything that reads the catalog (language-specific
 // cached reads), the visitor's currency cookie or the URL's query streams in behind <Suspense> with skeletons of the
-// same size; the merchant banner is a small Client Component (no server read).
-// The balance box (components/store/home-balance.tsx) reads the visitor's sessions and wallet: personal, never cached, also
+// same size; the rank banner is a small Client Component (no server read).
+// The balance box (components/store/home-balance.tsx) reads the visitor's account and wallet: personal, never cached, also
 // behind <Suspense>. The round WhatsApp button floats over the page's bottom end corner (components/store/whatsapp-float.tsx).
 // Motion: the hero row never animates (LCP). The blocks below it fade and rise in as they scroll into view (CSS
 // scroll-driven `.reveal` / `.reveal-grid`, globals.css); a client navigation to the page plays the shop's page enter.
@@ -18,7 +18,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { serviceCardLabels } from "@/components/store/card-labels";
-import { MerchantBanner } from "@/components/store/merchant-banner";
+import { RankBanner } from "@/components/store/rank-banner";
 import {
   CatalogTiles,
   CatalogTilesSkeleton,
@@ -90,7 +90,7 @@ export default function HomePage(props: PageProps<"/en">) {
           </div>
         </div>
 
-        <MerchantBanner text={t.home.merchant.text} cta={t.home.merchant.cta} href={sitePath("/merchant/services")} />
+        <RankBanner text={common.rankBanner.text} cta={common.rankBanner.cta} href={sitePath("/account/services")} />
 
         <Suspense fallback={<CatalogTilesSkeleton />}>
           <Tiles />

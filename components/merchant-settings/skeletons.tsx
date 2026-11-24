@@ -34,6 +34,19 @@ export function ListSkeleton({ rows = 3, rowHeight = "h-40" }: { rows?: number; 
   );
 }
 
+/** The settings navigation while the account is read (the list depends on its rank): a card with four rows. */
+export function NavSkeleton() {
+  return (
+    <Card aria-busy="true" className="p-2 lg:p-4">
+      <div className="grid gap-1 max-lg:grid-flow-col max-lg:auto-cols-max lg:gap-2">
+        {Array.from({ length: 4 }, (_, i) => (
+          <Skeleton key={i} className="h-11 w-28 rounded-control lg:w-full" />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 export function PageHeaderSkeleton() {
   return (
     <div className="flex min-h-[4.5rem] items-center justify-between gap-6 rounded-card border border-line bg-surface px-5 py-4 shadow-card sm:px-6">

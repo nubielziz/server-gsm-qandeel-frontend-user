@@ -33,8 +33,8 @@ site:3000 ── server-side reads (Server Components) ──► GSM_API_ORIGIN 
 | `NEXT_PUBLIC_SITE_URL` | at build | The public origin, `https://<SHOP_HOST>`. Used for canonical URLs, social cards, `robots.txt` and the sitemap. Required. |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | at build | Cloudflare Turnstile site key of the widget for `<SHOP_HOST>`. Required (production has no test key). |
 | `NEXT_PUBLIC_TIME_ZONE` | at build | IANA time zone for dates on the site. Default `UTC`, the API's own zone. |
-| `NEXT_PUBLIC_API_PUBLIC_URL` | at build | Optional: `https://<API_HOST>`, the machine API host shown as "Base URL" on the merchant API keys page. Empty hides that line. |
-| `NEXT_PUBLIC_MERCHANT_WHATSAPP` | at build | The team's WhatsApp number for merchant applications. "Apply as a merchant" sends the visitor to it. Default in the `Dockerfile`: `+20 12 10230575` (the owner's number, 2026-11-16); pass the build arg only to change it. International format: `+`, the country code, then the number **without** the national leading 0 (never `+44 (0)20 …`); spaces are allowed and kept on the page. Empty or malformed: the page shows no WhatsApp button and points to the support page. |
+| `NEXT_PUBLIC_API_PUBLIC_URL` | at build | Optional: `https://<API_HOST>`, the machine API host shown as "Base URL" on the API keys page (merchant rank). Empty hides that line. |
+| `NEXT_PUBLIC_MERCHANT_WHATSAPP` | at build | The team's WhatsApp number for merchant applications. `/en/become-a-merchant` sends the visitor to it. Default in the `Dockerfile`: `+20 12 10230575` (the team's number, 2026-11-16); pass the build arg only to change it. International format: `+`, the country code, then the number **without** the national leading 0 (never `+44 (0)20 …`); spaces are allowed and kept on the page. Empty or malformed: the page shows no WhatsApp button and points to the support page. |
 | `PORT`, `HOSTNAME` | at run time | The image sets `3000` and `0.0.0.0`. |
 
 - `NEXT_PUBLIC_*` values are written into the JavaScript at build time. Changing one needs a new image.
@@ -68,6 +68,26 @@ docker build -t gsm-site:<tag> \
   optimizes images is traced for the platform of the build. Build on the server's CPU architecture, or pass `--platform`.
   Override the base with `--build-arg NODE_IMAGE=<image>` if the tag moves.
 
+### The release of the one account model (decision 002)
+
+This release goes out together with the backend release of backend decision 064; the backend migrates the accounts and the old
+customer routes then answer 410, so a shop of the earlier model cannot run against it, nor this one against the earlier backend.
+The order matters, in three steps:
+
+1. **The backend first, with its contract file.** Merge the backend to its `main` with `docs/contract/openapi.json` regenerated and
+   committed in the same change. A stale file lacks routes the code serves (among them the retail two-step routes
+   `/store/v1/me/2fa/*`), and the shop's types are made from that file.
+2. **Then push the shop.** The required check `api-types` (`.github/workflows/ci.yml`) generates the types from the backend branch named
+   in `ci/backend-ref` (`main` outside a pull request that needs a stage branch) and fails when `lib/api/schema.gen.ts` differs. Pushed
+   before step 1, the check fails; do not make it green by regenerating the shop's types against the stale file, because the routes the
+   file lacks vanish from the types. Regenerate from the merged backend (`npm run gen:api`; `npm run gen:api:check` must pass).
+3. **Build and start.** Build the shop image while the earlier shop and API still run: its build reads the public configuration and the
+   catalog from the live API through the shop host, and this release changes none of those reads. Start the new image only after the
+   backend migration, inside the same maintenance, and keep the previous tag for the way back.
+
+Old addresses (`/merchant/…`, the old ticket list, mailed links from before the release) keep working: `next.config.ts` redirects them,
+with and without `/en`.
+
 ## 4. Run with the backend stack
 
 From the backend repository root:
@@ -89,12 +109,18 @@ In `backend/.env.production` (`.env.production.example` has the template):
 
 | Variable | Value | Why |
 |---|---|---|
-| `STORE_BASE_URL` | `https://<SHOP_HOST>` | customer links in mail (`/sign-in?token=`, `/unsubscribe?token=`) |
-| `PORTAL_BASE_URL` | `https://<SHOP_HOST>/merchant` | merchant links in mail (`/set-password?token=`) |
+| `STORE_BASE_URL` | `https://<SHOP_HOST>` | every link in mail, for every account: the pages at the shop root (`/sign-in?token=`, `/set-password?token=`, `/verify-email?token=`, `/unsubscribe?token=`) and the account pages (`/account/support/<id>`, `/account/settings/notifications`, …) |
+| `PORTAL_BASE_URL` | `https://<SHOP_HOST>/account` | the account area. Its one use: where a gateway sends a merchant rank back after an online card payment (`<PORTAL_BASE_URL>/wallet`, the wallet page). No mailed link uses it. Nothing is served under `/merchant` any more: a value that ends in `/merchant` reaches the wallet only through the redirect table (`lib/account/legacy-paths.ts`), so set it to the account address |
 | `CORS_ORIGINS` | includes `https://<SHOP_HOST>` | the Origin check of public `POST` routes (sign-in, forgot password) |
 | `TURNSTILE_HOSTNAMES` | `<SHOP_HOST>` | host names a Turnstile token may be issued for |
 | `TURNSTILE_SECRET_KEY` | secret of the widget whose site key is `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | token check |
 | `TRUST_PROXY` | `172.30.0.0/24` | the API trusts `X-Forwarded-For` from Caddy and from the site |
+
+**What the backend must send.** The account area lives at `/account` and nowhere else. Every shop address the backend builds or stores
+(a mail, a notification or inbox link, a campaign link, the preferences link of a mail, the return address of a card payment) must name
+an `/account/…` page, or a page at the shop root. An address under `/merchant` is only a stored link from before the release: the shop
+redirects it with a permanent redirect, so it works, but the backend must not write a new one. The redirect table is a safety net for
+old links, not a place to send people.
 
 ## 6. Checks
 

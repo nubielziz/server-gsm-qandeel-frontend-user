@@ -40,10 +40,12 @@ import {
   orderSignature,
   parseImeiLines,
   parseQuantity,
+  placedHref,
   quantityRule,
   summarizeImeiLines,
   visibleFields,
   type OrderFieldErrors,
+  type OrderFormHrefs,
 } from "@/lib/merchant/order-input";
 import { fromMerchantRule, invalidQuantityText, quantityRuleText } from "@/lib/quantity";
 import { FileUpload } from "@/components/forms/file-upload";
@@ -69,7 +71,7 @@ export type OrderFormProps = {
   service: Pick<MerchantServiceDetail, "id" | "name" | "type" | "price" | "currency" | "minQty" | "maxQty" | "qtyOptions" | "fields">;
   /** The wallet's spendable balance (`available`), or null when it could not be read. */
   available: string | null;
-  hrefs: { orders: string; orderBase: string; topUp: string; services: string };
+  hrefs: OrderFormHrefs;
   labels: OrderFormLabels;
   /** Server-rendered service details shown above the inputs. */
   intro: ReactNode;
@@ -277,13 +279,9 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
       if (orders === null) return; // the form was left while it waited
       keys.reset(); // a new submission starts with a new key
       // Stay disabled while the next page loads (submitting is not reset on success).
-      if (orders.length === 1) {
-        toast.success(fmt(labels.placed.one, { id: orders[0].id }));
-        router.push(`${hrefs.orderBase}/${orders[0].id}`);
-      } else {
-        toast.success(fmt(labels.placed.many, { count: orders.length }), labels.placed.manyText);
-        router.push(hrefs.orders);
-      }
+      if (orders.length === 1) toast.success(fmt(labels.placed.one, { id: orders[0].id }));
+      else toast.success(fmt(labels.placed.many, { count: orders.length }), labels.placed.manyText);
+      router.push(placedHref(orders, hrefs));
       router.refresh(); // the wallet pill in the header
     } catch (error) {
       inFlight.current = false;
@@ -549,6 +547,7 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
             {service.type === "file" ? (
               <div id={ID.file} tabIndex={-1} className="grid gap-2 focus:outline-none">
                 <FileUpload
+                  family="client"
                   required={fileRequired}
                   onChange={(next) => {
                     setFile(next);

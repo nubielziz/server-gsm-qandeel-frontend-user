@@ -1,5 +1,5 @@
-// Customer email confirmation (`/verify-email?token=`, sent after staff change an email). A button confirms and signs
-// the customer in. Static page; the action reads the token in the browser behind <Suspense>.
+// Email confirmation (`/verify-email?token=`, mailed after a staff change of the address, for every account). A button confirms
+// the address; it never signs anyone in. Static page; the action reads the token in the browser behind <Suspense>.
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AuthHeading } from "@/components/auth/auth-heading";
@@ -20,14 +20,12 @@ export default function VerifyEmailPage() {
       <Suspense
         fallback={
           <div aria-busy="true" className="grid gap-5">
-            <div>
-              <p className="text-body text-ink-muted">{t.verifyEmail.customerText}</p>
-            </div>
+            <p className="text-body text-ink-muted">{t.verifyEmail.text}</p>
             <Skeleton className="h-12 rounded-control" />
           </div>
         }
       >
-        <VerifyEmailAction surface="customer" t={{ shared: t.shared, signIn: t.signIn, verifyEmail: t.verifyEmail }} />
+        <VerifyEmailAction t={{ shared: t.shared, verifyEmail: t.verifyEmail }} />
       </Suspense>
     </>
   );

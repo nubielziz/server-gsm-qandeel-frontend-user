@@ -1,4 +1,4 @@
-// One order, by tracking token (the token is the customer's only key: never indexed, never cached, never shared).
+// One order, by tracking token (the token is the buyer's only key: never indexed, never cached, never shared).
 // Reads the order on the server with the visitor's IP forwarded, so the API's per-IP limit counts the visitor, not the site.
 import { Suspense } from "react";
 import { connection } from "next/server";

@@ -1,6 +1,7 @@
 // The home page's balance box as a picture of one state (components/store/home-balance.tsx reads the state): the available
 // wallet balance with the ways on, an invitation to sign in, or a signed-in account without a balance to show. No hooks and
-// no reads, so a test can draw every state. Amounts are USD, like the wallets.
+// no reads, so a test can draw every state. Amounts are USD, like the wallets. Every account has the same addresses: the
+// wallet, its Add funds page and the account home are pages of the one account area, whatever the rank.
 import type { ReactNode } from "react";
 import { Wallet } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
@@ -44,20 +45,19 @@ export function HomeBalanceView({ state, t }: { state: HomeBalanceState; t: Bala
       </BalanceFrame>
     );
   }
-  const merchant = state.account === "merchant";
   if (state.kind === "noWallet") {
     return (
       <BalanceFrame title={t.title} text={t.noWalletText}>
         <div className="mt-4">
-          <ButtonLink href={sitePath(merchant ? "/merchant" : "/account")} variant="secondary" size="sm">
-            {merchant ? t.merchantPortal : t.myAccount}
+          <ButtonLink href={sitePath("/account")} variant="secondary" size="sm">
+            {t.myAccount}
           </ButtonLink>
         </div>
       </BalanceFrame>
     );
   }
-  const wallet = sitePath(merchant ? "/merchant/wallet" : "/account/wallet");
-  const addFunds = sitePath(merchant ? "/merchant/wallet/top-up" : "/account/wallet/add-funds");
+  const wallet = sitePath("/account/wallet");
+  const addFunds = sitePath("/account/wallet/add-funds");
   return (
     <BalanceFrame title={t.title} text={t.text}>
       <p className="num mt-4 text-stat text-ink">

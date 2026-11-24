@@ -1,11 +1,9 @@
 "use client";
-// SetPasswordForm: the page behind an emailed password link. Customers: `/set-password?token=` (reset or invitation)
-// → POST /store/v1/auth/password/set. Merchants: `/merchant/set-password?token=` (reset AND staff invitation) →
-// POST /client/auth/password/reset. Both set the password, end every session and sign nobody in, so success points to
-// sign-in. WEAK_PASSWORD keeps the link usable (the error sits on the field); a 410 means the link is spent.
+// SetPasswordForm: the page behind an emailed password link (`/set-password?token=`: a reset or an invitation, for every
+// account) → POST /client/auth/password/reset. It sets the password, ends every session and signs nobody in, so success
+// points to sign-in. WEAK_PASSWORD keeps the link usable (the error sits on the field); a 410 means the link is spent.
 import { useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
-import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
@@ -13,17 +11,17 @@ import { sitePath } from "@/lib/site-path";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
+import { setPasswordFromLink } from "./auth-requests";
 import { FormAlert } from "./form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "./form-errors";
 import { LinkProblem } from "./link-problem";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
 
 export type SetPasswordFormProps = {
-  surface: "customer" | "merchant";
   t: Pick<AuthMessages, "fields" | "shared" | "setPassword">;
 };
 
-export function SetPasswordForm({ surface, t }: SetPasswordFormProps) {
+export function SetPasswordForm({ t }: SetPasswordFormProps) {
   const token = useSearchParams().get("token");
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
@@ -35,23 +33,22 @@ export function SetPasswordForm({ surface, t }: SetPasswordFormProps) {
 
   useFocusOnFeedback(feedback, form);
 
-  const forgot = `${sitePath("/forgot-password")}?as=${surface}`;
-  const signIn = `${sitePath("/sign-in")}?as=${surface}`;
   const newLink = (
-    <ButtonLink href={forgot} size="lg" block>
+    <ButtonLink href={sitePath("/forgot-password")} size="lg" block>
       {t.shared.requestNewLink}
     </ButtonLink>
   );
 
   if (!token) return <LinkProblem title={t.setPassword.missingTitle} text={t.setPassword.missingText} action={newLink} />;
-  if (state === "expired") return <LinkProblem title={t.setPassword.expiredTitle} text={t.setPassword.expiredText} action={newLink} />;
+  if (state === "expired")
+    return <LinkProblem title={t.setPassword.expiredTitle} text={t.setPassword.expiredText} action={newLink} />;
   if (state === "done") {
     return (
       <div className="grid gap-5">
         <Alert tone="success" title={t.setPassword.doneTitle}>
           {t.setPassword.doneText}
         </Alert>
-        <ButtonLink href={signIn} size="lg" block>
+        <ButtonLink href={sitePath("/sign-in")} size="lg" block>
           {t.shared.signIn}
         </ButtonLink>
       </div>
@@ -68,7 +65,7 @@ export function SetPasswordForm({ surface, t }: SetPasswordFormProps) {
     setBusy(true);
     setFeedback(NO_FEEDBACK);
     try {
-      await api.post(surface === "merchant" ? "/client/auth/password/reset" : "/store/v1/auth/password/set", { token, password });
+      await setPasswordFromLink(token, password);
       setState("done");
     } catch (error) {
       if (isApiError(error) && error.status === 410) setState("expired");

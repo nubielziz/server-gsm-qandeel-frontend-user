@@ -1,4 +1,4 @@
-// MerchantWhatsAppActions: the WhatsApp button and the number as text, on the merchant application page. Server-compatible
+// MerchantWhatsAppActions: the WhatsApp button and the number as text, on the "Become a merchant" page. Server-compatible
 // (no hooks): the page is fully static and the link works before and without JavaScript.
 import { MessageCircle } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
 
 /** The strings of the action block. */
-export type MerchantWhatsAppText = Pick<AuthMessages["register"], "chat" | "opensNewTab" | "numberLabel">;
+export type MerchantWhatsAppText = Pick<AuthMessages["becomeMerchant"], "chat" | "opensNewTab" | "numberLabel">;
 
 export type MerchantWhatsAppActionsProps = {
   /** The `wa.me` link with the prefilled message. */

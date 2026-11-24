@@ -7,7 +7,9 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh:
 const listed = vi.hoisted(() => ({ files: {} as Record<string, number[]> }));
 vi.mock("@/lib/payment-logo-sizes.json", () => ({ default: listed.files }));
 
-import type { CheckoutSession } from "@/lib/api/types";
+import type { AccountWalletRead } from "@/lib/account/wallet-read";
+import type { CheckoutSession, CustomerWallet } from "@/lib/api/types";
+import { balanceContextFor } from "@/lib/checkout/balance-context";
 import { ErrorTextProvider } from "@/lib/i18n/error-text";
 import { checkout } from "@/lib/i18n/messages/checkout";
 import { common } from "@/lib/i18n/messages/common";
@@ -116,5 +118,99 @@ describe("checkout: the logo of each payment method", () => {
     const html = render([gateway("stripe", "Card gateway", { supports3ds: true })]);
     expect(html).not.toContain("<img");
     expect(html).toContain("lucide-credit-card");
+  });
+});
+
+describe("checkout: the balance and the sign-in link by account", () => {
+  const methods = [gateway("stripe", "Card gateway", { supports3ds: true })];
+  const payable = { ...session(methods), balancePayable: true };
+  const renderFor = (balance: Parameters<typeof SessionView>[0]["balance"]) =>
+    renderToStaticMarkup(
+      <ErrorTextProvider messages={errors}>
+        <SessionView
+          session={payable}
+          labels={checkout.session}
+          quantityLabels={common.quantity}
+          typeLabel="IMEI"
+          decimals={2}
+          restartHref={null}
+          countryName="United States"
+          balance={balance}
+        />
+      </ErrorTextProvider>,
+    );
+  const storeRead: AccountWalletRead = {
+    kind: "store",
+    read: {
+      ok: true,
+      data: { enabled: true, currency: "USD", balance: "50.0000", available: "50.0000", frozen: null } as CustomerWallet,
+    },
+  };
+
+  it("sends a visitor who is signed out to the one sign-in page and back to this checkout, naming no account type", () => {
+    const html = renderFor({ signedIn: false, wallet: null });
+    expect(html).toContain("Sign in to pay from your store balance.");
+    expect(html).toContain('href="/en/sign-in?next=%2Fen%2Fcheckout%2Ftok-1"');
+    expect(html).not.toContain("as=");
+  });
+
+  it("offers a retail rank with enough funds the store balance first", () => {
+    const html = renderFor(balanceContextFor({ rank: { kind: "retail" } }, storeRead));
+    expect(html).toContain("Store balance");
+    expect(html).toContain("Card gateway");
+    expect(html.match(/type="radio"/g)).toHaveLength(2);
+  });
+
+  const priceList = {
+    labels: checkout.start.priceList,
+    priceListHref: "/en/account/services/1",
+    serviceHref: "/en/services/unlock",
+  };
+  const renderWithNotice = (notice: Parameters<typeof SessionView>[0]["priceList"]) =>
+    renderToStaticMarkup(
+      <ErrorTextProvider messages={errors}>
+        <SessionView
+          session={payable}
+          labels={checkout.session}
+          quantityLabels={common.quantity}
+          typeLabel="IMEI"
+          decimals={2}
+          restartHref={null}
+          countryName="United States"
+          balance={balanceContextFor({ rank: { kind: "merchant" } }, storeRead)}
+          priceList={notice}
+        />
+      </ErrorTextProvider>,
+    );
+
+  it("tells a merchant rank first that the shop checkout is for retail buyers, before the consents and the payment choices", () => {
+    const html = renderWithNotice(priceList);
+    const notice = html.indexOf("The shop checkout is for retail buyers");
+    expect(notice).toBeGreaterThan(-1);
+    expect(notice).toBeLessThan(html.indexOf(checkout.session.consent.title));
+    expect(notice).toBeLessThan(html.indexOf(checkout.session.methods.title));
+    expect(notice).toBeLessThan(html.indexOf("Card gateway"));
+    expect(html).toMatch(/<a [^>]*href="\/en\/account\/services\/1"[^>]*>Order at your price<\/a>/);
+    expect(html).toMatch(/<a [^>]*href="\/en\/services\/unlock"[^>]*>Back to the service<\/a>/);
+  });
+
+  it("shows no such notice to anyone else: a visitor who is signed out, a retail rank, an account that was not read", () => {
+    for (const html of [
+      renderFor({ signedIn: false, wallet: null }),
+      renderFor(balanceContextFor({ rank: { kind: "retail" } }, storeRead)),
+      renderWithNotice(null),
+      renderWithNotice(undefined),
+    ]) {
+      expect(html).not.toContain("The shop checkout is for retail buyers");
+      expect(html).toContain("Card gateway");
+    }
+  });
+
+  it("offers a merchant rank the payment methods only: no store balance, even for a checkout the balance could pay", () => {
+    const html = renderFor(balanceContextFor({ rank: { kind: "merchant" } }, storeRead));
+    expect(html).not.toContain("Store balance");
+    expect(html).not.toContain("Sign in to pay from your store balance.");
+    expect(html).toContain("Card gateway");
+    expect(html.match(/type="radio"/g)).toHaveLength(1);
   });
 });

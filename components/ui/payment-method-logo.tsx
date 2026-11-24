@@ -1,6 +1,6 @@
 "use client";
-// PaymentMethodLogo: the picture that goes before a payment method's name where a method is offered (the customer's and
-// the merchant's top-up forms, the checkout). The order is the API's (feature 32): the logo staff uploaded (`logoUrl`),
+// PaymentMethodLogo: the picture that goes before a payment method's name where a method is offered (the add-funds forms of
+// both ranks, the checkout). The order is the API's (feature 32): the logo staff uploaded (`logoUrl`),
 // else the bundled logo of the method's `preset` (`public/images/payments`, docs/LOGOS.md), else a plain icon. A picture
 // that does not load (a deleted or unreachable upload, a missing file) is dropped and the next of that order is shown:
 // that is why this is a Client Component (`onError`). Every variant sits in the same chip, so the names of a list start at

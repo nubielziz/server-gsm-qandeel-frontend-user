@@ -732,7 +732,7 @@ export default function UiKitPage() {
                 <Avatar name="Alex Morgan" size="sm" />
                 <Avatar name="Alex Morgan" size="md" />
                 <Avatar name="Alex Morgan" size="lg" />
-                {/* A customer's name typed in Arabic script (user text): the initial is its first letter. */}
+                {/* A person's name typed in Arabic script (user text): the initial is its first letter. */}
                 <Avatar name={"\u0633\u0627\u0631\u0629 \u0623\u062d\u0645\u062f"} size="lg" />
                 <VisuallyHidden>Avatar examples</VisuallyHidden>
               </div>

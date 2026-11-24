@@ -1,4 +1,4 @@
-// The unread count of the bell, kept in the browser (plan D10). One small external store per surface (customer, merchant),
+// The unread count of the bell, kept in the browser (plan D10). One small external store per family (store, client),
 // read with `useSyncExternalStore`:
 // - the server passes the first count (`reconcile`), so the bell never flashes; a later server count never overwrites a
 //   newer read of the store (a `router.refresh()` can land after the store has already asked), it makes the store ask;
@@ -9,17 +9,18 @@
 // - 429 waits for `Retry-After` (at least a minute), other failures back off, and the last known count stays on screen;
 // - 401 and 403 stop the polling for good (the session is gone; the layout sends the visitor to sign-in on the next
 //   navigation). The store never signs anyone out and never changes a cookie;
-// - while the live stream is open (`setLive(surface, true)`, lib/realtime) the stream brings every change (`push`), so the
+// - while the live stream is open (`setLive(family, true)`, lib/realtime) the stream brings every change (`push`), so the
 //   poll only checks now and then: its floor is five minutes instead of one. A stream that closes sets the floor back
 //   and the store asks at once when the minute has already passed.
 // Import only from Client Components. `createUnreadStore` takes its dependencies so the tests need no browser.
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { UnreadCount } from "@/lib/api/types";
-import { NOTIFICATION_API, UNREAD_CAP, type NotificationSurface } from "./link";
+import type { AccountFamily } from "@/lib/account/family";
+import { NOTIFICATION_API, UNREAD_CAP } from "./link";
 
 export { UNREAD_CAP };
-/** The least time between two polls of one surface. */
+/** The least time between two polls of one family. */
 export const POLL_INTERVAL_MS = 60_000;
 /** The same while the live stream is open: a safety poll for a doorbell that never rang (plan 27 §5). */
 export const LIVE_POLL_INTERVAL_MS = 300_000;
@@ -27,8 +28,8 @@ export const LIVE_POLL_INTERVAL_MS = 300_000;
 export const MAX_BACKOFF_MS = 10 * 60_000;
 
 export type UnreadEnv = {
-  /** The unread count of a surface; rejects with an `ApiError`. */
-  fetchCount(surface: NotificationSurface): Promise<number>;
+  /** The unread count of a family; rejects with an `ApiError`. */
+  fetchCount(family: AccountFamily): Promise<number>;
   /** True while the tab is in the foreground. */
   isVisible(): boolean;
   /** Calls `listener` whenever the tab's visibility changes; returns the function that stops it. */
@@ -37,23 +38,23 @@ export type UnreadEnv = {
 
 export type UnreadStore = {
   /** For `useSyncExternalStore`: `listener` is called when the count changes. The first listener starts the polling, the last one stops it. */
-  subscribe(surface: NotificationSurface, listener: () => void): () => void;
+  subscribe(family: AccountFamily, listener: () => void): () => void;
   /** The count (0 to 100), or `null` before the store knows one. */
-  getSnapshot(surface: NotificationSurface): number | null;
+  getSnapshot(family: AccountFamily): number | null;
   /** Takes a count as the truth: it starts the one-minute countdown again and lifts a stop (the session works). For a count that cannot be older than the store's own, which no server render guarantees: use `reconcile`. */
-  seed(surface: NotificationSurface, count: number): void;
+  seed(family: AccountFamily, count: number): void;
   /**
    * A count a server render brought (first paint, router.refresh, a remount). It may be older than the store's own last
    * read, so it never overwrites a known count: when the two differ the store asks the API at once. With no count yet, or
    * after a stop, it is a seed.
    */
-  reconcile(surface: NotificationSurface, count: number): void;
+  reconcile(family: AccountFamily, count: number): void;
   /** Asks the API now (after an action). Resolves when the request is over; it does nothing after a stop or during a 429 wait. */
-  refresh(surface: NotificationSurface): Promise<void>;
+  refresh(family: AccountFamily): Promise<void>;
   /** A count a live stream event brought (`unread.changed`, `notification.created`, `notification.read`): the same as `seed`. */
-  push(surface: NotificationSurface, count: number): void;
+  push(family: AccountFamily, count: number): void;
   /** Tells the store whether the live stream is open: the poll floor is `LIVE_POLL_INTERVAL_MS` while it is, `POLL_INTERVAL_MS` after. */
-  setLive(surface: NotificationSurface, live: boolean): void;
+  setLive(family: AccountFamily, live: boolean): void;
 };
 
 type Slot = {
@@ -78,15 +79,15 @@ function clamp(count: number): number {
   return Math.min(UNREAD_CAP, Math.max(0, Math.trunc(count)));
 }
 
-/** 401 and 403: no session on this surface (any more), so asking again cannot help. */
+/** 401 and 403: no session on this family (any more), so asking again cannot help. */
 function endsPolling(error: unknown): boolean {
   return isApiError(error) && (error.status === 401 || error.status === 403);
 }
 
 export function createUnreadStore(env: UnreadEnv): UnreadStore {
-  const slots: Record<NotificationSurface, Slot> = {
-    customer: newSlot(),
-    merchant: newSlot(),
+  const slots: Record<AccountFamily, Slot> = {
+    store: newSlot(),
+    client: newSlot(),
   };
 
   function newSlot(): Slot {
@@ -122,8 +123,8 @@ export function createUnreadStore(env: UnreadEnv): UnreadStore {
   }
 
   /** Arms the next poll: the rest of the floor, or the end of a back-off. Only while a bell is mounted and the tab is visible. */
-  function schedule(surface: NotificationSurface) {
-    const slot = slots[surface];
+  function schedule(family: AccountFamily) {
+    const slot = slots[family];
     clearTimer(slot);
     if (slot.stopped || slot.listeners.size === 0 || !env.isVisible()) return;
     const now = Date.now();
@@ -132,16 +133,16 @@ export function createUnreadStore(env: UnreadEnv): UnreadStore {
     slot.timer = setTimeout(() => {
       slot.timer = undefined;
       if (!env.isVisible()) return; // hidden: the visibility listener polls when the tab comes back
-      void run(surface, false);
+      void run(family, false);
     }, delay);
   }
 
-  async function run(surface: NotificationSurface, force: boolean): Promise<void> {
-    const slot = slots[surface];
+  async function run(family: AccountFamily, force: boolean): Promise<void> {
+    const slot = slots[family];
     if (slot.stopped) return;
     const now = Date.now();
     if (now < slot.blockedUntil || (!force && slot.lastAt !== null && now - slot.lastAt < floorOf(slot))) {
-      schedule(surface);
+      schedule(family);
       return;
     }
     if (slot.inFlight) {
@@ -150,7 +151,7 @@ export function createUnreadStore(env: UnreadEnv): UnreadStore {
     }
     slot.inFlight = true;
     try {
-      const unread = await env.fetchCount(surface);
+      const unread = await env.fetchCount(family);
       if (typeof unread !== "number" || !Number.isFinite(unread)) throw new Error("unread-count: not a number");
       slot.lastAt = Date.now();
       slot.failures = 0;
@@ -173,79 +174,79 @@ export function createUnreadStore(env: UnreadEnv): UnreadStore {
     }
     if (slot.again && !slot.stopped) {
       slot.again = false;
-      await run(surface, true);
+      await run(family, true);
     } else {
       slot.again = false;
-      schedule(surface);
+      schedule(family);
     }
   }
 
-  function onVisibility(surface: NotificationSurface) {
-    const slot = slots[surface];
-    if (env.isVisible()) void run(surface, false);
+  function onVisibility(family: AccountFamily) {
+    const slot = slots[family];
+    if (env.isVisible()) void run(family, false);
     else clearTimer(slot);
   }
 
-  function start(surface: NotificationSurface) {
-    const slot = slots[surface];
-    slot.stopVisibility = env.onVisibilityChange(() => onVisibility(surface));
+  function start(family: AccountFamily) {
+    const slot = slots[family];
+    slot.stopVisibility = env.onVisibilityChange(() => onVisibility(family));
     // Not a request right here: the bell hands over the server's count in the same commit, and a seed moves this to a minute later.
-    schedule(surface);
+    schedule(family);
   }
 
-  function seedSlot(surface: NotificationSurface, count: number) {
-    const slot = slots[surface];
+  function seedSlot(family: AccountFamily, count: number) {
+    const slot = slots[family];
     slot.lastAt = Date.now();
     slot.failures = 0;
     slot.blockedUntil = 0;
     slot.stopped = false;
     setCount(slot, clamp(count));
-    schedule(surface);
+    schedule(family);
   }
 
-  function halt(surface: NotificationSurface) {
-    const slot = slots[surface];
+  function halt(family: AccountFamily) {
+    const slot = slots[family];
     clearTimer(slot);
     slot.stopVisibility?.();
     slot.stopVisibility = undefined;
   }
 
   return {
-    subscribe(surface, listener) {
-      const slot = slots[surface];
+    subscribe(family, listener) {
+      const slot = slots[family];
       slot.listeners.add(listener);
-      if (slot.listeners.size === 1) start(surface);
+      if (slot.listeners.size === 1) start(family);
       return () => {
         slot.listeners.delete(listener);
-        if (slot.listeners.size === 0) halt(surface);
+        if (slot.listeners.size === 0) halt(family);
       };
     },
-    getSnapshot(surface) {
-      return slots[surface].count;
+    getSnapshot(family) {
+      return slots[family].count;
     },
     seed: seedSlot,
-    reconcile(surface, count) {
-      const slot = slots[surface];
-      if (slot.count === null || slot.stopped) seedSlot(surface, count);
-      else if (clamp(count) !== slot.count) void run(surface, true);
+    reconcile(family, count) {
+      const slot = slots[family];
+      if (slot.count === null || slot.stopped) seedSlot(family, count);
+      else if (clamp(count) !== slot.count) void run(family, true);
     },
-    refresh(surface) {
-      return run(surface, true);
+    refresh(family) {
+      return run(family, true);
     },
     push: seedSlot,
-    setLive(surface, live) {
-      const slot = slots[surface];
+    setLive(family, live) {
+      const slot = slots[family];
       if (slot.live === live) return;
       slot.live = live;
       // The floor moved: the armed timer is for the old one. When the stream closed and the short floor has passed, this polls now.
-      schedule(surface);
+      schedule(family);
     },
   };
 }
 
 const browserEnv: UnreadEnv = {
-  async fetchCount(surface) {
-    const answer = await api.get<UnreadCount>(`${NOTIFICATION_API[surface]}/unread-count`);
+  async fetchCount(family) {
+    const answer = await api.get<UnreadCount>(`${NOTIFICATION_API[family]}/unread-count`);
     return answer?.unread;
   },
   isVisible: () => typeof document === "undefined" || document.visibilityState === "visible",

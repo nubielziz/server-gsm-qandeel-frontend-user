@@ -10,7 +10,7 @@ import { isApiError } from "@/lib/api/errors";
 import type { UploadedFile } from "@/lib/api/types";
 import { useErrorText } from "@/lib/i18n/error-text";
 import { leaveIfSignedOut } from "@/lib/merchant/signed-out";
-import type { MerchantMessages } from "@/lib/i18n/messages/merchant";
+import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
 import { FileUpload } from "@/components/forms/file-upload";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,12 +23,11 @@ export type ReceiptFormProps = {
   invoiceId: number;
   /** Payment methods to choose from; empty when the invoice already has one. */
   methods: { id: number; name: string }[];
-  labels: MerchantMessages["invoice"];
-  upload: { choose: string; uploading: string; remove: string; tooLarge: string; wrongType: string };
+  labels: TopUpsMessages["merchant"]["invoice"];
   optionalLabel: string;
 };
 
-export function ReceiptForm({ invoiceId, methods, labels: t, upload, optionalLabel }: ReceiptFormProps) {
+export function ReceiptForm({ invoiceId, methods, labels: t, optionalLabel }: ReceiptFormProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const [file, setFile] = useState<UploadedFile | null>(null);
@@ -94,17 +93,18 @@ export function ReceiptForm({ invoiceId, methods, labels: t, upload, optionalLab
       <div id="receipt-file" tabIndex={-1} className="grid grid-cols-1 gap-2 focus:outline-none">
         <FileUpload
           required
+          family="client"
           accept={ACCEPT}
           disabled={submitting}
           onChange={setFile}
           labels={{
             label: t.receiptFile,
-            choose: upload.choose,
+            choose: t.upload.choose,
             hint: t.receiptHint,
-            uploading: upload.uploading,
-            remove: upload.remove,
-            tooLarge: upload.tooLarge,
-            wrongType: upload.wrongType,
+            uploading: t.upload.uploading,
+            remove: t.upload.remove,
+            tooLarge: t.upload.tooLarge,
+            wrongType: t.upload.wrongType,
           }}
         />
         {fileError ? (

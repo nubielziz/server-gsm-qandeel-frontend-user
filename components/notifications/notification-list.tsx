@@ -1,4 +1,5 @@
-// The notifications page of both areas (customer and merchant): All / Unread tabs, 20 items a page, "Mark all as read".
+// The one notifications page, for the inbox of either family (a retail account or a merchant rank): All / Unread tabs, 20 items
+// a page, "Mark all as read".
 // A server component that reads the session, so the page renders it inside <Suspense> with <NotificationListSkeleton />.
 // The tab and the page live in the URL (`?unread=1`, `?page=2`). Plan D11: `title` and `body` are plain text and are
 // rendered as React text nodes (line breaks by CSS), never as HTML; the link goes through `notificationHref`; the list
@@ -9,6 +10,7 @@ import { redirect } from "next/navigation";
 import { isApiError } from "@/lib/api/errors";
 import { listQuery, pageRange, parsePage } from "@/lib/api/query";
 import { apiSessionList } from "@/lib/api/server";
+import type { AccountFamily } from "@/lib/account/family";
 import type { NotificationItem } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
@@ -21,7 +23,6 @@ import {
   NOTIFICATIONS_PAGE,
   notificationHref,
   unreadText,
-  type NotificationSurface,
 } from "@/lib/notifications/link";
 import { BusyState } from "@/components/ui/busy-state";
 import { Badge } from "@/components/ui/badge";
@@ -48,18 +49,18 @@ export function NotificationListSkeleton() {
   );
 }
 
-export async function NotificationList({ surface, searchParams }: { surface: NotificationSurface; searchParams: Promise<SearchParams> }) {
-  const [sp, unreadTotal] = await Promise.all([searchParams, readUnreadCount(surface)]);
+export async function NotificationList({ family, searchParams }: { family: AccountFamily; searchParams: Promise<SearchParams> }) {
+  const [sp, unreadTotal] = await Promise.all([searchParams, readUnreadCount(family)]);
   const t = notifications;
   const unreadOnly = first(sp.unread) === "1";
   const page = parsePage(sp.page);
   const { start, end } = pageRange(page, PAGE_SIZE);
-  const basePath = sitePath(NOTIFICATIONS_PAGE[surface]);
+  const basePath = sitePath(NOTIFICATIONS_PAGE);
   const filters = unreadOnly ? { unread: "1" } : {};
 
   let rows: { data: NotificationItem[]; total: number };
   try {
-    rows = await apiSessionList<NotificationItem>(NOTIFICATION_API[surface], {
+    rows = await apiSessionList<NotificationItem>(NOTIFICATION_API[family], {
       query: listQuery({ start, end }, { unread: unreadOnly ? "true" : undefined }),
     });
   } catch (error) {
@@ -89,7 +90,7 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
     <div className="grid gap-4">
       <LiveRefresh
         key={`${page}:${unreadOnly ? "unread" : "all"}`}
-        surface={surface}
+        family={family}
         page={page}
         pageOneHref={pageHref(basePath, filters, 1)}
         unreadIds={data.filter((item) => item.readAt === null).map((item) => item.id)}
@@ -99,7 +100,7 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
         <Tabs label={t.tabsLabel} items={tabs} activeKey={unreadOnly ? "unread" : "all"} variant="pill" className="min-w-0" />
         {showMarkAll ? (
           <MarkAllRead
-            surface={surface}
+            family={family}
             upToId={newestId}
             labels={{ markAllRead: t.markAllRead, markedAll: t.markedAll, markedNone: t.markedNone }}
           />
@@ -128,7 +129,7 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
                 {data.map((item) => {
                   const unread = item.readAt === null;
                   const titleId = `notification-${item.id}-title`;
-                  const href = notificationHref(item.link, surface);
+                  const href = notificationHref(item.link);
                   const category = Object.hasOwn(categoryLabels, item.category) ? categoryLabels[item.category] : undefined;
                   return (
                     <li
@@ -170,7 +171,7 @@ export async function NotificationList({ surface, searchParams }: { surface: Not
                         <div className="max-sm:col-start-2 sm:self-start">
                           <NotificationActions
                             id={item.id}
-                            surface={surface}
+                            family={family}
                             unread={unread}
                             href={href}
                             leavesList={unreadOnly}

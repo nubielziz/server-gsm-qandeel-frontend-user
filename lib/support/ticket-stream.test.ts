@@ -12,19 +12,20 @@ vi.mock("@/lib/realtime/browser", () => ({
 }));
 
 type TicketStreamModule = typeof import("./ticket-stream");
-let acquireSurfaceTicketStream: TicketStreamModule["acquireSurfaceTicketStream"];
+let acquireFamilyTicketStream: TicketStreamModule["acquireFamilyTicketStream"];
 let openTicketStream: TicketStreamModule["openTicketStream"];
-let ticketSurfaceLockName: TicketStreamModule["ticketSurfaceLockName"];
-let watchSurfaceTicketStream: TicketStreamModule["watchSurfaceTicketStream"];
+let ticketFamilyLockName: TicketStreamModule["ticketFamilyLockName"];
+let watchFamilyTicketStream: TicketStreamModule["watchFamilyTicketStream"];
 
-// A fresh module per test: the shared clients of the surfaces are module state.
+// A fresh module per test: the shared clients of the families are module state.
 beforeEach(async () => {
   created.length = 0;
   vi.resetModules();
-  ({ acquireSurfaceTicketStream, openTicketStream, ticketSurfaceLockName, watchSurfaceTicketStream } = await import("./ticket-stream"));
+  ({ acquireFamilyTicketStream, openTicketStream, ticketFamilyLockName, watchFamilyTicketStream } =
+    await import("./ticket-stream"));
 });
 
-describe("openTicketStream: the customer's own stream", () => {
+describe("openTicketStream: the token page's own stream", () => {
   it("opens the ticket's route under its own lock, with the ticket events and the message dedupe", () => {
     const handle = openTicketStream({ kind: "own", url: "/store/v1/tickets/tok/stream", lockName: "gsm-ticket-T-1042" });
     expect(created).toHaveLength(1);
@@ -45,20 +46,22 @@ describe("openTicketStream: the customer's own stream", () => {
   });
 });
 
-describe("the merchant surface's ticket stream: shared and counted", () => {
+describe("a family's ticket stream: shared and counted", () => {
   it("names its lock apart from the bell's, so both can run in one browser", () => {
-    expect(ticketSurfaceLockName("merchant")).toBe("gsm-ticket-stream-merchant");
-    expect(ticketSurfaceLockName("merchant")).not.toBe("gsm-stream-merchant");
+    expect(ticketFamilyLockName("client")).toBe("gsm-ticket-stream-client");
+    expect(ticketFamilyLockName("client")).not.toBe("gsm-stream-client");
+    expect(ticketFamilyLockName("store")).toBe("gsm-ticket-stream-store");
+    expect(ticketFamilyLockName("store")).not.toBe("gsm-stream-store");
   });
 
-  it("opens one client for every user of a surface, on the surface's own route with the sign-out probe", () => {
-    const a = acquireSurfaceTicketStream("merchant");
-    const b = openTicketStream({ kind: "surface", surface: "merchant" });
+  it("opens one client for every user of a family, on the family's own route with the sign-out probe", () => {
+    const a = acquireFamilyTicketStream("client");
+    const b = openTicketStream({ kind: "family", family: "client" });
     expect(created).toHaveLength(1);
     expect(a.client).toBe(b.client);
     expect(created[0].options).toMatchObject({
       url: "/client/stream",
-      lockName: "gsm-ticket-stream-merchant",
+      lockName: "gsm-ticket-stream-client",
       probePath: "/client/notifications/unread-count",
     });
     a.release();
@@ -68,30 +71,41 @@ describe("the merchant surface's ticket stream: shared and counted", () => {
     expect(created[0].stop).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps a client per surface, stops each when its last user leaves, and starts the same client afresh for the next page", () => {
-    const customer = acquireSurfaceTicketStream("customer");
-    const merchant = acquireSurfaceTicketStream("merchant");
+  it("opens the shop family's stream for a retail account, on its own route and probe", () => {
+    const handle = openTicketStream({ kind: "family", family: "store" });
+    expect(created).toHaveLength(1);
+    expect(created[0].options).toMatchObject({
+      url: "/store/v1/me/stream",
+      lockName: "gsm-ticket-stream-store",
+      probePath: "/store/v1/me/notifications/unread-count",
+    });
+    handle.release();
+  });
+
+  it("keeps a client per family, stops each when its last user leaves, and starts the same client afresh for the next page", () => {
+    const store = acquireFamilyTicketStream("store");
+    const client = acquireFamilyTicketStream("client");
     expect(created.map((entry) => entry.options.url)).toEqual(["/store/v1/me/stream", "/client/stream"]);
-    customer.release();
-    merchant.release();
+    store.release();
+    client.release();
     expect(created.map((entry) => entry.stop.mock.calls.length)).toEqual([1, 1]);
     // `stop()` forgets the cursor and `start()` begins afresh, so the next page reuses the client instead of making another.
-    const again = acquireSurfaceTicketStream("merchant");
+    const again = acquireFamilyTicketStream("client");
     expect(created).toHaveLength(2);
-    expect(again.client).toBe(merchant.client);
+    expect(again.client).toBe(client.client);
     again.release();
     expect(created[1].stop).toHaveBeenCalledTimes(2);
   });
 });
 
-describe("watchSurfaceTicketStream: the workspace's support badge only listens", () => {
-  it("shares the surface's client, is no user of it, and never starts or stops it", () => {
-    const watch = watchSurfaceTicketStream("merchant");
+describe("watchFamilyTicketStream: the workspace's support badge only listens", () => {
+  it("shares the family's client, is no user of it, and never starts or stops it", () => {
+    const watch = watchFamilyTicketStream("client");
     expect(created).toHaveLength(1);
     const client = created[0];
     const handler = () => {};
     watch.subscribe("ticket.updated", handler);
-    const page = acquireSurfaceTicketStream("merchant");
+    const page = acquireFamilyTicketStream("client");
     expect(created).toHaveLength(1); // the ticket page gets the same client
     page.release();
     // The page was the only user: the watcher does not keep the stream open.

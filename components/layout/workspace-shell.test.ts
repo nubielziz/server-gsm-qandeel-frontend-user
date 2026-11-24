@@ -33,3 +33,22 @@ describe("WorkspaceShell: the frame (owner, 2026-11-15)", () => {
     expect(source).toContain("label={t.workspace.tabsLabel}");
   });
 });
+
+describe("WorkspaceShell: one frame for every account", () => {
+  it("gives the heading the nav, the footer and the title-only pages, as paths and words with no icons or badges", () => {
+    expect(source).toContain("const all = headingItems(nav, footerNav, titles);");
+    expect(source).toContain("<WorkspaceHeading items={all} {...headingProps} />");
+  });
+
+  it("swaps the header search for the session's own inside <Suspense>, with the static form as the fallback", () => {
+    expect(source).toContain("<Suspense fallback={<SearchInput {...search} />}>");
+    expect(source).toContain("<ResolvedSearch resolveSearch={resolveSearch} />");
+    // Without `resolveSearch` the form is drawn as given.
+    expect(source).toMatch(/\)\s*:\s*\(\s*<SearchInput \{\.\.\.search\} \/>\s*\)\}/);
+  });
+
+  it("swaps the nav lists for the session's own inside <Suspense>, with the static lists as the fallback", () => {
+    expect(source).toContain("<Suspense fallback={fixed}>");
+    expect(source).toContain("<ResolvedNav group={group} variant={variant} resolveNav={resolveNav} />");
+  });
+});

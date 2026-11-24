@@ -9,7 +9,8 @@
 // Two pure parts: `createBellMotion` turns stream events into cues (counters a bell compares with what it has played), and
 // `nextBellView` turns the newest cue and the count on screen into what the bell plays. `bellMotion` at the end is the
 // browser's instance: import it only from Client Components.
-import { UNREAD_CAP, type NotificationSurface } from "./link";
+import type { AccountFamily } from "@/lib/account/family";
+import { UNREAD_CAP } from "./link";
 
 /** At most one ring in this window (the same 3 s as the toast's). */
 export const RING_WINDOW_MS = 3_000;
@@ -31,7 +32,7 @@ export type BellMotionSnapshot = {
   change: BellChange | null;
 };
 
-/** No cue yet (the server's snapshot and the start of every surface). */
+/** No cue yet (the server's snapshot and the start of every family). */
 export const IDLE_MOTION: BellMotionSnapshot = Object.freeze({ rings: 0, change: null });
 
 export type BellMotionEnv = {
@@ -45,17 +46,17 @@ export type BellMotionEnv = {
 };
 
 export type BellMotion = {
-  /** For `useSyncExternalStore`. The first listener of a surface starts watching the tab's visibility, the last one stops it. */
-  subscribe(surface: NotificationSurface, listener: () => void): () => void;
-  /** The cues of a surface; the same object until the next cue. */
-  getSnapshot(surface: NotificationSurface): BellMotionSnapshot;
+  /** For `useSyncExternalStore`. The first listener of a family starts watching the tab's visibility, the last one stops it. */
+  subscribe(family: AccountFamily, listener: () => void): () => void;
+  /** The cues of a family; the same object until the next cue. */
+  getSnapshot(family: AccountFamily): BellMotionSnapshot;
   /** A `notification.created` frame. Call it before the count reaches the store, so one render sees both. */
-  arrival(surface: NotificationSurface, unread: number, live: boolean): void;
+  arrival(family: AccountFamily, unread: number, live: boolean): void;
   /**
    * A read: a `notification.read` frame (this tab, another tab or another device) with its count, or `null` from a read
    * action of this page whose new count is not known yet. Call it before the count reaches the store.
    */
-  read(surface: NotificationSurface, unread: number | null): void;
+  read(family: AccountFamily, unread: number | null): void;
 };
 
 type Slot = {
@@ -72,7 +73,7 @@ function clamp(count: number): number {
 }
 
 export function createBellMotion(env: BellMotionEnv): BellMotion {
-  const slots: Record<NotificationSurface, Slot> = { customer: newSlot(), merchant: newSlot() };
+  const slots: Record<AccountFamily, Slot> = { store: newSlot(), client: newSlot() };
 
   function newSlot(): Slot {
     return { snapshot: IDLE_MOTION, listeners: new Set(), stopVisibility: undefined, lastRingAt: null, missed: false };
@@ -104,8 +105,8 @@ export function createBellMotion(env: BellMotionEnv): BellMotion {
   }
 
   return {
-    subscribe(surface, listener) {
-      const slot = slots[surface];
+    subscribe(family, listener) {
+      const slot = slots[family];
       slot.listeners.add(listener);
       if (slot.listeners.size === 1) slot.stopVisibility = env.onVisibilityChange(() => onVisibility(slot));
       return () => {
@@ -115,11 +116,11 @@ export function createBellMotion(env: BellMotionEnv): BellMotion {
         slot.stopVisibility = undefined;
       };
     },
-    getSnapshot(surface) {
-      return slots[surface].snapshot;
+    getSnapshot(family) {
+      return slots[family].snapshot;
     },
-    arrival(surface, unread, live) {
-      const slot = slots[surface];
+    arrival(family, unread, live) {
+      const slot = slots[family];
       // A replayed item (reconnect, hand-over between tabs) is not news.
       if (!live) return;
       if (!env.isVisible()) {
@@ -130,8 +131,8 @@ export function createBellMotion(env: BellMotionEnv): BellMotion {
       const ring = takeRing(slot);
       publish(slot, { rings: slot.snapshot.rings + (ring ? 1 : 0), change: nextChange(slot, unread, ring) });
     },
-    read(surface, unread) {
-      const slot = slots[surface];
+    read(family, unread) {
+      const slot = slots[family];
       // Everything was read meanwhile (in another tab): there is nothing to ring for on return.
       if (unread !== null && clamp(unread) === 0) slot.missed = false;
       if (!env.isVisible() || env.reducedMotion()) return;

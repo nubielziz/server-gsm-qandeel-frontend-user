@@ -1,28 +1,18 @@
-// Workspace chrome shared by the merchant portal and the customer area: navigation, pending-approval state.
+// Words of the one account frame: the navigation (rail, drawer, phone tab bar), the header, the live badges and the
+// password gate. Every account has the same pages under /account; a merchant rank has a few more places.
 
 export const portal = {
-  workspace: "Workspace",
-  merchantArea: "Merchant portal",
-  customerArea: "My account",
-  merchantNav: {
+  // The breadcrumb's area name, and the line under the name while the session is still being read.
+  area: "My account",
+  accountRole: "Your account",
+  nav: {
     overview: "Overview",
-    services: "New order",
+    priceList: "Price list",
     orders: "Orders",
     wallet: "Wallet",
     invoices: "Invoices",
-    apiKeys: "API keys",
     notifications: "Notifications",
     support: "Support",
-    settings: "Settings",
-    shop: "Back to the shop",
-  },
-  customerNav: {
-    overview: "Overview",
-    orders: "Orders",
-    wallet: "Wallet",
-    notifications: "Notifications",
-    support: "Support",
-    myTickets: "My tickets",
     settings: "Settings",
     shop: "Back to the shop",
   },
@@ -30,10 +20,9 @@ export const portal = {
   tabs: {
     overview: "Overview",
     orders: "Orders",
+    priceList: "Prices",
     wallet: "Wallet",
     notifications: "Alerts",
-    tickets: "Tickets",
-    services: "Services",
     support: "Support",
   },
   // The live badges on the rail, the tab bar and the drawer: appended to the link's name ("Notifications, 3 unread").
@@ -42,32 +31,15 @@ export const portal = {
     inProgress: ", {count} in progress",
     newReply: ", new reply",
   },
-  // The merchant's support pages (`/merchant/support`): the list, a new ticket and the thread.
-  merchantSupport: {
-    metaTitle: "Support",
-    title: "Support",
-    subtitle: "Your conversations with our support team. Replies appear here as they are written.",
-    newMetaTitle: "New support ticket",
-    newTitle: "New ticket",
-    newSubtitle: "Tell us what happened. Our team answers in the conversation, and we email you if you miss a reply.",
-    breadcrumbs: "Breadcrumb",
-    threadMetaTitle: "Support ticket",
-    notFoundTitle: "We could not find this ticket",
-    notFoundText: "It may belong to another account, or the link is incomplete.",
-    backToList: "Back to support",
-  },
-  servicesTitle: "Services & prices",
+  // Header titles of the pages the static frame does not list (a merchant rank's own places).
+  servicesTitle: "Price list",
+  apiKeysTitle: "API keys",
   searchServices: "Search services…",
   availableBalance: "Available balance",
   storeBalance: "Store balance",
-  merchantRole: "Merchant account",
-  customerRole: "Customer account",
-  pending: {
-    badge: "Waiting for approval",
-    title: "Your merchant account is waiting for approval",
-    body: "Our team reviews every new merchant. Until then you can complete your profile and secure your account. Prices, orders and the wallet open as soon as you are approved.",
-    profile: "Complete your profile",
-    security: "Secure your account",
-    unavailable: "This page opens once your merchant account is approved.",
+  // The warning above a page while an account still has the temporary password staff gave it.
+  mustChange: {
+    title: "Choose a new password",
+    text: "Support gave you a temporary password. Set your own below to keep using your account.",
   },
 };

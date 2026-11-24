@@ -2,13 +2,13 @@
 // it must start with the language segment (`/en/…`). Anything else (another origin, `//host`, a backslash, control
 // characters) falls back to a fixed default. An old Arabic address (`/ar/…`: a bookmark, a sign-in redirect from before
 // English only, decision 039) is read as the same path under `/en`, where `/ar/…` now redirects anyway.
-// Safe to import anywhere.
+// There is one account area, so the target does not depend on who signed in. An old portal address (a bookmark, a link in a
+// mail) is written as the page that replaced it. Safe to import anywhere.
+import { legacyAccountPath } from "@/lib/account/legacy-paths";
 import { sitePath } from "@/lib/site-path";
 
 const SITE_PATH = /^\/en(?:[/?#]|$)/;
 const UNSAFE = /[\\\u0000-\u001f\u007f]/;
-const PORTAL_PATH = /^\/en\/merchant(?:\/|$)/;
-const ACCOUNT_PATH = /^\/en\/account(?:\/|$)/;
 /** A leading `/ar` that is a whole path segment (`/ar`, `/ar/x`, `/ar?x`, `/ar#x`, never `/arabic`). */
 const OLD_ARABIC_PREFIX = /^\/ar(?=$|[/?#])/;
 
@@ -28,38 +28,34 @@ export function safeNext(raw: string | null | undefined, fallback: string): stri
   return path;
 }
 
-/** Which area a sign-in opened: the `kind` of the smart sign-in's answer. */
-export type SignInKind = "merchant" | "customer";
-
 /**
- * The path as the browser will resolve it (dot segments folded, percent escapes decoded), or null when it cannot be
- * read. Used to look at WHICH area a `next` points into: `/en/x/../merchant` and `/en/%6Derchant` are the portal.
+ * The path as the browser will resolve it (dot segments folded, percent escapes decoded) and the query and fragment as
+ * written, or null when it cannot be read. Used to look at WHERE a `next` really points: `/en/x/../merchant` and
+ * `/en/%6Derchant` are the old portal.
  */
-function resolvedPath(path: string): string | null {
+function resolved(path: string): { pathname: string; tail: string } | null {
   try {
-    return decodeURIComponent(new URL(path, "http://site.invalid").pathname);
+    const url = new URL(path, "http://site.invalid");
+    return { pathname: decodeURIComponent(url.pathname), tail: `${url.search}${url.hash}` };
   } catch {
     return null;
   }
 }
 
 /**
- * Where a visitor lands once signed in (plan D3):
- * - a `next` under `/en/merchant` is honoured only for a merchant;
- * - a `next` under `/en/account` only for a customer;
- * - any other safe same-site path for both;
- * - otherwise the home of the kind (`/en/merchant`, `/en/account`).
- * This stops a loop when a customer signs in on a link that came from the portal (and the other way round).
+ * Where a visitor lands once signed in:
+ * - any safe same-site path is honoured, for every account;
+ * - an old portal address (`/en/merchant/orders/7`) or the old ticket list is written as its new page
+ *   (`/en/account/orders/7`), with its query and fragment, so a link that came from the old portal does not bounce;
+ * - otherwise the account (`/en/account`).
  */
-export function targetAfterSignIn(kind: SignInKind, next: string | null | undefined): string {
-  const home = sitePath(kind === "merchant" ? "/merchant" : "/account");
+export function targetAfterSignIn(next: string | null | undefined): string {
+  const home = sitePath("/account");
   const target = safeNext(next, home);
   if (target === home) return home;
+  const where = resolved(target);
+  if (where === null) return home;
   // Resolved, a path can land under `/ar` again (`/en/../ar/merchant`): the browser would follow the 308 into `/en`.
-  const resolved = resolvedPath(target);
-  if (resolved === null) return home;
-  const path = englishPath(resolved);
-  if (kind === "customer" && PORTAL_PATH.test(path)) return home;
-  if (kind === "merchant" && ACCOUNT_PATH.test(path)) return home;
-  return target;
+  const moved = legacyAccountPath(`${englishPath(where.pathname)}${where.tail}`);
+  return moved === null ? target : sitePath(moved);
 }

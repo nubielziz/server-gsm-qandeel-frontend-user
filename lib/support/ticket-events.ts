@@ -1,15 +1,15 @@
 // The ticket chat's live events, REQUESTER VIEW (feature 28; backend plan `docs/briefs/28-support-live-chat.md` §3.4).
 // Hand-written on purpose: the OpenAPI describes the stream routes but not the frames. Safe to import anywhere.
 //
-// A requester (a customer on the token page, a merchant in the portal) gets three events. None carries a token, a staff
-// name, an assignee or a note: the server renders a separate, smaller view for the requester.
+// A requester (on the token page, or in the signed-in thread of a merchant rank) gets three events. None carries a token, a
+// staff name, an assignee or a note: the server renders a separate, smaller view for the requester.
 // - `ticket.message.created`: a public message (id `t<message id>` on the wire). The only event that can repeat.
 // - `ticket.updated`: status, dates, `hasUnread`.
 // - `ticket.read`: one side saw messages up to an id (`by: "you"` is another tab or device of the same person).
 // A backend that still sends other events or keys (`ticket.typing`, a rating in `ticket.updated`) is heard and ignored:
 // the stream only listens to the names in `TICKET_EVENT_NAMES`, and a frame of any other name is dropped by `parseTicketFrame`.
-// `ticketId` is the id for a merchant and `null` for a customer (customers address tickets by token, which never goes into
-// an event): a customer's page matches by `number`.
+// `ticketId` is the id for a signed-in thread and `null` for a token page (a token never goes into an event): a token page
+// matches by `number`.
 import type { TicketMessage } from "@/lib/api/types";
 import { isRecord, parseBaseFrame, parseJson, type BaseEvents } from "@/lib/realtime/stream-client";
 
@@ -18,7 +18,7 @@ export const TICKET_EVENT_NAMES = ["ticket.message.created", "ticket.updated", "
 
 export type TicketStatus = "new" | "open" | "pending" | "resolved";
 
-/** What names a ticket in an event: the id for a merchant (`ticketId`), the number for everyone. */
+/** What names a ticket in an event: the id for a signed-in thread (`ticketId`), the number for everyone. */
 export type TicketRef = { ticketId: number | null; number: string };
 
 export type TicketMessageCreated = TicketRef & {
@@ -141,7 +141,7 @@ export function ticketDedupeKey(event: string, data: unknown): string | null {
   return `message:${String(data.message.id)}`;
 }
 
-/** True when an event is about this ticket: by id for a merchant's, by number for a customer's. */
+/** True when an event is about this ticket: by id for a signed-in thread, by number for a token page. */
 export function isAbout(ref: TicketRef, ticket: { id?: number; number: string }): boolean {
   if (ticket.id !== undefined && ref.ticketId !== null) return ref.ticketId === ticket.id;
   return ref.number === ticket.number;

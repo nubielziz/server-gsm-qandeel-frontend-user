@@ -1,8 +1,8 @@
-// Sign-in, sign-up and the email-link pages (customer and merchant). Server pages import the namespace
-// and pass the strings a Client Component needs as props.
+// Sign-in, sign-up and the email-link pages. There is one kind of account, so nothing here asks who the visitor is: a rank
+// tells a retail account from a merchant, and the pages do not (shop decision 002). Server pages import the namespace and
+// pass the strings a Client Component needs as props.
 
 export const auth = {
-  surfaces: { label: "Account type", customer: "Customer", merchant: "Merchant" },
   fields: {
     email: "Email address",
     emailPlaceholder: "name@example.com",
@@ -30,9 +30,8 @@ export const auth = {
     subtitle: "Welcome back to your account.",
     submit: "Sign in",
     forgot: "Forgot password?",
-    magicLinkCustomers: "Email me a sign-in link (customers)",
-    oneFormHint: "One form for customers and merchants.",
-    applyMerchant: "Apply as a merchant",
+    emailLink: "Email me a sign-in link",
+    merchantPrices: "Need merchant prices?",
     or: "or",
     noAccount: "Don't have an account?",
     createAccount: "Create account",
@@ -57,57 +56,45 @@ export const auth = {
       text: "Our team gave you a temporary password. Choose a new one to continue.",
       submit: "Save and continue",
     },
-    merchantNewPassword: {
-      title: "Choose your own password",
-      text: "Our team gave you a temporary password. Choose a new one to continue.",
-      submit: "Save and continue",
-    },
     link: {
       title: "You opened a sign-in link",
       text: "Select the button to finish signing in. We ask you to confirm so that an email scanner cannot use the link up before you.",
       submit: "Sign in to IMEI-HUB",
       expiredTitle: "This sign-in link has expired",
       expiredText: "Links work once and last 1 hour. Request a new one and we will email it right away.",
+      claim: "Add the orders I placed as a guest with this email",
+      claimed: {
+        one: "{count} guest order was added to your account.",
+        other: "{count} guest orders were added to your account.",
+      },
+      claimBusy: "Your guest orders could not be added just now. Ask for a new sign-in link later to try again.",
+      continue: "Continue",
+      signedInAs: "You are signed in as {email}.",
+      notYou: "Not you? Sign out",
+      signOutFailed: "We could not sign you out. Try again.",
     },
   },
 
   signUp: {
     metaTitle: "Create account",
     title: "Create your account",
-    subtitle: "Choose how you will use IMEI-HUB.",
-    choose: "I am a",
-    customer: {
-      title: "Customer",
-      text: "Buy IMEI checks, unlocks and activations for yourself. Pay at checkout and follow every order.",
-    },
-    merchant: {
-      title: "Merchant",
-      text: "For repair shops and resellers. Our team approves your account, then you get group prices, a wallet and API access.",
-    },
-    customerForm: {
+    subtitle: "Buy IMEI checks, unlocks and activations. Pay at checkout and follow every order.",
+    form: {
       hint: "We email you a link that creates your account and signs you in. No password to remember.",
       submit: "Email me a sign-in link",
       sentText:
         "If that address can sign in, a link is on its way to {email}. It works once and expires in 1 hour. Check your spam folder if you do not see it.",
     },
-    merchantInfo: {
-      intro: "A merchant account is for businesses that resell GSM services.",
-      points: [
-        "Our team opens every merchant account with you on WhatsApp.",
-        "Group prices, a prepaid wallet and invoices.",
-        "API keys to connect Dhru-compatible tools.",
-      ],
-      submit: "Apply as a merchant",
-    },
     haveAccount: "Already have an account?",
+    merchantNote: "Merchant accounts are opened by our team.",
+    merchantLink: "Become a merchant",
   },
 
   forgot: {
     metaTitle: "Reset your password",
     title: "Reset your password",
     subtitle: "Enter your email and we will send you a link to choose a new password.",
-    chooseHint: "Customers and merchants reset their password separately. Choose your account type.",
-    customerHint: "Signed in with an email link so far? Use this to set your first password.",
+    hint: "Signed in with an email link so far? Use this to set your first password.",
     submit: "Email me a reset link",
     sentTitle: "Check your email",
     sentText:
@@ -130,23 +117,21 @@ export const auth = {
   verifyEmail: {
     metaTitle: "Confirm your email",
     title: "Confirm your email",
-    customerText: "Confirm your email address to finish signing in to IMEI-HUB.",
-    customerSubmit: "Confirm and sign in",
-    merchantText: "Confirm your email address for your IMEI-HUB merchant account.",
-    merchantSubmit: "Verify my email",
+    text: "Confirm your email address for your IMEI-HUB account. This does not sign you in.",
+    submit: "Verify my email",
     missingTitle: "This page needs the link from your email",
     missingText: "Open the link in your email again. If it does not work, sign in and ask for a new one.",
     expiredTitle: "This link has expired",
     expiredText: "Verification links work once and last 1 hour. You can still sign in. Contact support if you need a new link.",
-    merchantDoneTitle: "Your email is verified",
-    merchantDoneText:
-      "Our team reviews every new merchant account before you can place orders. Sign in at any time to see the status of your account.",
+    doneTitle: "Your email is verified",
+    doneText: "Your address is confirmed. Sign in to continue.",
   },
 
-  register: {
-    metaTitle: "Apply as a merchant",
-    title: "Apply as a merchant",
-    subtitle: "Merchant accounts are opened by our team. Message us on WhatsApp and a team member will complete the steps with you.",
+  becomeMerchant: {
+    metaTitle: "Become a merchant",
+    title: "Become a merchant",
+    subtitle:
+      "Merchant accounts are opened by our team. Message us on WhatsApp and a team member will complete the steps with you.",
     stepsLabel: "How to apply",
     steps: [
       "Message us on WhatsApp.",
@@ -159,7 +144,7 @@ export const auth = {
     message: "Hello, I would like to open a merchant account.",
     unavailableText: "Merchant accounts are opened by our team. Contact support and we will help you open yours.",
     contactSupport: "Contact support",
-    haveAccount: "Already a merchant?",
+    haveAccount: "Already have an account?",
   },
 };
 

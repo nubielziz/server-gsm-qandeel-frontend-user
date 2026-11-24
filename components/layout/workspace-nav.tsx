@@ -9,29 +9,21 @@ import { Menu } from "lucide-react";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Drawer, openDialog } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
-import { isActivePath } from "./active-path";
-import { WorkspaceNavView, type WorkspaceNavItem } from "./workspace-nav-view";
+import { activeItem, WorkspaceNavView, type WorkspaceNavItem, type WorkspaceTitleItem } from "./workspace-nav-view";
 
 /** The nav list with the active item marked from the current pathname. */
 export function ActiveWorkspaceNav({ items, variant }: { items: WorkspaceNavItem[]; variant: "rail" | "drawer" | "tabs" }) {
   return <WorkspaceNavView items={items} pathname={usePathname()} variant={variant} />;
 }
 
-/** The item whose href is the longest match of the pathname. */
-function activeItem(items: WorkspaceNavItem[], pathname: string | null): WorkspaceNavItem | undefined {
-  return items
-    .filter((item) => isActivePath(pathname, item.href, item.match))
-    .sort((a, b) => b.href.length - a.href.length)[0];
-}
-
 export type WorkspaceHeadingViewProps = {
   areaLabel: string;
   areaHref: string;
   breadcrumbLabel: string;
-  active?: WorkspaceNavItem;
+  active?: WorkspaceTitleItem;
 };
 
-/** Breadcrumb ("Workspace / Orders") and the current section's title. Pure; also the server fallback. */
+/** Breadcrumb ("My account / Orders") and the current section's title. Pure; also the server fallback. */
 export function WorkspaceHeadingView({ areaLabel, areaHref, breadcrumbLabel, active }: WorkspaceHeadingViewProps) {
   return (
     <div className="min-w-0">
@@ -48,7 +40,7 @@ export function WorkspaceHeadingView({ areaLabel, areaHref, breadcrumbLabel, act
 }
 
 /**
- * The header card's heading, from the active nav item. A new section is a new key: the old heading and the new one form
+ * The header card's heading, from the active item (a nav item, or a page that only names a title). A new section is a new key: the old heading and the new one form
  * a named pair that crossfades in place on a client navigation (the block keeps its box, its width comes from the
  * header, so nothing stretches). Only this client version carries the <ViewTransition>, never the server fallback: a
  * fallback and its streamed content with the same name would pair up and crossfade on the first load (React's streamed
@@ -57,7 +49,7 @@ export function WorkspaceHeadingView({ areaLabel, areaHref, breadcrumbLabel, act
 export function WorkspaceHeading({
   items,
   ...rest
-}: { items: WorkspaceNavItem[] } & Omit<WorkspaceHeadingViewProps, "active">) {
+}: { items: WorkspaceTitleItem[] } & Omit<WorkspaceHeadingViewProps, "active">) {
   const active = activeItem(items, usePathname());
   return (
     <ViewTransition key={active?.href ?? ""} name="workspace-title" share="title-swap" default="none">

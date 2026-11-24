@@ -105,12 +105,11 @@ describe("shared strings (F01)", () => {
       reopened: "Being checked again",
     });
   });
-  it("has the navigation, wallet and notification labels for both areas", () => {
-    expect(portal.merchantNav.notifications).toBe("Notifications");
-    expect(portal.customerNav.wallet).toBe("Wallet");
-    expect(portal.customerNav.notifications).toBe("Notifications");
+  it("has the navigation, wallet and notification labels of the account area", () => {
+    expect(portal.nav.notifications).toBe("Notifications");
+    expect(portal.nav.wallet).toBe("Wallet");
     expect(portal.storeBalance).toBe("Store balance");
-    expect(common.header).toMatchObject({ notifications: "Notifications", storeBalance: "Store balance", myWallet: "Wallet" });
+    expect(common.header).toMatchObject({ storeBalance: "Store balance", myWallet: "Wallet" });
     expect(common.nav).toMatchObject({ allCategories: "All categories", categories: "Categories" });
   });
   it("labels every top-up status", () => {

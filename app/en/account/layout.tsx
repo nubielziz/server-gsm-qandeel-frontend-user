@@ -1,164 +1,197 @@
-// Customer area frame (same pattern as the merchant portal): dark icon rail, header card, avatar menu. The frame is part
-// of the static shell (plan P1.4): the rail, the header with the section title, the menu button and drawer and the main
-// area are prerendered with no personal data in them, and only what depends on who is signed in streams in small holes:
-// the avatar and name, the wallet item and pill, the bell. The session gate (signed out → sign-in, customer tab) is a
-// hole of its own, next to the page instead of above it, so the page's reads start with the gate's rather than after it.
-// The wallet (plan F21, D7) shows as a nav item and a header pill when `walletCapabilities().show`: the shop switch is
-// on, or the customer still has a balance. The static nav reserves the wallet item's place and the read of the wallet
-// shows or drops it. The pill steps aside on phones (below `sm`), like the merchant's, so the bell and the account menu
-// fit at 360 px; the wallet is one tap away in the navigation. "My tickets" (`/account/tickets`, feature 28) is the way into
-// support for a signed-in customer; the public form stays in the shop chrome (`/support`).
-// Live badges (owner, 2026-11-15; components/layout/workspace-badges.tsx): the unread notifications, a dot while support
-// wrote something unseen, and the orders in progress, each its own uncached read in its own <Suspense>. Below `lg` a tab
-// bar holds Overview, Orders, Wallet (when it shows), Notifications and My tickets; the drawer keeps the full list.
-import { Suspense } from "react";
-import Link from "next/link";
-import { Bell, ClipboardList, Headset, LayoutDashboard, Settings, Store, UserRound, Wallet } from "lucide-react";
-import { requireCustomer } from "@/lib/api/session";
-import { formatMoney } from "@/lib/format";
-import { sitePath } from "@/lib/site-path";
+// The one account frame: a dark icon rail, a header card with the search, the wallet pill and the avatar menu. Every account
+// has it, whatever its rank; the rank only decides which places the lists hold (lib/account/nav.ts). The frame is part of the
+// static shell: the rail, the header with the section title, the menu button and drawer, the search and the main area are
+// prerendered with no personal data in them (the retail list, the wallet's place held), and only what depends on who is signed
+// in streams in small holes: the lists of the account's rank, the search, the avatar and name, the wallet pill and the bell.
+// The page itself sits behind the session read (the main hole below): the password gate wraps it, and a visitor who is signed
+// out goes to sign-in.
+// Live badges (components/layout/workspace-badges.tsx): the unread notifications, a dot while support wrote something unseen,
+// and the orders in progress, each its own uncached read in its own <Suspense>, for the API family of the account's rank. They
+// come with the lists of the session, so the static shell has none. Below `lg` a tab bar holds up to five places.
+import { Suspense, type ReactNode } from "react";
+import {
+  Bell,
+  ClipboardList,
+  Headset,
+  LayoutDashboard,
+  PlusCircle,
+  ReceiptText,
+  Settings,
+  Store,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
+import { capabilitiesOf } from "@/lib/account/capabilities";
+import { familyOf, type AccountFamily } from "@/lib/account/family";
+import {
+  accountNav,
+  accountPageTitles,
+  accountSearch,
+  accountSubtitle,
+  securityPageHref,
+  staticAccountNav,
+  storeWalletShows,
+  type AccountNavEntry,
+  type AccountNavId,
+} from "@/lib/account/nav";
+import { readAccountWallet } from "@/lib/account/wallet-read";
+import { getAccount, requireAccount } from "@/lib/api/session";
 import { common } from "@/lib/i18n/messages/common";
 import { portal } from "@/lib/i18n/messages/portal";
-import { readCustomerWallet } from "@/components/layout/account-area";
+import { sitePath } from "@/lib/site-path";
 import { SignOutButton } from "@/components/layout/sign-out-button";
-import { BellSkeleton, BellSlot } from "@/components/notifications/bell-slot";
+import { WalletPill } from "@/components/layout/wallet-pill";
 import { NotificationsNavBadge, OrdersNavBadge, SupportNavBadge } from "@/components/layout/workspace-badges";
-import { WorkspaceMainSkeleton, WorkspaceShell, type WorkspaceNavItem } from "@/components/layout/workspace-shell";
+import {
+  WorkspaceMainSkeleton,
+  WorkspaceShell,
+  type WorkspaceNavItem,
+  type WorkspaceNavLists,
+  type WorkspaceSearch,
+  type WorkspaceUser,
+} from "@/components/layout/workspace-shell";
+import { MustChangePasswordGate } from "@/components/merchant/must-change-password-gate";
+import { BellSkeleton, BellSlot } from "@/components/notifications/bell-slot";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
-import { Money } from "@/components/ui/money";
 import { Skeleton } from "@/components/ui/skeleton";
-import { walletCapabilities } from "@/lib/wallet/view";
 
-/** Sends a signed-out visitor to sign-in. Renders nothing; the layout puts it in <Suspense> next to the page. */
-async function CustomerGate() {
-  await requireCustomer();
-  return null;
+const ICONS: Record<AccountNavId, LucideIcon> = {
+  overview: LayoutDashboard,
+  priceList: PlusCircle,
+  orders: ClipboardList,
+  wallet: Wallet,
+  invoices: ReceiptText,
+  notifications: Bell,
+  support: Headset,
+  settings: Settings,
+};
+
+/** The live badge of a place, for the API family of the account; most places have none. */
+function badgeOf(id: AccountNavId, family: AccountFamily): ReactNode {
+  if (id === "orders") return <OrdersNavBadge family={family} />;
+  if (id === "notifications") return <NotificationsNavBadge family={family} />;
+  if (id === "support") return <SupportNavBadge family={family} />;
+  return undefined;
 }
 
-/** The header's wallet pill: only for a customer whose wallet shows. */
-async function WalletPill() {
-  const walletRead = await readCustomerWallet();
-  const c = common;
-  if (!walletRead.ok || !walletCapabilities(walletRead.data).show) return null;
-  const wallet = walletRead.data;
+/** A place of the frame as a nav item: its words, its icon and (once the family is known) its live badge. */
+function itemOf(entry: AccountNavEntry, family?: AccountFamily): WorkspaceNavItem {
+  const Icon = ICONS[entry.id];
+  return {
+    href: entry.href,
+    label: entry.label,
+    shortLabel: entry.shortLabel,
+    title: entry.title,
+    match: entry.match,
+    reserve: entry.reserve,
+    icon: <Icon aria-hidden="true" className="size-5" />,
+    badge: family ? badgeOf(entry.id, family) : undefined,
+  };
+}
+
+/**
+ * The lists of the signed-in account's rank. A merchant rank's wallet always shows, so its wallet is not read here; a retail
+ * rank's shows only while its store wallet does (the read is the one the header pill shares). An account that cannot be read
+ * gets the retail list: the frame never breaks on it.
+ */
+async function resolveNav(): Promise<WorkspaceNavLists> {
+  const me = await getAccount().catch(() => null);
+  const caps = capabilitiesOf(me);
+  const wallet = me && caps.rankKind === "retail" ? await readAccountWallet().catch(() => null) : null;
+  const lists = accountNav(caps, storeWalletShows(wallet));
+  const family = caps.family;
+  return {
+    nav: lists.nav.map((entry) => itemOf(entry, family)),
+    footerNav: lists.footerNav.map((entry) => itemOf(entry, family)),
+    tabs: lists.tabs.map((entry) => itemOf(entry, family)),
+  };
+}
+
+/** The signed-in person (a visitor who is signed out goes to sign-in): the name, and the company or else the rank's name. */
+async function resolveUser(): Promise<WorkspaceUser> {
+  const me = await requireAccount();
+  return { name: me.name || me.email, subtitle: accountSubtitle(me) };
+}
+
+/** The header search of the account's rank. A failed read gives the shop's search, which every account may use. */
+async function resolveSearch(): Promise<WorkspaceSearch> {
+  return accountSearch(capabilitiesOf(await getAccount().catch(() => null)));
+}
+
+/** The bell of the account's API family. It never breaks the page: no account, no bell. */
+async function AccountBell() {
+  const me = await getAccount().catch(() => null);
+  return me ? <BellSlot family={familyOf(me)} /> : null;
+}
+
+/**
+ * The page: the session gate (signed out goes to sign-in) and the password gate around it. It waits for the account, so the
+ * page's own reads start after it (as they always did); the rest of the frame does not wait for it.
+ */
+async function AccountMain({ children }: { children: ReactNode }) {
+  const me = await requireAccount();
+  const t = portal;
   return (
-    <Link
-      href={sitePath("/account/wallet")}
-      aria-label={`${c.header.storeBalance}: ${formatMoney(wallet.available, "USD")}`}
-      className="inline-flex h-11 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-body font-bold transition-colors hover:bg-surface-muted max-sm:hidden"
+    <MustChangePasswordGate
+      mustChange={me.mustChangePassword === true}
+      securityPath={securityPageHref()}
+      title={t.mustChange.title}
+      text={t.mustChange.text}
     >
-      <Wallet aria-hidden="true" className="size-[18px]" />
-      <Money amount={wallet.available} currency="USD" />
-    </Link>
+      {children}
+    </MustChangePasswordGate>
   );
 }
 
+// No ChromeProviders here: WorkspaceShell mounts it (a second one would render a second <Toaster />).
 export default function AccountLayout({ children }: LayoutProps<"/en/account">) {
   const t = portal;
   const c = common;
-  const p = (path: string) => sitePath(path);
-  const icon = "size-5";
-
-  const overview: WorkspaceNavItem = {
-    href: p("/account"),
-    label: t.customerNav.overview,
-    shortLabel: t.tabs.overview,
-    icon: <LayoutDashboard aria-hidden="true" className={icon} />,
-    match: "exact",
-  };
-  const orders: WorkspaceNavItem = {
-    href: p("/account/orders"),
-    label: t.customerNav.orders,
-    shortLabel: t.tabs.orders,
-    icon: <ClipboardList aria-hidden="true" className={icon} />,
-    badge: <OrdersNavBadge surface="customer" />,
-  };
-  const wallet: WorkspaceNavItem = {
-    href: p("/account/wallet"),
-    label: t.customerNav.wallet,
-    shortLabel: t.tabs.wallet,
-    icon: <Wallet aria-hidden="true" className={icon} />,
-  };
-  const notifications: WorkspaceNavItem = {
-    href: p("/account/notifications"),
-    label: t.customerNav.notifications,
-    shortLabel: t.tabs.notifications,
-    icon: <Bell aria-hidden="true" className={icon} />,
-    badge: <NotificationsNavBadge surface="customer" />,
-  };
-  const tickets: WorkspaceNavItem = {
-    href: p("/account/tickets"),
-    label: t.customerNav.myTickets,
-    shortLabel: t.tabs.tickets,
-    icon: <Headset aria-hidden="true" className={icon} />,
-    badge: <SupportNavBadge surface="customer" />,
-  };
-  const footerNav: WorkspaceNavItem[] = [
-    { href: p("/account/settings"), label: t.customerNav.settings, icon: <Settings aria-hidden="true" className={icon} /> },
-  ];
-
-  // A wallet that cannot be read (or must not show) is no nav item and no pill: the frame never breaks on it.
-  async function resolveNav() {
-    const walletRead = await readCustomerWallet();
-    const shows = walletRead.ok && walletCapabilities(walletRead.data).show;
-    // The tab bar holds the same five (four without the wallet): the drawer keeps Settings.
-    const nav = shows ? [overview, orders, wallet, notifications, tickets] : [overview, orders, notifications, tickets];
-    return { nav, footerNav, tabs: nav };
-  }
-
-  async function resolveUser() {
-    const me = await requireCustomer();
-    return { name: me.name || me.email, subtitle: t.customerRole };
-  }
-
-  const staticNav = [overview, orders, { ...wallet, reserve: true }, notifications, tickets];
+  const lists = staticAccountNav();
 
   return (
     <WorkspaceShell
-      // The static shell assumes the wallet shows: its place is held, and `resolveNav` drops the slot when it does not.
-      nav={staticNav}
-      footerNav={footerNav}
-      tabs={staticNav}
+      // The static shell draws the retail list with the wallet's place held; `resolveNav` swaps in the account's own.
+      nav={lists.nav.map((entry) => itemOf(entry))}
+      footerNav={lists.footerNav.map((entry) => itemOf(entry))}
+      tabs={lists.tabs.map((entry) => itemOf(entry))}
+      titles={accountPageTitles()}
       resolveNav={resolveNav}
-      areaLabel={t.customerArea}
-      homeHref={p("/account")}
-      roleLabel={t.customerRole}
+      areaLabel={t.area}
+      homeHref={sitePath("/account")}
+      roleLabel={t.accountRole}
       resolveUser={resolveUser}
       userMenu={
         <>
-          <MenuItem href={p("/account")} icon={<UserRound aria-hidden="true" />}>
-            {c.header.myAccount}
+          <MenuItem href={sitePath("/account/settings")} icon={<Settings aria-hidden="true" />}>
+            {t.nav.settings}
           </MenuItem>
-          <MenuItem href={p("/account/settings")} icon={<Settings aria-hidden="true" />}>
-            {t.customerNav.settings}
-          </MenuItem>
-          <MenuItem href={p("/")} icon={<Store aria-hidden="true" />}>
-            {t.customerNav.shop}
+          <MenuItem href={sitePath("/")} icon={<Store aria-hidden="true" />}>
+            {t.nav.shop}
           </MenuItem>
           <MenuSeparator />
-          <SignOutButton surface="customer" label={c.header.signOut} pendingLabel={c.header.signingOut} />
+          <SignOutButton label={c.header.signOut} pendingLabel={c.header.signingOut} />
         </>
       }
       headerSlot={
         <>
           <Suspense fallback={<BellSkeleton />}>
-            <BellSlot surface="customer" />
+            <AccountBell />
           </Suspense>
           <Suspense fallback={<Skeleton className="h-11 w-32 rounded-control max-sm:hidden" />}>
             <WalletPill />
           </Suspense>
         </>
       }
-      search={{ action: p("/services"), label: t.searchServices, placeholder: t.searchServices, submitLabel: c.actions.search }}
+      search={accountSearch({ priceList: false })}
+      resolveSearch={resolveSearch}
     >
-      <Suspense fallback={null}>
-        <CustomerGate />
-      </Suspense>
-      {/* A page that waits for request data outside a boundary of its own shows this until it is ready. The element between
-          the boundary and the page keeps a streamed page from playing its enter transition on the first load (React's
-          streamed reveal animates a <ViewTransition> that is the first thing in the revealed content). */}
+      {/* The element between the boundary and the page keeps the streamed page from playing its enter transition on the
+          first load (React's streamed reveal animates a <ViewTransition> that is the first thing in the revealed content). */}
       <Suspense fallback={<WorkspaceMainSkeleton />}>
-        <div className="contents">{children}</div>
+        <div className="contents">
+          <AccountMain>{children}</AccountMain>
+        </div>
       </Suspense>
     </WorkspaceShell>
   );

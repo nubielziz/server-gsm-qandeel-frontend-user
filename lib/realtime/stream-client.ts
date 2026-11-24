@@ -14,7 +14,7 @@
 //   after 5 s, doubling to 60 s, plus or minus 20 %; a `ready` resets the delay. A watchdog reconnects when nothing, not
 //   even `hb`, arrived for 45 s. A visible tab that finds the stream stale or waiting tries at once (at most every 5 s).
 // - Refusals. An `EventSource` does not show the status of a refusal, so an `error` before any `ready` asks the probe (the
-//   surface's unread-count route) and decides from its answer: 401 or 403 stops the stream for this page load; 429 waits
+//   family's unread-count route) and decides from its answer: 401 or 403 stops the stream for this page load; 429 waits
 //   its `Retry-After` (at least 60 s); a 200 means the stream itself was refused (a cap, the kill switch, a restart):
 //   normal back-off, then 60 s from the third refusal in a row.
 // - `bye`. The server ends a stream on purpose: after `max_age` or `reauth` the client reconnects within two seconds
@@ -48,7 +48,7 @@ export type BaseEvents = {
   "stream.refetch": { reason: "ready" | "resync" };
 };
 
-/** What a screen asks the probe: the answer of a cheap authenticated route of the same surface. */
+/** What a screen asks the probe: the answer of a cheap authenticated route of the same family. */
 export type ProbeOutcome =
   | { kind: "ok" }
   | { kind: "signed_out" }
@@ -85,7 +85,7 @@ export type StreamTimers = {
 export type StreamEnv = {
   /** Same-origin path of the stream, without a query. */
   url: string;
-  /** The name of the lock and of the broadcast channel: one per browser and stream (`gsm-stream-customer`). */
+  /** The name of the lock and of the broadcast channel: one per browser and stream (`gsm-stream-store`). */
   lockName: string;
   createEventSource(url: string): EventSourceLike;
   /** `navigator.locks`, or null where the browser has none (every tab then runs its own stream). */

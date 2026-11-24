@@ -1,7 +1,9 @@
 // Review and pay for one checkout session. The session is read on the server with the visitor's IP forwarded (the token
 // routes are limited to 30 requests a minute per IP), behind <Suspense>; the interactive part is a Client Component.
 // For the store balance (plan F30, D9) the server also reads who is signed in and their wallet, in this request and never
-// cached, and hands the view only the facts it needs (`balanceOption` decides what shows).
+// cached, and hands the view only the facts it needs (`balanceOption` decides what shows). An account of a merchant rank
+// has no store balance: its wallet is not read, and the view offers the payment methods only (`balanceContextFor`). The same
+// read tells the view that the account orders from its price list, so the view shows that notice first (`sessionPriceList`).
 import { Suspense } from "react";
 import { connection } from "next/server";
 import type { Metadata } from "next";
@@ -11,20 +13,23 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { BalanceWallet } from "@/components/checkout/balance-option";
+import type { BalanceContext } from "@/components/checkout/balance-option";
 import { SessionView } from "@/components/checkout/session-view";
 import { isApiError } from "@/lib/api/errors";
 import { BusyState } from "@/components/ui/busy-state";
 import { getStoreConfig } from "@/lib/api/public";
 import { apiSessionGet } from "@/lib/api/server";
-import { getCustomer } from "@/lib/api/session";
-import type { CheckoutSession, CustomerWallet } from "@/lib/api/types";
+import { getAccount } from "@/lib/api/session";
+import type { AccountMe, CheckoutSession } from "@/lib/api/types";
+import { sessionPriceList } from "@/lib/checkout/access";
+import { balanceContextFor } from "@/lib/checkout/balance-context";
+import { familyOf } from "@/lib/account/family";
+import { readAccountWallet, type AccountWalletRead } from "@/lib/account/wallet-read";
 import { slugForService } from "@/lib/catalog";
 import { countryName } from "@/lib/countries";
 import { checkout } from "@/lib/i18n/messages/checkout";
 import { common } from "@/lib/i18n/messages/common";
 import { sitePath } from "@/lib/site-path";
-import { walletCapabilities } from "@/lib/wallet/view";
 
 export function generateMetadata(): Metadata {
   const t = checkout;
@@ -73,11 +78,12 @@ async function Session({ params }: { params: Promise<{ token: string }> }) {
     throw error;
   }
 
-  const [config, slug, balance] = await Promise.all([
+  const [config, slug, { me, balance }] = await Promise.all([
     getStoreConfig(),
     slugForService(session.service.id),
-    readBalanceContext(session),
+    readAccountContext(session),
   ]);
+  const priceList = sessionPriceList(me, session.service.id, slug);
   const decimals = config.currencies.find((currency) => currency.code === session.currency)?.decimals ?? 2;
   return (
     <SessionView
@@ -90,32 +96,36 @@ async function Session({ params }: { params: Promise<{ token: string }> }) {
       restartHref={slug ? `${sitePath("/checkout")}?service=${encodeURIComponent(slug)}&quantity=${session.quantity}` : null}
       countryName={session.country ? countryName(session.country) : ""}
       balance={balance}
+      priceList={priceList ? { labels: t.start.priceList, ...priceList } : null}
     />
   );
 }
 
 /**
- * Who is signed in and their wallet, for the "Store balance" choice. Only an open checkout needs it. A visitor without a
- * customer session costs no request (`getCustomer` looks at the CSRF cookie first). Any failure leaves the balance out:
- * the card gateways must keep working when the wallet cannot be read.
+ * Who is signed in and their store balance, for the "Store balance" choice and the price-list notice. Only an open checkout
+ * needs it. A visitor without an account session costs no request (`getAccount` looks at the CSRF cookie first), and an account
+ * of a merchant rank costs no wallet read: it has no store balance (`balanceContextFor`). Any failure leaves the balance out
+ * (and the account unknown): the card gateways must keep working when the wallet cannot be read.
  */
-async function readBalanceContext(session: CheckoutSession): Promise<{ signedIn: boolean; wallet: BalanceWallet | null }> {
-  if (session.status !== "open") return { signedIn: false, wallet: null };
-  let customer;
+async function readAccountContext(session: CheckoutSession): Promise<{ me: AccountMe | null; balance: BalanceContext }> {
+  if (session.status !== "open") return { me: null, balance: { signedIn: false, wallet: null } };
+  let me: AccountMe | null;
   try {
-    customer = await getCustomer();
+    me = await getAccount();
   } catch {
-    // `getCustomer` already answers null for a signed-out visitor and throws only on other failures (5xx, 429): do not
+    // `getAccount` already answers null for a signed-out visitor and throws only on other failures (5xx, 429): do not
     // say "sign in" to someone who may be signed in. Leave the balance out; the gateways keep working.
-    return { signedIn: true, wallet: null };
+    return { me: null, balance: { signedIn: true, wallet: null } };
   }
-  if (!customer) return { signedIn: false, wallet: null };
-  try {
-    const wallet = await apiSessionGet<CustomerWallet>("/store/v1/me/wallet");
-    return { signedIn: true, wallet: { enabled: wallet.enabled === true, available: wallet.available, frozen: walletCapabilities(wallet).frozen } };
-  } catch {
-    return { signedIn: true, wallet: null };
+  let wallet: AccountWalletRead | null = null;
+  if (me && familyOf(me) === "store") {
+    try {
+      wallet = await readAccountWallet();
+    } catch {
+      wallet = null;
+    }
   }
+  return { me, balance: balanceContextFor(me, wallet) };
 }
 
 /** Same layout as the loaded page: order, consents and methods on the left, the summary on the right. */

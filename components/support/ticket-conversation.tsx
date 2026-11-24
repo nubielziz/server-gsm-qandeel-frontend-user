@@ -1,19 +1,19 @@
 "use client";
 // The live ticket conversation (feature 28; backend plan `docs/briefs/28-support-live-chat.md` §2 and §4.2). One file, four
 // parts, because they share one state:
-// - `TicketLive`: the provider. It owns the state (`lib/support/conversation.ts`), the adapter (the customer's token or
-//   the merchant's id), the stream and the refetch. It renders no markup of its own, so a server page can wrap its whole body
-//   in it and keep the static parts as Server Components.
+// - `TicketLive`: the provider. It owns the state (`lib/support/conversation.ts`), the adapter (the ticket's token, or the
+//   id of a merchant rank's thread), the stream and the refetch. It renders no markup of its own, so a server page can wrap
+//   its whole body in it and keep the static parts as Server Components.
 // - `TicketConversation`: the card body: the messages, the connection line and the reply form.
 // - `LiveTicketStatus` and `LiveTicketFacts`: the status badge and the dates of the page, which change with the ticket.
 // Rules this file keeps:
 // - The ticket the server read is the FIRST state. The visitor's own message is added from the answer of the `POST`; the
 //   event the stream sends for the same message is ignored by its id. Messages stay in the order of their id (no sorting by
 //   time, no duplicate) whatever order they arrive in.
-// - The customer's page opens its OWN stream (`GET /store/v1/tickets/<token>/stream`) through `createStream`, with one lock
-//   per ticket (`gsm-ticket-<number>`): the tabs of a browser share one connection. The merchant's page listens on the
-//   merchant stream (`lib/support/ticket-stream.ts`). The token never goes into an event: a customer's events are matched by
-//   the ticket number.
+// - The token page opens its OWN stream (`GET /store/v1/tickets/<token>/stream`) through `createStream`, with one lock
+//   per ticket (`gsm-ticket-<number>`): the tabs of a browser share one connection. The signed-in thread of a merchant rank
+//   listens on the stream of its family (`lib/support/ticket-stream.ts`). The token never goes into an event: the events of
+//   a token page are matched by the ticket number.
 // - Without a stream the ticket is read again every 30 s while the tab is visible. With one, the ticket is read again every
 //   time the stream becomes live (it opens without a cursor, so nothing is replayed: the server's read and the first `ready`,
 //   or a hidden page that shows again, would lose messages otherwise), and a lost doorbell is covered by the client's own
@@ -56,7 +56,7 @@ import {
   type TicketSource,
 } from "@/lib/support/conversation";
 import { initialReplyArea, refusedAsClosed, replyAreaFor, unsentText } from "@/lib/support/reply-area";
-import { merchantAdapter, tokenAdapter, type TicketAdapter } from "@/lib/support/ticket-api";
+import { clientAdapter, tokenAdapter, type TicketAdapter } from "@/lib/support/ticket-api";
 import { isAbout, type TicketStatus } from "@/lib/support/ticket-events";
 import { openTicketStream } from "@/lib/support/ticket-stream";
 import { createRefreshScheduler } from "@/lib/realtime/refresh-scheduler";
@@ -67,8 +67,8 @@ import { Textarea } from "@/components/ui/input";
 import { DescriptionItem } from "@/components/ui/description-list";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-/** Who is reading: the customer holds the ticket's token; the merchant is signed in and addresses the ticket by id. */
-export type TicketAccess = { kind: "token"; token: string } | { kind: "merchant"; id: number };
+/** Who is reading: the token page holds the ticket's token; a signed-in merchant rank addresses the ticket by id. */
+export type TicketAccess = { kind: "token"; token: string } | { kind: "client"; id: number };
 
 type TicketLiveValue = {
   adapter: TicketAdapter;
@@ -94,7 +94,7 @@ const BROWSER_TIMERS = {
 };
 
 export type TicketLiveProps = {
-  /** The ticket's number (`T-1042`): it names the stream's lock and matches a customer's events. */
+  /** The ticket's number (`T-1042`): it names the stream's lock and matches the events of a token page. */
   number: string;
   access: TicketAccess;
   /** What the server read: the first state. */
@@ -105,8 +105,11 @@ export type TicketLiveProps = {
 /** Owns the state of one open ticket and keeps it current: stream events and the refetch fallback. */
 export function TicketLive({ number, access, source, children }: TicketLiveProps) {
   const token = access.kind === "token" ? access.token : "";
-  const merchantId = access.kind === "merchant" ? access.id : 0;
-  const adapter = useMemo(() => (merchantId ? merchantAdapter(merchantId) : tokenAdapter(token, number)), [token, merchantId, number]);
+  const clientTicketId = access.kind === "client" ? access.id : 0;
+  const adapter = useMemo(
+    () => (clientTicketId ? clientAdapter(clientTicketId) : tokenAdapter(token, number)),
+    [token, clientTicketId, number],
+  );
   const [state, dispatch] = useReducer(conversationReducer, source, initialState);
   const [connection] = useState(createConnectionStore);
   // The scheduler lives in the effect below; event handlers reach it through this (a no-op while it is not running).
@@ -247,7 +250,7 @@ const canObserve = () => typeof IntersectionObserver !== "undefined";
 
 export type TicketConversationProps = {
   t: TicketConversationTexts;
-  /** "Open a new ticket" of the closed notice: the new-ticket form of the surface (lib/support/new-ticket-link.ts). */
+  /** "Open a new ticket" of the closed notice: the new-ticket form of the visitor (lib/support/new-ticket-link.ts). */
   newTicketHref: string;
 };
 

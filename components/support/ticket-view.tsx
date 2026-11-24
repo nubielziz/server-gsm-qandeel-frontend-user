@@ -1,5 +1,5 @@
-// TicketView: the body of a ticket page, shared by the customer's token page (`/support/tickets/<token>`) and the merchant's
-// thread (`/merchant/support/<id>`) (feature 28). Server component: the header, the cards and the fixed facts are static
+// TicketView: the body of a ticket page, shared by the token page (`/support/tickets/<token>`) and the signed-in thread of a
+// merchant rank (`/account/support/<id>`) (feature 28). Server component: the header, the cards and the fixed facts are static
 // output; everything that changes while the page is open (the messages, the status badge, the dates, the reply box) is a
 // client leaf inside `<TicketLive>` (`ticket-conversation.tsx`), which owns the state and the stream.
 // Conversation on the start side, ticket information on the end side (Support Tickets mockup). A resolved ticket shows the

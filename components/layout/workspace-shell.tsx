@@ -13,8 +13,8 @@
 // area are prerendered, so the page has text on screen at first paint instead of a skeleton until the session is read.
 // Nothing personal is in it. The parts that depend on who is signed in are small holes with their own <Suspense> and a
 // same-size fallback, each read by an async function the layout passes (`resolveNav`, `resolveUser`): the nav lists
-// when the session decides which links exist, and the avatar with the name. A layout puts its session gate and its own
-// holes (wallet pill, bell) in `headerSlot` / `children`.
+// when the session decides which links exist, the search form (a merchant rank searches its own price list) and the avatar
+// with the name. A layout puts its session gate and its own holes (wallet pill, bell) in `headerSlot` / `children`.
 import { Suspense, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -29,9 +29,9 @@ import { Logo } from "./logo";
 import { SkipLink } from "./skip-link";
 import { SlidingNav } from "./sliding-nav";
 import { ActiveWorkspaceNav, WorkspaceHeading, WorkspaceHeadingView, WorkspaceMobileNav } from "./workspace-nav";
-import { WorkspaceNavView, type WorkspaceNavItem } from "./workspace-nav-view";
+import { headingItems, WorkspaceNavView, type WorkspaceNavItem, type WorkspaceTitleItem } from "./workspace-nav-view";
 
-export type { WorkspaceNavItem };
+export type { WorkspaceNavItem, WorkspaceTitleItem };
 
 /** The nav lists once the session is known. */
 export type WorkspaceNavLists = {
@@ -42,6 +42,9 @@ export type WorkspaceNavLists = {
   /** The phone tab bar's destinations (4 or 5, with `shortLabel`s). */
   tabs?: WorkspaceNavItem[];
 };
+
+/** A search form of the header: where it goes (GET) and its words. */
+export type WorkspaceSearch = { action: string; label: string; placeholder: string; submitLabel: string };
 
 /** The signed-in person. */
 export type WorkspaceUser = {
@@ -54,10 +57,15 @@ export type WorkspaceUser = {
 export type WorkspaceShellProps = {
   /**
    * Main navigation as the static shell shows it, before the session is read (top of the rail / drawer): every link an
-   * account might have. An item the session may take away (the customer's wallet) is `reserve`d, which holds its place.
+   * account might have. An item the session may take away (a retail account's wallet) is `reserve`d, which holds its place.
    * Every item here also names its page for the header title, so the title is right in the static shell.
    */
   nav: WorkspaceNavItem[];
+  /**
+   * Pages that are not in the static `nav` but still need their header title in the static shell: the places only some
+   * accounts have (a merchant rank's price list and invoices). They are never drawn as links; the heading reads them.
+   */
+  titles?: WorkspaceTitleItem[];
   /** Secondary navigation pinned to the bottom of the rail (settings), as the static shell shows it. */
   footerNav?: WorkspaceNavItem[];
   /**
@@ -66,16 +74,15 @@ export type WorkspaceShellProps = {
    */
   tabs?: WorkspaceNavItem[];
   /**
-   * Reads the session and returns the final lists (the wallet item for a customer who has one, the short list of a merchant
-   * waiting for approval). It runs inside <Suspense>; the static `nav` shows until it returns. Leave it out when every
-   * account has the same links.
+   * Reads the session and returns the final lists (the places the account's rank adds, the wallet item when it shows). It
+   * runs inside <Suspense>; the static `nav` shows until it returns. Leave it out when every account has the same links.
    */
   resolveNav?: () => Promise<WorkspaceNavLists>;
   /** Name of the area for the breadcrumb ("Workspace", "My account"). */
   areaLabel: string;
   /** Where the area label and the rail logo go. Defaults to the shop home. */
   homeHref?: string;
-  /** The account's role in words ("Merchant account"): shown under the name's placeholder while the session is read. */
+  /** A line in words ("Your account"): shown under the name's placeholder while the session is read. */
   roleLabel: string;
   /** Reads the signed-in person (and sends a signed-out visitor to sign-in). Runs inside <Suspense>. */
   resolveUser: () => Promise<WorkspaceUser>;
@@ -83,8 +90,13 @@ export type WorkspaceShellProps = {
   userMenu: ReactNode;
   /** Header slot on the end side, before the avatar (the bell, the wallet pill). Anything personal needs its own <Suspense>. */
   headerSlot?: ReactNode;
-  /** A search form in the header (shown from `md`). Omit for none. */
-  search?: { action: string; label: string; placeholder: string; submitLabel: string };
+  /** A search form in the header (shown from `md`), as the static shell draws it. Omit for none. */
+  search?: WorkspaceSearch;
+  /**
+   * Reads the session and returns the search form the account uses (a merchant rank searches its own price list, any other
+   * account the shop). It runs inside <Suspense>; `search` shows until it returns, so it must be given too.
+   */
+  resolveSearch?: () => Promise<WorkspaceSearch>;
   /** The page. Personal content needs its own <Suspense> (the layout adds the page-wide one and the session gate). */
   children: ReactNode;
 };
@@ -138,6 +150,11 @@ function NavGroup({ group, variant, nav, footerNav, tabs, resolveNav }: NavGroup
   );
 }
 
+/** The header's search form as the session's account uses it. Same boxes as the static one: nothing moves when it swaps in. */
+async function ResolvedSearch({ resolveSearch }: { resolveSearch: () => Promise<WorkspaceSearch> }) {
+  return <SearchInput {...await resolveSearch()} />;
+}
+
 /** The rail's avatar: initials of the signed-in person. */
 async function RailAvatar({ resolveUser }: { resolveUser: () => Promise<WorkspaceUser> }) {
   const user = await resolveUser();
@@ -176,6 +193,7 @@ function UserTriggerFallback({ roleLabel }: { roleLabel: string }) {
 /** The rail, the header card, the main column and the phone drawer. Server component, static (no session read). */
 export function WorkspaceShell({
   nav,
+  titles,
   footerNav,
   tabs,
   resolveNav,
@@ -186,12 +204,13 @@ export function WorkspaceShell({
   userMenu,
   headerSlot,
   search,
+  resolveSearch,
   children,
 }: WorkspaceShellProps) {
   const t = common;
   const home = homeHref ?? sitePath();
-  // The heading only names the page: no badges in its props (each would be rendered for nothing).
-  const all = [...nav, ...(footerNav ?? [])].map((item) => ({ ...item, badge: undefined }));
+  // The heading only names the page: it gets the paths and the words, no icons or badges (each would be rendered for nothing).
+  const all = headingItems(nav, footerNav, titles);
   const headingProps = { areaLabel, areaHref: home, breadcrumbLabel: t.workspace.breadcrumbLabel };
   const lists = { nav, footerNav, tabs, resolveNav };
   const hasTabs = Boolean(tabs && tabs.length > 0);
@@ -211,7 +230,7 @@ export function WorkspaceShell({
         )}
       >
         <div className="flex w-full items-start gap-4">
-          {/* Rail (lg+). At least the screen's height; on a short screen it grows with its links (the merchant has nine)
+          {/* Rail (lg+). At least the screen's height; on a short screen it grows with its links (the longest list has eight)
               instead of letting them spill below the dark panel. Above the main column (`z-20`): its tooltips reach over
               the page. Named for page transitions: held still while the page changes. */}
           <div className="surface-inverse vt-workspace-rail sticky top-4 z-20 hidden min-h-[calc(100dvh-2rem)] w-20 shrink-0 flex-col items-center rounded-panel py-4 lg:flex">
@@ -250,7 +269,13 @@ export function WorkspaceShell({
               {search ? (
                 <div className="hidden min-w-0 flex-1 justify-center md:flex">
                   <div className="w-full max-w-xl">
-                    <SearchInput {...search} />
+                    {resolveSearch ? (
+                      <Suspense fallback={<SearchInput {...search} />}>
+                        <ResolvedSearch resolveSearch={resolveSearch} />
+                      </Suspense>
+                    ) : (
+                      <SearchInput {...search} />
+                    )}
                   </div>
                 </div>
               ) : (

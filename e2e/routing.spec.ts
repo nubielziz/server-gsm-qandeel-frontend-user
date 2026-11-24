@@ -1,5 +1,6 @@
 // Routing layer: the one language (decision 039: /en only, old /ar addresses answer 308), the language-less links of
-// emails, optimistic sign-in redirects and the API rewrites. HTTP-level checks, no UI.
+// emails, the one account area (every old portal and ticket address answers 308 to it), the optimistic sign-in redirect and
+// the API rewrites. HTTP-level checks, no UI.
 import { expect, test } from "./fixtures";
 
 /** The Location of a redirect, as a path with its query. */
@@ -42,10 +43,10 @@ test.describe("old Arabic addresses", () => {
 });
 
 test.describe("retired pages", () => {
-  test("the old merchant verification address answers 308 to the settings page, with or without /en, before any sign-in check", async ({ request }) => {
+  test("the old verification address answers 308 to the settings, with or without /en, before sign-in", async ({ request }) => {
     const cases: [string, string][] = [
-      ["/en/merchant/settings/verification", "/en/merchant/settings"],
-      ["/merchant/settings/verification", "/en/merchant/settings"],
+      ["/en/merchant/settings/verification", "/en/account/settings"],
+      ["/merchant/settings/verification", "/en/account/settings"],
     ];
     for (const [from, to] of cases) {
       const res = await request.get(from, { maxRedirects: 0 });
@@ -54,12 +55,12 @@ test.describe("retired pages", () => {
     }
   });
 
-  test("the old merchant referrals address answers 308 to the merchant overview, with or without /en, query included", async ({ request }) => {
+  test("the old referrals address answers 308 to the account overview, with or without /en, query kept", async ({ request }) => {
     const cases: [string, string][] = [
-      ["/en/merchant/referrals", "/en/merchant"],
-      ["/merchant/referrals", "/en/merchant"],
+      ["/en/merchant/referrals", "/en/account"],
+      ["/merchant/referrals", "/en/account"],
       // A bookmark of a filtered view still lands on the overview: the old query rides along and the overview ignores it.
-      ["/en/merchant/referrals?status=approved&period=2026-11", "/en/merchant?status=approved&period=2026-11"],
+      ["/en/merchant/referrals?status=approved&period=2026-11", "/en/account?status=approved&period=2026-11"],
     ];
     for (const [from, to] of cases) {
       const res = await request.get(from, { maxRedirects: 0 });
@@ -68,12 +69,12 @@ test.describe("retired pages", () => {
     }
   });
 
-  test("the old merchant Webhooks addresses answer 308 to the API keys page, with or without /en, before any sign-in check", async ({ request }) => {
+  test("the old Webhooks addresses answer 308 to the API keys page, with or without /en, before sign-in", async ({ request }) => {
     const cases: [string, string][] = [
-      ["/en/merchant/webhooks", "/en/merchant/api-keys"],
-      ["/en/merchant/webhooks/12", "/en/merchant/api-keys"],
-      ["/merchant/webhooks", "/en/merchant/api-keys"],
-      ["/merchant/webhooks/12", "/en/merchant/api-keys"],
+      ["/en/merchant/webhooks", "/en/account/settings/api-keys"],
+      ["/en/merchant/webhooks/12", "/en/account/settings/api-keys"],
+      ["/merchant/webhooks", "/en/account/settings/api-keys"],
+      ["/merchant/webhooks/12", "/en/account/settings/api-keys"],
     ];
     for (const [from, to] of cases) {
       const res = await request.get(from, { maxRedirects: 0 });
@@ -83,8 +84,83 @@ test.describe("retired pages", () => {
   });
 });
 
+/**
+ * Every old portal and ticket address and the page that took its place (the table of lib/account/legacy-paths.ts, written out
+ * here on purpose so a wrong row of the table fails). A parameter is a made-up id.
+ */
+const OLD_ADDRESSES: [string, string][] = [
+  ["/merchant", "/account"],
+  ["/merchant/services", "/account/services"],
+  ["/merchant/services/9", "/account/services/9"],
+  ["/merchant/orders", "/account/orders"],
+  ["/merchant/orders/42", "/account/orders/42"],
+  ["/merchant/wallet", "/account/wallet"],
+  ["/merchant/wallet/top-up", "/account/wallet/add-funds"],
+  ["/merchant/invoices", "/account/invoices"],
+  ["/merchant/invoices/17", "/account/invoices/17"],
+  ["/merchant/api-keys", "/account/settings/api-keys"],
+  ["/merchant/webhooks", "/account/settings/api-keys"],
+  ["/merchant/webhooks/12", "/account/settings/api-keys"],
+  ["/merchant/webhooks/12/deliveries", "/account/settings/api-keys"],
+  ["/merchant/referrals", "/account"],
+  ["/merchant/notifications", "/account/notifications"],
+  ["/merchant/support", "/account/support"],
+  ["/merchant/support/new", "/account/support/new"],
+  ["/merchant/support/5", "/account/support/5"],
+  ["/merchant/settings", "/account/settings"],
+  ["/merchant/settings/security", "/account/settings/security"],
+  ["/merchant/settings/notifications", "/account/settings/notifications"],
+  ["/merchant/settings/verification", "/account/settings"],
+  ["/merchant/set-password", "/set-password"],
+  ["/merchant/verify-email", "/verify-email"],
+  ["/merchant/register", "/become-a-merchant"],
+  ["/account/tickets", "/account/support"],
+  ["/account/tickets/new", "/account/support/new"],
+  // Anything else under the old portal prefix ends at the overview.
+  ["/merchant/x", "/account"],
+  ["/merchant/orders/42/refund", "/account"],
+];
+
+test.describe("old portal addresses", () => {
+  for (const [from, to] of OLD_ADDRESSES) {
+    test(`${from} answers 308 to ${to}, with and without /en, and keeps the query`, async ({ request }) => {
+      const forms: [string, string][] = [
+        [from, `/en${to}`],
+        [`/en${from}`, `/en${to}`],
+        [`${from}?token=tok`, `/en${to}?token=tok`],
+        [`/en${from}?token=tok&x=1`, `/en${to}?token=tok&x=1`],
+      ];
+      for (const [address, expected] of forms) {
+        // maxRedirects 0: the answer is the redirect itself, which comes before any sign-in check (no cookie is sent).
+        const res = await request.get(address, { maxRedirects: 0 });
+        expect(res.status(), address).toBe(308);
+        expect(target(res.headers()["location"]), address).toBe(expected);
+      }
+    });
+  }
+
+  test("an old Arabic portal address takes two hops: first /en, then the account area", async ({ request }) => {
+    const first = await request.get("/ar/merchant/orders/42?x=1", { maxRedirects: 0 });
+    expect(first.status()).toBe(308);
+    expect(target(first.headers()["location"])).toBe("/en/merchant/orders/42?x=1");
+    const second = await request.get("/en/merchant/orders/42?x=1", { maxRedirects: 0 });
+    expect(second.status()).toBe(308);
+    expect(target(second.headers()["location"])).toBe("/en/account/orders/42?x=1");
+  });
+
+  test("an address that only starts like an old one is not moved", async ({ request }) => {
+    for (const path of ["/en/merchants", "/en/merchantx/orders"]) {
+      const res = await request.get(path, { maxRedirects: 0 });
+      expect(res.status(), path).not.toBe(308);
+    }
+  });
+});
+
 test.describe("old service addresses (the two rows the demo seed keeps, plan 30 §4.5 and §7.1)", () => {
-  test("an old service address ends on the English page of the same service; one with no page on sale, on the list", async ({ page, request }) => {
+  test("an old service address ends on the English page of the same service; one with no page on sale, on the list", async ({
+    page,
+    request,
+  }) => {
     // Where the seeded old address leads (the seed names one service of a seeded listing; its slug is the API's).
     const answer = await request.get("/store/v1/legacy-slugs/service/legacy-demo-service");
     expect(answer.status(), await answer.text()).toBe(200);
@@ -130,9 +206,11 @@ test.describe("language-less links", () => {
   test("an emailed link goes to /en and keeps the query, whatever cookie or Accept-Language is sent", async ({ request }) => {
     const cases: [string, string][] = [
       ["/sign-in?token=t", "/en/sign-in?token=t"],
-      ["/merchant/register?from=x", "/en/merchant/register?from=x"],
-      ["/merchant/set-password?token=xyz", "/en/merchant/set-password?token=xyz"],
+      ["/set-password?token=xyz", "/en/set-password?token=xyz"],
+      ["/verify-email?token=t", "/en/verify-email?token=t"],
+      ["/become-a-merchant?from=x", "/en/become-a-merchant?from=x"],
       ["/support/tickets/t_abc", "/en/support/tickets/t_abc"],
+      ["/account/orders?status=open", "/en/account/orders?status=open"],
       ["/", "/en"],
     ];
     const headers: Record<string, string>[] = [
@@ -184,22 +262,30 @@ test.describe("English only in the markup and the sitemap", () => {
 });
 
 test.describe("private areas", () => {
-  test("account and merchant portal redirect to sign-in without a session", async ({ request }) => {
-    const account = await request.get("/en/account/orders", { maxRedirects: 0 });
-    expect(account.status()).toBe(307);
-    const to = new URL(account.headers()["location"], "http://x");
-    expect(to.pathname).toBe("/en/sign-in");
-    expect(to.searchParams.get("as")).toBe("customer");
-    expect(to.searchParams.get("next")).toBe("/en/account/orders");
-
-    const merchant = await request.get("/en/merchant/orders", { maxRedirects: 0 });
-    expect(new URL(merchant.headers()["location"], "http://x").searchParams.get("as")).toBe("merchant");
+  test("the account area redirects to sign-in without a session, with the page as next and no kind", async ({ request }) => {
+    for (const path of ["/en/account", "/en/account/orders", "/en/account/orders?status=open", "/en/account/settings/security"]) {
+      const res = await request.get(path, { maxRedirects: 0 });
+      expect(res.status(), path).toBe(307);
+      const to = new URL(res.headers()["location"], "http://x");
+      expect(to.pathname, path).toBe("/en/sign-in");
+      expect(to.searchParams.get("next"), path).toBe(path);
+      expect([...to.searchParams.keys()], path).toEqual(["next"]);
+    }
+    // The exact address the proxy writes: the path and its query, encoded once.
+    const orders = await request.get("/en/account/orders", { maxRedirects: 0 });
+    expect(target(orders.headers()["location"])).toBe("/en/sign-in?next=%2Fen%2Faccount%2Forders");
   });
 
-  test("merchant email-link pages stay public", async ({ request }) => {
-    for (const path of ["/en/merchant/register?from=x", "/en/merchant/set-password?token=t", "/en/merchant/verify-email?token=t"]) {
+  test("an old portal page goes to the account area before any sign-in check, never to sign-in", async ({ request }) => {
+    const res = await request.get("/en/merchant/orders", { maxRedirects: 0 });
+    expect(res.status()).toBe(308);
+    expect(target(res.headers()["location"])).toBe("/en/account/orders");
+  });
+
+  test("the sign-up and email-link pages stay public", async ({ request }) => {
+    for (const path of ["/en/become-a-merchant?from=x", "/en/set-password?token=t", "/en/verify-email?token=t", "/en/sign-in"]) {
       const res = await request.get(path, { maxRedirects: 0 });
-      expect(res.status(), path).not.toBe(307);
+      expect([307, 308], path).not.toContain(res.status());
     }
   });
 });

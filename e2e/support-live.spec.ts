@@ -1,7 +1,7 @@
 // Support as a live chat (feature 28, backend plan `docs/briefs/28-support-live-chat.md` §4.2): a ticket page changes the moment
-// the other side writes, with no reload; "Seen", files, "My tickets" and the merchant's portal thread work on the same
-// layer. Runs against the isolated demo backend (:3100) built from the feature-28 branch. Written to be run by the lead.
-// Rules (F03): every test that changes data uses throwaway emails or a fresh customer or merchant; nothing global is switched.
+// the other side writes, with no reload; "Seen", files, the Support list of an account and the merchant rank's thread work on the
+// same layer. Runs against the isolated demo backend (:3100) built from the feature-28 branch. Meant to be run by hand.
+// Rules (F03): every test that changes data uses throwaway emails or a fresh account; nothing global is switched.
 // Staff act through the admin API as the seeded Owner (`adminCall`; the Owner holds `support:read` and `support:reply`), because
 // the customer side cannot create them. Tickets are filed through the public route (`POST /store/v1/tickets`, dev Turnstile
 // token): an `orderToken` makes the answer carry the ticket's token, so the test can open the page at once.
@@ -13,7 +13,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { adminCall } from "./admin";
 import { expect, test } from "./fixtures";
-import { DEV_TURNSTILE_TOKEN, freshCustomer, freshMerchant, go, signInMerchant, uniqueEmail } from "./helpers";
+import { ACCOUNTS, DEV_TURNSTILE_TOKEN, freshAccount, go, signIn, signUpByLink, uniqueEmail } from "./helpers";
 
 /** Seeded demo order (tracking token): a ticket filed with it comes back with its own token. */
 const ORDER_TOKEN = "t_4056k559090000000000";
@@ -95,9 +95,9 @@ const agentRead = (id: number, upToMessageId: number) => adminCall("POST", `/adm
 /** Staff close (`resolved`) or reopen (`open`) the ticket: the requester gets `ticket.updated`. */
 const setTicketStatus = (id: number, status: "resolved" | "open") => adminCall("PATCH", `/admin/support-tickets/${id}`, { json: { status } });
 
-// ── Customer: the token page ────────────────────────────────────────────────────────────────────────────────────────
+// ── The token page ────────────────────────────────────────────────────────────────────────────────────────
 
-test.describe("customer: the token page", () => {
+test.describe("the token page", () => {
   test("a staff reply shows with no reload, is marked seen, and the receipt moves from Sent to Seen", async ({ page }) => {
     const { number, token } = await fileTicket(page.request);
     const id = await ticketIdOf(number);
@@ -226,11 +226,11 @@ test.describe("customer: the token page", () => {
   });
 });
 
-// ── Customer: a closed ticket (owner, 2026-11-15) ───────────────────────────────────────────────────────────────────
+// ── A closed ticket (owner, 2026-11-15) ───────────────────────────────────────────────────────────────────
 // A resolved ticket takes no more messages from the requester (`409 TICKET_RESOLVED` from the API): the page swaps the reply
 // box for the closed notice, live, and brings the box back when staff reopen the ticket.
 
-test.describe("customer: a closed ticket", () => {
+test.describe("a closed ticket", () => {
   const notice = (page: Page) => page.getByRole("group", { name: "This ticket is closed" });
 
   test("after staff resolve, the page shows the closed notice live and no reply box; after a reopen the box returns", async ({ page }) => {
@@ -301,24 +301,25 @@ test.describe("customer: a closed ticket", () => {
   });
 });
 
-// ── Customer: My tickets ────────────────────────────────────────────────────────────────────────────────────────────
+// ── A retail account: the Support page ──────────────────────────────────────────────────────────────────────────────
 
-test.describe("customer: My tickets", () => {
-  test("a signed-in customer opens a ticket, finds it (and a guest ticket on their address) in the list, and sees a reply arrive in it", async ({
+test.describe("retail account: the Support page", () => {
+  test("a signed-in account opens a ticket, finds it (and a guest ticket on their address) in the list, and sees a reply arrive in it", async ({
     page,
     request,
   }) => {
-    const email = await freshCustomer(page);
-    await page.goto("/en/account/tickets");
-    await expect(page.getByRole("heading", { level: 1, name: "My tickets" })).toBeVisible();
+    const { email } = await signUpByLink(page);
+    await page.goto("/en/account/support");
+    await expect(page.getByRole("heading", { level: 1, name: "Support" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "You have no tickets yet" })).toBeVisible();
-    await expect(page.locator('a[href="/en/account/tickets"]')).not.toHaveCount(0); // the account navigation's item
+    await expect(page.locator('a[href="/en/account/support"]')).not.toHaveCount(0); // the account navigation's item
 
-    // A ticket filed as a guest with the customer's address belongs to them.
+    // A ticket filed as a guest with the account's address belongs to it.
     const guest = await fileTicket(request, { email, withOrder: false });
 
-    // A ticket opened signed in: no email, no security check; the customer lands on the token page.
-    await go(page, "/en/account/tickets/new");
+    // A ticket opened signed in: no email, no security check; the account lands on the token page.
+    await go(page, "/en/account/support/new");
+    await expect(page.getByRole("heading", { level: 1, name: "New ticket" })).toBeVisible();
     const subject = `Signed-in ticket ${tag()}`;
     await page.locator('input[name="subject"]').fill(subject);
     await page.locator('textarea[name="message"]').fill("Opened from my account.");
@@ -328,9 +329,9 @@ test.describe("customer: My tickets", () => {
     await expect(log(page).getByText("Opened from my account.")).toBeVisible();
     const number = (await page.getByText(/^Ticket T-\d+ · /).first().innerText()).match(/T-\d+/)![0];
 
-    // The list shows both, newest activity first.
+    // The list shows both, newest activity first; a retail row opens the token page.
     const bellAndRefresh = countStreams(page, "/store/v1/me/stream");
-    await page.goto("/en/account/tickets");
+    await page.goto("/en/account/support");
     const rows = page.locator("tr[data-ticket-number]");
     await expect(rows).toHaveCount(2);
     await expect(rows.first()).toHaveAttribute("data-ticket-number", number);
@@ -352,22 +353,45 @@ test.describe("customer: My tickets", () => {
     await expect(log(page).getByText(/List reply/)).toBeVisible();
   });
 
-  test("a customer does not see another customer's tickets", async ({ page }) => {
-    await freshCustomer(page);
-    await page.goto("/en/account/tickets");
+  test("an account does not see another account's tickets", async ({ page }) => {
+    await signUpByLink(page);
+    await page.goto("/en/account/support");
     await expect(page.getByRole("heading", { name: "You have no tickets yet" })).toBeVisible();
     await expect(page.locator("tr[data-ticket-number]")).toHaveCount(0);
   });
+
+  test("a retail account that opens a merchant thread address is sent to the account home", async ({ page }) => {
+    await signUpByLink(page);
+    await page.goto("/en/account/support/1");
+    await expect(page).toHaveURL(/\/en\/account$/);
+  });
+
+  test("the old ticket list and its new-ticket page lead to the Support pages, keeping ?order=", async ({ page }) => {
+    await signUpByLink(page);
+    await page.goto("/en/account/tickets");
+    await expect(page).toHaveURL(/\/en\/account\/support$/);
+    await page.goto("/en/account/tickets/new?order=5");
+    await expect(page).toHaveURL(/\/en\/account\/support\/new\?order=5$/);
+  });
+
+  test("a closed ticket opened by a signed-in account offers the account's form, with the order", async ({ page, request }) => {
+    await signUpByLink(page);
+    const { number, token } = await fileTicket(request);
+    await setTicketStatus(await ticketIdOf(number), "resolved");
+    await go(page, `/en/support/tickets/${token}`);
+    const closed = page.getByRole("group", { name: "This ticket is closed" });
+    await expect(closed).toBeVisible();
+    await expect(closed.getByRole("link", { name: "Open a new ticket" })).toHaveAttribute("href", /^\/en\/account\/support\/new\?order=\d+$/);
+  });
 });
 
-// ── Merchant: the portal ────────────────────────────────────────────────────────────────────────────────────────────
+// ── A merchant rank: the Support page and the thread ────────────────────────────────────────────────────────────────
 
-test.describe("merchant: support in the portal", () => {
+test.describe("merchant rank: support in the account area", () => {
   test("a merchant opens a ticket, gets the agent's reply live and marks it seen", async ({ page }) => {
-    const account = await freshMerchant(page);
-    await signInMerchant(page, account);
+    await freshAccount(page, { rank: "merchant", signedIn: true });
     const bellStream = streamOpened(page, "/client/stream");
-    await go(page, "/en/merchant/support/new");
+    await go(page, "/en/account/support/new");
     await expect(page.getByRole("heading", { level: 1, name: "New ticket" })).toBeVisible();
     await bellStream;
     await page.waitForTimeout(500);
@@ -375,10 +399,10 @@ test.describe("merchant: support in the portal", () => {
     await page.locator('input[name="subject"]').fill(subject);
     await page.locator('textarea[name="message"]').fill("A question from the portal.");
 
-    // The bell's merchant stream is open already; the thread opens a client of its own. Wait for that one.
+    // The bell's portal stream is open already; the thread opens a client of its own. Wait for that one.
     const threadStream = streamOpened(page, "/client/stream");
     await page.getByRole("button", { name: "Open ticket" }).click();
-    await expect(page).toHaveURL(/\/en\/merchant\/support\/\d+$/);
+    await expect(page).toHaveURL(/\/en\/account\/support\/\d+$/);
     await expect(page.getByRole("heading", { level: 1, name: subject })).toBeVisible();
     await expect(log(page).getByText("A question from the portal.")).toBeVisible();
     await hydrated(box(page));
@@ -396,20 +420,62 @@ test.describe("merchant: support in the portal", () => {
       .poll(async () => (await ticketRow(number)).requesterSeenMessageId ?? 0, { timeout: 20_000 })
       .toBeGreaterThanOrEqual(replyId ?? 1);
 
-    // The merchant answers from the thread; the list shows the ticket.
+    // The merchant answers from the thread; the list shows the ticket, and its row opens the thread by id.
     await box(page).fill("Thanks, got it.");
     await page.getByRole("button", { name: "Send reply" }).click();
     await expect(log(page).getByText("Thanks, got it.")).toBeVisible();
-    await page.goto("/en/merchant/support");
+    await page.goto("/en/account/support");
     await expect(page.getByRole("heading", { level: 1, name: "Support" })).toBeVisible();
     await expect(page.locator(`tr[data-ticket-number="${number}"]`)).toBeVisible();
+    await expect(page.getByRole("link", { name: new RegExp(`^Open ticket ${number}`) })).toHaveAttribute("href", /\/en\/account\/support\/\d+$/);
   });
 
-  test("another merchant's ticket id is a 404 page, not a thread", async ({ page }) => {
-    const account = await freshMerchant(page);
-    await signInMerchant(page, account);
-    await page.goto("/en/merchant/support/99999999");
+  test("another account's ticket id is a 404 page, not a thread", async ({ page }) => {
+    await freshAccount(page, { rank: "merchant", signedIn: true });
+    await page.goto("/en/account/support/99999999");
     await expect(page.getByRole("heading", { level: 1, name: "We could not find this ticket" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Back to support" })).toHaveAttribute("href", "/en/merchant/support");
+    await expect(page.getByRole("link", { name: "Back to support" })).toHaveAttribute("href", "/en/account/support");
   });
+
+  test("the old portal addresses of the support pages lead to the Support pages", async ({ page }) => {
+    await freshAccount(page, { rank: "merchant", signedIn: true });
+    await page.goto("/en/merchant/support");
+    await expect(page).toHaveURL(/\/en\/account\/support$/);
+    await page.goto("/en/merchant/support/new");
+    await expect(page).toHaveURL(/\/en\/account\/support\/new$/);
+  });
+
+  test("a merchant rank's ticket does not show in a retail account's list", async ({ page }) => {
+    await freshAccount(page, { rank: "merchant", signedIn: true });
+    await go(page, "/en/account/support/new");
+    await page.locator('input[name="subject"]').fill(`Portal only ${tag()}`);
+    await page.locator('textarea[name="message"]').fill("Seen on the portal routes only.");
+    await page.getByRole("button", { name: "Open ticket" }).click();
+    await expect(page).toHaveURL(/\/en\/account\/support\/\d+$/);
+
+    await page.context().clearCookies();
+    await signUpByLink(page);
+    await page.goto("/en/account/support");
+    await expect(page.getByRole("heading", { name: "You have no tickets yet" })).toBeVisible();
+  });
+});
+
+// ── The order picker of the new-ticket form: each rank lists its own orders ─────────────────────────────────────────────
+
+test.describe("the order picker of the new-ticket form", () => {
+  const demo = [
+    { name: "retail", account: ACCOUNTS.retail, route: "/store/v1/me/orders" },
+    { name: "merchant", account: ACCOUNTS.merchant, route: "/client/orders" },
+  ] as const;
+  for (const { name, account, route } of demo) {
+    test(`${name}: ?order= preselects one of the account's own orders`, async ({ page }) => {
+      await signIn(page, account);
+      const list = await page.request.get(`${route}?_start=0&_end=1`);
+      expect(list.status(), await list.text()).toBe(200);
+      const [first] = (await list.json()) as { id: number }[];
+      test.skip(!first, "the demo account has no order to pick");
+      await go(page, `/en/account/support/new?order=${first.id}`);
+      await expect(page.locator('select[name="orderId"]')).toHaveValue(String(first.id));
+    });
+  }
 });

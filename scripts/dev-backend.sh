@@ -18,7 +18,9 @@ export S3_BUCKET=gsm-files-storefront
 # :5175 = next dev, :5176 = next start (production build checks).
 export CORS_ORIGINS=http://localhost:5175,http://127.0.0.1:5175,http://localhost:5176
 export STORE_BASE_URL=http://localhost:5175
-export PORTAL_BASE_URL=http://localhost:5175/merchant
+# Every emailed link is built from STORE_BASE_URL; PORTAL_BASE_URL is only where a gateway sends a merchant back after an online payment
+# (`<PORTAL_BASE_URL>/wallet`, which the account area answers).
+export PORTAL_BASE_URL=http://localhost:5175/account
 # The site (Next, on this machine) is a trusted proxy: the API takes the visitor's IP from X-Forwarded-For, as in
 # production behind a reverse proxy (handoff §3.9). E2E tests send one IP per test so rate limits do not pile up.
 export TRUST_PROXY=loopback

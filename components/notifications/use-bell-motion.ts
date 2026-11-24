@@ -11,15 +11,15 @@ import {
   settleBellView,
   type BellView,
 } from "@/lib/notifications/bell-motion";
-import type { NotificationSurface } from "@/lib/notifications/link";
+import type { AccountFamily } from "@/lib/account/family";
 import { titleBadge } from "@/lib/notifications/title-badge";
 
 /**
- * What the bell of `surface` plays for the count on screen. `onAnimationEnd` goes on the bell's root: the swing, the pop
+ * What the bell of `family` plays for the count on screen. `onAnimationEnd` goes on the bell's root: the swing, the pop
  * and the roll bubble up to it, and each one that ends is set at rest (no timer).
  */
 export function useBellMotion(
-  surface: NotificationSurface,
+  family: AccountFamily,
   count: number,
   text: string,
 ): {
@@ -28,8 +28,8 @@ export function useBellMotion(
   /** Sets one motion at rest by its name (the swing is played with the Web Animations API, which fires no animationend). */
   settle: (name: string) => void;
 } {
-  const subscribe = useCallback((listener: () => void) => bellMotion.subscribe(surface, listener), [surface]);
-  const motion = useSyncExternalStore(subscribe, () => bellMotion.getSnapshot(surface), () => IDLE_MOTION);
+  const subscribe = useCallback((listener: () => void) => bellMotion.subscribe(family, listener), [family]);
+  const motion = useSyncExternalStore(subscribe, () => bellMotion.getSnapshot(family), () => IDLE_MOTION);
   const [view, setView] = useState(() => initialBellView(count, text, motion));
   // The previous render's view is kept in state and moved on during render (React's "storing information from previous
   // renders"): only when something changed, so this never loops.

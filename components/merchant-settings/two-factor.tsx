@@ -1,10 +1,13 @@
 "use client";
-// Two-step verification: off → "Set up" (POST 2fa/setup, no body) → QR + key + 6-digit code → POST 2fa/enable;
-// on → disable with a code (POST 2fa/disable). TWOFA_ALREADY_ENABLED / TWOFA_NOT_ENABLED (409) resync the state.
+// Two-step verification, for an account of either rank (the routes are the family's own, `FAMILY_ROUTES[family].twoFactor`):
+// off → "Set up" (POST setup, no body) → QR + key + 6-digit code → POST enable; on → disable with a code (POST disable).
+// TWOFA_ALREADY_ENABLED / TWOFA_NOT_ENABLED (409) resync the state.
 // The QR is an SVG string from the API: it is only ever used as an <img> data URI, never injected as HTML.
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound } from "lucide-react";
+import type { AccountFamily } from "@/lib/account/family";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { TwoFactorSetup } from "@/lib/api/types";
@@ -20,12 +23,15 @@ import { ProblemAlert, useFocusFirstInvalid, useFormProblem } from "./form-probl
 type Phase = { kind: "idle" } | { kind: "setup"; setup: TwoFactorSetup } | { kind: "disable" };
 
 type Props = {
+  /** The routes of this account's family: `store` for a retail rank, `client` for a merchant rank. */
+  family: AccountFamily;
   enabled: boolean;
   t: MerchantSettingsMessages["security"]["twoFactor"];
   fieldTexts: MerchantSettingsMessages["fieldErrors"];
 };
 
-export function TwoFactor({ enabled, t, fieldTexts }: Props) {
+export function TwoFactor({ family, enabled, t, fieldTexts }: Props) {
+  const routes = FAMILY_ROUTES[family].twoFactor;
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [override, setOverride] = useState<boolean | null>(null);
@@ -70,7 +76,7 @@ export function TwoFactor({ enabled, t, fieldTexts }: Props) {
 
   const startSetup = () =>
     run(async () => {
-      const setup = await api.post<TwoFactorSetup>("/client/security/2fa/setup");
+      const setup = await api.post<TwoFactorSetup>(routes.setup);
       setCode("");
       setPhase({ kind: "setup", setup });
     });
@@ -84,7 +90,7 @@ export function TwoFactor({ enabled, t, fieldTexts }: Props) {
         return;
       }
       await run(async () => {
-        await api.post(`/client/security/2fa/${path}`, { code });
+        await api.post(routes[path], { code });
         setOverride(path === "enable");
         toast.success(path === "enable" ? t.enabledToast : t.disabledToast);
         reset();

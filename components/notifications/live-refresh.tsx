@@ -1,6 +1,6 @@
 "use client";
 // Keeps the notifications page current without a reload (feature 27, plan §5.1). Rendered by notification-list.tsx; it
-// listens to the surface's stream (started by the bell) and:
+// listens to the family's stream (started by the bell) and:
 // - on page 1: a new item, a resync or a reconnect makes the server list render again in place (`router.refresh()`; the
 //   scroll position is kept). Events are collected for 400 ms and refreshes are at least 2 s apart. An item read in another
 //   tab or on another device refreshes the list too, when it is still shown as unread here;
@@ -11,12 +11,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import type { NotificationSurface } from "@/lib/notifications/link";
+import type { AccountFamily } from "@/lib/account/family";
 import { streamFor } from "@/lib/realtime/browser";
 import { createRefreshScheduler, needsRefresh, type RefreshWish } from "@/lib/realtime/refresh-scheduler";
 
 export type LiveRefreshProps = {
-  surface: NotificationSurface;
+  family: AccountFamily;
   page: number;
   /** Page 1 of the same tab (all or unread), language-prefixed. */
   pageOneHref: string;
@@ -25,7 +25,7 @@ export type LiveRefreshProps = {
   labels: { pill: string; pillAction: string };
 };
 
-export function LiveRefresh({ surface, page, pageOneHref, unreadIds, labels }: LiveRefreshProps) {
+export function LiveRefresh({ family, page, pageOneHref, unreadIds, labels }: LiveRefreshProps) {
   const router = useRouter();
   const [fresh, setFresh] = useState(false);
   const latest = useRef({ page, unreadIds });
@@ -34,7 +34,7 @@ export function LiveRefresh({ surface, page, pageOneHref, unreadIds, labels }: L
   });
 
   useEffect(() => {
-    const client = streamFor(surface);
+    const client = streamFor(family);
     const wish: RefreshWish = { always: false, all: false, readIds: new Set() };
     const scheduler = createRefreshScheduler({
       timers: {
@@ -75,7 +75,7 @@ export function LiveRefresh({ surface, page, pageOneHref, unreadIds, labels }: L
       for (const stop of stops) stop();
       scheduler.dispose();
     };
-  }, [surface, router]);
+  }, [family, router]);
 
   if (page === 1) return null;
   return (

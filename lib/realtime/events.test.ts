@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { FAMILY_ROUTES } from "@/lib/account/routes";
 import { dedupeKeyOf, parseFrame, STREAM_API, STREAM_PROBE_API, streamLockName } from "./events";
 
 const item = {
@@ -14,14 +15,26 @@ const item = {
 };
 
 describe("stream names", () => {
-  it("one route, one probe and one lock per surface", () => {
-    expect(STREAM_API).toEqual({ customer: "/store/v1/me/stream", merchant: "/client/stream" });
+  it("one route, one probe and one lock per family", () => {
+    expect(STREAM_API).toEqual({ store: "/store/v1/me/stream", client: "/client/stream" });
     expect(STREAM_PROBE_API).toEqual({
-      customer: "/store/v1/me/notifications/unread-count",
-      merchant: "/client/notifications/unread-count",
+      store: "/store/v1/me/notifications/unread-count",
+      client: "/client/notifications/unread-count",
     });
-    expect(streamLockName("customer")).toBe("gsm-stream-customer");
-    expect(streamLockName("merchant")).toBe("gsm-stream-merchant");
+    expect(streamLockName("store")).toBe("gsm-stream-store");
+    expect(streamLockName("client")).toBe("gsm-stream-client");
+  });
+
+  it("the routes follow the route table of the families", () => {
+    expect(STREAM_API.store).toBe(FAMILY_ROUTES.store.stream);
+    expect(STREAM_API.client).toBe(FAMILY_ROUTES.client.stream);
+    expect(STREAM_PROBE_API.store).toBe(`${FAMILY_ROUTES.store.notifications}/unread-count`);
+    expect(STREAM_PROBE_API.client).toBe(`${FAMILY_ROUTES.client.notifications}/unread-count`);
+  });
+
+  it("a family never shares a lock or a route with the other", () => {
+    expect(streamLockName("store")).not.toBe(streamLockName("client"));
+    expect(STREAM_API.store).not.toBe(STREAM_API.client);
   });
 });
 

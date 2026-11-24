@@ -1,13 +1,12 @@
-// Merchant settings and integrations: profile, security (password, 2FA), notifications,
-// API keys. Real browser → Next → the isolated demo backend.
-// - Active merchant m1 is only read, except for harmless, restored changes (phone, one API key that ends revoked).
-//   Password and 2FA run on a throwaway merchant that staff invite (`freshMerchant`); the approval notice is read on the demo's
-//   own pending account.
+// Settings of a merchant rank and of a retail rank: profile, security (password, two-step), notifications, API keys and
+// privacy, all under /en/account/settings. Real browser -> Next -> the isolated demo backend.
+// - The demo merchant is only read, except for harmless, restored changes (phone, one API key that ends revoked).
+//   Password, two-step and privacy run on throwaway accounts that staff create (`freshAccount`).
 // - Mutating integration tests (API keys) run on the desktop project only.
 import { createHmac } from "node:crypto";
 import { expect, test } from "./fixtures";
 import { type Request } from "@playwright/test";
-import { ACCOUNTS, freshMerchant, hydrated, signInMerchant } from "./helpers";
+import { ACCOUNTS, freshAccount, hydrated, signIn } from "./helpers";
 
 // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -31,34 +30,34 @@ function totp(secret: string, step = 0): string {
   return String(value % 1_000_000).padStart(6, "0");
 }
 
-// ── active merchant ──────────────────────────────────────────────────────────────────────────────────────────
+// ── demo merchant ────────────────────────────────────────────────────────────────────────────────────────────
 
-test.describe("settings (active merchant)", () => {
+test.describe("settings (demo merchant)", () => {
   test.beforeEach(async ({ page }) => {
-    await signInMerchant(page);
+    await signIn(page, ACCOUNTS.merchant);
   });
 
   test("the settings frame: navigation, summary, security shortcuts and help", async ({ page }) => {
-    await page.goto("/en/merchant/settings");
+    await page.goto("/en/account/settings");
     await expect(page.getByRole("heading", { level: 1, name: "Account settings" })).toBeVisible();
     const nav = page.getByRole("navigation", { name: "Settings sections" });
     await expect(nav.getByRole("link", { name: "Profile" })).toHaveAttribute("aria-current", "page");
     await expect(nav.getByRole("link", { name: "Security" })).not.toHaveAttribute("aria-current", "page");
-    // The page of verification documents is gone: three tabs are left.
-    await expect(nav.getByRole("link")).toHaveCount(3);
+    // A merchant rank has every section: profile, security, notifications, API keys and privacy.
+    await expect(nav.getByRole("link")).toHaveText(["Profile", "Security", "Notifications", "API keys", "Privacy"]);
     await expect(nav.getByRole("link", { name: "Verification" })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Account summary" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Account security" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Contact support" })).toHaveAttribute("href", "/en/help");
+    await expect(page.getByRole("link", { name: "Contact support" })).toHaveAttribute("href", "/en/account/support/new");
 
     await nav.getByRole("link", { name: "Security" }).click();
-    await expect(page).toHaveURL(/\/en\/merchant\/settings\/security$/);
+    await expect(page).toHaveURL(/\/en\/account\/settings\/security$/);
     await expect(nav.getByRole("link", { name: "Security" })).toHaveAttribute("aria-current", "page");
     await expect(nav.getByRole("link", { name: "Profile" })).not.toHaveAttribute("aria-current", "page");
   });
 
   test("profile: read-only email with its badge, editable fields, only changes are saved", async ({ page }) => {
-    await page.goto("/en/merchant/settings");
+    await page.goto("/en/account/settings");
     await expect(page.getByLabel("Email address")).toHaveValue(ACCOUNTS.merchant.email);
     await expect(page.getByLabel("Email address")).toHaveJSProperty("readOnly", true);
     await expect(page.getByText("Verified", { exact: true }).first()).toBeVisible();
@@ -84,8 +83,20 @@ test.describe("settings (active merchant)", () => {
     await expect(page.getByText("Profile updated").first()).toBeVisible();
   });
 
+  test("profile: the account details are read only and name the Dhru username and the rank", async ({ page }) => {
+    await page.goto("/en/account/settings");
+    const details = page.getByRole("region", { name: "Account details" });
+    await expect(details).toBeVisible();
+    await expect(details.getByText("Username", { exact: true })).toBeVisible();
+    await expect(details.getByText("Rank", { exact: true })).toBeVisible();
+    await expect(details.getByText("Member since", { exact: true })).toBeVisible();
+    await expect(details.getByRole("textbox")).toHaveCount(0);
+    // A merchant rank has no preferences card (that is the retail rank's currency and marketing choice).
+    await expect(page.getByRole("heading", { name: "Preferences" })).toHaveCount(0);
+  });
+
   test("profile: an empty name is refused in the browser and focus moves to it", async ({ page }) => {
-    await page.goto("/en/merchant/settings");
+    await page.goto("/en/account/settings");
     await page.getByLabel("Full name").fill("");
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByText("Enter your name.")).toBeVisible();
@@ -94,7 +105,7 @@ test.describe("settings (active merchant)", () => {
 
   test("security: password and two-step cards only; the old #sessions address opens the page without an error", async ({ page }) => {
     // The per-device session list is retired; a bookmark or an old shortcut to its anchor still lands on the security page.
-    const response = await page.goto("/en/merchant/settings/security#sessions");
+    const response = await page.goto("/en/account/settings/security#sessions");
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("heading", { name: "Password" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Two-step verification" })).toBeVisible();
@@ -104,7 +115,7 @@ test.describe("settings (active merchant)", () => {
   });
 
   test("notifications: every event has one Email switch, the threshold is validated and discarding restores the form", async ({ page }) => {
-    await page.goto("/en/merchant/settings/notifications");
+    await page.goto("/en/account/settings/notifications");
     await expect(page.getByText("ops@zainmobilehub.example")).toBeVisible();
 
     // Announcements (`broadcast.announcement`): one switch, Email (the account is only read here, e2e/merchant-account.spec.ts
@@ -135,7 +146,7 @@ test.describe("settings (active merchant)", () => {
       await expect(page.getByText("Notification settings saved").first()).toBeVisible();
       return request.postDataJSON() as unknown;
     };
-    await page.goto("/en/merchant/settings/notifications");
+    await page.goto("/en/account/settings/notifications");
     await hydrated(page);
     const alert = page.getByLabel(/Alert me when my available balance/);
     // Start from "no alert": a run that ended before its last save was answered left 12.5 behind (seen 2026-11-17), and
@@ -157,44 +168,47 @@ test.describe("settings (active merchant)", () => {
 
   test("the old verification address opens the profile page", async ({ page }) => {
     await page.goto("/en/merchant/settings/verification");
-    await expect(page).toHaveURL(/\/en\/merchant\/settings$/);
+    await expect(page).toHaveURL(/\/en\/account\/settings$/);
     await expect(page.getByRole("heading", { level: 1, name: "Account settings" })).toBeVisible();
     await expect(page.getByLabel("Full name")).toBeVisible();
   });
 
-  test("the old referrals address opens the merchant overview", async ({ page }) => {
+  test("the old referrals address opens the account home, a filtered bookmark too", async ({ page }) => {
     await page.goto("/en/merchant/referrals");
-    await expect(page).toHaveURL(/\/en\/merchant$/);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Welcome back,");
-    await page.goto("/en/merchant/referrals?status=approved&period=2026-11"); // a filtered bookmark ends on the same page
-    await expect(page).toHaveURL(/\/en\/merchant(\?|$)/);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Welcome back,");
+    await expect(page).toHaveURL(/\/en\/account$/);
+    await page.goto("/en/merchant/referrals?status=approved&period=2026-11");
+    await expect(page).toHaveURL(/\/en\/account(\?|$)/);
   });
 
   test("the old Webhooks addresses open the API keys page", async ({ page }) => {
     for (const path of ["/en/merchant/webhooks", "/en/merchant/webhooks/12"]) {
       await page.goto(path);
-      await expect(page).toHaveURL(/\/en\/merchant\/api-keys$/);
-      await expect(page.getByRole("heading", { level: 1, name: "API keys" })).toBeVisible();
+      await expect(page).toHaveURL(/\/en\/account\/settings\/api-keys$/);
+      await expect(page.getByRole("heading", { level: 1, name: "Account settings" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 2, name: "API keys" })).toBeVisible();
     }
   });
 
-  test("the settings and API keys pages open with their heading and do not scroll sideways", async ({ page }) => {
+  test("the settings pages open with their heading and do not scroll sideways", async ({ page }) => {
     for (const [path, heading] of [
-      ["/en/merchant/settings", "Account settings"],
-      ["/en/merchant/api-keys", "API keys"],
+      ["/en/account/settings", "Personal information"],
+      ["/en/account/settings/security", "Password"],
+      ["/en/account/settings/notifications", "Notifications"],
+      ["/en/account/settings/api-keys", "API keys"],
+      ["/en/account/settings/privacy", "Privacy and data"],
     ] as const) {
       await page.goto(path);
-      await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Account settings" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 2, name: heading }).first()).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-      expect(overflow).toBeLessThanOrEqual(0);
+      expect(overflow, path).toBeLessThanOrEqual(0);
     }
   });
 
   test("API keys: create → secret shown once → edit IPs → revoke", async ({ page, isMobile }) => {
     test.skip(isMobile, "mutating integration test: desktop project only");
     const keyName = `E2E key ${Date.now()}`;
-    await page.goto("/en/merchant/api-keys");
+    await page.goto("/en/account/settings/api-keys");
     await page.getByRole("button", { name: "New API key" }).click();
     const create = page.getByRole("dialog", { name: "New API key" });
 
@@ -239,36 +253,44 @@ test.describe("settings (active merchant)", () => {
   });
 });
 
-// ── merchant waiting for approval (the demo's pending account, only read) ───────────────────────────────────
-// Staff-made accounts are active at once, so the waiting state is no longer made by a test: the demo's own pending account is read.
+// ── a retail account: the sections it has, and the ones it does not ──────────────────────────────────────────
 
-test.describe("settings (merchant waiting for approval)", () => {
-  test.beforeEach(async ({ page }) => {
-    await signInMerchant(page, ACCOUNTS.pendingMerchant);
+test.describe("settings (retail account)", () => {
+  test("the navigation lists Profile, Security and Privacy only", async ({ page }) => {
+    await freshAccount(page, { signedIn: true });
+    await page.goto("/en/account/settings");
+    const nav = page.getByRole("navigation", { name: "Settings sections" });
+    await expect(nav.getByRole("link")).toHaveText(["Profile", "Security", "Privacy"]);
+    await expect(nav.getByRole("link", { name: "Notifications" })).toHaveCount(0);
+    await expect(nav.getByRole("link", { name: "API keys" })).toHaveCount(0);
   });
 
-  test("API keys and notifications show the approval notice, never a sign-out", async ({ page }) => {
-    for (const path of ["/en/merchant/api-keys", "/en/merchant/settings/notifications"]) {
+  test("the merchant-only pages send a retail account to the account home", async ({ page }) => {
+    await freshAccount(page, { signedIn: true });
+    for (const path of ["/en/account/settings/notifications", "/en/account/settings/api-keys"]) {
       await page.goto(path);
-      await expect(page.getByText("This page opens once your merchant account is approved.")).toBeVisible();
-      await expect(page).toHaveURL(new RegExp(`${path}$`));
+      await expect(page).toHaveURL(/\/en\/account$/);
     }
-    // Profile and security work.
-    await page.goto("/en/merchant/settings");
-    await expect(page.getByLabel("Full name")).not.toHaveValue("");
-    await expect(page.getByText("Pending approval").first()).toBeVisible();
+  });
+
+  test("privacy: a retail account can ask for a copy of its data and for erasure", async ({ page }) => {
+    await freshAccount(page, { signedIn: true });
+    await page.goto("/en/account/settings/privacy");
+    await expect(page.getByRole("button", { name: "Request data export" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Request deletion" })).toBeVisible();
+    await expect(page.getByText("This account has a merchant rank.")).toHaveCount(0);
   });
 });
 
-// ── a merchant that staff invited (a throwaway account for each test) ───────────────────────────────────────
+// ── a merchant that staff created (a throwaway account for each test) ────────────────────────────────────────
 
-test.describe("settings (invited merchant)", () => {
+test.describe("settings (new merchant)", () => {
   test.beforeEach(async ({ page }) => {
-    await signInMerchant(page, await freshMerchant(page));
+    await signIn(page, await freshAccount(page, { rank: "merchant" }));
   });
 
   test("password: wrong current password and mismatch are reported on the right fields", async ({ page }) => {
-    await page.goto("/en/merchant/settings/security");
+    await page.goto("/en/account/settings/security");
     const form = page.locator("section#password");
     await form.getByLabel("Current password").fill("not-my-password-1");
     await form.getByLabel(/^New password/).fill("Marble-Orbit-71920");
@@ -278,13 +300,13 @@ test.describe("settings (invited merchant)", () => {
 
     await form.getByLabel("Confirm new password").fill("Marble-Orbit-71920");
     await form.getByRole("button", { name: "Change password" }).click();
-    await expect(form.getByText("That is not your current password.")).toBeVisible();
+    await expect(form.getByText("This is not your current password.")).toBeVisible();
     await expect(form.getByLabel("Current password")).toBeFocused();
   });
 
   test("two-step verification: set up → enable → disable, QR is an image", async ({ page, isMobile }) => {
     test.skip(isMobile, "same flow as desktop");
-    await page.goto("/en/merchant/settings/security");
+    await page.goto("/en/account/settings/security");
     const card = page.locator("section#two-factor");
     await card.getByRole("button", { name: "Set up" }).click();
 
@@ -313,12 +335,30 @@ test.describe("settings (invited merchant)", () => {
     await expect(card.getByText("Off", { exact: true })).toBeVisible();
   });
 
-  test("sign out: the account menu ends the merchant session and goes to sign-in", async ({ page, isMobile }) => {
+  test("privacy: a merchant rank can ask for its data and is told how to ask for erasure; no erasure is sent", async ({ page }) => {
+    const sent: string[] = [];
+    page.on("request", (request) => {
+      const path = new URL(request.url()).pathname;
+      if (request.method() === "POST" && /\/store\/v1\/me\/data-(export|delete)$/.test(path)) sent.push(path);
+    });
+    await page.goto("/en/account/settings/privacy");
+    const card = page.locator("section#privacy");
+    await expect(card.getByText("This account has a merchant rank. Ask us to move it to the retail rank first; then you can ask for erasure.")).toBeVisible();
+    await expect(card.getByRole("link", { name: "Contact support" })).toHaveAttribute("href", "/en/account/support/new");
+    await expect(page.getByRole("button", { name: "Request deletion" })).toHaveCount(0);
+
+    await hydrated(page);
+    await card.getByRole("button", { name: "Request data export" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Request received: Data export" })).toBeVisible();
+    expect(sent).toEqual(["/store/v1/me/data-export"]);
+  });
+
+  test("sign out: the account menu ends the session and goes to sign-in", async ({ page, isMobile }) => {
     test.skip(isMobile, "same flow as desktop");
-    await page.goto("/en/merchant/settings/security");
+    await page.goto("/en/account/settings/security");
     await page.getByRole("button", { name: "Account menu" }).click();
     await page.getByRole("button", { name: "Sign out" }).click();
-    await expect(page).toHaveURL(/\/en\/sign-in\?as=merchant/);
+    await expect(page).toHaveURL(/\/en\/sign-in(\?|$)/);
     await expect(async () => {
       const me = await page.request.get("/client/auth/me");
       expect(me.status()).toBe(401);

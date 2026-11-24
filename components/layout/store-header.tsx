@@ -13,7 +13,7 @@
 // SearchEnhancer, which turns it into the search combobox on the first interaction (without JavaScript it stays a plain
 // GET form). The phone copy carries `autofocus`, so the row's popover focuses it inside
 // the tap (a phone then opens its keyboard).
-import { Headset, LayoutGrid, Store, PackageSearch, LifeBuoy } from "lucide-react";
+import { Headset, LayoutGrid, PackageSearch, LifeBuoy } from "lucide-react";
 import { sitePath } from "@/lib/site-path";
 import { common } from "@/lib/i18n/messages/common";
 import { search as searchMessages } from "@/lib/i18n/messages/search";
@@ -108,10 +108,6 @@ export async function StoreHeader() {
         <Headset aria-hidden="true" />
         {t.nav.support}
       </NavLink>
-      <NavLink href={p("/merchant")} className={navLinkClasses}>
-        <Store aria-hidden="true" />
-        {t.nav.merchants}
-      </NavLink>
     </>
   );
 
@@ -134,10 +130,6 @@ export async function StoreHeader() {
         <NavLink href={p("/support")} className={drawerLinkClasses}>
           <Headset aria-hidden="true" />
           {t.nav.support}
-        </NavLink>
-        <NavLink href={p("/merchant")} className={drawerLinkClasses}>
-          <Store aria-hidden="true" />
-          {t.nav.merchants}
         </NavLink>
       </nav>
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">

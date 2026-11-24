@@ -1,5 +1,5 @@
-// Logos of payment methods (feature 32, ready-made payment methods). Pure and safe anywhere: the three places that offer
-// a method (the customer's and the merchant's top-up forms, the checkout) are Client Components, so no file is read here.
+// Logos of payment methods (feature 32, ready-made payment methods). Pure and safe anywhere: the places that offer
+// a method (the add-funds forms of both ranks, the checkout) are Client Components, so no file is read here.
 // The order of a logo is the API's: the picture staff uploaded (`logoUrl`, `/store/v1/media/<name>`), else the bundled logo
 // of the method's `preset` (`public/images/payments/<file>`), else an icon. Which bundled files exist comes from
 // `lib/payment-logo-sizes.json`, which `npm run logos` writes (scripts/logo-sizes.mjs), the way the brand logos are listed

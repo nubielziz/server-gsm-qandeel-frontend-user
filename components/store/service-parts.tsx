@@ -1,6 +1,6 @@
 // Pieces of the service page and the quick view: FAQ accordion, the price block (unit price, "per unit", "From", the
-// packs), the facts rows (availability, delivery, quantity) and the merchant price hint.
-// The price (currency cookie) and the merchant hint (session) await `navigation()` first: they render on the click, never
+// packs), the facts rows (availability, delivery, quantity) and the price hint of a merchant rank.
+// The price (currency cookie) and the rank hint (session) await `navigation()` first: they render on the click, never
 // in a prefetch, so every cookie read of the service page sits below it and a prefetch of a prerendered slug is served
 // from the static output (plan P3.2; Next docs "Optimizing prefetching", "Keep the prefetch static"). Each sits in its
 // own <Suspense>, whose fallback is what the prefetch shows.
@@ -9,19 +9,21 @@ import { navigation } from "next/cache";
 import Link from "next/link";
 import { ChevronDown, CircleCheck, Clock, Hash, PackageCheck, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button";
 import { Money } from "@/components/ui/money";
 import { Markdown } from "@/components/ui/markdown";
 import { Skeleton } from "@/components/ui/skeleton";
 import { demoteHeadings } from "./markdown-source";
 import { priceNotes } from "./card-labels";
+import { rankKindOf } from "@/lib/account/family";
 import { getStoreService } from "@/lib/api/public";
 import { apiSessionGet } from "@/lib/api/server";
-import { getMerchant } from "@/lib/api/session";
+import { getAccount } from "@/lib/api/session";
 import type { MerchantServiceDetail, StoreServiceDetail } from "@/lib/api/types";
+import { priceListHref } from "@/lib/checkout/access";
 import { getCurrency } from "@/lib/currency";
 import { formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
-import { sitePath } from "@/lib/site-path";
 import { common, type CommonMessages } from "@/lib/i18n/messages/common";
 import type { StoreMessages } from "@/lib/i18n/messages/store";
 import { store } from "@/lib/i18n/messages/store";
@@ -202,34 +204,37 @@ export async function ServicePrice({ slug }: { slug: string }) {
 }
 
 /**
- * For a signed-in ACTIVE merchant only: what the merchant pays for this service (`GET /client/services/:id`), with a link
- * to the portal. Nothing for visitors, pending merchants or services the merchant cannot see (403/404). Reading it records
- * the merchant's listed price, which is intended (handoff §4.4). Personal: rendered on the navigation, per request, never
- * cached or prefetched. The merchant comes from `getMerchant()` (no API call without the merchant's CSRF cookie, one per
- * request however many parts ask).
+ * For a signed-in account of a merchant rank only: what the account pays for this service (`GET /client/services/:id`), a
+ * button "Order at your price" to its price list, and the line that the shop checkout is for retail buyers. Nothing for
+ * visitors, for retail ranks, or for a service the account cannot see (403/404). Reading it records the account's listed
+ * price, which is intended. Personal: rendered on the navigation, per request, never cached or prefetched. The account
+ * comes from `getAccount()` (no API call without the account's CSRF cookie, one per request however many parts ask); a retail
+ * rank costs that one read and no service read.
  */
-export async function MerchantPriceHint({ serviceId }: { serviceId: number }) {
+export async function RankPriceHint({ serviceId }: { serviceId: number }) {
   await navigation();
   const t = store;
   let service: MerchantServiceDetail | null = null;
   try {
-    const me = await getMerchant();
-    if (me?.status === "active") service = await apiSessionGet<MerchantServiceDetail>(`/client/services/${serviceId}`);
+    const me = await getAccount();
+    if (me && rankKindOf(me) === "merchant") {
+      service = await apiSessionGet<MerchantServiceDetail>(`/client/services/${serviceId}`);
+    }
   } catch {
-    // 401/403 (signed out, pending, not allowed) and 404 (service not on this merchant's list): no hint. Never break the page.
+    // 401/403 (signed out, suspended, not allowed) and 404 (service not on this account's list): no hint. Never break the page.
     service = null;
   }
   if (!service) return null;
   return (
-    <div className="rounded-card border border-line bg-surface-muted p-4">
-      <p className="text-small text-ink-muted">{t.service.merchantPrice}</p>
-      <Money amount={service.price} currency={service.currency} decimals={2} className="text-heading font-bold text-ink" />
-      <Link
-        href={sitePath(`/merchant/services/${serviceId}`)}
-        className="touch-target mt-1 flex text-small font-semibold text-ink underline underline-offset-4"
-      >
-        {t.service.merchantManage}
-      </Link>
+    <div className="grid gap-3 rounded-card border border-line bg-surface-muted p-4">
+      <div>
+        <p className="text-small text-ink-muted">{t.service.rankPrice}</p>
+        <Money amount={service.price} currency={service.currency} decimals={2} className="text-heading font-bold text-ink" />
+      </div>
+      <ButtonLink href={priceListHref(serviceId)} block>
+        {t.service.rankOrder}
+      </ButtonLink>
+      <p className="text-small text-ink-subtle">{t.service.rankRetailOnly}</p>
     </div>
   );
 }

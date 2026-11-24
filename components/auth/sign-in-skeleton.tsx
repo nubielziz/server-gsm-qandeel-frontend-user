@@ -1,7 +1,6 @@
-// The same-size placeholder of the sign-in form while the query string (`?as=`, `?next=`, `?token=`) is read in the
-// browser. Server-compatible. Heights follow the real password form (one form for customers and merchants: the two fields
-// and the Turnstile box, the submit button, the divider, the two secondary buttons and the "create account" line), so
-// nothing jumps when it replaces this.
+// The same-size placeholder of the sign-in form while the query string (`?next=`, `?token=`) is read in the browser.
+// Server-compatible. Heights follow the real password form (the two fields and the Turnstile box, the submit button, the
+// divider, the two secondary buttons and the "create account" line), so nothing jumps when it replaces this.
 import { Skeleton } from "@/components/ui/skeleton";
 
 function FieldSkeleton() {
