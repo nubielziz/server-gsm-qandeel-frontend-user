@@ -23,6 +23,16 @@ export const common = {
     menu: "Menu",
     allCategories: "All categories",
     categories: "Categories",
+    /**
+     * The four service-type links (they open the catalog filtered to a type). The desktop row shows `short` below `xl`
+     * and `short rest` from `xl` (the whole text stays in the accessible name); the phone menu shows both.
+     */
+    typeLinks: {
+      imei: { short: "IMEI", rest: "services" },
+      server: { short: "Server", rest: "services" },
+      file: { short: "File", rest: "services" },
+      remote: { short: "Remote", rest: "services" },
+    },
   },
   header: {
     skipToContent: "Skip to content",

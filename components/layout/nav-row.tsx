@@ -5,7 +5,8 @@
 // (a CSS transition on `translate` and `width`, globals.css `.nav-pill`), and the links' text turns white or grey when
 // the pill covers half of them (`data-pill-on`, timing in nav-pill-timing.ts), so the colour follows the slide.
 // - First placement, resizes and font loading: the pill jumps (no slide on page load). Only a change of the current
-//   link with a new pathname slides; a link that resolves its active mark after hydration (NavLink's <Suspense>) jumps.
+//   link with a new address (pathname or query: "All services" to "IMEI services" is the same path) slides; a link that
+//   resolves its active mark after hydration (NavLink's <Suspense>) jumps.
 // - Before this script runs (server HTML, no JavaScript) the selected link draws the black box itself (globals.css),
 //   so nothing moves when the pill takes over.
 // - Measured with offsetLeft/offsetWidth relative to the row, which are physical px. The
@@ -56,7 +57,10 @@ export function NavRow({ children, className }: NavRowProps) {
     if (!row || !pill) return;
     let timers: number[] = [];
     let last: { link: HTMLElement; box: Box } | null = null;
-    let path = window.location.pathname;
+    // The address the row last saw: the query counts, the catalog's type links differ from "All services" by it alone.
+    // A query change that leaves the current link (and its box) as it was is a no-op in place().
+    const address = () => window.location.pathname + window.location.search;
+    let path = address();
     const on = new Set<string>();
     const commit = () => setCovered([...on]);
 
@@ -134,7 +138,7 @@ export function NavRow({ children, className }: NavRowProps) {
     };
     // A NavLink's `aria-current` changes on a navigation; a link is replaced when its <Suspense> resolves.
     const changes = new MutationObserver(() => {
-      const next = window.location.pathname;
+      const next = address();
       const navigated = next !== path;
       path = next;
       observeSizes();

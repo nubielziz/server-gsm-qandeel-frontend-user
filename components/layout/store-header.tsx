@@ -1,6 +1,12 @@
 // StoreHeader (mockup "E-Commerce"): logo, search, currency, account area, then a nav row ("All services",
-// the "All categories" menu and the other links) whose black pill marks the current page's link and slides to the next
+// the "All categories" menu, the four service-type links "IMEI services", "Server services", "File services" and
+// "Remote services", and the other links) whose black pill marks the current page's link and slides to the next
 // one (components/layout/nav-row.tsx); on pages without a current link (the home page) it rests on "All services".
+// A type link opens the catalog filtered to that type (`/services?type=imei`...). Its path is the one of "All services",
+// so the mark also reads the `type` parameter (NavLink `param` / `exceptParam`, active-path.ts): the type link is
+// current for exactly that one type, "All services" for the catalog without a type or with two or more, never both.
+// From `xl` the type links read "IMEI services"; between `lg` and `xl` the row is tight and they read "IMEI" (the word
+// "services" stays in the accessible name).
 // There is no cart, no favourites, no bell and no social sign-in (the API has none).
 // Mobile: a compact bar (logo, search toggle, account, menu button) and a start-side drawer with the nav, the same
 // categories in a `<details>` block, and a bottom row with the currency picker and the theme switch. The theme switch is
@@ -16,6 +22,8 @@
 // GET form). The phone copy carries `autofocus`, so the row's popover focuses it inside
 // the tap (a phone then opens its keyboard).
 import { Headset, LayoutGrid, PackageSearch, LifeBuoy } from "lucide-react";
+import { serviceTypeIcons } from "@/components/store/service-art";
+import type { ServiceType } from "@/lib/api/types";
 import { sitePath } from "@/lib/site-path";
 import { common } from "@/lib/i18n/messages/common";
 import { search as searchMessages } from "@/lib/i18n/messages/search";
@@ -40,6 +48,15 @@ const navLinkClasses =
 const drawerLinkClasses =
   "flex min-h-12 items-center gap-3 rounded-control px-3 text-body font-semibold text-ink transition-colors hover:bg-surface-muted " +
   "aria-[current=page]:bg-surface-sunken [&_svg]:size-5 [&_svg]:text-ink-muted";
+
+/** The service types the nav links to, in the row's order (the owner's order, not the catalog's). */
+const NAV_TYPES = ["imei", "server", "file", "remote"] as const satisfies readonly ServiceType[];
+
+/** Query parameter of the catalog that holds the service type (the catalog page reads `type`, components/store/service-list.tsx). */
+const TYPE_PARAM = "type";
+
+/** The catalog filtered to one type. */
+const typeHref = (type: ServiceType) => sitePath(`/services?${TYPE_PARAM}=${type}`);
 
 /** The shop header. Render it in the (store) layout; it needs no props. */
 export async function StoreHeader() {
@@ -86,11 +103,15 @@ export async function StoreHeader() {
     );
   };
 
+  /** "All services" gives way to a type link when the URL is the catalog with exactly one of the four types. */
+  const exceptTypes = { name: TYPE_PARAM, oneOf: NAV_TYPES };
+  const typeLabels = t.nav.typeLinks;
+
   const nav = (
     <>
       {/* prefetch: the catalog's first page comes with the prefetch, not after the click (plan P3.1).
           data-nav-default: the pill rests here on pages without a current link (the home page). */}
-      <NavLink href={p("/services")} prefetch data-nav-default className={navLinkClasses}>
+      <NavLink href={p("/services")} exceptParam={exceptTypes} prefetch data-nav-default className={navLinkClasses}>
         <LayoutGrid aria-hidden="true" />
         {t.nav.allServices}
       </NavLink>
@@ -100,6 +121,17 @@ export async function StoreHeader() {
         listLabel={t.nav.categories}
         triggerClassName={navLinkClasses}
       />
+      {/* Text only: the row is tight. "services" is hidden below `xl` for sighted visitors (sr-only keeps it in the
+          accessible name; the no-break space keeps the name "IMEI services" and the gap at `xl`). One inner span, so
+          the link's flex gap does not open between the two words. */}
+      {NAV_TYPES.map((type) => (
+        <NavLink key={type} href={typeHref(type)} param={{ name: TYPE_PARAM, is: type }} className={navLinkClasses}>
+          <span>
+            {typeLabels[type].short}
+            <span className="max-xl:sr-only">&nbsp;{typeLabels[type].rest}</span>
+          </span>
+        </NavLink>
+      ))}
       <NavLink href={p("/track")} className={navLinkClasses}>
         {t.nav.trackOrder}
       </NavLink>
@@ -117,10 +149,19 @@ export async function StoreHeader() {
   const drawerContent = (
     <div className="grid gap-6">
       <nav aria-label={t.nav.label} className="grid gap-1">
-        <NavLink href={p("/services")} prefetch className={drawerLinkClasses}>
+        <NavLink href={p("/services")} exceptParam={exceptTypes} prefetch className={drawerLinkClasses}>
           <LayoutGrid aria-hidden="true" />
           {t.nav.allServices}
         </NavLink>
+        {NAV_TYPES.map((type) => {
+          const Icon = serviceTypeIcons[type];
+          return (
+            <NavLink key={type} href={typeHref(type)} param={{ name: TYPE_PARAM, is: type }} className={drawerLinkClasses}>
+              <Icon aria-hidden="true" />
+              {typeLabels[type].short} {typeLabels[type].rest}
+            </NavLink>
+          );
+        })}
         <CategoryDrawerList categories={categories} label={t.nav.categories} summaryClassName={drawerLinkClasses} />
         <NavLink href={p("/track")} className={drawerLinkClasses}>
           <PackageSearch aria-hidden="true" />

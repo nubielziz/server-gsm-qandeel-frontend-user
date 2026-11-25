@@ -572,6 +572,18 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
 - Checks: typecheck, lint, the unit tests, `gen:api:check` and a production build; every page family looked at in both themes
   (desktop and phone) on the isolated demo backend. The e2e were not run.
 
+## Service types in the nav (2026-11-25, owner's request)
+- The shop's nav has four new links after "All categories": "IMEI services", "Server services", "File services" and "Remote services".
+  Each opens the catalog with that one type chosen (`/en/services?type=imei` ...), so the list, the ticked filter and its chip show
+  every service of the type. The phone menu has the same four links with the type icons.
+- One current link: the type links and "All services" share the catalog's path, so `NavLink` can read one query parameter
+  (`param` / `exceptParam`, `components/layout/active-path.ts`): a type link is current for exactly its own type, "All services" for
+  the catalog without a type or with several, never both. The pill slides on a change of the query too.
+- Between `lg` and `xl` the row is tight: the links read "IMEI", "Server", "File", "Remote" there (the word "services" stays in the
+  accessible name); from `xl` they read in full. Measured: the row fits from 1024 px up.
+- Checks: typecheck, lint, the unit tests, `gen:api:check`, a production build, and a look in the browser (the row at seven widths,
+  the current link after each click, the phone menu). The e2e were not run (`e2e/home-sections.spec.ts` lists the new names).
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.

@@ -24,7 +24,7 @@ const TEXT = {
   categories: "Categories",
   openMenu: "Open menu",
   menu: "Menu",
-  navRow: ["All services", "Track an order", "Help center", "Support"],
+  navRow: ["All services", "IMEI services", "Server services", "File services", "Remote services", "Track an order", "Help center", "Support"],
 } as const;
 
 /** A row of the home sections holds this many cards at most. */
