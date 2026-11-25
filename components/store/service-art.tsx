@@ -45,7 +45,7 @@ const logoSizes = {
   /** Tiles: 28 px high, narrower. */
   lg: "h-7 max-w-[6.5rem]",
   /** In place of a service picture (quick view, service page): 64 px high. */
-  xl: "h-16 max-w-[75%]",
+  xl: "h-16 max-w-[75%] [--plate-pad:12px]",
 } as const;
 
 export type LogoProps = {
@@ -58,7 +58,10 @@ export type LogoProps = {
   className?: string;
 };
 
-/** A brand or carrier logo at its real proportions, or nothing when there is no file. */
+/**
+ * A brand or carrier logo at its real proportions, or nothing when there is no file. The files are made for a light
+ * background, so in the dark theme the logo sits on a white plate (`logo-plate`, globals.css; decision 006).
+ */
 export function Logo({ folder, name, alt, size = "md", className }: LogoProps) {
   const file = name ? logoFile(folder, name) : null;
   const src = file ? siteImage(file) : null;
@@ -71,7 +74,7 @@ export function Logo({ folder, name, alt, size = "md", className }: LogoProps) {
       alt={alt ?? name}
       width={box.width}
       height={box.height}
-      className={cn("w-auto shrink-0 object-contain", logoSizes[size], className)}
+      className={cn("logo-plate w-auto shrink-0 object-contain", logoSizes[size], className)}
     />
   );
 }

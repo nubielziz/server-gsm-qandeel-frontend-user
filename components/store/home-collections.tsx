@@ -92,8 +92,8 @@ export function CollectionCards({ collections, decimals, t, countText }: Collect
                   aria-hidden="true"
                   className={
                     "grid size-9 shrink-0 place-items-center rounded-full border border-line-strong text-ink transition-colors " +
-                    "duration-(--duration-base) ease-standard group-hover/head:border-inverse group-hover/head:bg-inverse " +
-                    "group-hover/head:text-on-inverse [&_svg]:size-4"
+                    "duration-(--duration-base) ease-standard group-hover/head:border-primary group-hover/head:bg-primary " +
+                    "group-hover/head:text-on-primary [&_svg]:size-4"
                   }
                 >
                   <ArrowRight />

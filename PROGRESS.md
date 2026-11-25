@@ -559,6 +559,19 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
   shop's search answers as before (the shipped synonyms stay); pins and hidden popular terms are gone on the backend. Push the backend
   first: the `api-types` check reads its `main`.
 
+## Dark theme (2026-11-25, owner's request; `docs/decisions/006-dark-theme.md`)
+- The whole site has a dark theme beside the light one. `data-theme` on `<html>` switches every colour and shadow token
+  (`app/globals.css`); `THEME_GUARD` (`lib/theme/theme.ts`) sets it before the first paint from the visitor's stored choice
+  (`localStorage` `gsm.theme`) or the system, and follows the system while nothing is stored. The switch (`ThemeToggle`) is in the
+  shop header, the account rail, both phone drawers, the sign-in pages and the checkout header.
+- The old `inverse` colour is two families now: `primary` for solid controls (flips with the theme) and `inverse` for dark panels
+  (dark in both). New tokens: `primary*`, `on-primary`, `inverse-edge`, `surface-raised`, `danger-strong`, `plate`, `on-plate`.
+  Light looks as before.
+- Pictures: the site logo swaps its ink by theme; brand, carrier and payment logos get a white plate in dark; the two light home
+  banners draw their art as a negative in dark; the sign-in picture is dimmed.
+- Checks: typecheck, lint, the unit tests, `gen:api:check` and a production build; every page family looked at in both themes
+  (desktop and phone) on the isolated demo backend. The e2e were not run.
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.

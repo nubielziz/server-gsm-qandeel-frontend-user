@@ -4,6 +4,8 @@
 // comfortable 120rem, never leaving a strip at the start edge) and starts with a white header card (breadcrumb + section
 // title, search, header slot such as the wallet pill, avatar menu). Below lg: a top bar with a menu button that opens a
 // start-side drawer with the labelled navigation, and a fixed bottom tab bar with the key destinations.
+// The theme switch sits near the bottom of the rail (a dark-surface button, between the footer nav and the avatar) and, below `lg`,
+// in the menu drawer's bottom row: the phone header card (menu button, title, bell, account menu) has no room for one more button.
 // The rail and the tab bar mark the current page with one sliding indicator each (sliding-nav.tsx). On a client
 // navigation the page plays the shop's enter/exit view transition (each page wraps itself in <PageTransition>) while the
 // rail, the header card and the tab bar are named and held still (globals.css "Page transitions").
@@ -28,6 +30,7 @@ import { ChromeProviders } from "./chrome-providers";
 import { Logo } from "./logo";
 import { SkipLink } from "./skip-link";
 import { SlidingNav } from "./sliding-nav";
+import { ThemeToggle } from "./theme-toggle";
 import { ActiveWorkspaceNav, WorkspaceHeading, WorkspaceHeadingView, WorkspaceMobileNav } from "./workspace-nav";
 import { headingItems, WorkspaceNavView, type WorkspaceNavItem, type WorkspaceTitleItem } from "./workspace-nav-view";
 
@@ -243,6 +246,13 @@ export function WorkspaceShell({
               <NavGroup group="main" variant="rail" {...lists} />
               <div className="grid justify-items-center gap-4">
                 {footerNav && footerNav.length > 0 ? <NavGroup group="footer" variant="rail" {...lists} /> : null}
+                {/* Same boxes as the rail's links (48 px, 44 and 40 px on short screens), the same colours (tone="inverse"). */}
+                <ThemeToggle
+                  label={t.theme.dark}
+                  tone="inverse"
+                  size="lg"
+                  className="[&_svg]:size-6! [@media(max-height:46rem)]:size-11 [@media(max-height:41rem)]:size-10!"
+                />
                 {/* The header's account menu shows the same avatar: on short screens the rail drops it to fit. */}
                 <Suspense fallback={<span aria-hidden="true" className={`size-10 rounded-full bg-inverse-raised ${RAIL_AVATAR_HIDE}`} />}>
                   <RailAvatar resolveUser={resolveUser} />
@@ -255,11 +265,13 @@ export function WorkspaceShell({
             <header className="vt-workspace-header flex min-h-[4.5rem] items-center gap-3 rounded-card border border-line bg-surface px-3 py-2.5 shadow-card sm:px-5">
               <WorkspaceMobileNav brand={<Logo href={home} />} labels={{ open: t.workspace.openNav, title: t.workspace.navLabel }}>
                 <NavGroup group="main" variant="drawer" {...lists} />
-                {footerNav && footerNav.length > 0 ? (
-                  <div className="border-t border-line pt-4">
-                    <NavGroup group="footer" variant="drawer" {...lists} />
+                <div className="grid gap-4 border-t border-line pt-4">
+                  {footerNav && footerNav.length > 0 ? <NavGroup group="footer" variant="drawer" {...lists} /> : null}
+                  <div className="flex items-center justify-between gap-3 ps-3">
+                    <span className="text-body font-semibold text-ink-muted">{t.theme.appearance}</span>
+                    <ThemeToggle label={t.theme.dark} />
                   </div>
-                ) : null}
+                </div>
               </WorkspaceMobileNav>
               <div className="min-w-0 flex-1 lg:flex-none lg:basis-72">
                 <Suspense fallback={<WorkspaceHeadingView {...headingProps} />}>

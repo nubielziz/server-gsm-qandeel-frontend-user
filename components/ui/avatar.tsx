@@ -36,7 +36,7 @@ export function Avatar({ name, size = "md", tone = "dark", label, className }: A
       className={cn(
         "inline-grid shrink-0 select-none place-items-center rounded-full font-bold",
         sizes[size],
-        tone === "dark" ? "bg-inverse text-on-inverse" : "bg-surface text-ink",
+        tone === "dark" ? "bg-primary text-on-primary" : "bg-plate text-on-plate",
         className,
       )}
     >

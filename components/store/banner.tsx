@@ -42,6 +42,14 @@ export type BannerArtProps = {
 };
 
 /**
+ * The art of a `light` banner is a dark, colourless subject on a white ground (docs/IMAGE-PROMPTS.md). On the dark theme's
+ * card that white ground would glare, so the picture is drawn as its negative there: a light subject on a black ground
+ * that fades into the dark card (decision 006). The hue is turned back, so a colour in the picture keeps its hue. The
+ * slot's own placeholder colour is dropped, or it would be inverted too while the picture loads.
+ */
+const LIGHT_ART_IN_DARK = "dark:bg-transparent dark:invert dark:hue-rotate-180";
+
+/**
  * The owner's image on one side of a banner card, fading into the card towards the text. Renders nothing until the
  * file exists (the card then shows only its surface). The images keep their subject on the outer side (right for `end`,
  * left for `start`, docs/IMAGE-PROMPTS.md): the crop keeps that side.
@@ -58,6 +66,7 @@ export function BannerArt({ file, alt, sizes, loading, fetchPriority, tone, side
         loading={loading}
         fetchPriority={fetchPriority}
         objectPosition={end ? "right center" : "left center"}
+        className={tone === "light" ? LIGHT_ART_IN_DARK : undefined}
       />
       <div
         aria-hidden="true"

@@ -19,16 +19,16 @@ const base =
   "[&_svg]:size-[1.125em] [&_svg]:shrink-0";
 
 const variants: Record<ButtonVariant, string> = {
-  /** Near-black filled: the main action of a screen. */
-  primary: "btn-lift rounded-control bg-inverse text-on-inverse hover:bg-inverse-raised active:bg-inverse-raised",
+  /** Filled with the primary colour (near-black in light, near-white in dark): the main action of a screen. */
+  primary: "btn-lift rounded-control bg-primary text-on-primary hover:bg-primary-raised active:bg-primary-raised",
   /** White with a border: the secondary action next to a primary. */
   secondary: "btn-lift-soft rounded-control border border-line-strong bg-surface text-ink hover:border-ink active:bg-surface-muted",
   /** No box until hovered: toolbars, table row actions. */
   ghost: "rounded-control text-ink hover:bg-surface-sunken active:bg-surface-sunken",
-  /** White on dark surfaces (e.g. "Add funds" on the dark balance card). */
-  inverse: "rounded-control bg-surface text-ink hover:bg-surface-sunken active:bg-surface-sunken",
+  /** White on dark surfaces (e.g. "Add funds" on the dark balance card): white in both themes, as the panel under it is dark in both. */
+  inverse: "rounded-control bg-plate text-on-plate hover:bg-plate-raised active:bg-plate-raised",
   /** Destructive action. */
-  danger: "rounded-control bg-danger text-on-inverse hover:bg-danger-ink active:bg-danger-ink",
+  danger: "rounded-control bg-danger text-on-inverse hover:bg-danger-strong active:bg-danger-strong",
   /** Looks like an underlined link, behaves like a button. */
   link: "touch-target rounded-badge text-ink underline decoration-1 underline-offset-4 hover:decoration-2",
 };

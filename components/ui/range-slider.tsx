@@ -77,7 +77,7 @@ export function RangeSlider({ min, max, step = 1, value, names, labels, format, 
       <div className="relative mt-2 h-5">
         <div className="absolute inset-x-[9px] top-1/2 h-1 -translate-y-1/2 rounded-full bg-line-strong" />
         <div
-          className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-inverse"
+          className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-primary"
           style={{ insetInlineStart: at(startPct), insetInlineEnd: at(endPct) }}
         />
         <input

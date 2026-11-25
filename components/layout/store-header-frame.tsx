@@ -23,7 +23,7 @@ export type StoreHeaderFrameProps = {
   search: ReactNode;
   /** The search form of the phone row (its field carries `autofocus`); defaults to `search`. */
   searchPhone?: ReactNode;
-  /** Currency + language pickers (desktop bar). */
+  /** The currency picker and the theme switch (desktop bar; on phones they are in the drawer). */
   switchers: ReactNode;
   /** Sign-in button or account menu. */
   account: ReactNode;

@@ -4,7 +4,7 @@ import { cn } from "@/lib/cn";
 export type ProgressTone = "ink" | "success" | "warning" | "danger" | "neutral";
 
 const toneClasses: Record<ProgressTone, string> = {
-  ink: "bg-inverse",
+  ink: "bg-primary",
   success: "bg-success",
   warning: "bg-warning",
   danger: "bg-danger",

@@ -10,7 +10,7 @@ export const badgeToneClasses: Record<BadgeTone, string> = {
   success: "bg-success-soft text-success-ink",
   warning: "bg-warning-soft text-warning-ink",
   danger: "bg-danger-soft text-danger-ink",
-  inverse: "bg-inverse text-on-inverse",
+  inverse: "bg-primary text-on-primary",
   outline: "border border-line-strong bg-surface text-ink-muted",
 };
 

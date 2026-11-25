@@ -33,9 +33,9 @@ describe("RankChip", () => {
     expect(renderToStaticMarkup(<RankChip me={account("merchant")} />)).toContain("Gold merchant");
   });
 
-  it("draws a merchant rank darker than a retail one", () => {
-    expect(renderToStaticMarkup(<RankChip me={account("merchant")} />)).toContain("bg-inverse");
-    expect(renderToStaticMarkup(<RankChip me={account("retail")} />)).not.toContain("bg-inverse");
+  it("draws a merchant rank as a solid chip and a retail one as a quiet one", () => {
+    expect(renderToStaticMarkup(<RankChip me={account("merchant")} />)).toContain("bg-primary");
+    expect(renderToStaticMarkup(<RankChip me={account("retail")} />)).not.toContain("bg-primary");
   });
 });
 

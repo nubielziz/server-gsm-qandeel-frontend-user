@@ -31,7 +31,7 @@ export function PaymentMarks({ t }: { t: PaymentMarksText }) {
                   key={method.name}
                   className="inline-flex items-center gap-2 rounded-control border border-inverse-raised py-1 ps-1 pe-3 text-small text-on-inverse"
                 >
-                  <span className="grid size-7 shrink-0 place-items-center rounded-badge bg-surface text-ink [&_svg]:size-4">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-badge bg-plate text-on-plate [&_svg]:size-4">
                     <Mark method={method} />
                   </span>
                   {method.name}

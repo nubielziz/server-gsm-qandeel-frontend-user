@@ -19,7 +19,7 @@ function BalanceFrame({ title, text, children }: { title: string; text: ReactNod
   return (
     <Card className="sheen-surface justify-center p-5 sm:p-6">
       <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-control bg-inverse text-on-inverse">
+        <span className="grid size-10 shrink-0 place-items-center rounded-control bg-primary text-on-primary">
           <Wallet aria-hidden="true" className="size-5" />
         </span>
         <div className="min-w-0 flex-1">

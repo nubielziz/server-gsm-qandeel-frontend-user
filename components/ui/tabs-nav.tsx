@@ -203,7 +203,7 @@ export function TabsNav({ label, variant, className, children }: TabsNavProps) {
       {pill && covered.length > 0 ? (
         // The links the pill covers get white text (the doubled class beats the hover colour). Nothing is rendered on the
         // server or before the pill is placed, so hydration sees the same markup.
-        <style>{`.tabs-pill[data-indicator][data-tabs=${cssString(id)}] a.tabs-link.tabs-link:is(${covered.map((href) => `[href=${cssString(href)}]`).join(",")}){color:var(--color-on-inverse);background-color:transparent;--tabs-count-bg:var(--color-inverse-raised);--tabs-count-ink:var(--color-on-inverse)}`}</style>
+        <style>{`.tabs-pill[data-indicator][data-tabs=${cssString(id)}] a.tabs-link.tabs-link:is(${covered.map((href) => `[href=${cssString(href)}]`).join(",")}){color:var(--color-on-primary);background-color:transparent;--tabs-count-bg:var(--color-primary-raised);--tabs-count-ink:var(--color-on-primary)}`}</style>
       ) : null}
       {/* First in the nav: the links (positioned) paint above it. */}
       <span ref={markRef} aria-hidden="true" className="tabs-indicator">

@@ -39,7 +39,7 @@ export default function ErrorPage({
           <a href={sitePath()} className="inline-flex min-h-11 items-center gap-2.5 rounded-control" aria-label={t.logoAlt}>
             <span
               aria-hidden="true"
-              className="grid size-9 place-items-center rounded-[10px] bg-inverse text-[0.6875rem] font-extrabold leading-none tracking-wide text-on-inverse"
+              className="grid size-9 place-items-center rounded-[10px] bg-primary text-[0.6875rem] font-extrabold leading-none tracking-wide text-on-primary"
             >
               GSM
             </span>

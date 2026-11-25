@@ -112,7 +112,7 @@ export function SegmentedControl({
               "disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
               size === "sm" ? "h-9 px-3 text-small" : "h-10 px-4 text-body",
               fullWidth && "flex-1",
-              checked ? "bg-surface text-ink shadow-card" : "text-ink-muted hover:text-ink",
+              checked ? "bg-surface-raised text-ink shadow-card" : "text-ink-muted hover:text-ink",
             )}
           >
             {option.icon}

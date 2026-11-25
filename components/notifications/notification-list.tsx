@@ -144,7 +144,7 @@ export async function NotificationList({ family, searchParams }: { family: Accou
                       <span
                         className={cn(
                           "grid size-10 place-items-center rounded-full [&_svg]:size-5",
-                          unread ? "bg-inverse text-on-inverse" : "bg-surface-sunken text-ink-muted",
+                          unread ? "bg-primary text-on-primary" : "bg-surface-sunken text-ink-muted",
                         )}
                       >
                         <CategoryIcon category={item.category} />

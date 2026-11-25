@@ -95,6 +95,12 @@ Mailpit http://localhost:8025); the owner's API on :3000 and its data are never 
 ## UI rules
 - Build pages from `components/ui` (primitives) and `components/layout` (shells); no one-off copies of a primitive.
   Design tokens live in `app/globals.css` (`@theme`); never hard-code colours, radii or shadows in pages.
+- **Two themes (decision 006):** `data-theme="light" | "dark"` on `<html>`, set before the first paint by `THEME_GUARD`
+  (`lib/theme/theme.ts`: the visitor's stored choice, else the system); the switch is `ThemeToggle`. Every token has a dark value,
+  so a page written with tokens works in both: check a new screen in both. Pick by what the thing is: `primary` / `on-primary` for
+  solid controls and marks (dark in light, light in dark), `inverse` / `on-inverse` for dark panels (dark in both). Never use
+  `dark:` for a colour: it is only for showing one of two pictures or a filter on a picture. A logo made for a light background
+  gets `logo-plate` (or `bg-plate`).
 - Accessibility: real labels, `aria-describedby` for hints/errors, focus moves to the first error, keyboard support,
   visible focus, touch targets ≥ 44 px, `aria-live` for async results.
 - Layout is left-to-right only (no `rtl:` variants, no `dir="rtl"`: the guard fails on them). Logical utilities

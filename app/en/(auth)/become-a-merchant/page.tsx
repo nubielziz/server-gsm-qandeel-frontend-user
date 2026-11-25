@@ -34,7 +34,7 @@ export default function BecomeMerchantPage() {
               <li key={step} className="flex items-start gap-3 text-body text-ink">
                 <span
                   aria-hidden="true"
-                  className="num grid size-7 shrink-0 place-items-center rounded-full bg-inverse text-small font-bold text-on-inverse"
+                  className="num grid size-7 shrink-0 place-items-center rounded-full bg-primary text-small font-bold text-on-primary"
                 >
                   {index + 1}
                 </span>

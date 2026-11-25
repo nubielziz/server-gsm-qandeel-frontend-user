@@ -74,6 +74,13 @@ export const common = {
     tabsLabel: "Shortcuts",
   },
 
+  /** The theme switch (components/layout/theme-toggle.tsx): one toggle, so one name for both themes; pressed = dark. */
+  theme: {
+    dark: "Dark theme",
+    /** The word beside the switch where it stands in a list of labelled links (the account area's phone menu). */
+    appearance: "Appearance",
+  },
+
   /** Left panel of the sign-in and sign-up pages. */
   auth: {
     headline: "Your GSM services, in one account.",

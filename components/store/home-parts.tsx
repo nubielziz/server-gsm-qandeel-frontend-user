@@ -134,7 +134,7 @@ const tileClasses =
 
 const tileMarkClasses =
   "mb-1.5 grid size-9 place-items-center rounded-full bg-surface-sunken text-small font-bold text-ink transition-colors " +
-  "duration-(--duration-base) ease-standard group-hover:bg-inverse group-hover:text-on-inverse [&_svg]:size-[18px]";
+  "duration-(--duration-base) ease-standard group-hover:bg-primary group-hover:text-on-primary [&_svg]:size-[18px]";
 
 export type CatalogTile = {
   /** Which catalog filter the tile sets. */
@@ -293,7 +293,7 @@ export function HowItWorks({ t, layout }: { t: Home["how"]; layout: "stack" | "r
               stack && "xl:items-center xl:not-first:border-t",
             )}
           >
-            <span className="num grid size-7 shrink-0 place-items-center rounded-full bg-inverse text-small font-bold text-on-inverse" aria-hidden="true">
+            <span className="num grid size-7 shrink-0 place-items-center rounded-full bg-primary text-small font-bold text-on-primary" aria-hidden="true">
               {i + 1}
             </span>
             <div className="min-w-0">

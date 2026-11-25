@@ -83,7 +83,7 @@ export function SearchInput({
         title={submitLabel}
         className={cn(
           // btn-motion: the background eases and a press scales it (globals.css); no lift, it is joined to the field.
-          "btn-motion inline-flex shrink-0 items-center justify-center rounded-e-control bg-inverse text-on-inverse hover:bg-inverse-raised",
+          "btn-motion inline-flex shrink-0 items-center justify-center rounded-e-control bg-primary text-on-primary hover:bg-primary-raised",
           large ? "w-13" : "w-11",
         )}
       >

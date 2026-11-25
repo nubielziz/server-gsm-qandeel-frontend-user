@@ -28,10 +28,10 @@ const itemClasses =
   "relative flex min-h-11 items-center gap-3 whitespace-nowrap rounded-control px-3.5 text-body font-medium text-ink-muted transition-colors " +
   "hover:text-ink lg:hover:bg-surface-muted " +
   "aria-[current=page]:font-bold aria-[current=page]:text-ink " +
-  "max-lg:aria-[current=page]:bg-inverse max-lg:aria-[current=page]:text-on-inverse max-lg:hover:bg-surface-sunken max-lg:aria-[current=page]:hover:bg-inverse " +
+  "max-lg:aria-[current=page]:bg-primary max-lg:aria-[current=page]:text-on-primary max-lg:hover:bg-surface-sunken max-lg:aria-[current=page]:hover:bg-primary " +
   "lg:aria-[current=page]:bg-surface-muted " +
   "[&_svg]:size-[18px] [&_svg]:shrink-0 " +
-  "lg:before:absolute lg:before:inset-y-1.5 lg:before:start-0 lg:before:w-1 lg:before:rounded-e-full lg:before:bg-transparent lg:aria-[current=page]:before:bg-inverse";
+  "lg:before:absolute lg:before:inset-y-1.5 lg:before:start-0 lg:before:w-1 lg:before:rounded-e-full lg:before:bg-transparent lg:aria-[current=page]:before:bg-primary";
 
 /** The navigation for an already-chosen list of entries (what the tests and the server slot both render). */
 export function SettingsNavView({ items, labels }: { items: SettingsNavItem[]; labels: SettingsNavLabels }) {

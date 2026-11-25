@@ -99,7 +99,7 @@ export function Pagination({ total, pageSize, page, basePath, searchParams, page
                     href={href(n)}
                     aria-label={fmt(t.pagination.goTo, { page: formatNumber(n) })}
                     aria-current={n === current ? "page" : undefined}
-                    className={cn(itemClasses, n === current ? "bg-inverse text-on-inverse" : "text-ink hover:bg-surface-sunken")}
+                    className={cn(itemClasses, n === current ? "bg-primary text-on-primary" : "text-ink hover:bg-surface-sunken")}
                   >
                     {formatNumber(n)}
                   </Link>

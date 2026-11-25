@@ -33,7 +33,10 @@ export type PaymentMethodLogoProps = {
   className?: string;
 };
 
-/** The chip: 48 × 32 px, the logo scaled to fit inside it (`object-contain`), an icon centred in it. */
+/**
+ * The chip: 48 × 32 px, the logo scaled to fit inside it (`object-contain`), an icon centred in it. A logo is a file made
+ * for a light background: in the dark theme its chip is a white plate (`logo-plate`, globals.css).
+ */
 const CHIP = "relative grid h-8 w-12 shrink-0 place-items-center";
 
 /**
@@ -51,7 +54,7 @@ export function PaymentMethodLogo({ name, alt, logoUrl, preset, methodType, code
   const src = paymentLogoSources({ logoUrl, preset }).find((source) => !failed.includes(source));
   if (src) {
     return (
-      <span className={cn(CHIP, className)}>
+      <span className={cn(CHIP, "logo-plate [--plate-pad:3px]", className)}>
         <Image
           src={src}
           alt={alt ?? name}

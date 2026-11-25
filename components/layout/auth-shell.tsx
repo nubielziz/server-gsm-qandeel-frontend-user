@@ -2,6 +2,7 @@
 // a subtitle, three feature items and the `sign-in-hero.jpg` image filling the space under them. Right: the white form panel
 // (children), centred, max 28rem, Terms / Privacy at the bottom.
 // Mobile: the form comes first under a compact brand bar; no hero image.
+// The theme switch is a quiet button in the top end corner of the form panel (the brand bar's end on phones).
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Layers, Store, Zap } from "lucide-react";
@@ -11,6 +12,7 @@ import { ImageSlot } from "@/components/ui/image-slot";
 import { ChromeProviders } from "./chrome-providers";
 import { Logo } from "./logo";
 import { SkipLink } from "./skip-link";
+import { ThemeToggle } from "./theme-toggle";
 
 export type AuthShellProps = {
   /** The form content: the page renders its own `h1` and form. */
@@ -52,7 +54,8 @@ export function AuthShell({ children }: AuthShellProps) {
             </ul>
           </div>
           {/* The image fills the rest of the panel under the text (never behind it: the scene is dark in the middle),
-              anchored to the desk at the bottom and fading into the panel at the top. */}
+              anchored to the desk at the bottom and fading into the panel at the top. A bright studio picture: the dark theme
+              dims it a little so it does not glare beside the dark panels. */}
           <div className="relative mt-8 min-h-64 flex-1">
             <ImageSlot
               file="sign-in-hero.jpg"
@@ -60,14 +63,19 @@ export function AuthShell({ children }: AuthShellProps) {
               sizes="(min-width: 1024px) 56vw, 0px"
               objectPosition="center bottom"
               priority
+              className="dark:brightness-75"
             />
             <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1/3 bg-linear-to-b from-surface-muted to-transparent" />
           </div>
         </section>
 
-        <div className="flex min-h-dvh flex-col lg:min-h-0">
-          <div className="flex items-center px-gutter py-3 lg:hidden">
-            <Logo />
+        <div className="relative flex min-h-dvh flex-col lg:min-h-0">
+          {/* From `lg` the logo is on the hero side: the switch alone hangs in the panel's top end corner and takes no room, so the form stays centred. */}
+          <div className="flex items-center justify-between px-gutter py-3 lg:absolute lg:end-0 lg:top-0">
+            <div className="lg:hidden">
+              <Logo />
+            </div>
+            <ThemeToggle label={t.theme.dark} tone="quiet" />
           </div>
           <main id="main" className="flex flex-1 items-center justify-center px-gutter py-8">
             <div className="w-full max-w-[28rem]">{children}</div>

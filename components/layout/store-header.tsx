@@ -3,7 +3,9 @@
 // one (components/layout/nav-row.tsx); on pages without a current link (the home page) it rests on "All services".
 // There is no cart, no favourites, no bell and no social sign-in (the API has none).
 // Mobile: a compact bar (logo, search toggle, account, menu button) and a start-side drawer with the nav, the same
-// categories in a `<details>` block, and the currency picker.
+// categories in a `<details>` block, and a bottom row with the currency picker and the theme switch. The theme switch is
+// beside the currency picker on the desktop bar and inside the drawer on phones: the compact bar has no room for a fifth
+// button (the logo's box sizes keep four controls inside 345 px, see components/layout/logo.tsx).
 // Static shell: only the account area and the currency picker read request data, each inside its own <Suspense>. The
 // categories are a cached catalog read (components/layout/category-menu.tsx): a change shows when the cache turns over.
 // The two "All services" links use `prefetch={true}`: their prefetch carries the catalog's first page (cached, URL data),
@@ -26,6 +28,7 @@ import { CurrencySwitcherSlot } from "./currency-switcher-slot";
 import { Logo } from "./logo";
 import { NavLink } from "./nav-link";
 import { StoreHeaderFrame } from "./store-header-frame";
+import { ThemeToggle } from "./theme-toggle";
 
 // The nav row's items. Colours, hover and the selected look are `.nav-item` in globals.css (they depend on the pill's
 // state); one weight for every link, so selecting one never changes the row's widths. 40 px high like the old pill,
@@ -134,6 +137,7 @@ export async function StoreHeader() {
       </nav>
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
         <CurrencySwitcherSlot />
+        <ThemeToggle label={t.theme.dark} />
       </div>
     </div>
   );
@@ -143,7 +147,12 @@ export async function StoreHeader() {
       logo={<Logo tagline />}
       search={searchCopy(false)}
       searchPhone={searchCopy(true)}
-      switchers={<CurrencySwitcherSlot />}
+      switchers={
+        <>
+          <CurrencySwitcherSlot />
+          <ThemeToggle label={t.theme.dark} />
+        </>
+      }
       account={<AccountArea />}
       nav={nav}
       drawerContent={drawerContent}

@@ -362,7 +362,7 @@ export function TicketConversation({ t, newTicketHref }: TicketConversationProps
                 setHasNew(false);
                 scrollToEnd(end.current);
               }}
-              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-inverse px-4 text-small font-semibold text-on-inverse shadow-overlay transition-colors hover:bg-inverse-raised"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 text-small font-semibold text-on-primary shadow-overlay transition-colors hover:bg-primary-raised"
             >
               <ArrowDown aria-hidden="true" className="size-4" />
               {t.chat.newMessage}

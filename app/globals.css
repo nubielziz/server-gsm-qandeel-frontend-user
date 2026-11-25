@@ -8,9 +8,21 @@
  * Rules for pages: use these tokens through utilities (`bg-surface`, `text-ink-muted`, `rounded-card`, `shadow-card`,
  * `text-title`, `max-w-page`, `px-gutter` …). Never write a hex colour, a raw radius or a raw shadow in a page. The
  * default Tailwind colour palette is switched off on purpose: only the colours below exist.
- * No dark mode: the site is light only.
+ *
+ * Two themes (decision 006): light is the owner's mockups; dark is the same monochrome look on a near-black page. The
+ * theme is the attribute `data-theme="light" | "dark"` on <html>, set before the first paint by the guard script of the
+ * root layout (lib/theme/theme.ts: the visitor's saved choice, else the system's). Every colour and shadow token has its
+ * dark value in the `[data-theme="dark"]` block below, so a page written with tokens needs nothing more. Two families
+ * look alike in light and part in dark, so pick by what the thing IS:
+ *   - `primary` / `on-primary`: solid controls and marks (the main button, a checked box, the selected pill, a count):
+ *     black in light, near-white in dark.
+ *   - `inverse` / `on-inverse`: dark panels (hero cards, the rail, the footer): black in light, a raised dark panel in
+ *     dark; the text on them is white in both.
+ * `dark:` exists for the few things a token cannot do (showing one of two pictures); never for colours.
  */
 @import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme static {
   /* ── Colour ─────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -21,8 +33,17 @@
   --color-surface: #ffffff; /* cards, panels, inputs */
   --color-surface-muted: #f5f5f6; /* table header rows, quiet blocks inside a card */
   --color-surface-sunken: #ededef; /* hover on ghost buttons, skeletons, wells */
-  --color-inverse: #111111; /* primary buttons, dark hero cards, the dark rail and footer */
+  --color-surface-raised: #ffffff; /* a part that stands ON a sunken well (the chosen segment of a segmented control) */
+  --color-inverse: #111111; /* dark panels: hero cards, the rail, the footer (dark in both themes) */
   --color-inverse-raised: #1e1e21; /* hover / raised block on an inverse surface */
+  --color-inverse-edge: #111111; /* the border of an inverse card: unseen in light, a hairline in dark */
+  --color-primary: #111111; /* solid controls: primary buttons, checked boxes, the selected pill, counts */
+  --color-primary-raised: #1e1e21; /* their hover */
+  /* What stays white in both themes: the plate under a logo made for a light background (brands, carriers, payment
+     marks), and the white control on a dark panel (the `inverse` button, the rail's avatar and count). */
+  --color-plate: #ffffff;
+  --color-plate-raised: #ededef; /* hover of a white control */
+  --color-on-plate: #0b0b0c;
 
   /* Text (all meet WCAG AA on the surface they are meant for) */
   --color-ink: #0b0b0c; /* headings and body */
@@ -30,6 +51,7 @@
   --color-ink-subtle: #6b6b74; /* captions, placeholders, hints (4.5:1 on white, grey page and sunken wells) */
   --color-on-inverse: #ffffff;
   --color-on-inverse-muted: #a1a1aa;
+  --color-on-primary: #ffffff;
 
   /* Lines. `control` is the border of inputs, checkboxes and radios: 3:1 against white (WCAG 1.4.11). */
   --color-line: #e4e4e7; /* card borders, dividers */
@@ -47,6 +69,7 @@
   --color-danger: #dc2626;
   --color-danger-soft: #fdecec;
   --color-danger-ink: #991b1b;
+  --color-danger-strong: #991b1b; /* hover of a danger button (white text stays readable on it in both themes) */
 
   --color-focus: #2563eb;
 
@@ -56,15 +79,18 @@
   --radius-card: 12px; /* rounded-card: cards, alerts, table frames */
   --radius-panel: 16px; /* rounded-panel: drawers, modals, the rail, hero panels */
 
-  /* ── Shadow ─────────────────────────────────────────────────────────────────────────────────────────────── */
-  --shadow-card: 0 1px 2px 0 rgb(17 17 17 / 0.04);
-  --shadow-raised: 0 6px 16px -4px rgb(17 17 17 / 0.1), 0 2px 4px -2px rgb(17 17 17 / 0.06);
-  --shadow-overlay: 0 24px 64px -16px rgb(17 17 17 / 0.35), 0 8px 24px -8px rgb(17 17 17 / 0.18);
+  /* ── Shadow ───────────────────────────────────────────────────────────────────────────────────────────────
+     Each token points at an `--elevation-*` custom property (":root" below, and the dark block). Tailwind writes a
+     shadow token's value into its `shadow-*` utilities when it builds them, so a value that must change with the theme
+     has to be read at run time: the utilities then hold `var(--elevation-…)` and follow the theme like the colours. */
+  --shadow-card: var(--elevation-card);
+  --shadow-raised: var(--elevation-raised);
+  --shadow-overlay: var(--elevation-overlay);
   /* A hovered card: softer and larger than `raised`, the card seems to float (service cards, components/store/service-card.tsx). */
-  --shadow-lift: 0 16px 32px -14px rgb(17 17 17 / 0.16), 0 4px 10px -6px rgb(17 17 17 / 0.08);
+  --shadow-lift: var(--elevation-lift);
   /* Hovered buttons (.btn-lift, .btn-lift-soft below): a soft shadow under the black button, a lighter one under an outlined one. */
-  --shadow-button: 0 6px 14px -6px rgb(17 17 17 / 0.38);
-  --shadow-button-soft: 0 4px 10px -6px rgb(17 17 17 / 0.16);
+  --shadow-button: var(--elevation-button);
+  --shadow-button-soft: var(--elevation-button-soft);
 
   /* ── Font ───────────────────────────────────────────────────────────────────────────────────────────────── */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -262,6 +288,16 @@
 :root {
   --gutter: 1rem;
   color-scheme: light;
+  /* The shadows the `--shadow-*` tokens point at (see "Shadow" in the theme above). */
+  --elevation-card: 0 1px 2px 0 rgb(17 17 17 / 0.04);
+  --elevation-raised: 0 6px 16px -4px rgb(17 17 17 / 0.1), 0 2px 4px -2px rgb(17 17 17 / 0.06);
+  --elevation-overlay: 0 24px 64px -16px rgb(17 17 17 / 0.35), 0 8px 24px -8px rgb(17 17 17 / 0.18);
+  --elevation-lift: 0 16px 32px -14px rgb(17 17 17 / 0.16), 0 4px 10px -6px rgb(17 17 17 / 0.08);
+  --elevation-button: 0 6px 14px -6px rgb(17 17 17 / 0.38);
+  --elevation-button-soft: 0 4px 10px -6px rgb(17 17 17 / 0.16);
+  /* Two colours that are not utilities: the light that sweeps a skeleton, and the veil behind a dialog. */
+  --skeleton-sheen: rgb(255 255 255 / 0.65);
+  --backdrop: rgb(17 17 17 / 0.5);
   /* Motion distances (no utilities): how far a new page rises on a client navigation, how far a block rises while it
      scrolls into view, how much scrolling that takes, and how much later each next card of a grid row starts. */
   --rise-page: 8px;
@@ -283,6 +319,63 @@
   :root {
     --gutter: 2rem;
   }
+}
+
+/* ── Dark theme (decision 006) ───────────────────────────────────────────────────────────────────────────────
+   The same tokens, their dark values. Unlayered, so it wins over the theme layer. Surfaces rise in four small steps from a
+   near-black page; text keeps the contrast its light value has (ink-subtle 4.5:1 on page, surface and sunken; control 3:1
+   on surface); status "soft" backgrounds turn into dark tints and their "ink" into light tints; shadows are black and
+   stronger, and an overlay also gets a hairline so it parts from the dark page behind it. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-page: #0a0a0b;
+  --color-surface: #151517;
+  --color-surface-muted: #1b1b1e;
+  --color-surface-sunken: #242428;
+  --color-surface-raised: #38383f;
+  --color-inverse: #1e1e22;
+  --color-inverse-raised: #2c2c32;
+  --color-inverse-edge: #2e2e35;
+  --color-primary: #f4f4f5;
+  --color-primary-raised: #d4d4d8;
+
+  --color-ink: #f4f4f5;
+  --color-ink-muted: #b1b1bb;
+  --color-ink-subtle: #8f8f9a;
+  --color-on-primary: #0b0b0c;
+
+  --color-line: #27272c;
+  --color-line-strong: #38383f;
+  --color-control: #74747f;
+
+  --color-success: #22c55e;
+  --color-success-soft: #0f2a1a;
+  --color-success-ink: #86efac;
+  --color-warning: #f59e0b;
+  --color-warning-soft: #2e2109;
+  --color-warning-ink: #fcd34d;
+  --color-danger-soft: #311516;
+  --color-danger-ink: #fca5a5;
+  --color-danger-strong: #b91c1c;
+
+  --color-focus: #60a5fa;
+
+  --elevation-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --elevation-raised: 0 6px 16px -4px rgb(0 0 0 / 0.55), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --elevation-overlay: 0 24px 64px -16px rgb(0 0 0 / 0.75), 0 8px 24px -8px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.07);
+  --elevation-lift: 0 16px 32px -14px rgb(0 0 0 / 0.65), 0 4px 10px -6px rgb(0 0 0 / 0.5);
+  --elevation-button: 0 6px 14px -6px rgb(0 0 0 / 0.65);
+  --elevation-button-soft: 0 4px 10px -6px rgb(0 0 0 / 0.5);
+
+  --skeleton-sheen: rgb(255 255 255 / 0.06);
+  --backdrop: rgb(0 0 0 / 0.7);
+}
+/* While the theme is switched nothing eases: every colour changes in the same frame (lib/theme/theme.ts sets the class
+   for two frames). */
+.theme-switching,
+.theme-switching * {
+  transition: none !important;
 }
 
 /* ── Utilities ───────────────────────────────────────────────────────────────────────────────────────────── */
@@ -338,6 +431,17 @@
   );
 }
 
+/* A logo file made for a light background (brands, carriers, payment methods), drawn on any surface: in the dark theme
+   it gets a white plate, painted around the picture without changing its size or the layout (`--plate-pad` is how far
+   the plate reaches past the picture). In light it does nothing. */
+@utility logo-plate {
+  :where([data-theme="dark"]) & {
+    background-color: var(--color-plate);
+    border-radius: 3px;
+    box-shadow: 0 0 0 var(--plate-pad, 4px) var(--color-plate);
+  }
+}
+
 /* Money, counts and stats: digits keep one width so columns and animated values do not jitter. */
 @utility num {
   font-variant-numeric: tabular-nums lining-nums;
@@ -360,8 +464,8 @@
     -webkit-tap-highlight-color: transparent;
   }
   ::selection {
-    background: var(--color-inverse);
-    color: var(--color-on-inverse);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
   }
   h1,
   h2,
@@ -390,7 +494,7 @@
     font: inherit;
     letter-spacing: inherit;
   }
-  /* Browsers autofill with a yellow/blue background: keep the field white. */
+  /* Browsers autofill with a yellow/blue background: keep the field's own surface. */
   input:-webkit-autofill {
     -webkit-box-shadow: 0 0 0 100px var(--color-surface) inset;
     -webkit-text-fill-color: var(--color-ink);
@@ -682,8 +786,8 @@
   }
   .nav-row:not([data-pill]) a.nav-item[aria-current="page"],
   .nav-row:not([data-pill]):not(:has(a.nav-item[aria-current="page"])) .nav-item[data-nav-default] {
-    color: var(--color-on-inverse);
-    background-color: var(--color-inverse);
+    color: var(--color-on-primary);
+    background-color: var(--color-primary);
   }
   .nav-row[data-pill] a.nav-item[aria-current="page"],
   .nav-row[data-pill]:not(:has(a.nav-item[aria-current="page"])) .nav-item[data-nav-default] {
@@ -699,7 +803,7 @@
     left: 0;
     display: none;
     border-radius: 9999px;
-    background-color: var(--color-inverse);
+    background-color: var(--color-primary);
     pointer-events: none;
     transition-property: translate, width, height;
     transition-duration: var(--duration-slow);
@@ -753,8 +857,8 @@
 
   .rail-link {
     --badge-ring: var(--color-inverse);
-    --badge-count-bg: var(--color-on-inverse);
-    --badge-count-ink: var(--color-ink);
+    --badge-count-bg: var(--color-plate);
+    --badge-count-ink: var(--color-on-plate);
     color: var(--color-on-inverse-muted);
     transition:
       color var(--duration-fast) var(--ease-standard),
@@ -794,8 +898,8 @@
     white-space: nowrap;
     pointer-events: none;
     border-radius: var(--radius-control);
-    background-color: var(--color-inverse);
-    color: var(--color-on-inverse);
+    background-color: var(--color-primary);
+    color: var(--color-on-primary);
     padding: 0.375rem 0.625rem;
     font-size: var(--text-small);
     line-height: var(--text-small--line-height);
@@ -832,19 +936,19 @@
 
   .drawer-link {
     --badge-ring: var(--color-surface);
-    --badge-count-bg: var(--color-inverse);
-    --badge-count-ink: var(--color-on-inverse);
+    --badge-count-bg: var(--color-primary);
+    --badge-count-ink: var(--color-on-primary);
   }
   .drawer-link[aria-current="page"] {
-    --badge-ring: var(--color-inverse);
-    --badge-count-bg: var(--color-on-inverse);
+    --badge-ring: var(--color-primary);
+    --badge-count-bg: var(--color-on-primary);
     --badge-count-ink: var(--color-ink);
   }
 
   .tab-link {
     --badge-ring: var(--color-surface);
-    --badge-count-bg: var(--color-inverse);
-    --badge-count-ink: var(--color-on-inverse);
+    --badge-count-bg: var(--color-primary);
+    --badge-count-ink: var(--color-on-primary);
     color: var(--color-ink-subtle);
     transition: color var(--duration-fast) var(--ease-standard);
   }
@@ -868,8 +972,8 @@
     color: var(--color-on-inverse);
   }
   .nav-badge-count {
-    background-color: var(--badge-count-bg, var(--color-inverse));
-    color: var(--badge-count-ink, var(--color-on-inverse));
+    background-color: var(--badge-count-bg, var(--color-primary));
+    color: var(--badge-count-ink, var(--color-on-primary));
   }
   .nav-dot {
     background-color: var(--color-danger);
@@ -914,16 +1018,16 @@
     background-color: var(--color-ink);
   }
   .tabs-pill:not([data-indicator]) .tabs-link[aria-current="page"] {
-    --tabs-count-bg: var(--color-inverse-raised);
-    --tabs-count-ink: var(--color-on-inverse);
-    color: var(--color-on-inverse);
-    background-color: var(--color-inverse);
+    --tabs-count-bg: var(--color-primary-raised);
+    --tabs-count-ink: var(--color-on-primary);
+    color: var(--color-on-primary);
+    background-color: var(--color-primary);
   }
   .tabs-underline {
     --tabs-indicator: var(--color-ink);
   }
   .tabs-pill {
-    --tabs-indicator: var(--color-inverse);
+    --tabs-indicator: var(--color-primary);
   }
   .tabs-indicator {
     position: absolute;
@@ -969,7 +1073,7 @@
     background-image: linear-gradient(
       90deg,
       transparent 0%,
-      rgb(255 255 255 / 0.65) 50%,
+      var(--skeleton-sheen) 50%,
       transparent 100%
     );
     background-size: 200% 100%;
@@ -1012,7 +1116,7 @@
     width: 18px;
     height: 18px;
     margin-top: 1px;
-    border: 2px solid var(--color-inverse);
+    border: 2px solid var(--color-primary);
     border-radius: 9999px;
     background: var(--color-surface);
     box-shadow: var(--shadow-card);
@@ -1022,7 +1126,7 @@
     pointer-events: auto;
     width: 14px;
     height: 14px;
-    border: 2px solid var(--color-inverse);
+    border: 2px solid var(--color-primary);
     border-radius: 9999px;
     background: var(--color-surface);
     cursor: grab;
@@ -1061,7 +1165,7 @@
       overlay var(--duration-base) allow-discrete;
   }
   .dialog::backdrop {
-    background: rgb(17 17 17 / 0.5);
+    background: var(--backdrop);
     transition:
       opacity var(--duration-base) var(--ease-standard),
       display var(--duration-base) allow-discrete,

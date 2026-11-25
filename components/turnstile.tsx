@@ -4,9 +4,12 @@
 // `X-Turnstile-Token` header (lib/api/browser.ts `turnstileToken`). A token is single use and is spent even when the
 // request fails validation, so forms bump `resetKey` after EVERY submit to get a fresh one.
 // The script loads lazily, only on pages that render this component.
+// The widget's theme is the page's (`readTheme`, lib/theme/theme.ts) at the moment it is drawn. It is not redrawn when the
+// visitor switches the theme while it is on screen (a redraw would spend the token); the next page that draws it uses the new theme.
 // Dev: with no NEXT_PUBLIC_TURNSTILE_SITE_KEY the always-pass test key is used; it yields `XXXX.DUMMY.TOKEN.XXXX`,
 // the only token the backend's dev verifier accepts.
 import { useEffect, useRef } from "react";
+import { readTheme } from "@/lib/theme/theme";
 
 type TurnstileApi = {
   render(el: HTMLElement, options: Record<string, unknown>): string;
@@ -70,7 +73,7 @@ export function Turnstile({ onToken, resetKey = 0, className }: TurnstileProps) 
           sitekey: TURNSTILE_SITE_KEY,
           // The site is English only (decision 039): the widget speaks English whatever the browser's language.
           language: "en",
-          theme: "light",
+          theme: readTheme(),
           size: "flexible",
           callback: (token: string) => callback.current(token),
           "expired-callback": () => callback.current(null),

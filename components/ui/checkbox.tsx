@@ -48,7 +48,7 @@ export function Checkbox({ label, description, error, size = "md", trailing, cla
             aria-invalid={error ? true : undefined}
             className={cn(
               "peer absolute inset-0 size-full appearance-none rounded-badge border border-control bg-surface transition-colors",
-              "checked:border-inverse checked:bg-inverse hover:border-ink-muted aria-invalid:border-danger",
+              "checked:border-primary checked:bg-primary hover:border-ink-muted aria-invalid:border-danger",
               "disabled:cursor-not-allowed disabled:opacity-50",
               className,
             )}
@@ -57,7 +57,7 @@ export function Checkbox({ label, description, error, size = "md", trailing, cla
           <Check
             aria-hidden="true"
             strokeWidth={3}
-            className={cn("pointer-events-none relative text-on-inverse opacity-0 peer-checked:opacity-100", sm ? "size-3" : "size-3.5")}
+            className={cn("pointer-events-none relative text-on-primary opacity-0 peer-checked:opacity-100", sm ? "size-3" : "size-3.5")}
           />
         </span>
         {sm ? (
@@ -112,7 +112,7 @@ export function Switch({ label, description, className, wrapperClassName, id, ..
           role="switch"
           aria-describedby={description ? descId : undefined}
           className={cn(
-            "peer absolute inset-0 size-full appearance-none rounded-full bg-control transition-colors checked:bg-inverse",
+            "peer absolute inset-0 size-full appearance-none rounded-full bg-control transition-colors checked:bg-primary",
             "disabled:cursor-not-allowed disabled:opacity-50",
             className,
           )}

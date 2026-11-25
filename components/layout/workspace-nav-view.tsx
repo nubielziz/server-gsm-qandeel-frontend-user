@@ -91,7 +91,7 @@ export function WorkspaceNavView({ items, pathname, variant }: WorkspaceNavViewP
                 aria-current={current(item)}
                 className={cn(
                   "drawer-link flex min-h-12 items-center gap-3 rounded-control px-3 text-body font-semibold text-ink-muted transition-colors",
-                  "hover:bg-surface-muted hover:text-ink aria-[current=page]:bg-inverse aria-[current=page]:text-on-inverse",
+                  "hover:bg-surface-muted hover:text-ink aria-[current=page]:bg-primary aria-[current=page]:text-on-primary",
                   "[&_svg]:size-5 [&_svg]:shrink-0",
                 )}
               >

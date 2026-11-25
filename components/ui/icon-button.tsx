@@ -14,9 +14,9 @@ const variants: Record<IconButtonVariant, string> = {
   /** A ghost with a muted icon that turns ink on hover: a secondary action that should not compete (a card's quick view eye). */
   quiet: "text-ink-subtle hover:bg-surface-sunken hover:text-ink active:bg-surface-sunken",
   secondary: "btn-lift-soft border border-line-strong bg-surface text-ink hover:border-ink active:bg-surface-muted",
-  primary: "btn-lift bg-inverse text-on-inverse hover:bg-inverse-raised active:bg-inverse-raised",
-  inverse: "bg-surface text-ink hover:bg-surface-sunken active:bg-surface-sunken",
-  danger: "bg-danger text-on-inverse hover:bg-danger-ink active:bg-danger-ink",
+  primary: "btn-lift bg-primary text-on-primary hover:bg-primary-raised active:bg-primary-raised",
+  inverse: "bg-plate text-on-plate hover:bg-plate-raised active:bg-plate-raised",
+  danger: "bg-danger text-on-inverse hover:bg-danger-strong active:bg-danger-strong",
 };
 
 const sizes: Record<IconButtonSize, string> = {

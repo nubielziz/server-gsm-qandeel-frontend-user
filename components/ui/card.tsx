@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 export type CardProps = ComponentProps<"div"> & {
   /** The element to render (default `div`). Use `section`/`article` for landmarks, `li` inside a list. */
   as?: ElementType;
-  /** `default` white, `muted` grey fill without shadow, `inverse` near-black with white text. */
+  /** `default` white, `muted` grey fill without shadow, `inverse` a dark panel with white text (dark in both themes). */
   tone?: "default" | "muted" | "inverse";
   /** Corner radius: `card` (12px) or `panel` (16px). Default: `panel` for `inverse`, `card` for the others. */
   radius?: "card" | "panel";
@@ -14,7 +14,7 @@ export type CardProps = ComponentProps<"div"> & {
 const tones = {
   default: "border border-line bg-surface shadow-card",
   muted: "border border-line bg-surface-muted",
-  inverse: "surface-inverse border border-inverse",
+  inverse: "surface-inverse border border-inverse-edge",
 } as const;
 
 /** A card surface. Compose with CardHeader / CardBody / CardFooter, or put your own padding inside. */

@@ -163,7 +163,7 @@ export function NavRow({ children, className }: NavRowProps) {
       {covered.length > 0 ? (
         // The links the pill covers get white text (the specificity beats the hover grey). Nothing is rendered on the
         // server or before the pill is placed, so hydration sees the same markup.
-        <style>{`.nav-row[data-pill] a.nav-item.nav-item:is(${covered.map((href) => `[href=${cssString(href)}]`).join(",")}){color:var(--color-on-inverse);background-color:transparent;transition-property:color}`}</style>
+        <style>{`.nav-row[data-pill] a.nav-item.nav-item:is(${covered.map((href) => `[href=${cssString(href)}]`).join(",")}){color:var(--color-on-primary);background-color:transparent;transition-property:color}`}</style>
       ) : null}
       <span ref={pillRef} aria-hidden="true" className="nav-pill" />
       {children}

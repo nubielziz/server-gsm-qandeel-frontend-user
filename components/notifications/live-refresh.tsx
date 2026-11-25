@@ -84,7 +84,7 @@ export function LiveRefresh({ family, page, pageOneHref, unreadIds, labels }: Li
         <Link
           href={pageOneHref}
           onClick={() => setFresh(false)}
-          className="pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-full bg-inverse px-4 text-small font-semibold text-on-inverse shadow-overlay transition-colors hover:bg-inverse-raised"
+          className="pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 text-small font-semibold text-on-primary shadow-overlay transition-colors hover:bg-primary-raised"
         >
           <span>{labels.pill}</span>
           <span className="font-bold underline underline-offset-4">{labels.pillAction}</span>

@@ -40,7 +40,7 @@ export function RadioCard({
         "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus",
         "has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60",
         inverse
-          ? "surface-inverse border-inverse has-[:checked]:ring-2 has-[:checked]:ring-on-inverse/60"
+          ? "surface-inverse border-inverse-edge has-[:checked]:ring-2 has-[:checked]:ring-on-inverse/60"
           : "border-line bg-surface hover:border-control has-[:checked]:border-ink has-[:checked]:shadow-[inset_0_0_0_1px_var(--color-ink)]",
         cardClassName,
       )}
@@ -52,7 +52,7 @@ export function RadioCard({
           "mt-0.5 size-5 shrink-0 rounded-full border-2 transition-colors",
           inverse
             ? "border-on-inverse-muted peer-checked:border-on-inverse peer-checked:bg-on-inverse peer-checked:shadow-[inset_0_0_0_3px_var(--color-inverse)]"
-            : "border-control peer-checked:border-inverse peer-checked:bg-inverse peer-checked:shadow-[inset_0_0_0_3px_var(--color-surface)]",
+            : "border-control peer-checked:border-primary peer-checked:bg-primary peer-checked:shadow-[inset_0_0_0_3px_var(--color-surface)]",
         )}
       />
       <span className="min-w-0 flex-1">

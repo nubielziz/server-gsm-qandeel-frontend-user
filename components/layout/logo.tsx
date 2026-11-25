@@ -1,6 +1,7 @@
 // Logo: the IMEI-HUB mark (the "IH" in its orbit) + the "IMEI-HUB" wordmark (+ the tagline). Both are the owner's own logo,
 // cut into files under public/images/: logo-mark.png and logo-wordmark.png for light surfaces, the *-inverse.png pair (white
-// ink, the same gold) for dark ones. Until a file exists a plain text stands in for it. Never an SVG drawing.
+// ink, the same gold) for dark ones: dark panels in both themes, and every surface of the dark theme (decision 006). Until a
+// file exists a plain text stands in for it. Never an SVG drawing.
 import Image from "next/image";
 import Link from "next/link";
 import { sitePath } from "@/lib/site-path";
@@ -35,27 +36,40 @@ const MARK_BOX = {
 /** 16 x 98 px, from `sm` 20 x 123 px. */
 const WORDMARK_BOX = "h-4 w-[6.125rem] sm:h-5 sm:w-[7.6875rem]";
 
-function Mark({ tone, box }: { tone: "default" | "inverse"; box: keyof typeof MARK_BOX }) {
-  // A dark surface takes the light-ink file; without it the dark mark is inverted, which is right only for a one-colour mark.
-  const light = tone === "inverse" ? siteImage("logo-mark-inverse.png") : null;
-  const src = light ?? siteImage("logo-mark.png");
-  if (src) {
-    return (
-      <Image
-        src={src}
-        alt=""
-        width={48}
-        height={36}
-        className={cn("shrink-0 object-contain", MARK_BOX[box], tone === "inverse" && !light && "invert")}
-      />
-    );
+/**
+ * One picture of the logo in the ink that suits the surface under it. `<name>.png` is dark ink (for a light surface),
+ * `<name>-inverse.png` is white ink (for a dark one). On a dark panel (`inverse`) the white ink is drawn in both themes.
+ * On a normal surface both files are in the HTML and the theme shows one of them (decision 006): the page is static, so the
+ * server cannot know the theme, and a hidden lazy image is never downloaded. A missing white file falls back to the dark
+ * one inverted, which is right only for a one-colour mark. Null while neither file exists.
+ */
+function Ink({ name, tone, width, height, className }: { name: string; tone: "default" | "inverse"; width: number; height: number; className: string }) {
+  const dark = siteImage(name + ".png");
+  const light = siteImage(name + "-inverse.png");
+  const picture = (src: string, extra?: string) => <Image src={src} alt="" width={width} height={height} className={cn(className, extra)} />;
+  if (tone === "inverse") {
+    if (light) return picture(light);
+    return dark ? picture(dark, "invert") : null;
   }
+  if (!dark) return null;
+  if (!light) return picture(dark, "dark:invert");
+  return (
+    <>
+      {picture(dark, "dark:hidden")}
+      {picture(light, "hidden dark:block")}
+    </>
+  );
+}
+
+function Mark({ tone, box }: { tone: "default" | "inverse"; box: keyof typeof MARK_BOX }) {
+  const ink = <Ink name="logo-mark" tone={tone} width={48} height={36} className={cn("shrink-0 object-contain", MARK_BOX[box])} />;
+  if (siteImage("logo-mark.png") || (tone === "inverse" && siteImage("logo-mark-inverse.png"))) return ink;
   return (
     <span
       aria-hidden="true"
       className={cn(
         "grid size-9 shrink-0 place-items-center rounded-[10px] text-[0.6875rem] font-extrabold leading-none tracking-wide",
-        tone === "inverse" ? "bg-surface text-ink" : "bg-inverse text-on-inverse",
+        tone === "inverse" ? "bg-plate text-on-plate" : "bg-primary text-on-primary",
       )}
     >
       IH
@@ -66,16 +80,12 @@ function Mark({ tone, box }: { tone: "default" | "inverse"; box: keyof typeof MA
 /** The name beside the mark: the wordmark picture, or the name as text while the file is missing. Hidden on very narrow screens. */
 function Wordmark({ tone, name }: { tone: "default" | "inverse"; name: string }) {
   const inverse = tone === "inverse";
-  const src = siteImage(inverse ? "logo-wordmark-inverse.png" : "logo-wordmark.png");
-  if (src) {
+  if (siteImage(inverse ? "logo-wordmark-inverse.png" : "logo-wordmark.png")) {
+    // The wrapper hides the name on very narrow screens; inside it the theme picks the ink (`contents`: no box of its own).
     return (
-      <Image
-        src={src}
-        alt=""
-        width={123}
-        height={20}
-        className={cn("shrink-0 object-contain max-[22.5rem]:hidden", WORDMARK_BOX)}
-      />
+      <span className="contents max-[22.5rem]:hidden">
+        <Ink name="logo-wordmark" tone={tone} width={123} height={20} className={cn("shrink-0 object-contain", WORDMARK_BOX)} />
+      </span>
     );
   }
   return (

@@ -80,7 +80,7 @@ export async function AccountAreaContent({ compact }: { compact?: boolean }) {
           title={t.header.signIn}
           className={
             "inline-flex size-11 items-center justify-center rounded-control sm:hidden " +
-            (compact ? "border border-line-strong bg-surface text-ink" : "bg-inverse text-on-inverse")
+            (compact ? "border border-line-strong bg-surface text-ink" : "bg-primary text-on-primary")
           }
         >
           <LogIn aria-hidden="true" className="size-5" />

@@ -98,7 +98,7 @@ function BrandLogo({ name }: { name: string }) {
   if (!logo) return name ? <span className="truncate">{name}</span> : null;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- a static logo file at its recorded size; no optimizer needed.
-    <img src={logo.src} width={logo.width} height={logo.height} alt={name} loading="lazy" decoding="async" className="h-4 w-auto max-w-[5rem] object-contain" />
+    <img src={logo.src} width={logo.width} height={logo.height} alt={name} loading="lazy" decoding="async" className="logo-plate h-4 w-auto max-w-[5rem] object-contain [--plate-pad:3px]" />
   );
 }
 
