@@ -95,10 +95,7 @@ export const merchant = {
     title: "Order details",
     imeiHint: "15 digits. Spaces and dashes are removed.",
     imeiOk: "This IMEI is valid.",
-    imeiBad: "This IMEI does not pass the check-digit test. Check the number.",
-    /** An IMEI service with no field for its IMEI (decision 007): it cannot be ordered, and the button stays off. */
-    noMainInput: "This service can't be ordered right now. Please contact support.",
-    contactSupport: "Contact support",
+    imeiBad: "This is not a valid IMEI: it needs 15 digits and a correct check digit.",
     quantity: "Quantity",
     selectPlaceholder: "Select…",
     file: "Input file",
@@ -110,7 +107,6 @@ export const merchant = {
     fileTooLarge: "This file is empty or larger than 25 MB.",
     fileWrongType: "This file type is not accepted.",
     noInputs: "This service needs no extra details. Review the summary and place the order.",
-    imeiRequired: "Enter the IMEI.",
     problems: {
       required: "This field is required.",
       number: "Enter a number.",

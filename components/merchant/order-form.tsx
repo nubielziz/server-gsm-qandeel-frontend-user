@@ -1,10 +1,10 @@
 "use client";
 // The order form of a service (handoff §4.5). One form for the four service types, drawn from what the service lists
 // (decision 007: no built-in box, no bulk list; one request is one order):
-//  - custom fields (text / number / select / textarea) with the catalog's regex, exactly as the API sends them. On an IMEI
-//    service one of them is flagged `isMainInput` and holds the IMEI: it is drawn as a numeric box, checked with the check
-//    digit as you type, and sent normalised (digits only) under `inputs[<its key>]`. An IMEI service that has no such
-//    field cannot be ordered: the form says so and the button stays off;
+//  - custom fields (text / number / select / textarea / imei) with the catalog's regex, exactly as the API sends them. Every
+//    field is drawn and checked by its own type and Required tick, whatever the type of the service (decision 008). A field of
+//    type `imei` is a numeric box with a live "valid / not valid" hint, checked with the check digit, and sent as digits
+//    only under `inputs[<its key>]`. A service with no fields asks nothing (a file service asks for its file);
 //  - quantity (lib/quantity.ts decides): a select for two or more packs, a number box for a range, nothing for one
 //    pack, an exact N or one per order; the rule and its refusals are worded by `quantityRuleText` and
 //    `invalidQuantityText`, for the local check and for a server `invalid_quantity` alike;
@@ -34,11 +34,9 @@ import {
   MAX_IN_PROGRESS_RETRIES,
   buildInputs,
   checkField,
-  checkMainInput,
   defaultQuantityOf,
   hasFieldErrors,
   inProgressWaitMs,
-  mainInputOf,
   mapOrderFieldErrors,
   orderSignature,
   parseQuantity,
@@ -91,7 +89,6 @@ type Banner =
 const ID = {
   quantity: "order-quantity",
   file: "order-file",
-  unorderable: "order-unorderable",
   field: (key: string) => `order-field-${key}`,
 };
 
@@ -102,13 +99,10 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
   const errorText = useErrorText();
   const { form: f, summary: s } = labels;
 
-  // Every field the service lists, in its own order (decision 007); the IMEI of an IMEI service is one of them.
+  // Every field the service lists, in its own order (decision 007), each drawn and checked by its own type (decision 008).
   const fields = service.fields;
-  const mainInput = mainInputOf(service);
   // The boxes this form draws: a server error on any other path has no place on the page.
   const drawn = { inputKeys: new Set(fields.map((field) => field.key)), file: service.type === "file" };
-  // An IMEI service without a field for its IMEI cannot be ordered from here (decision 007): say so, never send half an order.
-  const unorderable = service.type === "imei" && mainInput === null;
   const rule = quantityRule(service);
   const wording = fromMerchantRule(service);
   const fileRequired = service.type === "file" && service.fields.length === 0;
@@ -167,17 +161,15 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
     file: fileRequired && !file ? f.fileRequired : undefined,
     inputs: Object.fromEntries(
       fields.flatMap((field) => {
-        const isMain = field === mainInput;
-        const problem = isMain ? checkMainInput(field, values[field.key] ?? "") : checkField(field, values[field.key] ?? "");
-        return problem ? [[field.key, problemText(problem, isMain)]] : [];
+        const problem = checkField(field, values[field.key] ?? "");
+        return problem ? [[field.key, problemText(problem)]] : [];
       }),
     ) as Record<string, string>,
   };
 
-  /** The words for a problem of a field; the main input of an IMEI service has its own for an empty box and a bad check digit. */
-  function problemText(problem: FieldProblem | "invalid_imei", isMain: boolean): string {
+  /** The words for a problem of a field; a field of type `imei` has its own for a number that fails the check digit. */
+  function problemText(problem: FieldProblem): string {
     if (problem === "invalid_imei") return f.imeiBad;
-    if (problem === "required" && isMain) return f.imeiRequired;
     return fmt(f.problems[problem], { max: MAX_FIELD_VALUE });
   }
 
@@ -237,7 +229,7 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting || inFlight.current || unorderable) return; // one send at a time; a repeat after it ends carries the same key
+    if (submitting || inFlight.current) return; // one send at a time; a repeat after it ends carries the same key
     setSubmitted(true);
     setBanner(null);
     setServerErrors(null);
@@ -250,8 +242,8 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
     const body: MerchantOrderInput = { serviceId: service.id };
     // Everything but "one per order" is sent: an exact N or a single pack is not asked, but the API orders `min` without it.
     if (quantity !== null && !(rule.kind === "fixed" && rule.value === 1)) body.quantity = quantity;
-    // The IMEI of an IMEI service is one of the inputs, under the key of its main-input field, as digits only.
-    const inputs = buildInputs(fields, values, mainInput?.key ?? null);
+    // A field of type `imei` goes out as digits only, under its own key.
+    const inputs = buildInputs(fields, values);
     if (Object.keys(inputs).length > 0) body.inputs = inputs;
     if (file) body.fileId = file.id;
 
@@ -361,14 +353,13 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
   // ── Render
   const optional = f.optional;
 
-  /** One custom field, drawn by its type. The main input of an IMEI service is a numeric box with the check-digit hint. */
+  /** One custom field, drawn by its type. A field of type `imei` is a one-line numeric box with the check-digit hint. */
   function renderField(field: ServiceField) {
-    const isMain = field === mainInput;
     const common = {
       id: ID.field(field.key),
       name: `inputs.${field.key}`,
       label: field.label,
-      required: isMain || field.required,
+      required: field.required,
       optionalLabel: optional,
       value: values[field.key] ?? "",
       error: shown.input(field.key),
@@ -377,7 +368,7 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
       setValues((prev) => ({ ...prev, [field.key]: v }));
       dropInputError(field.key);
     };
-    if (isMain) {
+    if (field.fieldType === "imei") {
       const imei = normalizeImei(common.value);
       return (
         <Input
@@ -387,7 +378,7 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
           autoComplete="off"
           spellCheck={false}
           dir="ltr"
-          maxLength={64}
+          maxLength={24}
           hint={
             imei !== "" && isValidImei(imei) ? (
               <span className="text-success-ink">{f.imeiOk}</span>
@@ -439,20 +430,6 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
         <Card>
           <CardHeader title={f.title} />
           <CardBody className="grid gap-5">
-            {unorderable ? (
-              <Alert
-                id={ID.unorderable}
-                tone="warning"
-                action={
-                  <ButtonLink href={hrefs.support} size="sm" variant="secondary">
-                    {f.contactSupport}
-                  </ButtonLink>
-                }
-              >
-                {f.noMainInput}
-              </Alert>
-            ) : null}
-
             {rule.kind === "options" ? (
               <Select
                 id={ID.quantity}
@@ -522,7 +499,7 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
               </div>
             ) : null}
 
-            {fields.length === 0 && service.type !== "file" && !unorderable ? <p className="text-body text-ink-muted">{f.noInputs}</p> : null}
+            {fields.length === 0 && service.type !== "file" ? <p className="text-body text-ink-muted">{f.noInputs}</p> : null}
           </CardBody>
         </Card>
       </div>
@@ -568,8 +545,6 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
               size="lg"
               block
               loading={submitting}
-              disabled={unorderable}
-              aria-describedby={unorderable ? ID.unorderable : undefined}
               aria-label={submitting ? s.placing : undefined}
             >
               <span>{s.place}</span>

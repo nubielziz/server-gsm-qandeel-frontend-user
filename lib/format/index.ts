@@ -113,11 +113,17 @@ export function normalizeImei(value: string): string {
 /**
  * What is wrong with a typed IMEI, by the checks a form can make before it sends anything: `"length"` (not 15 digits once
  * spaces and dashes are removed) or `"checksum"` (15 digits whose last digit does not match the rest); null for a good one.
- * The main input of an IMEI service in both order forms (decision 007).
+ * The check of a field of type `imei` in the shop's drawer (the merchant form uses `isValidImei`; decision 008).
  */
 export function imeiProblem(value: string): "length" | "checksum" | null {
   if (!/^\d{15}$/.test(normalizeImei(value))) return "length";
   return isValidImei(value) ? null : "checksum";
+}
+
+/** An IMEI with all but its last four digits hidden ("•••••••••••7518"): what a summary line shows of a typed IMEI. */
+export function maskImei(value: string): string {
+  const digits = normalizeImei(value);
+  return digits.length > 4 ? `${"•".repeat(digits.length - 4)}${digits.slice(-4)}` : digits;
 }
 
 /** 15 digits with a valid Luhn check digit. */

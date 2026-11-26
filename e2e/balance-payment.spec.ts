@@ -12,7 +12,7 @@ import { accountIdByEmail, creditAccount, freezeWallet } from "./admin";
 import { expect, test } from "./fixtures";
 import { DEV_TURNSTILE_TOKEN, freshAccount, imeiBox, imeiInputs, signIn, signUpByLink, stubTurnstile } from "./helpers";
 
-/** Service 1: an IMEI service sold at $3.99 net, one at a time. Its IMEI is a field of the service the API flags `isMainInput` (decision 007). */
+/** Service 1: an IMEI service sold at $3.99 net, one at a time. Its IMEI is its field of type `imei` (decisions 007 and 008). */
 const SLUG = "icloud-clean-lost-check";
 const SERVICE_NAME = "iCloud Clean / Lost Check";
 const IMEI = "490154203237518";

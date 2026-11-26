@@ -48,18 +48,29 @@ export async function signIn(page: Page, account: Credentials = ACCOUNTS.retail,
   return res.headers()["x-csrf-token"] ?? "";
 }
 
+type ApiField = { key: string; label: string; fieldType: string; isMainInput: boolean };
+
 /**
- * The box that holds the IMEI of an IMEI service: its custom field flagged `isMainInput` (decision 007). Its key and its label
- * come from the shop's own read of the service (`GET /store/v1/services/:slug`, through the site's rewrite), so no spec guesses
- * either. There is no `imei` in an order or a checkout session any more: the IMEI is an input under that key.
+ * The field of a service that holds an IMEI: the first of type `imei`, else the one flagged `isMainInput` (decision 008: the
+ * type, not the type of the service, makes a box an IMEI box; the flag is the fallback for demo data not yet migrated). Null when
+ * the service lists neither.
+ */
+function imeiFieldOf(fields: readonly ApiField[]): { key: string; label: string } | null {
+  const box = fields.find((field) => field.fieldType === "imei") ?? fields.find((field) => field.isMainInput);
+  return box ? { key: box.key, label: box.label } : null;
+}
+
+/**
+ * The box that holds the IMEI of a service: its custom field of type `imei` (or, failing that, flagged `isMainInput`). Its key
+ * and its label come from the shop's own read of the service (`GET /store/v1/services/:slug`, through the site's rewrite), so no
+ * spec guesses either. There is no `imei` in an order or a checkout session any more: the IMEI is an input under that key.
  */
 export async function imeiBox(request: APIRequestContext, slug: string): Promise<{ key: string; label: string }> {
   const res = await request.get(`/store/v1/services/${encodeURIComponent(slug)}`);
   expect(res.status(), `${slug}: ${await res.text()}`).toBe(200);
-  const { fields } = (await res.json()) as { fields: { key: string; label: string; isMainInput: boolean }[] };
-  const box = fields.find((field) => field.isMainInput);
-  if (!box) throw new Error(`E2E: ${slug} is an IMEI service with no main-input field: the demo data must give it one (decision 007).`);
-  return { key: box.key, label: box.label };
+  const box = imeiFieldOf(((await res.json()) as { fields: ApiField[] }).fields);
+  if (!box) throw new Error(`E2E: ${slug} lists no field of type imei and none flagged isMainInput: the demo data must give it one (decision 008).`);
+  return box;
 }
 
 /** The `inputs` of a checkout session for an IMEI service of the shop: `{ [key of its IMEI field]: imei }`. */
@@ -69,15 +80,14 @@ export async function imeiInputs(request: APIRequestContext, slug: string, imei:
 
 /**
  * The same for the order form of the signed-in merchant rank (`GET /client/services/:id`): the key and the label of the field
- * of the service the API flags `isMainInput`. The page must be signed in as a merchant rank.
+ * of type `imei` (or flagged `isMainInput`). The page must be signed in as a merchant rank.
  */
 export async function merchantImeiBox(request: APIRequestContext, serviceId: number): Promise<{ key: string; label: string }> {
   const res = await request.get(`/client/services/${serviceId}`);
   expect(res.status(), `service ${serviceId}: ${await res.text()}`).toBe(200);
-  const { fields } = (await res.json()) as { fields: { key: string; label: string; isMainInput: boolean }[] };
-  const box = fields.find((field) => field.isMainInput);
-  if (!box) throw new Error(`E2E: service ${serviceId} is an IMEI service with no main-input field: the demo data must give it one (decision 007).`);
-  return { key: box.key, label: box.label };
+  const box = imeiFieldOf(((await res.json()) as { fields: ApiField[] }).fields);
+  if (!box) throw new Error(`E2E: service ${serviceId} lists no field of type imei and none flagged isMainInput: the demo data must give it one (decision 008).`);
+  return box;
 }
 
 /** The `inputs` of `POST /client/orders` for an IMEI service: `{ [key of its IMEI field]: imei }`. */

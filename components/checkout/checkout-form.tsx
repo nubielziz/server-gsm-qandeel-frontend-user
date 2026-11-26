@@ -3,9 +3,9 @@
 // details (email, country → tax, currency), the order summary with an indicative price, Turnstile and
 // "Continue to payment" → POST /store/v1/checkout-sessions → /en/checkout/<token>. The amounts on this page are
 // indicative: the session locks price, tax and exchange rate for 30 minutes on the next page (handoff §5.8).
-// The drawer draws only what the service lists (decision 007): its custom fields, and the quantity. On an IMEI service the
-// field flagged `isMainInput` holds the IMEI: a numeric box, checked with the check digit, sent as digits only under
-// `inputs[<its key>]`. An IMEI service without such a field cannot be ordered: the form says so and "Continue" stays off.
+// The drawer draws only what the service lists (decision 007): its custom fields, and the quantity. Every field is drawn and
+// checked by its own type and Required tick, whatever the type of the service (decision 008): a field of type `imei` is a
+// numeric box checked with the check digit and sent as digits only. A service with no fields and no quantity control asks nothing.
 // The quantity rule of the service (a range, packs, exactly N) is state, not a constant: it starts from the server-rendered
 // service and is replaced by every re-read of the service (currency, country, region, a server refusal) (plan D17).
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -25,7 +25,8 @@ import { isApiError } from "@/lib/api/errors";
 import type { CheckoutSession, CheckoutSessionInput, StoreConfig, StoreServiceDetail } from "@/lib/api/types";
 import { checkoutHref, type CheckoutBuyer } from "@/lib/checkout/access";
 import { drawnPaths, placeFieldErrors } from "@/lib/checkout/field-errors";
-import { formatDateTime, formatNumber, formatPercent, imeiProblem, normalizeImei } from "@/lib/format";
+import { fieldProblem, sentValue, summaryValue } from "@/lib/checkout/field-check";
+import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
 import { fmt, plural } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import { isRankRefusal } from "@/lib/merchant/signed-out";
@@ -61,8 +62,6 @@ export type CheckoutFormProps = {
     id: number;
     slug: string;
     title: string;
-    /** An IMEI service: the field of `fields` flagged `isMainInput` holds the IMEI (without one the service cannot be ordered). */
-    isImei: boolean;
     /** The rule when the page was rendered; the form reads it again and keeps the newest. */
     quantity: StoreServiceDetail["quantity"];
     availability: StoreServiceDetail["availability"];
@@ -111,11 +110,6 @@ function hasControl(rule: QuantityRule): boolean {
   return kind === "range" || kind === "packs";
 }
 
-function maskImei(imei: string): string {
-  const digits = normalizeImei(imei);
-  return digits.length > 4 ? `${"•".repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}` : digits;
-}
-
 export function CheckoutForm({
   labels,
   quantityLabels,
@@ -141,10 +135,8 @@ export function CheckoutForm({
   const drawerId = `${drawerFormId}-drawer`;
 
   const { fields } = service;
-  // The box of the IMEI: the field the API flags `isMainInput`, on an IMEI service only. An IMEI service that has none cannot
-  // be ordered (decision 007): nothing to type the IMEI into, and the session would be refused.
-  const mainInput = service.isImei ? (fields.find((field) => field.isMainInput) ?? null) : null;
-  const unorderable = service.isImei && mainInput === null;
+  // The field flagged `isMainInput` is the one the summary line shows once the details are saved (whatever the type of the service).
+  const mainInput = fields.find((field) => field.isMainInput) ?? null;
   // The URL's quantity, checked once against the rule the page was rendered with (a rule that no longer allows it falls
   // back to the default and says so).
   const [initial] = useState(() => coerceQuantity(service.quantity, initialQuantity));
@@ -154,8 +146,8 @@ export function CheckoutForm({
   const quantityRef = useRef(String(initial.quantity));
   const mode = quantityMode(rule);
   const controlled = hasControl(rule);
-  // The drawer holds the service's fields and its quantity control; an IMEI service with no IMEI field has nothing to ask.
-  const needsDetails = !unorderable && (fields.length > 0 || controlled);
+  // The drawer holds the service's fields and its quantity control; with neither there is nothing to ask.
+  const needsDetails = fields.length > 0 || controlled;
 
   const [email, setEmail] = useState(account?.email ?? "");
   const [country, setCountry] = useState(account?.country ?? "");
@@ -209,13 +201,13 @@ export function CheckoutForm({
         setQuantity(value);
         if (after === "silent" && typed !== null) setQuantityNotice(true);
       }
-      const needs = !unorderable && (fields.length > 0 || hasControl(next));
+      const needs = fields.length > 0 || hasControl(next);
       // Whatever the buyer saved before no longer matches the form: ask again. Nothing to enter: nothing to ask.
       if (!needs) setDetailsSaved(true);
       else if (!kept || (!hasControl(previous) && hasControl(next))) setDetailsSaved(false);
       return next;
     },
-    [fields.length, unorderable],
+    [fields.length],
   );
 
   // ── Indicative price: the service card in the chosen currency and, once known, the buyer's country (tax included).
@@ -252,20 +244,19 @@ export function CheckoutForm({
   const qtyNumber = typedQuantity !== null && isAllowedQuantity(rule, typedQuantity) ? typedQuantity : defaultQuantity(rule);
   const taxRate = country ? taxRates.find((rate) => rate.country === country && (!region || rate.region === region || !rate.region)) : undefined;
   const countryLabel = countries.find((c) => c.code === country)?.name ?? country;
+  // The summary line of the main input: masked for an IMEI, as typed (cut short) for anything else; nothing while it is empty.
+  const mainValue = mainInput ? summaryValue(mainInput, inputs[mainInput.key] ?? "") : "";
 
   const fieldMessage = (code: string) => errorText.field({ field: "", code, message: "" }) ?? "";
 
-  /** Errors of the drawer's fields (the order fields, the IMEI among them, and the quantity). */
+  /** Errors of the drawer's fields (each judged by its own type and Required tick) and the quantity. */
   function detailErrors(): Record<string, string> {
     const found: Record<string, string> = {};
     for (const field of fields) {
-      const value = inputs[field.key] ?? "";
-      if (field === mainInput) {
-        // An IMEI is always required, whatever the field says: an empty box is "an IMEI has 15 digits".
-        const problem = imeiProblem(value);
-        if (problem) found[`inputs.${field.key}`] = problem === "length" ? labels.drawer.errorLength : labels.drawer.errorChecksum;
-      } else if (field.required && !value.trim()) {
-        found[`inputs.${field.key}`] = labels.drawer.errorRequired;
+      const problem = fieldProblem(field, inputs[field.key] ?? "");
+      if (problem) {
+        found[`inputs.${field.key}`] =
+          problem === "required" ? labels.drawer.errorRequired : problem === "length" ? labels.drawer.errorLength : labels.drawer.errorChecksum;
       }
     }
     // One per order and exactly N have no control: the rule decides the quantity.
@@ -343,7 +334,7 @@ export function CheckoutForm({
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (busy || unorderable) return;
+    if (busy) return;
     const found: Record<string, string> = { ...detailErrors() };
     if (!EMAIL.test(email.trim())) found.email = fieldMessage(email.trim() ? "invalid_string" : "required");
     if (!country) found.country = fieldMessage("required");
@@ -355,11 +346,11 @@ export function CheckoutForm({
     }
     if (!token) return;
 
-    // The IMEI goes out as digits only, under the key of its field; every other value as typed.
+    // A field of type `imei` goes out as digits only; every other value as typed; a field left empty is left out.
     const filled = Object.fromEntries(
       fields.flatMap((field) => {
-        const value = inputs[field.key] ?? "";
-        return value.trim() ? [[field.key, field === mainInput ? normalizeImei(value) : value]] : [];
+        const value = sentValue(field, inputs[field.key] ?? "");
+        return value === null ? [] : [[field.key, value]];
       }),
     );
     const body: CheckoutSessionInput = {
@@ -496,7 +487,7 @@ export function CheckoutForm({
                         </span>
                       ) : null}
                     </p>
-                    {unorderable ? null : <p className="mt-2">{detailsStatus}</p>}
+                    <p className="mt-2">{detailsStatus}</p>
                   </div>
                 </div>
                 {needsDetails ? (
@@ -511,20 +502,6 @@ export function CheckoutForm({
                   </DialogTrigger>
                 ) : null}
               </div>
-              {unorderable ? (
-                <Alert
-                  id="checkout-unorderable"
-                  tone="warning"
-                  className="mt-4"
-                  action={
-                    <ButtonLink href={supportHref} variant="secondary" size="sm">
-                      {labels.errors.contactSupport}
-                    </ButtonLink>
-                  }
-                >
-                  {labels.errors.noMainInput}
-                </Alert>
-              ) : null}
               {quantityNotice ? (
                 <Alert tone="info" className="mt-4">
                   {labels.info.quantityChanged}
@@ -532,11 +509,12 @@ export function CheckoutForm({
               ) : null}
               {needsDetails && detailsSaved ? (
                 <dl className="mt-4 grid gap-2 text-body">
-                  {mainInput ? (
+                  {mainInput && mainValue ? (
                     <div className="flex justify-between gap-4">
                       <dt className="text-ink-subtle">{mainInput.label}</dt>
-                      <dd className="num font-semibold text-ink" dir="ltr">
-                        {maskImei(inputs[mainInput.key] ?? "")}
+                      {/* A masked IMEI is digits (left to right); any other value is text a person typed. */}
+                      <dd className={mainInput.fieldType === "imei" ? "num font-semibold text-ink" : "min-w-0 break-words text-end font-semibold text-ink"} dir={mainInput.fieldType === "imei" ? "ltr" : "auto"}>
+                        {mainValue}
                       </dd>
                     </div>
                   ) : null}
@@ -716,13 +694,12 @@ export function CheckoutForm({
               size="lg"
               block
               loading={busy}
-              disabled={!token || unorderable}
-              aria-describedby={unorderable ? "checkout-unorderable" : undefined}
+              disabled={!token}
               endIcon={<ArrowRight aria-hidden="true" />}
             >
               {busy ? labels.summary.continuing : labels.summary.continue}
             </Button>
-            {!token && !busy && !unorderable ? <p className="-mt-2 text-center text-small text-ink-subtle">{labels.summary.waitingSecurity}</p> : null}
+            {!token && !busy ? <p className="-mt-2 text-center text-small text-ink-subtle">{labels.summary.waitingSecurity}</p> : null}
           </CardBody>
         </Card>
       </form>
@@ -767,22 +744,21 @@ export function CheckoutForm({
                 required: field.required,
                 optionalLabel: field.required ? undefined : labels.drawer.optional,
               };
-              if (field === mainInput) {
-                // The IMEI itself: always required, numeric keyboard, read as digits whatever separators or digits are typed.
+              if (field.fieldType === "imei") {
+                // One IMEI: a one-line numeric box, read as digits whatever separators or digits are typed (decision 008).
                 return (
                   <Input
                     key={field.key}
                     {...common}
-                    required
-                    optionalLabel={undefined}
                     hint={labels.drawer.imeiHint}
                     placeholder={labels.drawer.imeiPlaceholder}
                     value={inputs[field.key] ?? ""}
                     onChange={(event) => setInput(field.key, event.target.value)}
                     inputMode="numeric"
                     autoComplete="off"
+                    spellCheck={false}
                     maxLength={24}
-                    dir="auto"
+                    dir="ltr"
                   />
                 );
               }

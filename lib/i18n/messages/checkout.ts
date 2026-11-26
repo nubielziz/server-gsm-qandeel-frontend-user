@@ -106,8 +106,6 @@ export const checkout = {
       maintenance: "Checkout is temporarily unavailable because of maintenance. Please try again soon.",
       maintenanceUntil: "Expected back around {time}.",
       service: "This service cannot be ordered right now.",
-      /** An IMEI service with no field for its IMEI (decision 007): it cannot be ordered, and "Continue" stays off. */
-      noMainInput: "This service can't be ordered right now. Please contact support.",
       contactSupport: "Contact support",
     },
   },

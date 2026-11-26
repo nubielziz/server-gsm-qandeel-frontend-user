@@ -6,7 +6,7 @@ import type { FieldError } from "@/lib/api/errors";
 /**
  * The paths of the field errors the details form draws a box for.
  *
- * @param shape `fieldKeys`: the keys of the custom fields it lists (each is `inputs.<key>`, the IMEI's included); `region`: the
+ * @param shape `fieldKeys`: the keys of the custom fields it lists (each is `inputs.<key>`, a field of type `imei` included); `region`: the
  *   region box is shown (the country has regional tax); `quantity`: the drawer, which holds the quantity, is offered.
  * @returns `email`, `country` and `currency` always, plus what `shape` says
  */

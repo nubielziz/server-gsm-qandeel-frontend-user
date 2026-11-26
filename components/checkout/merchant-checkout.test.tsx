@@ -58,8 +58,8 @@ const SERVICE = {
   minQty: 1,
   maxQty: 1,
   qtyOptions: [],
-  // An IMEI service lists its IMEI as a field the API flags `isMainInput` (decision 007).
-  fields: [{ key: "imei", label: "IMEI", fieldType: "text", required: true, isMainInput: true, options: [], regex: "" }],
+  // An IMEI service lists its IMEI as a field of type `imei`, flagged `isMainInput` (decisions 007 and 008).
+  fields: [{ key: "imei", label: "IMEI", fieldType: "imei", required: true, isMainInput: true, options: [], regex: "" }],
   options: [],
 };
 

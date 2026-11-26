@@ -3,8 +3,8 @@
 // built from the rule (never the server's English text); the quantity survives a restart and a resumed checkout.
 // Real browser → Next → the isolated demo backend (:3100). The services are the fixtures of the global setup
 // (e2e/global-setup.ts → e2e/.auth/fixtures.json): range = 2 to 50, packs = 5/10/25, exact = 5. They are IMEI services, so
-// every test that opens a checkout also enters the IMEI, into the field of the service the API flags `isMainInput` (decision
-// 007). A server answer that cannot be provoked on demand (the rule changed between the page and the click) is mocked at
+// every test that opens a checkout also enters the IMEI, into the service's field of type `imei` (decisions 007
+// and 008). A server answer that cannot be provoked on demand (the rule changed between the page and the click) is mocked at
 // the browser boundary, together with the re-read of the service it triggers.
 // Nothing here pays or changes data: the sessions it opens just expire. The site caches catalog reads for about 30 s, so the
 // first visit of a page waits (toPass, with a reload) until the rule the setup just wrote shows.
@@ -43,7 +43,7 @@ async function apiService(request: APIRequestContext, slug: string): Promise<Api
   return (await res.json()) as ApiService;
 }
 
-/** Types the IMEI of a service into the drawer: its box is the field of the service the API flags `isMainInput`. */
+/** Types the IMEI of a service into the drawer: its box is the service's field of type `imei`. */
 async function fillImei(page: Page, drawer: Locator, slug: string) {
   await drawer.getByLabel((await imeiBox(page.request, slug)).label).fill(IMEI);
 }

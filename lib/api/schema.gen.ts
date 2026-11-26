@@ -616,13 +616,13 @@ export type GetClientOrdersResponse = Array<{
 export type PostClientOrdersBody = {
   /** Numeric record id. */
   serviceId: Id;
-  /** The IMEI of an IMEI service. The shop now types it into the main-input field (`inputs`); when both are sent, this one wins. */
+  /** The main input of an IMEI service, from older pages: the value of its main-input field (it wins over a value sent under that field's key; a service without such a field takes it as sent). The shop now types it into the field (`inputs`). */
   imei?: string;
-  /** A bulk order: one order of the same service per IMEI, placed all together or not at all. Still accepted; the shop no longer sends it. */
+  /** A bulk order: one order of the same service per item, each the value of the main-input field like `imei`, placed all together or not at all. Still accepted; the shop no longer sends it. */
   imeis?: string[];
   /** Defaults to the service's minimum. */
   quantity?: number;
-  /** The values of the service's custom fields by field key (`GET /client/services/:id`); on an IMEI service the IMEI goes under the key of the field with `isMainInput` when `imei` is not sent. */
+  /** The values of the service's custom fields by field key (`GET /client/services/:id`), each judged by its field's type, required tick and pattern; a field of type `imei` is stored as digits. */
   inputs?: {
     [key: string]: string;
   };
@@ -952,13 +952,14 @@ export type GetClientServicesByIdResponse = {
   fields: Array<{
     key: string;
     label: string;
-    fieldType: "text" | "number" | "select" | "textarea";
+    /** `imei` holds one IMEI: read as digits (spaces and dashes removed), 15 digits with a valid Luhn check digit (else `422 INVALID_IMEI`, code `invalid_imei` on `inputs.<key>`). */
+    fieldType: "text" | "number" | "select" | "textarea" | "imei";
     required: boolean;
     /** The choices of a `select` field. */
     options: string[];
     /** `""` when there is no pattern. */
     regex: string;
-    /** The service's main input (at most one field). On an IMEI service the merchant types the IMEI here: it is checked as an IMEI (15 digits, Luhn) and sent as the IMEI. */
+    /** The service's main input (at most one field): its value is what the supplier receives as the IMEI. It is judged like any other field, by its own type (an IMEI only for the type `imei`), `required` and pattern. */
     isMainInput: boolean;
   }>;
   options: Array<{
@@ -1339,9 +1340,9 @@ export type PostStoreV1CheckoutSessionsBody = {
   currency?: string;
   /** Defaults to the service's minimum. */
   quantity?: number;
-  /** The 15-digit IMEI of an IMEI service, from older shop pages: the shop now types it into the main-input field (`inputs`). When both are sent, this one wins. */
+  /** The main input of an IMEI service, from older shop pages: the value of its main-input field (it wins over a value sent under that field's key; a service without such a field takes it as sent). The shop now types it into the field (`inputs`). */
   imei?: string;
-  /** The values of the service's order fields by field key (`GET /store/v1/services/:slug`); on an IMEI service the IMEI goes under the key of the field with `isMainInput` when `imei` is not sent. */
+  /** The values of the service's order fields by field key (`GET /store/v1/services/:slug`), each judged by its field's type, required tick and pattern; a field of type `imei` is stored as digits. */
   inputs?: {
     [key: string]: string;
   };
@@ -1372,7 +1373,7 @@ export type PostStoreV1CheckoutSessionsResponse = {
     deliveryTime: string;
   };
   quantity: number;
-  /** The IMEI with all but its last four digits hidden; null for a service that takes none. */
+  /** The main input of an IMEI service (usually its IMEI) with all but its last four characters hidden; null for another service or none. */
   imei: string | null;
   /** The buyer's address with most of it hidden. */
   email: string;
@@ -1449,7 +1450,7 @@ export type GetStoreV1CheckoutSessionsByTokenResponse = {
     deliveryTime: string;
   };
   quantity: number;
-  /** The IMEI with all but its last four digits hidden; null for a service that takes none. */
+  /** The main input of an IMEI service (usually its IMEI) with all but its last four characters hidden; null for another service or none. */
   imei: string | null;
   /** The buyer's address with most of it hidden. */
   email: string;
@@ -2888,11 +2889,12 @@ export type GetStoreV1ServicesBySlugResponse = {
   fields: Array<{
     key: string;
     label: string;
-    fieldType: "text" | "number" | "select" | "textarea";
+    /** `imei` holds one IMEI: read as digits (spaces and dashes removed), 15 digits with a valid Luhn check digit (else `422 INVALID_IMEI`, code `invalid_imei` on `inputs.<key>`). */
+    fieldType: "text" | "number" | "select" | "textarea" | "imei";
     /** The choices of a `select` field. */
     options: string[];
     required: boolean;
-    /** The service's main input (at most one field). On an IMEI service the buyer types the IMEI here: it is checked as an IMEI (15 digits, Luhn) and sent as the IMEI. */
+    /** The service's main input (at most one field): its value is what the supplier receives as the IMEI. It is judged like any other field, by its own type (an IMEI only for the type `imei`), `required` and pattern. */
     isMainInput: boolean;
   }>;
   faqs: Array<{

@@ -2,7 +2,7 @@
 // with the account's own order form in place of the shop's. The order is placed with `POST /client/orders` and paid from the
 // account's wallet (the price is held at once and settled on delivery), at the account's own price, read here from
 // `GET /client/services/:id` (the API remembers that price for the price-change guard of the order). One order per request;
-// custom fields (the IMEI of an IMEI service is one of them, decision 007) and file services work as they did. No checkout
+// custom fields (a field of type `imei` holds an IMEI, decision 008) and file services work as they did. No checkout
 // session is ever created for such an account: the API keeps refusing the shop checkout to a merchant rank, and no money rule
 // changes. Personal: rendered per request inside the page's account boundary, never cached or prefetched.
 import { PackageSearch } from "lucide-react";

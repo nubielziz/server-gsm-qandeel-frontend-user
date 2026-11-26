@@ -1,5 +1,6 @@
-// Pure helpers for the order form (handoff §4.5): finding and checking the main input of an IMEI service, checking custom
-// fields, building the request body and mapping the API's field errors back onto the form. No React, no I/O: unit-tested.
+// Pure helpers for the order form (handoff §4.5): checking custom fields (each by its own type and Required tick, a field of
+// type `imei` included, decision 008), building the request body and mapping the API's field errors back onto the form.
+// No React, no I/O: unit-tested.
 import { isValidImei, normalizeImei } from "@/lib/format";
 import type { MerchantOrderInput, MerchantServiceDetail } from "@/lib/api/types";
 import type { FieldError } from "@/lib/api/errors";
@@ -13,7 +14,7 @@ export type ServiceField = MerchantServiceDetail["fields"][number];
 
 // ── Custom fields ──────────────────────────────────────────────────────────────────────────────────────────
 
-export type FieldProblem = "required" | "pattern" | "number" | "tooLong" | "option";
+export type FieldProblem = "required" | "pattern" | "number" | "tooLong" | "option" | "invalid_imei";
 
 /** A `new RegExp` that never throws: an invalid pattern from the catalog is ignored (the server still checks). */
 export function safeRegExp(pattern: string): RegExp | null {
@@ -25,8 +26,19 @@ export function safeRegExp(pattern: string): RegExp | null {
   }
 }
 
-/** Checks one custom field the way the API does (required, number, select option, regex, 500 characters). */
+/**
+ * Checks one custom field the way the API does, by the field's own type and Required tick: required, number, select option,
+ * regex, 500 characters. A field of type `imei` is read as digits (spaces and dashes removed): empty follows its Required
+ * tick, else it must be 15 digits with a valid check digit (`invalid_imei`) and fit the field's own pattern.
+ */
 export function checkField(field: ServiceField, value: string): FieldProblem | null {
+  if (field.fieldType === "imei") {
+    const imei = normalizeImei(value);
+    if (imei === "") return field.required ? "required" : null;
+    if (!isValidImei(imei)) return "invalid_imei";
+    const imeiPattern = safeRegExp(field.regex);
+    return imeiPattern && !imeiPattern.test(imei) ? "pattern" : null;
+  }
   const text = value.trim();
   if (text === "") return field.required ? "required" : null;
   if (text.length > MAX_FIELD_VALUE) return "tooLong";
@@ -38,33 +50,14 @@ export function checkField(field: ServiceField, value: string): FieldProblem | n
 }
 
 /**
- * The field that holds the IMEI of an IMEI service: the one the API flags `isMainInput`. Null for any other type, and for
- * an IMEI service that has no such field: that service cannot be ordered (the form says so).
+ * `inputs` for the request: only fields with a value, trimmed. The value of a field of type `imei` goes out as digits
+ * only, the way the API reads an IMEI; a field that holds nothing (an IMEI box with only dashes, say) is left out.
  */
-export function mainInputOf(service: Pick<MerchantServiceDetail, "type" | "fields">): ServiceField | null {
-  return service.type === "imei" ? (service.fields.find((field) => field.isMainInput) ?? null) : null;
-}
-
-/**
- * Checks the main input of an IMEI service as the API does, on the value as it will be sent (spaces and dashes removed):
- * an IMEI is always required, must be 15 digits with a valid check digit (`invalid_imei`), and must fit the field's own pattern.
- */
-export function checkMainInput(field: ServiceField, value: string): FieldProblem | "invalid_imei" | null {
-  const imei = normalizeImei(value);
-  if (imei === "") return "required";
-  if (!isValidImei(imei)) return "invalid_imei";
-  return checkField(field, imei);
-}
-
-/**
- * `inputs` for the request: only fields with a value, trimmed. The value of the main input (`mainKey`) goes out as digits
- * only, the way the API reads an IMEI.
- */
-export function buildInputs(fields: ServiceField[], values: Record<string, string>, mainKey: string | null = null): Record<string, string> {
+export function buildInputs(fields: ServiceField[], values: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const f of fields) {
-    const v = (values[f.key] ?? "").trim();
-    if (v !== "") out[f.key] = f.key === mainKey ? normalizeImei(v) : v;
+    const v = f.fieldType === "imei" ? normalizeImei(values[f.key] ?? "") : (values[f.key] ?? "").trim();
+    if (v !== "") out[f.key] = v;
   }
   return out;
 }
@@ -148,8 +141,6 @@ export type OrderFormHrefs = {
   topUp: string;
   /** The shop's services (the way back when a service is switched off). */
   services: string;
-  /** Support (the way on from a service that cannot be ordered). */
-  support: string;
 };
 
 /** The addresses the order form leads to (it opens at a service's checkout address for a merchant rank, decision 003). */
@@ -158,7 +149,6 @@ export function orderFormHrefs(): OrderFormHrefs {
     orderBase: sitePath("/account/orders"),
     topUp: sitePath("/account/wallet/add-funds"),
     services: sitePath("/services"),
-    support: sitePath("/support"),
   };
 }
 
@@ -172,7 +162,7 @@ export function placedHref(order: { id: number }, hrefs: Pick<OrderFormHrefs, "o
 export type OrderFieldErrors = {
   quantity?: string;
   fileId?: string;
-  /** Per custom field key, from `inputs.<key>` of a field the form draws: the main input of an IMEI service too (`required`, `invalid_imei`, `pattern`). */
+  /** Per custom field key, from `inputs.<key>` of a field the form draws: a field of type `imei` too (`required`, `invalid_imei`, `pattern`). */
   inputs: Record<string, string>;
   /**
    * Every error the form has no box for: `serviceId`, `body`, a path of an older API such as `imei`, an `inputs.<key>` the form does

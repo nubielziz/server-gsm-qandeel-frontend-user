@@ -11,7 +11,7 @@ import { ACCOUNTS, freshAccount, imeiBox, imeiInputs, signIn } from "./helpers";
 
 const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 const IMEI = "490154203237518";
-/** Service 1: an IMEI service. Its IMEI is the field of the service the API flags `isMainInput` (decision 007). */
+/** Service 1: an IMEI service. Its IMEI is its field of type `imei` (decisions 007 and 008). */
 const ICLOUD = "icloud-clean-lost-check";
 
 async function stubTurnstile(page: Page) {
@@ -106,6 +106,10 @@ test.describe("opening a checkout", () => {
     await page.goto("/en/checkout?service=icloud-clean-lost-check");
     await formReady(page);
     await page.getByRole("button", { name: "Continue to payment" }).click();
+    // An empty IMEI box follows its Required tick like any field (decision 008); a typed value is checked as an IMEI.
+    await expect(page.getByRole("dialog").getByText("This field is required.")).toBeVisible();
+    await page.getByRole("dialog").getByLabel(label).fill("49015420323751");
+    await page.getByRole("button", { name: "Save details and continue" }).click();
     await expect(page.getByRole("dialog").getByText("An IMEI has 15 digits.")).toBeVisible();
     await page.getByRole("dialog").getByLabel(label).fill("490154203237519");
     await page.getByRole("button", { name: "Save details and continue" }).click();

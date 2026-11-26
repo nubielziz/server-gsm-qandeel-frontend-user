@@ -39,8 +39,8 @@ async function go(page: Page, path: string, account: { email: string; password: 
 const main = (page: Page) => page.getByRole("main");
 
 /**
- * The IMEI box of a service's order form (service 1 unless told): the field of the service the API flags `isMainInput`
- * (decision 007), found by its own label. The page is signed in as the merchant.
+ * The IMEI box of a service's order form (service 1 unless told): its field of type `imei` (decision 008), found by its own
+ * label. The page is signed in as the merchant.
  */
 async function imeiTextbox(page: Page, serviceId = 1): Promise<Locator> {
   return main(page).getByRole("textbox", { name: (await merchantImeiBox(page.request, serviceId)).label });
@@ -181,7 +181,7 @@ test.describe("ordering", () => {
     // Early feedback: a wrong check digit never leaves the browser.
     await input.fill("123456789012345");
     await place.click();
-    await expect(main(page).getByText("does not pass the check-digit test").first()).toBeVisible();
+    await expect(main(page).getByText("This is not a valid IMEI").first()).toBeVisible();
     await expect(input).toBeFocused();
 
     await input.fill(imei);
@@ -453,7 +453,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
   });
 
   test("a 422 on inputs.<key> lands on its field, the IMEI's box included; a path with no box is said, not lost", async ({ page }) => {
-    // Service 1 is an IMEI service: its IMEI is an input under the key of its own IMEI field (decision 007).
+    // Service 1 is an IMEI service: its IMEI is an input under the key of its own field of type imei (decision 008).
     const [imeiKey] = Object.keys(await merchantImeiInputs(page.request, 1, ""));
     await refuse(page, "**/client/orders", 422, {
       code: "VALIDATION_FAILED",
@@ -463,7 +463,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
     const imei = await imeiTextbox(page);
     await imei.fill(randomImei());
     await place(page).click();
-    await expect(main(page).getByText(/This IMEI does not pass the check-digit test/).first()).toBeVisible();
+    await expect(main(page).getByText(/This is not a valid IMEI: it needs 15 digits/).first()).toBeVisible();
     await expect(imei).toHaveAttribute("aria-invalid", "true");
     await expect(main(page).getByText("English text from the API")).toHaveCount(0); // translated by code, never raw
 
@@ -472,7 +472,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
     await refuse(page, "**/client/orders", 422, { code: "VALIDATION_FAILED", errors: [{ field: "imei", code: "INVALID_IMEI", message: "x" }] });
     await imei.fill(randomImei());
     await place(page).click();
-    await expect(alert(page, "The order was not placed")).toContainText("does not pass the check-digit test");
+    await expect(alert(page, "The order was not placed")).toContainText("This is not a valid IMEI");
 
     await page.unroute("**/client/orders");
     await refuse(page, "**/client/orders", 422, { code: "VALIDATION_FAILED", errors: [{ field: "inputs.account", code: "custom", message: "x" }] });

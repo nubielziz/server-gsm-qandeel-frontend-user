@@ -1,6 +1,7 @@
 // The details step of the shop checkout: a signed-in account of a retail rank has its email locked and its country filled in;
 // a guest types both and is offered the one sign-in page (which names no account type). The drawer draws only the fields the
-// service lists (decision 007): the IMEI of an IMEI service is the field the API flags `isMainInput`, whatever its key and label.
+// service lists (decision 007) and draws each by its own type (decision 008): a field of type `imei` is a numeric box, whatever its
+// key and label and whatever the type of the service.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -27,8 +28,8 @@ const PRICE: StoreServiceDetail["price"] = {
 
 type Field = StoreServiceDetail["fields"][number];
 
-/** The box of the IMEI: the API names its key and label, the form hard-codes neither. */
-const IMEI_FIELD: Field = { key: "imei_number", label: "Device IMEI", fieldType: "text", options: [], required: true, isMainInput: true };
+/** A field of type `imei`: the API names its key and label, the form hard-codes neither. */
+const IMEI_FIELD: Field = { key: "imei_number", label: "Device IMEI", fieldType: "imei", options: [], required: true, isMainInput: true };
 const MODEL_FIELD: Field = { key: "model", label: "Phone model", fieldType: "text", options: [], required: false, isMainInput: false };
 
 const props = (account: CheckoutFormProps["account"], fields: Field[] = [IMEI_FIELD]): CheckoutFormProps => ({
@@ -40,7 +41,6 @@ const props = (account: CheckoutFormProps["account"], fields: Field[] = [IMEI_FI
     id: 42,
     slug: "icloud-clean",
     title: "iCloud Clean",
-    isImei: true,
     quantity: { min: 1, max: 1, options: [] },
     availability: "on_request",
     etaText: "",
@@ -101,17 +101,55 @@ describe("CheckoutForm: whose details it opens with", () => {
   });
 });
 
-describe("CheckoutForm: the IMEI is a field of the service, not a box of the form", () => {
-  it("draws the field the API flags isMainInput, with its own label, as a numeric box", () => {
+describe("CheckoutForm: every field is drawn by its own type, whatever the type of the service (decision 008)", () => {
+  it("draws a field of type imei, with its own label, as a one-line numeric box with the IMEI hint", () => {
     const html = render(null);
     const box = inputOf(html, "imei_number");
     expect(box).toContain('inputMode="numeric"');
     expect(box).toContain('autoComplete="off"');
+    expect(box).toContain('dir="ltr"');
+    expect(box).not.toContain('type="number"');
+    expect(box).toContain('maxLength="24"');
     expect(html).toContain("Device IMEI");
     expect(html).toContain(checkout.start.drawer.imeiHint);
     // No built-in box is left: neither its name nor its old label.
     expect(html).not.toContain('name="imei"');
     expect(html).not.toContain("IMEI number");
+  });
+
+  it("an imei field follows its own Required tick: optional when it is not required", () => {
+    const required = render(null, [IMEI_FIELD]);
+    expect(required).not.toContain(checkout.start.drawer.optional);
+    const optional = render(null, [{ ...IMEI_FIELD, required: false }]);
+    expect(optional).toContain(checkout.start.drawer.optional);
+  });
+
+  it("draws the field flagged isMainInput by its own type: a text field stays a text box with no numeric keyboard", () => {
+    const html = render(null, [{ ...IMEI_FIELD, fieldType: "text" }]);
+    const box = inputOf(html, "imei_number");
+    expect(box).not.toContain("inputMode");
+    expect(html).not.toContain(checkout.start.drawer.imeiHint);
+    expect(html).toContain("Device IMEI");
+  });
+
+  it("draws the field flagged isMainInput by its own type, whatever that type is: a select, a textarea, a number box", () => {
+    const flagged = (fieldType: Field["fieldType"], options: string[] = []): Field => ({ ...IMEI_FIELD, fieldType, options });
+
+    const select = render(null, [flagged("select", ["Model A", "Model B"])]);
+    expect(select).toMatch(/<select[^>]*name="imei_number"/);
+    expect(select).toContain('<option value="Model A"');
+    expect(select).toContain('<option value="Model B"');
+    expect(inputOf(select, "imei_number")).toBe("");
+
+    const textarea = render(null, [flagged("textarea")]);
+    expect(textarea).toMatch(/<textarea[^>]*name="imei_number"/);
+    expect(inputOf(textarea, "imei_number")).toBe("");
+
+    const number = render(null, [flagged("number")]);
+    expect(inputOf(number, "imei_number")).toContain('type="number"');
+    expect(inputOf(number, "imei_number")).not.toContain('inputMode="numeric"');
+
+    for (const html of [select, textarea, number]) expect(html).not.toContain(checkout.start.drawer.imeiHint);
   });
 
   it("draws every other field of the service as an ordinary one, after the IMEI, with no numeric keyboard", () => {
@@ -127,29 +165,15 @@ describe("CheckoutForm: the IMEI is a field of the service, not a box of the for
     expect(html.indexOf('name="model"')).toBeLessThan(html.indexOf('name="imei_number"'));
   });
 
-  it("an IMEI service with no field for its IMEI cannot be ordered: it says so, with the way to support", () => {
+  it("a service with no fields asks nothing and never says it cannot be ordered", () => {
     for (const fields of [[], [MODEL_FIELD]]) {
       const html = render(null, fields);
-      expect(html).toContain("This service can&#x27;t be ordered right now. Please contact support.");
-      expect(html).toContain('href="/en/support"');
-      // The disabled button points at the notice.
-      expect(html).toMatch(/<button type="submit"[^>]*aria-describedby="checkout-unorderable"/);
-      expect(html).toMatch(/<div id="checkout-unorderable"[^>]*role="alert"|<div role="alert"[^>]*id="checkout-unorderable"/);
-      // Nothing to enter, so no drawer, no "Enter details", no "No extra details needed", and nothing to wait for.
-      expect(html).not.toContain("Enter details");
-      expect(html).not.toContain("No extra details needed");
-      expect(html).not.toContain("Waiting for the security check");
+      expect(html).not.toContain("can&#x27;t be ordered right now");
+      expect(html).not.toContain("checkout-unorderable");
+      expect(html).not.toContain("Contact support");
     }
-  });
-
-  it("a service that is not an IMEI service needs no IMEI field, and says nothing about one", () => {
-    const html = renderToStaticMarkup(
-      <ErrorTextProvider messages={errors}>
-        <CheckoutForm {...props(null, [])} service={{ ...props(null, []).service, isImei: false }} />
-      </ErrorTextProvider>,
-    );
-    expect(html).not.toContain("can&#x27;t be ordered right now");
-    expect(html).not.toContain("checkout-unorderable");
-    expect(html).toContain("No extra details needed");
+    const empty = render(null, []);
+    expect(empty).toContain("No extra details needed");
+    expect(empty).not.toContain("Enter details");
   });
 });

@@ -1,7 +1,7 @@
-// The order form of a merchant rank (decision 007): it draws only what the service lists. The IMEI of an IMEI service is the
-// field the API flags `isMainInput`, whatever its key and label: a numeric box, drawn in the service's own order like every other field. There is no switch between
-// one IMEI and several, no IMEI list, and the total is the price times the quantity. An IMEI service with no such field says
-// it cannot be ordered and its button is off. (The send, the errors and the idempotency key are the browser's: e2e/merchant*.spec.ts.)
+// The order form of a merchant rank (decisions 007 and 008): it draws only what the service lists, each field by its own type and
+// Required tick, whatever the type of the service. A field of type `imei` is a numeric box with a live hint; a service with no
+// fields asks nothing. There is no switch between one IMEI and several, no IMEI list, and the total is the price times the quantity.
+// (The send, the errors and the idempotency key are the browser's: e2e/merchant*.spec.ts.)
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,8 +16,8 @@ import { OrderForm, type OrderFormProps } from "./order-form";
 
 type Field = OrderFormProps["service"]["fields"][number];
 
-/** The box of the IMEI: the API names its key and label, the form hard-codes neither. */
-const IMEI_FIELD: Field = { key: "imei_number", label: "Device IMEI", fieldType: "text", required: true, isMainInput: true, options: [], regex: "" };
+/** A field of type `imei`: the API names its key and label, the form hard-codes neither. */
+const IMEI_FIELD: Field = { key: "imei_number", label: "Device IMEI", fieldType: "imei", required: true, isMainInput: true, options: [], regex: "" };
 const ACCOUNT_FIELD: Field = { key: "account", label: "Z3X account", fieldType: "text", required: true, isMainInput: false, options: [], regex: "" };
 
 const props = (over: Partial<OrderFormProps["service"]>): OrderFormProps => ({
@@ -38,14 +38,61 @@ const render = (over: Partial<OrderFormProps["service"]> = {}) =>
 /** The `<input>` tag of a field, by its name. */
 const inputOf = (html: string, name: string) => new RegExp(`<input[^>]*name="${name}"[^>]*>`).exec(html)?.[0] ?? "";
 
-describe("OrderForm: the IMEI is a field of the service", () => {
-  it("draws the field the API flags isMainInput, with its own label, as a required numeric box", () => {
+describe("OrderForm: every field is drawn by its own type (decision 008)", () => {
+  it("draws a field of type imei, with its own label, as a one-line numeric box with the IMEI hint", () => {
     const html = render();
     const box = inputOf(html, "inputs.imei_number");
     expect(box).toContain('inputMode="numeric"');
+    expect(box).toContain('autoComplete="off"');
+    expect(box).toContain('dir="ltr"');
+    expect(box).toContain('maxLength="24"');
     expect(box).toContain("required");
     expect(html).toContain("Device IMEI");
     expect(html).toContain(merchant.form.imeiHint);
+  });
+
+  it("an imei field follows its own Required tick", () => {
+    const html = render({ fields: [{ ...IMEI_FIELD, required: false }] });
+    expect(inputOf(html, "inputs.imei_number")).not.toContain("required");
+    expect(html).toContain(merchant.form.optional);
+  });
+
+  it("draws the field flagged isMainInput by its own type: a text field stays a plain text box, required or not", () => {
+    const text: Field = { ...IMEI_FIELD, fieldType: "text", required: false };
+    const html = render({ fields: [text] });
+    const box = inputOf(html, "inputs.imei_number");
+    expect(box).not.toContain("inputMode");
+    expect(box).not.toContain("required");
+    expect(html).not.toContain(merchant.form.imeiHint);
+    expect(html).toContain(merchant.form.optional);
+  });
+
+  it("draws the field flagged isMainInput by its own type, whatever that type is: a select, a textarea, a number box", () => {
+    const flagged = (fieldType: Field["fieldType"], options: string[] = []): Field => ({ ...IMEI_FIELD, fieldType, options });
+
+    const select = render({ fields: [flagged("select", ["Model A", "Model B"])] });
+    expect(select).toMatch(/<select[^>]*name="inputs.imei_number"/);
+    expect(select).toContain('<option value="Model A"');
+    expect(select).toContain('<option value="Model B"');
+    expect(inputOf(select, "inputs.imei_number")).toBe("");
+
+    const textarea = render({ fields: [flagged("textarea")] });
+    expect(textarea).toMatch(/<textarea[^>]*name="inputs.imei_number"/);
+    expect(inputOf(textarea, "inputs.imei_number")).toBe("");
+
+    const number = render({ fields: [flagged("number")] });
+    expect(inputOf(number, "inputs.imei_number")).toContain('inputMode="decimal"');
+    expect(inputOf(number, "inputs.imei_number")).not.toContain('inputMode="numeric"');
+
+    for (const html of [select, textarea, number]) expect(html).not.toContain(merchant.form.imeiHint);
+  });
+
+  it("draws a field of type imei on a service of any type, and a plain field on an IMEI service", () => {
+    const server = render({ type: "server", fields: [IMEI_FIELD] });
+    expect(inputOf(server, "inputs.imei_number")).toContain('inputMode="numeric"');
+    const imei = render({ type: "imei", fields: [ACCOUNT_FIELD] });
+    expect(inputOf(imei, "inputs.account")).not.toContain("inputMode");
+    expect(imei).not.toContain(merchant.form.imeiHint);
   });
 
   it("has no switch between one IMEI and several, no IMEI list and no box of its own for the IMEI", () => {
@@ -75,23 +122,14 @@ describe("OrderForm: the IMEI is a field of the service", () => {
     expect(render()).toContain("$3.20");
   });
 
-  it("an IMEI service with no field for its IMEI says it cannot be ordered, with the way to support, and its button is off and points at the notice", () => {
-    for (const fields of [[], [ACCOUNT_FIELD]]) {
-      const html = render({ fields });
-      expect(html).toContain("This service can&#x27;t be ordered right now. Please contact support.");
-      expect(html).toContain('href="/en/support">Contact support</a>');
-      expect(html).toMatch(/<button type="submit"[^>]*\sdisabled=""/);
-      expect(html).toMatch(/<button type="submit"[^>]*aria-describedby="order-unorderable"/);
-      expect(html).toMatch(/<div id="order-unorderable"[^>]*role="alert"|<div role="alert"[^>]*id="order-unorderable"/);
-      expect(html).not.toContain(merchant.form.noInputs);
+  it("a service with no fields asks nothing, whatever its type, and its button is on", () => {
+    for (const type of ["imei", "server"] as const) {
+      const html = render({ type, fields: [] });
+      expect(html).toContain(merchant.form.noInputs);
+      expect(html).not.toContain("can&#x27;t be ordered right now");
+      expect(html).not.toContain("Contact support");
+      expect(html).not.toContain("order-unorderable");
+      expect(html).not.toMatch(/<button type="submit"[^>]*\sdisabled=""/);
     }
-  });
-
-  it("a service that is not an IMEI service needs no IMEI field and says nothing about one", () => {
-    const html = render({ type: "server", fields: [] });
-    expect(html).not.toContain("can&#x27;t be ordered right now");
-    expect(html).toContain(merchant.form.noInputs);
-    expect(html).not.toMatch(/<button type="submit"[^>]*\sdisabled=""/);
-    expect(html).not.toContain("order-unorderable");
   });
 });

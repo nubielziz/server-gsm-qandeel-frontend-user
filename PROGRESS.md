@@ -594,6 +594,14 @@ message (`lib/checkout/field-errors.ts`, `mapOrderFieldErrors`). Bulk ordering l
 reviewer (one fix round), final review by the lead. Checks: gen:api against the backend, typecheck, lint, the touched unit tests (73 pass); e2e specs
 updated, not run. Needs the backend's decision 070 first. Merged and pushed on the owner's word.
 
+## IMEI is a field type (2026-11-26, owner's decision; `docs/decisions/008-imei-is-a-field-type.md`, backend decision 073)
+
+The forms no longer treat an IMEI service specially: every field is drawn and checked by its own type and Required tick (the owner's report: a main
+input set to select or textarea was still drawn as the IMEI box). A field of the new type `imei` is a one-line numeric box with the 15-digit and
+check-digit checks, sent as digits; the "can't be ordered" notice of decision 007 is gone (a service is ordered with the fields it has). Built by a
+Sonnet implementer, reviewed by an Opus reviewer (ok). Checks: gen:api against the backend, typecheck, lint, the touched unit tests (268 pass); e2e
+specs updated, not run. Needs the backend's decision 073 first. Merged, not pushed (waiting for the owner's word).
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.

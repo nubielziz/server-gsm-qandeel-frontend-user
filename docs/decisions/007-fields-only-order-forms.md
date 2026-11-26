@@ -1,5 +1,7 @@
 # 007 Order forms draw only the service's fields
 
+> Items 2 (the forced IMEI box) and 3 (the "can't be ordered" notice) are replaced by decision 008: an IMEI is a field type.
+
 **Context.** On 2026-11-26 the owner ruled that an order form draws only the custom fields of the service. Until then two forms
 added inputs of their own when a service's type is `imei`: the shop checkout (an "IMEI number" box, sent as `imei`) and the order
 form of a merchant rank (a switch "One IMEI / Several IMEIs", an IMEI box and a bulk "IMEI list" of up to 100, sent as `imei` or

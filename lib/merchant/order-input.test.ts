@@ -3,11 +3,9 @@ import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import {
   buildInputs,
   checkField,
-  checkMainInput,
   defaultQuantityOf,
   hasFieldErrors,
   inProgressWaitMs,
-  mainInputOf,
   mapOrderFieldErrors,
   orderFormHrefs,
   orderSignature,
@@ -47,52 +45,63 @@ describe("checkField", () => {
     expect(safeRegExp("([")).toBeNull();
     expect(checkField(field({ regex: "([" }), "anything")).toBeNull();
   });
+  it("judges a field flagged isMainInput by its own type, like any other", () => {
+    const flagged = field({ key: "serial", isMainInput: true, required: true });
+    expect(checkField(flagged, "ABC123")).toBeNull();
+    expect(checkField(flagged, "")).toBe("required");
+    expect(checkField({ ...flagged, required: false }, "")).toBeNull();
+    expect(checkField({ ...flagged, fieldType: "number" }, "ABC123")).toBe("number");
+  });
+});
+
+describe("checkField on a field of type imei", () => {
+  const imeiField = field({ key: "imei_number", label: "IMEI", fieldType: "imei", required: true });
+
+  it("follows the field's Required tick when it is empty, spaces and dashes included", () => {
+    expect(checkField(imeiField, "")).toBe("required");
+    expect(checkField(imeiField, "  - ")).toBe("required");
+    expect(checkField({ ...imeiField, required: false }, "")).toBeNull();
+    expect(checkField({ ...imeiField, required: false }, " - ")).toBeNull();
+  });
+  it("reads the value as digits: 15 of them with a valid check digit", () => {
+    expect(checkField(imeiField, "49015420323751")).toBe("invalid_imei");
+    expect(checkField(imeiField, "490154203237519")).toBe("invalid_imei");
+    expect(checkField(imeiField, "49015420323751x")).toBe("invalid_imei");
+    expect(checkField(imeiField, "490154203237518")).toBeNull();
+    expect(checkField(imeiField, "4901 5420-3237 518")).toBeNull();
+    expect(checkField(imeiField, "٤٩٠١٥٤٢٠٣٢٣٧٥١٨")).toBeNull();
+  });
+  it("checks a typed value even when the field is optional", () => {
+    expect(checkField({ ...imeiField, required: false }, "123")).toBe("invalid_imei");
+  });
+  it("then applies the field's own pattern to the digits", () => {
+    expect(checkField({ ...imeiField, regex: "^35\\d{13}$" }, "490154203237518")).toBe("pattern");
+    expect(checkField({ ...imeiField, regex: "^49\\d{13}$" }, "4901 5420 3237 518")).toBeNull();
+    expect(checkField({ ...imeiField, regex: "([" }, "490154203237518")).toBeNull();
+  });
+  it("is judged by its type, not by its key, its flag or the service: a text field keyed imei is plain text", () => {
+    expect(checkField(field({ key: "imei", required: true, isMainInput: true }), "not an imei")).toBeNull();
+  });
 });
 
 describe("buildInputs", () => {
-  // A field keyed imei is not special unless the API flags it.
-  const fields = [field({ key: "imei" }), field({ key: "device" })];
+  const fields = [field({ key: "imei", fieldType: "imei" }), field({ key: "device" })];
   it("sends only filled fields, trimmed", () => {
     expect(buildInputs(fields, { imei: " ", device: " iPhone " })).toEqual({ device: "iPhone" });
   });
-  it("sends the main input as digits only, and every other field as typed", () => {
+  it("sends a field of type imei as digits only, and every other field as typed", () => {
     const values = { imei: " 4901 5420-3237 518 ", device: "iPhone 15" };
-    expect(buildInputs(fields, values, "imei")).toEqual({ imei: "490154203237518", device: "iPhone 15" });
-    expect(buildInputs(fields, values)).toEqual({ imei: "4901 5420-3237 518", device: "iPhone 15" });
+    expect(buildInputs(fields, values)).toEqual({ imei: "490154203237518", device: "iPhone 15" });
+  });
+  it("leaves out an imei field that holds only separators", () => {
+    expect(buildInputs(fields, { imei: " - - ", device: "x" })).toEqual({ device: "x" });
   });
   it("reads an IMEI typed with Arabic-Indic digits as Latin digits", () => {
-    expect(buildInputs(fields, { imei: "٤٩٠١٥٤٢٠٣٢٣٧٥١٨" }, "imei")).toEqual({ imei: "490154203237518" });
+    expect(buildInputs(fields, { imei: "٤٩٠١٥٤٢٠٣٢٣٧٥١٨" })).toEqual({ imei: "490154203237518" });
   });
-});
-
-describe("the main input of an IMEI service", () => {
-  const imeiField = field({ key: "imei_number", label: "IMEI", required: true, isMainInput: true });
-  const device = field({ key: "device" });
-
-  it("is the field flagged isMainInput, whatever its key, on an IMEI service only", () => {
-    expect(mainInputOf({ type: "imei", fields: [device, imeiField] })).toBe(imeiField);
-    expect(mainInputOf({ type: "server", fields: [device, imeiField] })).toBeNull();
-    expect(mainInputOf({ type: "file", fields: [] })).toBeNull();
-  });
-  it("is null for an IMEI service that has no such field: it cannot be ordered", () => {
-    expect(mainInputOf({ type: "imei", fields: [device] })).toBeNull();
-    expect(mainInputOf({ type: "imei", fields: [] })).toBeNull();
-    // A field keyed imei is not the main input unless the API flags it.
-    expect(mainInputOf({ type: "imei", fields: [field({ key: "imei" })] })).toBeNull();
-  });
-  it("checks the value as it will be sent: required, then the check digit, then the field's own pattern", () => {
-    expect(checkMainInput(imeiField, "")).toBe("required");
-    expect(checkMainInput(imeiField, "  - ")).toBe("required");
-    expect(checkMainInput(imeiField, "49015420323751")).toBe("invalid_imei");
-    expect(checkMainInput(imeiField, "490154203237519")).toBe("invalid_imei");
-    expect(checkMainInput(imeiField, "490154203237518")).toBeNull();
-    expect(checkMainInput(imeiField, "4901 5420-3237 518")).toBeNull();
-    expect(checkMainInput(imeiField, "٤٩٠١٥٤٢٠٣٢٣٧٥١٨")).toBeNull();
-    expect(checkMainInput({ ...imeiField, regex: "^35\\d{13}$" }, "490154203237518")).toBe("pattern");
-    expect(checkMainInput({ ...imeiField, regex: "^49\\d{13}$" }, "4901 5420 3237 518")).toBeNull();
-  });
-  it("is required even when the field says it is optional", () => {
-    expect(checkMainInput({ ...imeiField, required: false }, "")).toBe("required");
+  it("does not touch a field keyed imei unless its type is imei, nor a field flagged isMainInput", () => {
+    const plain = [field({ key: "imei", isMainInput: true })];
+    expect(buildInputs(plain, { imei: "4901 5420-3237 518" })).toEqual({ imei: "4901 5420-3237 518" });
   });
 });
 
@@ -137,7 +146,7 @@ describe("quantity", () => {
 });
 
 describe("orderSignature and the Idempotency-Key", () => {
-  // The IMEI of an IMEI service is one of the inputs, under the key of its main-input field (decision 007).
+  // An IMEI is one of the inputs, under the key of its field of type imei (decision 008).
   const body = { serviceId: 1, quantity: 5, inputs: { imei: "490154203237518", account: "a@b.c", model: "X" } };
   const withImei = (imei: string) => ({ ...body, inputs: { ...body.inputs, imei } });
 
@@ -190,7 +199,7 @@ describe("mapOrderFieldErrors", () => {
   const drawn = { inputKeys: new Set(["imei", "account"]), file: false };
   const fileDrawn = { ...drawn, file: true };
 
-  it("puts a problem of the IMEI on its own field: the main input is an input like any other", () => {
+  it("puts a problem of an imei field on its own field, like any other field's", () => {
     const out = mapOrderFieldErrors(
       [
         { field: "inputs.imei", code: "invalid_imei", message: "" },
@@ -267,7 +276,6 @@ describe("where the order form leads", () => {
       orderBase: "/en/account/orders",
       topUp: "/en/account/wallet/add-funds",
       services: "/en/services",
-      support: "/en/support",
     });
     for (const href of Object.values(hrefs)) expect(href).not.toContain("/merchant");
   });

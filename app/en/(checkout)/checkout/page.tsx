@@ -133,7 +133,6 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
       id: service.id,
       slug: service.slug,
       title: service.title,
-      isImei: service.type === "imei",
       quantity: service.quantity,
       availability: service.availability,
       etaText: service.etaText,

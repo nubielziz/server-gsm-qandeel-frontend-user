@@ -102,7 +102,7 @@ test.describe("before hydration", () => {
 
     await trigger.click();
     const drawer = page.getByRole("dialog");
-    // The IMEI box is the field of the service the API flags `isMainInput`, drawn like any other (decision 007).
+    // The IMEI box is the service's field of type `imei`, drawn like any other (decisions 007 and 008).
     const { label } = await imeiBox(page.request, "icloud-clean-lost-check");
     await expect(drawer.getByLabel(label)).toBeVisible();
     expect(await drawer.evaluate((element) => element.matches(":modal"))).toBe(true);

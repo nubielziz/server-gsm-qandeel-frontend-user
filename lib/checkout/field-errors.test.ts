@@ -4,7 +4,7 @@ import { drawnPaths, placeFieldErrors } from "./field-errors";
 const text = (e: { code: string }) => `T:${e.code}`;
 const error = (field: string, code = "custom") => ({ field, code, message: "" });
 
-/** A form that lists the IMEI's field (key `imei_number`) and another one, with the drawer and no region box. */
+/** A form that lists a field of type `imei` (key `imei_number`) and another one, with the drawer and no region box. */
 const drawn = drawnPaths({ fieldKeys: ["imei_number", "model"], region: false, quantity: true });
 
 describe("drawnPaths", () => {
@@ -17,7 +17,7 @@ describe("drawnPaths", () => {
 });
 
 describe("placeFieldErrors", () => {
-  it("puts an error on a drawn field, the IMEI's included, under that field", () => {
+  it("puts an error on a drawn field, a field of type imei included, under that field", () => {
     const placed = placeFieldErrors([error("inputs.imei_number", "invalid_imei"), error("email", "invalid_string")], drawn, text);
     expect(placed.fields).toEqual({ "inputs.imei_number": "T:invalid_imei", email: "T:invalid_string" });
     expect(placed.unplaced).toBeUndefined();

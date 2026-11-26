@@ -29,7 +29,7 @@ function randomImei(): string {
 }
 
 const main = (page: Page) => page.getByRole("main");
-/** The IMEI box of service 1: the field of the service the API flags `isMainInput` (decision 007), found by its own label. */
+/** The IMEI box of service 1: its field of type `imei` (decision 008), found by its own label. */
 const imeiBox = async (page: Page): Promise<Locator> => main(page).getByRole("textbox", { name: (await merchantImeiBox(page.request, 1)).label });
 const place = (page: Page) => main(page).getByRole("button", { name: /^Place order/ });
 
