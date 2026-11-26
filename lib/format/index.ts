@@ -110,6 +110,16 @@ export function normalizeImei(value: string): string {
     .replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (d) => String((d.charCodeAt(0) & 0xf) % 10));
 }
 
+/**
+ * What is wrong with a typed IMEI, by the checks a form can make before it sends anything: `"length"` (not 15 digits once
+ * spaces and dashes are removed) or `"checksum"` (15 digits whose last digit does not match the rest); null for a good one.
+ * The main input of an IMEI service in both order forms (decision 007).
+ */
+export function imeiProblem(value: string): "length" | "checksum" | null {
+  if (!/^\d{15}$/.test(normalizeImei(value))) return "length";
+  return isValidImei(value) ? null : "checksum";
+}
+
 /** 15 digits with a valid Luhn check digit. */
 export function isValidImei(value: string): boolean {
   const digits = normalizeImei(value);

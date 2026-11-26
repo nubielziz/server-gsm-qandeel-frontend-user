@@ -7,7 +7,7 @@
 import { expect, test } from "./fixtures";
 import { type Locator, type Page } from "@playwright/test";
 import fs from "node:fs/promises";
-import { ACCOUNTS, BASE_URL, fixtures, signIn } from "./helpers";
+import { ACCOUNTS, BASE_URL, fixtures, merchantImeiBox, merchantImeiInputs, signIn } from "./helpers";
 
 /** A valid 1x1 PNG: a stand-in for a bank receipt. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==", "base64");
@@ -37,6 +37,14 @@ async function go(page: Page, path: string, account: { email: string; password: 
 
 /** The main landmark of the workspace (the header search and the wallet pill live outside it). */
 const main = (page: Page) => page.getByRole("main");
+
+/**
+ * The IMEI box of a service's order form (service 1 unless told): the field of the service the API flags `isMainInput`
+ * (decision 007), found by its own label. The page is signed in as the merchant.
+ */
+async function imeiTextbox(page: Page, serviceId = 1): Promise<Locator> {
+  return main(page).getByRole("textbox", { name: (await merchantImeiBox(page.request, serviceId)).label });
+}
 
 /** Lists render a table from `md` up and a compact list below: only the visible copy counts. */
 const vis = (locator: Locator) => locator.filter({ visible: true });
@@ -167,7 +175,7 @@ test.describe("ordering", () => {
   test("places an IMEI order, finds it in orders and the statement, and cancels it when the API allows", async ({ page }) => {
     const imei = randomImei();
     await go(page, SERVICE_1);
-    const input = main(page).getByRole("textbox", { name: /^IMEI/ });
+    const input = await imeiTextbox(page);
     const place = main(page).getByRole("button", { name: /^Place order/ });
 
     // Early feedback: a wrong check digit never leaves the browser.
@@ -189,7 +197,7 @@ test.describe("ordering", () => {
 
     // The same open order again: the API refuses a duplicate (409 DUPLICATE_ORDER) and we link to the first one.
     await go(page, SERVICE_1);
-    await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(imei);
+    await (await imeiTextbox(page)).fill(imei);
     await main(page).getByRole("button", { name: /^Place order/ }).click();
     await expect(main(page).getByText("You already have this order open")).toBeVisible();
     await expect(main(page).getByRole("link", { name: `View order #${id}` })).toHaveAttribute("href", `/en/account/orders/${id}`);
@@ -212,27 +220,6 @@ test.describe("ordering", () => {
     } else {
       test.info().annotations.push({ type: "note", description: "canCancel was already false" });
     }
-  });
-
-  test("bulk IMEIs: per-line errors, an exact live total, all orders placed together", async ({ page }) => {
-    const [a, b] = [randomImei(), randomImei()];
-    await go(page, SERVICE_1);
-    await main(page).getByRole("radio", { name: "Several IMEIs" }).click();
-    const list = main(page).getByRole("textbox", { name: /^IMEI list/ });
-    await list.fill(`${a}\n\n12345\n${b}`);
-    await expect(main(page).getByText("2 IMEIs ready · 1 to fix")).toBeVisible(); // live, no layout shift on blur
-    await main(page).getByRole("button", { name: /^Place order/ }).click();
-    await expect(main(page).getByText("Line 3: not a valid IMEI.")).toBeVisible(); // numbering counts blank lines
-    await expect(list).toBeFocused();
-
-    await list.fill(`${a}\n${b}`);
-    await expect(main(page).getByText("2 IMEIs ready")).toBeVisible();
-    const place = main(page).getByRole("button", { name: /^Place order/ });
-    await expect(place).toContainText("$0.20"); // 2 × $0.10, exact
-    await place.click();
-    await page.waitForURL(/\/en\/account\/orders$/);
-    await expect(vis(main(page).getByText(a)).first()).toBeVisible();
-    await expect(vis(main(page).getByText(b)).first()).toBeVisible();
   });
 
   test("custom field: required, then the result code of an instant order", async ({ page }) => {
@@ -298,7 +285,7 @@ test.describe("quantity rules (the three services the global setup configured, n
 
     const quantity = main(page).getByRole("textbox", { name: /^Quantity/ });
     await expect(quantity).toHaveValue("2");
-    await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
+    await (await imeiTextbox(page, range.id)).fill(randomImei());
     await quantity.fill("1");
     await place(page).click();
     await expect(main(page).getByText("Enter a quantity from 2 to 50.")).toBeVisible();
@@ -443,7 +430,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
   test("PRICE_CHANGED shows both prices and offers to reload the price", async ({ page }) => {
     await refuse(page, "**/client/orders", 409, { code: "PRICE_CHANGED", listedPrice: "0.1000", currentPrice: "0.1100" });
     await go(page, SERVICE_1);
-    await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
+    await (await imeiTextbox(page)).fill(randomImei());
     await place(page).click();
     await expect(alert(page, "The price changed")).toContainText(/You saw \u2066?\$0\.10/); // amounts are wrapped in bidi isolates
     await expect(alert(page, "The price changed")).toContainText(/\$0\.11/);
@@ -455,7 +442,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
   test("INSUFFICIENT_FUNDS links to the top-up page; SERVICE_DISABLED links back to the catalog", async ({ page }) => {
     await go(page, SERVICE_1);
     await refuse(page, "**/client/orders", 402, { code: "INSUFFICIENT_FUNDS" });
-    await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
+    await (await imeiTextbox(page)).fill(randomImei());
     await place(page).click();
     await expect(alert(page, "Your balance is too low").getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/en/account/wallet/add-funds");
 
@@ -465,17 +452,27 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
     await expect(alert(page, "This service is unavailable").getByRole("link", { name: "Back to services" })).toHaveAttribute("href", "/en/services");
   });
 
-  test("a 422 on imeis.N lands on the right textarea line, and inputs.<key> on its field", async ({ page }) => {
+  test("a 422 on inputs.<key> lands on its field, the IMEI's box included; a path with no box is said, not lost", async ({ page }) => {
+    // Service 1 is an IMEI service: its IMEI is an input under the key of its own IMEI field (decision 007).
+    const [imeiKey] = Object.keys(await merchantImeiInputs(page.request, 1, ""));
     await refuse(page, "**/client/orders", 422, {
       code: "VALIDATION_FAILED",
-      errors: [{ field: "imeis.1", code: "invalid_imei", message: "English text from the API" }],
+      errors: [{ field: `inputs.${imeiKey}`, code: "invalid_imei", message: "English text from the API" }],
     });
     await go(page, SERVICE_1);
-    await main(page).getByRole("radio", { name: "Several IMEIs" }).click();
-    await main(page).getByRole("textbox", { name: /^IMEI list/ }).fill(`${randomImei()}\n\n${randomImei()}`);
+    const imei = await imeiTextbox(page);
+    await imei.fill(randomImei());
     await place(page).click();
-    await expect(main(page).getByText(/^Line 3: This IMEI does not pass the check-digit test/)).toBeVisible(); // item 1 = textarea line 3
+    await expect(main(page).getByText(/This IMEI does not pass the check-digit test/).first()).toBeVisible();
+    await expect(imei).toHaveAttribute("aria-invalid", "true");
     await expect(main(page).getByText("English text from the API")).toHaveCount(0); // translated by code, never raw
+
+    // An answer on a path the form draws no box for (an older API's `imei`) is the banner's message, not the generic words.
+    await page.unroute("**/client/orders");
+    await refuse(page, "**/client/orders", 422, { code: "VALIDATION_FAILED", errors: [{ field: "imei", code: "INVALID_IMEI", message: "x" }] });
+    await imei.fill(randomImei());
+    await place(page).click();
+    await expect(alert(page, "The order was not placed")).toContainText("does not pass the check-digit test");
 
     await page.unroute("**/client/orders");
     await refuse(page, "**/client/orders", 422, { code: "VALIDATION_FAILED", errors: [{ field: "inputs.account", code: "custom", message: "x" }] });
@@ -494,7 +491,7 @@ test.describe("refusals from the API (answers mocked in the browser)", () => {
     });
     await go(page, `/en/checkout?service=${packs.slug}`);
     await formReady(page);
-    await main(page).getByRole("textbox", { name: /^IMEI/ }).fill(randomImei());
+    await (await imeiTextbox(page, packs.id)).fill(randomImei());
     await place(page).click();
     await expect(main(page).getByText("Choose one of these quantities: 5, 10, 25.")).toBeVisible();
     await expect(main(page).getByText("Choose one of the quantities this service sells")).toHaveCount(0);

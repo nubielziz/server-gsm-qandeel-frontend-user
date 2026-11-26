@@ -5,9 +5,9 @@
 // (decision 003): the tests that place a real order say so, and try to cancel it afterwards (the worker usually picks it up
 // first, then the API answers 409 and the order stays).
 // The refusals are mocked in the browser, so they cost nothing.
-import type { Page, Request } from "@playwright/test";
+import type { Locator, Page, Request } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { ACCOUNTS, go, signIn } from "./helpers";
+import { ACCOUNTS, go, merchantImeiBox, signIn } from "./helpers";
 
 const SERVICE = "/en/checkout?service=icloud-clean-lost-check";
 const ORDERS = "**/client/orders";
@@ -29,7 +29,8 @@ function randomImei(): string {
 }
 
 const main = (page: Page) => page.getByRole("main");
-const imeiBox = (page: Page) => main(page).getByRole("textbox", { name: /^IMEI/ });
+/** The IMEI box of service 1: the field of the service the API flags `isMainInput` (decision 007), found by its own label. */
+const imeiBox = async (page: Page): Promise<Locator> => main(page).getByRole("textbox", { name: (await merchantImeiBox(page.request, 1)).label });
 const place = (page: Page) => main(page).getByRole("button", { name: /^Place order/ });
 
 test.beforeEach(async ({ page }) => {
@@ -43,7 +44,7 @@ async function openForm(page: Page) {
     await signIn(page, ACCOUNTS.merchant);
     await go(page, SERVICE);
   }
-  await expect(imeiBox(page)).toBeVisible();
+  await expect(await imeiBox(page)).toBeVisible();
 }
 
 const isOrderPost = (request: Request) => request.method() === "POST" && new URL(request.url()).pathname === "/client/orders";
@@ -96,7 +97,7 @@ test("the order request carries an Idempotency-Key, and a double click sends one
   const imei = randomImei();
   const sent = recordOrderPosts(page);
   await openForm(page);
-  await imeiBox(page).fill(imei);
+  await (await imeiBox(page)).fill(imei);
   await expect(main(page).getByText("This IMEI is valid.")).toBeVisible();
 
   await place(page).dblclick();
@@ -125,7 +126,7 @@ test("a lost answer: the second click sends the same key and gets the same order
   });
 
   await openForm(page);
-  await imeiBox(page).fill(imei);
+  await (await imeiBox(page)).fill(imei);
   await place(page).click();
   await expect(main(page).getByRole("alert").filter({ hasText: "The order was not placed" })).toBeVisible();
   await expect(main(page).getByText("Could not reach the server")).toBeVisible();
@@ -151,14 +152,14 @@ test("a key follows the body: the same body keeps it, another IMEI takes a new o
   await openForm(page);
 
   const [a, b] = [randomImei(), randomImei()];
-  await imeiBox(page).fill(a);
+  await (await imeiBox(page)).fill(a);
   await place(page).click();
   await expect(main(page).getByText("This service is unavailable")).toBeVisible();
   await expect(place(page)).toBeEnabled();
   await place(page).click(); // the same form again: the refusal stored nothing, so the same key is right
   await expect.poll(() => sent.length).toBe(2);
 
-  await imeiBox(page).fill(b);
+  await (await imeiBox(page)).fill(b);
   await place(page).click();
   await expect.poll(() => sent.length).toBe(3);
 
@@ -166,7 +167,11 @@ test("a key follows the body: the same body keeps it, another IMEI takes a new o
   for (const key of keys) expect(key).toMatch(UUID);
   expect(keys[1]).toBe(keys[0]);
   expect(keys[2]).not.toBe(keys[0]);
-  expect(JSON.parse(sent[2].postData() ?? "{}")).toMatchObject({ serviceId: 1, imei: b });
+  // The IMEI is an input under the key of the service's own IMEI field, as digits only (decision 007): there is no `imei` in the body.
+  const third = JSON.parse(sent[2].postData() ?? "{}") as { serviceId: number; inputs: Record<string, string> };
+  expect(third.serviceId).toBe(1);
+  expect(Object.values(third.inputs)).toContain(b);
+  expect(third).not.toHaveProperty("imei");
 });
 
 test("409 IDEMPOTENCY_IN_PROGRESS: the form waits Retry-After, says so, and sends the same key again (places a real $0.10 order)", async ({ page }) => {
@@ -185,7 +190,7 @@ test("409 IDEMPOTENCY_IN_PROGRESS: the form waits Retry-After, says so, and send
   });
 
   await openForm(page);
-  await imeiBox(page).fill(imei);
+  await (await imeiBox(page)).fill(imei);
   await place(page).click();
   await expect(main(page).getByText("Your order is still being processed.")).toBeVisible();
   await page.waitForURL(/\/en\/account\/orders\/\d+$/);
@@ -204,7 +209,7 @@ test("409 IDEMPOTENCY_IN_PROGRESS that never ends: three more tries, then the te
   const sent = recordOrderPosts(page);
   await refuseOrders(page, 409, { code: "IDEMPOTENCY_IN_PROGRESS" }, { "retry-after": "1" });
   await openForm(page);
-  await imeiBox(page).fill(randomImei());
+  await (await imeiBox(page)).fill(randomImei());
   await place(page).click();
 
   // The first send and three retries, one second apart; then the person sees the generic text and can press again.
@@ -219,7 +224,7 @@ test("409 IDEMPOTENCY_KEY_REUSED shows the generic text and the next press takes
   const sent = recordOrderPosts(page);
   await refuseOrders(page, 409, { code: "IDEMPOTENCY_KEY_REUSED" });
   await openForm(page);
-  await imeiBox(page).fill(randomImei());
+  await (await imeiBox(page)).fill(randomImei());
   await place(page).click();
   await expect(main(page).getByRole("alert").filter({ hasText: "This request changed while it was being sent." })).toBeVisible();
   await expect(place(page)).toBeEnabled();

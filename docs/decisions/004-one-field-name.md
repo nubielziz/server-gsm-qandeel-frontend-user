@@ -15,7 +15,8 @@ field is the IMEI box itself. This is the shop's side of it (a bare "decision 06
    labels and people type the values, in any script.
 2. **No second IMEI box.** `GET /client/services/:id` (the order form of a merchant rank) and `GET /store/v1/services/:slug` (the shop
    checkout) leave the main-input field of an IMEI service out of `fields`. The shop therefore draws every field the API sends:
-   `visibleFields` filters nothing, and no key (`imei` was one) is special any more.
+   `visibleFields` filters nothing, and no key (`imei` was one) is special any more. *Replaced by decision 007: both routes now
+   list the main-input field too, flagged `isMainInput`, and the forms draw it instead of a box of their own.*
 3. **The hidden key stays hidden.** Nothing in the shop shows it or asks for it; `inputs` of an order are still sent by it.
 
 **Consequences.** A merchant reads what it was asked ("Serial number: …") instead of a key, and nobody is asked for the IMEI twice.

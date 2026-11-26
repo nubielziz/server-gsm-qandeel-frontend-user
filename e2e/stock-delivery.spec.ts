@@ -9,7 +9,7 @@ import type { Locator, Page } from "@playwright/test";
 import { store } from "../lib/i18n/messages/store";
 import { availableCodes, completeOrder, creditAccount, ensureStock } from "./admin";
 import { expect, test } from "./fixtures";
-import { DEV_TURNSTILE_TOKEN, fixtures, freshAccount } from "./helpers";
+import { DEV_TURNSTILE_TOKEN, fixtures, freshAccount, imeiInputs } from "./helpers";
 
 const IMEI = "490154203237518";
 
@@ -32,11 +32,12 @@ const clipboard = (page: Page) => page.evaluate(() => navigator.clipboard.readTe
  * As the signed-in account: opens a checkout, records every consent it asks for and pays it from the store balance
  * (`POST …/balance-payment`: no body, no Content-Type, its own Idempotency-Key). Returns the order.
  */
-async function buyFromBalance(page: Page, email: string, serviceId: number, quantity: number): Promise<{ id: number; trackingToken: string }> {
+async function buyFromBalance(page: Page, email: string, service: { id: number; slug: string }, quantity: number): Promise<{ id: number; trackingToken: string }> {
   const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "csrf_token_store")?.value ?? "";
   const opened = await page.request.post("/store/v1/checkout-sessions", {
     headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { serviceId, email, country: "US", currency: "USD", quantity, imei: IMEI },
+    // The IMEI is an input under the key of the service's own IMEI field (decision 007).
+    data: { serviceId: service.id, email, country: "US", currency: "USD", quantity, inputs: await imeiInputs(page.request, service.slug, IMEI) },
   });
   expect(opened.status(), await opened.text()).toBe(201);
   const session = (await opened.json()) as { token: string; balancePayable: boolean; consent: { required: string[] } };
@@ -66,7 +67,7 @@ test("a stocked order completes at once, its codes are listed with a Copy button
   await ensureStock(packs.id, 5, "E2ESD");
 
   // 4. Five units from stock: the order is completed when it is created.
-  const stocked = await buyFromBalance(page, email, packs.id, 5);
+  const stocked = await buyFromBalance(page, email, packs, 5);
 
   // 5. Tracking page.
   await page.goto(`/en/track/${stocked.trackingToken}`);
@@ -100,7 +101,7 @@ test("a stocked order completes at once, its codes are listed with a Copy button
 
   // 6. Ten units: the stock cannot cover them, so the order stays pending (nothing was taken). The text promises no time.
   expect(await availableCodes(packs.id), "the packs service holds fewer than 10 codes, so a 10-unit order cannot be filled").toBeLessThan(10);
-  const waiting = await buyFromBalance(page, email, packs.id, 10);
+  const waiting = await buyFromBalance(page, email, packs, 10);
   await page.goto(`/en/track/${waiting.trackingToken}`);
   const pending = main.getByText(store.track.pendingText, { exact: true });
   await expect(pending).toBeVisible();

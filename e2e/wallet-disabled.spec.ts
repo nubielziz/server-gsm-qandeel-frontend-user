@@ -8,7 +8,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { adminCall, creditAccount } from "./admin";
 import { expect, test } from "./fixtures";
-import { DEV_TURNSTILE_TOKEN, freshAccount, go, signIn } from "./helpers";
+import { DEV_TURNSTILE_TOKEN, freshAccount, go, imeiInputs, signIn } from "./helpers";
 
 test.skip(() => process.env.E2E_EXCLUSIVE !== "1", "Exclusive: it switches the customer wallet off for every customer. Run it with E2E_EXCLUSIVE=1 and nothing else running.");
 test.skip(({ isMobile }) => isMobile, "One project is enough: the setting is global and the pages are the same.");
@@ -63,7 +63,8 @@ test("a switched-off wallet still shows a balance and its statement, offers noth
     const csrf = (await page.context().cookies()).find((cookie) => cookie.name.startsWith("csrf_token_"))?.value ?? "";
     const created = await page.request.post("/store/v1/checkout-sessions", {
       headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-      data: { serviceId: 1, email: rich.email, country: "DE", currency: "USD", imei: IMEI },
+      // Service 1 is an IMEI service: its IMEI is an input under the key of its own IMEI field (decision 007).
+      data: { serviceId: 1, email: rich.email, country: "DE", currency: "USD", inputs: await imeiInputs(page.request, "icloud-clean-lost-check", IMEI) },
     });
     expect(created.status(), await created.text()).toBe(201);
     const session = (await created.json()) as { token: string; balancePayable: boolean };

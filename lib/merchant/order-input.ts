@@ -1,67 +1,15 @@
-// Pure helpers for the order form (handoff §4.5): reading bulk IMEI lists, checking custom fields, building the
-// request body and mapping the API's field errors back onto the form. No React, no I/O: unit-tested.
+// Pure helpers for the order form (handoff §4.5): finding and checking the main input of an IMEI service, checking custom
+// fields, building the request body and mapping the API's field errors back onto the form. No React, no I/O: unit-tested.
 import { isValidImei, normalizeImei } from "@/lib/format";
 import type { MerchantOrderInput, MerchantServiceDetail } from "@/lib/api/types";
 import type { FieldError } from "@/lib/api/errors";
 import { fromMerchantRule, isAllowedQuantity, parseQuantityInput, quantityMode } from "@/lib/quantity";
 import { sitePath } from "@/lib/site-path";
 
-/** At most this many IMEIs in one bulk order (`imeis` has 1–100 items). */
-export const MAX_BULK_IMEIS = 100;
 /** Custom field values are at most 500 characters. */
 export const MAX_FIELD_VALUE = 500;
 
 export type ServiceField = MerchantServiceDetail["fields"][number];
-
-// ── Bulk IMEI list ─────────────────────────────────────────────────────────────────────────────────────────
-
-export type ImeiLine = {
-  /** 1-based line number in the textarea (blank lines count, so it matches what the person sees). */
-  line: number;
-  /** The text as typed. */
-  raw: string;
-  /** Spaces and dashes removed, as the API does. */
-  imei: string;
-  valid: boolean;
-  /** Another line already holds the same IMEI. */
-  duplicate: boolean;
-};
-
-/** Splits the textarea into IMEI lines (blank lines are skipped, numbering is kept). */
-export function parseImeiLines(text: string): ImeiLine[] {
-  const seen = new Set<string>();
-  const out: ImeiLine[] = [];
-  text.split(/\r\n|\r|\n/).forEach((raw, index) => {
-    if (raw.trim() === "") return;
-    const imei = normalizeImei(raw);
-    const duplicate = seen.has(imei);
-    seen.add(imei);
-    out.push({ line: index + 1, raw, imei, valid: isValidImei(imei), duplicate });
-  });
-  return out;
-}
-
-export type ImeiListSummary = {
-  count: number;
-  invalid: ImeiLine[];
-  duplicates: ImeiLine[];
-  tooMany: boolean;
-  /** Ready to send: at least one IMEI, all valid, no duplicates, within the limit. */
-  ok: boolean;
-};
-
-export function summarizeImeiLines(lines: ImeiLine[]): ImeiListSummary {
-  const invalid = lines.filter((l) => !l.valid);
-  const duplicates = lines.filter((l) => l.duplicate);
-  const tooMany = lines.length > MAX_BULK_IMEIS;
-  return {
-    count: lines.length,
-    invalid,
-    duplicates,
-    tooMany,
-    ok: lines.length > 0 && invalid.length === 0 && duplicates.length === 0 && !tooMany,
-  };
-}
 
 // ── Custom fields ──────────────────────────────────────────────────────────────────────────────────────────
 
@@ -90,19 +38,33 @@ export function checkField(field: ServiceField, value: string): FieldProblem | n
 }
 
 /**
- * The custom fields a person fills in: the fields as the API sends them. On an IMEI service the API already leaves out the
- * field that is the IMEI itself (the form has its own IMEI box), so nothing is filtered here and no key is special.
+ * The field that holds the IMEI of an IMEI service: the one the API flags `isMainInput`. Null for any other type, and for
+ * an IMEI service that has no such field: that service cannot be ordered (the form says so).
  */
-export function visibleFields(service: Pick<MerchantServiceDetail, "fields">): ServiceField[] {
-  return service.fields;
+export function mainInputOf(service: Pick<MerchantServiceDetail, "type" | "fields">): ServiceField | null {
+  return service.type === "imei" ? (service.fields.find((field) => field.isMainInput) ?? null) : null;
 }
 
-/** `inputs` for the request: only fields with a value, trimmed. */
-export function buildInputs(fields: ServiceField[], values: Record<string, string>): Record<string, string> {
+/**
+ * Checks the main input of an IMEI service as the API does, on the value as it will be sent (spaces and dashes removed):
+ * an IMEI is always required, must be 15 digits with a valid check digit (`invalid_imei`), and must fit the field's own pattern.
+ */
+export function checkMainInput(field: ServiceField, value: string): FieldProblem | "invalid_imei" | null {
+  const imei = normalizeImei(value);
+  if (imei === "") return "required";
+  if (!isValidImei(imei)) return "invalid_imei";
+  return checkField(field, imei);
+}
+
+/**
+ * `inputs` for the request: only fields with a value, trimmed. The value of the main input (`mainKey`) goes out as digits
+ * only, the way the API reads an IMEI.
+ */
+export function buildInputs(fields: ServiceField[], values: Record<string, string>, mainKey: string | null = null): Record<string, string> {
   const out: Record<string, string> = {};
   for (const f of fields) {
     const v = (values[f.key] ?? "").trim();
-    if (v !== "") out[f.key] = v;
+    if (v !== "") out[f.key] = f.key === mainKey ? normalizeImei(v) : v;
   }
   return out;
 }
@@ -159,7 +121,7 @@ function canonicalJson(value: unknown): string {
 
 /**
  * The signature of an order request for `createIdempotencyKeys().keyFor()`: equal bodies give the same text whatever
- * the order of their keys, and any change (an IMEI, the quantity, one input, the file, the IMEI order of a bulk list)
+ * the order of their keys, and any change (the IMEI, which is one of the inputs, the quantity, another input, the file)
  * gives another. The same signature keeps the same `Idempotency-Key`, so a retry or a double click replays the first
  * answer; a changed form takes a new key (a reused key with another body is 409 IDEMPOTENCY_KEY_REUSED).
  */
@@ -180,74 +142,67 @@ export function inProgressWaitMs(retryAfterSeconds: number | undefined): number 
 
 /** The pages the order form and its notices lead to. They are pages of the account area, which every rank shares. */
 export type OrderFormHrefs = {
-  /** The list of the account's orders (where a bulk order lands). */
-  orders: string;
-  /** The orders address; an order's own page is `<orderBase>/<id>`. */
+  /** The orders address; an order's own page is `<orderBase>/<id>`, where the form leads once the order is placed. */
   orderBase: string;
   /** The page that adds funds to the wallet (the notice for a balance that is too low). */
   topUp: string;
   /** The shop's services (the way back when a service is switched off). */
   services: string;
+  /** Support (the way on from a service that cannot be ordered). */
+  support: string;
 };
 
 /** The addresses the order form leads to (it opens at a service's checkout address for a merchant rank, decision 003). */
 export function orderFormHrefs(): OrderFormHrefs {
   return {
-    orders: sitePath("/account/orders"),
     orderBase: sitePath("/account/orders"),
     topUp: sitePath("/account/wallet/add-funds"),
     services: sitePath("/services"),
+    support: sitePath("/support"),
   };
 }
 
-/** Where the form goes once the API accepted the order: the order's own page for one order, the orders list for a bulk order. */
-export function placedHref(orders: readonly { id: number }[], hrefs: Pick<OrderFormHrefs, "orders" | "orderBase">): string {
-  return orders.length === 1 ? `${hrefs.orderBase}/${orders[0].id}` : hrefs.orders;
+/** Where the form goes once the API accepted the order: the order's own page (one order per request, decision 007). */
+export function placedHref(order: { id: number }, hrefs: Pick<OrderFormHrefs, "orderBase">): string {
+  return `${hrefs.orderBase}/${order.id}`;
 }
 
 // ── API field errors → form state ──────────────────────────────────────────────────────────────────────────
 
 export type OrderFieldErrors = {
-  imei?: string;
-  /** The `imeis` list as a whole (too many, both `imei` and `imeis` sent …). */
-  imeis?: string;
-  /** Per textarea line (1-based), from `imeis.N`. */
-  lines: Record<number, string>;
   quantity?: string;
   fileId?: string;
-  /** Per custom field key, from `inputs.<key>`. */
+  /** Per custom field key, from `inputs.<key>` of a field the form draws: the main input of an IMEI service too (`required`, `invalid_imei`, `pattern`). */
   inputs: Record<string, string>;
-  /** Anything else (`serviceId`, `body` …). */
+  /**
+   * Every error the form has no box for: `serviceId`, `body`, a path of an older API such as `imei`, an `inputs.<key>` the form does
+   * not list (`unknown_field`: staff removed or renamed the field while the page was open) and a `fileId` on a service that takes
+   * no file.
+   */
   other: string[];
 };
 
+/** What the form draws a box for: the keys of the custom fields it lists, and whether it has the file box. The quantity always has a place. */
+export type DrawnBoxes = { inputKeys: ReadonlySet<string>; file: boolean };
+
 /**
- * Maps `errors[]` of a 422 onto the form. `lines` are the IMEI lines that were sent, so `imeis.N` (index into the
- * sent array) lands on the right textarea line. `text` turns one error into the person's language.
+ * Maps `errors[]` of a 422 onto the boxes the form draws. An error with no box is an `other` error, so it can be said, never
+ * dropped and never left as "check the highlighted fields" with nothing highlighted. `text` turns one error into the person's language.
  */
-export function mapOrderFieldErrors(
-  errors: FieldError[],
-  sentLines: ImeiLine[],
-  text: (error: FieldError) => string,
-): OrderFieldErrors {
-  const out: OrderFieldErrors = { lines: {}, inputs: {}, other: [] };
+export function mapOrderFieldErrors(errors: FieldError[], drawn: DrawnBoxes, text: (error: FieldError) => string): OrderFieldErrors {
+  const out: OrderFieldErrors = { inputs: {}, other: [] };
   for (const e of errors) {
     const message = text(e);
-    const bulk = /^imeis\.(\d+)$/.exec(e.field);
-    if (e.field === "imei") out.imei ??= message;
-    else if (e.field === "imeis") out.imeis ??= message;
-    else if (bulk) {
-      const line = sentLines[Number(bulk[1])]?.line;
-      if (line !== undefined) out.lines[line] ??= message;
-      else out.imeis ??= message;
-    } else if (e.field === "quantity") out.quantity ??= message;
-    else if (e.field === "fileId") out.fileId ??= message;
-    else if (e.field.startsWith("inputs.")) out.inputs[e.field.slice("inputs.".length)] ??= message;
+    const key = e.field.startsWith("inputs.") ? e.field.slice("inputs.".length) : null;
+    if (e.field === "quantity") out.quantity ??= message;
+    else if (e.field === "fileId" && drawn.file) out.fileId ??= message;
+    else if (key !== null && drawn.inputKeys.has(key)) out.inputs[key] ??= message;
     else out.other.push(message);
   }
   return out;
 }
 
+/** True when some error belongs to a box the form draws (the quantity, the file or a field); the `other` ones have none. */
 export function hasFieldErrors(e: OrderFieldErrors): boolean {
-  return Boolean(e.imei || e.imeis || e.quantity || e.fileId || e.other.length || Object.keys(e.lines).length || Object.keys(e.inputs).length);
+  return Boolean(e.quantity || e.fileId || Object.keys(e.inputs).length);
 }

@@ -44,7 +44,6 @@ export const checkout = {
       none: "No extra details needed",
       enter: "Enter details",
       edit: "Edit details",
-      imei: "IMEI",
       quantity: "Quantity",
       quantityChanged: "The quantities this service sells have changed. We chose an allowed one.",
     },
@@ -67,7 +66,6 @@ export const checkout = {
     drawer: {
       eyebrow: "Service requirements",
       description: "Provide the information we need to deliver this service.",
-      imei: "IMEI number",
       imeiHint: "15 digits. Dial *#06# on the device to see it.",
       imeiPlaceholder: "Enter the 15-digit IMEI",
       quantity: "Quantity",
@@ -108,6 +106,8 @@ export const checkout = {
       maintenance: "Checkout is temporarily unavailable because of maintenance. Please try again soon.",
       maintenanceUntil: "Expected back around {time}.",
       service: "This service cannot be ordered right now.",
+      /** An IMEI service with no field for its IMEI (decision 007): it cannot be ordered, and "Continue" stays off. */
+      noMainInput: "This service can't be ordered right now. Please contact support.",
       contactSupport: "Contact support",
     },
   },

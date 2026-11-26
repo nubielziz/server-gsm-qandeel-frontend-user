@@ -58,7 +58,8 @@ const SERVICE = {
   minQty: 1,
   maxQty: 1,
   qtyOptions: [],
-  fields: [],
+  // An IMEI service lists its IMEI as a field the API flags `isMainInput` (decision 007).
+  fields: [{ key: "imei", label: "IMEI", fieldType: "text", required: true, isMainInput: true, options: [], regex: "" }],
   options: [],
 };
 
@@ -77,8 +78,11 @@ describe("MerchantCheckout", () => {
     const form = find(tree, (element) => element.type === OrderForm);
     expect(form).not.toBeNull();
     expect(form!.props.service).toMatchObject({ id: 42, price: "3.2000", currency: "USD", type: "imei" });
+    // Every field of the service goes to the form, the IMEI's box included: it draws them all (decision 007).
+    expect(form!.props.service).toMatchObject({ fields: [{ key: "imei", isMainInput: true }] });
     expect(form!.props.available).toBe("15.0000");
     expect(form!.props.hrefs).toMatchObject({ orderBase: "/en/account/orders", services: "/en/services" });
+    expect(form!.props.labels).toMatchObject({ placed: { one: "Order #{id} placed" } });
     expect(find(form!.props.intro as ReactNode, (element) => element.type === ServiceAbout)).not.toBeNull();
   });
 

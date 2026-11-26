@@ -10,9 +10,9 @@ import { randomUUID } from "node:crypto";
 import type { APIRequestContext, Locator, Page, Request } from "@playwright/test";
 import { accountIdByEmail, creditAccount, freezeWallet } from "./admin";
 import { expect, test } from "./fixtures";
-import { DEV_TURNSTILE_TOKEN, freshAccount, signIn, signUpByLink, stubTurnstile } from "./helpers";
+import { DEV_TURNSTILE_TOKEN, freshAccount, imeiBox, imeiInputs, signIn, signUpByLink, stubTurnstile } from "./helpers";
 
-/** Service 1: an IMEI service sold at $3.99 net, one at a time. */
+/** Service 1: an IMEI service sold at $3.99 net, one at a time. Its IMEI is a field of the service the API flags `isMainInput` (decision 007). */
 const SLUG = "icloud-clean-lost-check";
 const SERVICE_NAME = "iCloud Clean / Lost Check";
 const IMEI = "490154203237518";
@@ -80,7 +80,7 @@ async function storeCsrf(page: Page): Promise<string> {
 async function openCustomerSession(page: Page, email: string): Promise<SessionBody> {
   const res = await page.request.post("/store/v1/checkout-sessions", {
     headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "X-CSRF-Token": await storeCsrf(page), "Content-Type": "application/json" },
-    data: { serviceId: 1, email, country: "DE", currency: "USD", imei: IMEI, quantity: 1 },
+    data: { serviceId: 1, email, country: "DE", currency: "USD", inputs: await imeiInputs(page.request, SLUG, IMEI), quantity: 1 },
   });
   expect(res.status(), await res.text()).toBe(201);
   return (await res.json()) as SessionBody;
@@ -90,7 +90,7 @@ async function openCustomerSession(page: Page, email: string): Promise<SessionBo
 async function openGuestSession(request: APIRequestContext): Promise<SessionBody> {
   const res = await request.post("/store/v1/checkout-sessions", {
     headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "Content-Type": "application/json" },
-    data: { serviceId: 1, email: "e2e-balance-guest@example.com", country: "DE", currency: "USD", imei: IMEI, quantity: 1 },
+    data: { serviceId: 1, email: "e2e-balance-guest@example.com", country: "DE", currency: "USD", inputs: await imeiInputs(request, SLUG, IMEI), quantity: 1 },
   });
   expect(res.status(), await res.text()).toBe(201);
   return (await res.json()) as SessionBody;
@@ -191,7 +191,7 @@ test.describe("pay from the store balance", () => {
     await page.getByRole("button", { name: "Enter details" }).first().click();
     const drawer = page.getByRole("dialog");
     await expect(drawer).toBeVisible();
-    await drawer.getByLabel("IMEI number").fill(IMEI);
+    await drawer.getByLabel((await imeiBox(page.request, SLUG)).label).fill(IMEI);
     await drawer.getByRole("button", { name: "Save details and continue" }).click();
     await expect(page.getByText("Details added")).toBeVisible();
     await page.getByLabel("Country").selectOption("DE");

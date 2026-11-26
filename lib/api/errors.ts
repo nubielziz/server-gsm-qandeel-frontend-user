@@ -4,7 +4,7 @@
 // Safe to import anywhere.
 
 export type FieldError = {
-  /** Dotted path from the API (`imeis.0`, `inputs.model`, `email`), or `body` / `query` for a whole-input issue. */
+  /** Dotted path from the API (`inputs.model`, `quantity`, `email`), or `body` / `query` for a whole-input issue. */
   field: string;
   /** A zod issue code (`too_small`, `invalid_type` …) or a business word (`WEAK_PASSWORD`, `not_available` …). */
   code: string;

@@ -8,7 +8,7 @@
 // keyboard (feature 29). Nothing here changes data.
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { go } from "./helpers";
+import { go, imeiBox } from "./helpers";
 
 /** The width from which the shop header shows the nav row (Tailwind `lg`); under it the menu button opens the drawer. */
 const DESKTOP_NAV = 1024;
@@ -102,7 +102,9 @@ test.describe("before hydration", () => {
 
     await trigger.click();
     const drawer = page.getByRole("dialog");
-    await expect(drawer.getByLabel("IMEI number")).toBeVisible();
+    // The IMEI box is the field of the service the API flags `isMainInput`, drawn like any other (decision 007).
+    const { label } = await imeiBox(page.request, "icloud-clean-lost-check");
+    await expect(drawer.getByLabel(label)).toBeVisible();
     expect(await drawer.evaluate((element) => element.matches(":modal"))).toBe(true);
     await drawer.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(drawer).toBeHidden();
@@ -111,7 +113,7 @@ test.describe("before hydration", () => {
     // The drawer's form is `method="dialog"`: before hydration Save only closes it, with no GET that would drop
     // `?service=` and put the IMEI in the address.
     await trigger.click();
-    await drawer.getByLabel("IMEI number").fill(IMEI);
+    await drawer.getByLabel(label).fill(IMEI);
     await page.getByRole("button", { name: "Save details and continue" }).click();
     await expect(drawer).toBeHidden();
     await expect(page).toHaveURL(/\/en\/checkout\?service=icloud-clean-lost-check$/);

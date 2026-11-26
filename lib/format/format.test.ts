@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareMoney, formatMoney, isValidImei, normalizeImei, subtractMoney, sumMoney } from "./index";
+import { compareMoney, formatMoney, imeiProblem, isValidImei, normalizeImei, subtractMoney, sumMoney } from "./index";
 
 describe("money math on 4-decimal strings", () => {
   it("sums exactly where floats would drift", () => {
@@ -41,5 +41,13 @@ describe("IMEI helpers", () => {
     expect(isValidImei("490154203237518")).toBe(true);
     expect(isValidImei("490154203237519")).toBe(false);
     expect(isValidImei("49015420323751")).toBe(false);
+  });
+  it("names what is wrong with a typed IMEI: its length first, then the check digit", () => {
+    expect(imeiProblem("490154203237518")).toBeNull();
+    expect(imeiProblem("4901 5420-3237 518")).toBeNull();
+    expect(imeiProblem("")).toBe("length");
+    expect(imeiProblem("49015420323751")).toBe("length");
+    expect(imeiProblem("49015420323751x")).toBe("length");
+    expect(imeiProblem("490154203237519")).toBe("checksum");
   });
 });

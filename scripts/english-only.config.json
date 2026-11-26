@@ -41,7 +41,7 @@
     },
     {
       "path": "lib/merchant/order-input.test.ts",
-      "why": "Group C: a typed quantity or IMEI list with Arabic-Indic digits is read; the test needs those digits."
+      "why": "Group C: a typed quantity or IMEI with Arabic-Indic digits is read; the test needs those digits."
     },
     {
       "path": "lib/search/terms.test.ts",

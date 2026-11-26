@@ -30,7 +30,8 @@ const SERVICE = {
   availability: "on_request",
   etaText: "",
   deliveryMinutes: 2,
-  fields: [],
+  // An IMEI service lists its IMEI as a field the API flags `isMainInput` (decision 007).
+  fields: [{ key: "imei", label: "IMEI", fieldType: "text", options: [], required: true, isMainInput: true }],
   price: { currency: "USD", fxRate: "1.00000000", net: "3.9900", tax: "0.0000", gross: "3.9900", taxRate: "0", taxCountry: null },
 };
 

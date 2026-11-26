@@ -3,14 +3,15 @@
 // built from the rule (never the server's English text); the quantity survives a restart and a resumed checkout.
 // Real browser → Next → the isolated demo backend (:3100). The services are the fixtures of the global setup
 // (e2e/global-setup.ts → e2e/.auth/fixtures.json): range = 2 to 50, packs = 5/10/25, exact = 5. They are IMEI services, so
-// every test that opens a checkout also enters the IMEI. A server answer that cannot be provoked on demand (the rule changed
-// between the page and the click) is mocked at the browser boundary, together with the re-read of the service it triggers.
+// every test that opens a checkout also enters the IMEI, into the field of the service the API flags `isMainInput` (decision
+// 007). A server answer that cannot be provoked on demand (the rule changed between the page and the click) is mocked at
+// the browser boundary, together with the re-read of the service it triggers.
 // Nothing here pays or changes data: the sessions it opens just expire. The site caches catalog reads for about 30 s, so the
 // first visit of a page waits (toPass, with a reload) until the rule the setup just wrote shows.
 import { type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { checkout } from "../lib/i18n/messages/checkout";
 import { expect, test } from "./fixtures";
-import { DEV_TURNSTILE_TOKEN, fixtures, stubTurnstile } from "./helpers";
+import { DEV_TURNSTILE_TOKEN, fixtures, imeiBox, imeiInputs, stubTurnstile } from "./helpers";
 
 type Rule = { min: number; max: number; options: number[] };
 
@@ -42,11 +43,16 @@ async function apiService(request: APIRequestContext, slug: string): Promise<Api
   return (await res.json()) as ApiService;
 }
 
+/** Types the IMEI of a service into the drawer: its box is the field of the service the API flags `isMainInput`. */
+async function fillImei(page: Page, drawer: Locator, slug: string) {
+  await drawer.getByLabel((await imeiBox(page.request, slug)).label).fill(IMEI);
+}
+
 /** Opens a checkout session straight through the API, as the form would, and returns its token. */
-async function createSession(request: APIRequestContext, overrides: Record<string, unknown>): Promise<string> {
+async function createSession(request: APIRequestContext, service: { id: number; slug: string }, overrides: Record<string, unknown>): Promise<string> {
   const res = await request.post("/store/v1/checkout-sessions", {
     headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "Content-Type": "application/json" },
-    data: { email: "e2e-qty@example.com", country: "DE", currency: "USD", imei: IMEI, ...overrides },
+    data: { serviceId: service.id, email: "e2e-qty@example.com", country: "DE", currency: "USD", inputs: await imeiInputs(request, service.slug, IMEI), ...overrides },
   });
   expect(res.status(), await res.text()).toBe(201);
   return ((await res.json()) as { token: string }).token;
@@ -153,7 +159,7 @@ test.describe("one control per mode", () => {
     await expect(box).toHaveValue("2"); // the default is the smallest allowed quantity
     await expect(drawer.getByRole("radio")).toHaveCount(0);
 
-    await drawer.getByLabel("IMEI number").fill(IMEI);
+    await fillImei(page, drawer, range.slug);
     await box.fill("60");
     await saveDrawer(drawer);
     await expect(drawer.getByText("Enter a quantity from 2 to 50.")).toBeVisible();
@@ -206,7 +212,7 @@ test.describe("one control per mode", () => {
     // The radio input is visually hidden: click its card.
     await drawer.locator("label").filter({ hasText: /^10$/ }).click();
     await expect(drawer.getByRole("radio", { name: "10", exact: true })).toBeChecked();
-    await drawer.getByLabel("IMEI number").fill(IMEI);
+    await fillImei(page, drawer, packs.slug);
     await saveDrawer(drawer);
     await expect(drawer).toBeHidden();
 
@@ -233,7 +239,7 @@ test.describe("one control per mode", () => {
     await expect(drawer.getByRole("radio")).toHaveCount(0);
     await expect(drawer.getByRole("combobox")).toHaveCount(0);
     await expect(drawer.getByText("5 per order")).toBeVisible();
-    await drawer.getByLabel("IMEI number").fill(IMEI);
+    await fillImei(page, drawer, exact.slug);
     await saveDrawer(drawer);
     await expect(drawer).toBeHidden();
 
@@ -270,7 +276,7 @@ test.describe("a refused quantity", () => {
     await openCheckout(page, `/en/checkout?service=${packs.slug}`, { rule: "Packs of 5, 10, 25" });
     const drawer = await openDrawer(page);
     await drawer.locator("label").filter({ hasText: /^10$/ }).click();
-    await drawer.getByLabel("IMEI number").fill(IMEI);
+    await fillImei(page, drawer, packs.slug);
     await saveDrawer(drawer);
     await expect(drawer).toBeHidden();
     await fillBuyer(page);
@@ -317,7 +323,7 @@ test.describe("a refused quantity", () => {
     const drawer = await openDrawer(page);
     const box = drawer.getByRole("spinbutton", { name: "Quantity" });
     await box.fill("3");
-    await drawer.getByLabel("IMEI number").fill(IMEI);
+    await fillImei(page, drawer, range.slug);
     await saveDrawer(drawer);
     await expect(drawer).toBeHidden();
     await fillBuyer(page);
@@ -350,7 +356,7 @@ test.describe("a refused quantity", () => {
 
     await openCheckout(page, `/en/checkout?service=${exact.slug}`, { rule: "5 per order" });
     const drawer = await openDrawer(page);
-    await drawer.getByLabel("IMEI number").fill(IMEI);
+    await fillImei(page, drawer, exact.slug);
     await saveDrawer(drawer);
     await expect(drawer).toBeHidden();
     await fillBuyer(page);
@@ -391,7 +397,7 @@ test.describe("a refused quantity", () => {
 
     await openCheckout(page, `/en/checkout?service=${stocked.slug}`);
     const drawer = await openDrawer(page);
-    await drawer.getByLabel(t.drawer.imei).fill(IMEI);
+    await fillImei(page, drawer, stocked.slug);
     await saveDrawer(drawer);
     await expect(drawer).toBeHidden();
     await fillBuyer(page);
@@ -412,7 +418,7 @@ test.describe("a refused quantity", () => {
 test.describe("the quantity survives a restart", () => {
   test("a resumed checkout opens with the same quantity; a quantity the rule no longer allows falls back with a notice", async ({ page, request }) => {
     const { packs } = fixtures();
-    const token = await createSession(request, { serviceId: packs.id, quantity: 10 });
+    const token = await createSession(request, packs, { quantity: 10 });
 
     await page.goto(`/en/checkout/resume?token=${token}`);
     const link = page.getByRole("link", { name: "Start a new checkout at today's price" });
@@ -436,7 +442,7 @@ test.describe("the quantity survives a restart", () => {
 
   test("an expired review page restarts the checkout with its quantity", async ({ page, request }) => {
     const { packs } = fixtures();
-    const token = await createSession(request, { serviceId: packs.id, quantity: 10 });
+    const token = await createSession(request, packs, { quantity: 10 });
     // The page counts the lock down by the browser's clock: jump 31 minutes ahead instead of waiting for it.
     await page.clock.install();
     await page.goto(`/en/checkout/${token}`);

@@ -1,12 +1,13 @@
 "use client";
-// The order form of a service (handoff §4.5). One form for the four service types:
-//  - imei: one IMEI or a bulk list (≤ 100, one order per IMEI, all or none), checked with the Luhn digit as you type;
+// The order form of a service (handoff §4.5). One form for the four service types, drawn from what the service lists
+// (decision 007: no built-in box, no bulk list; one request is one order):
+//  - custom fields (text / number / select / textarea) with the catalog's regex, exactly as the API sends them. On an IMEI
+//    service one of them is flagged `isMainInput` and holds the IMEI: it is drawn as a numeric box, checked with the check
+//    digit as you type, and sent normalised (digits only) under `inputs[<its key>]`. An IMEI service that has no such
+//    field cannot be ordered: the form says so and the button stays off;
 //  - quantity (lib/quantity.ts decides): a select for two or more packs, a number box for a range, nothing for one
 //    pack, an exact N or one per order; the rule and its refusals are worded by `quantityRuleText` and
 //    `invalidQuantityText`, for the local check and for a server `invalid_quantity` alike;
-//  - custom fields (text / number / select / textarea) with the catalog's regex, exactly as the API sends them: on an IMEI
-//    service the API leaves out the field that is the main input (it is the IMEI box itself), so the IMEI is not asked twice
-//    and no key is special here (decision 004);
 //  - file services: an upload → `fileId` (required when the service has no fields).
 // One submission = one `Idempotency-Key` (`POST /client/orders` replays the first answer for a repeated key and the
 // same body): the key is the same while the same body is sent again (a lost answer, a double click) and new as soon
@@ -21,7 +22,7 @@ import { isApiError, type FieldError } from "@/lib/api/errors";
 import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { MerchantOrder, MerchantOrderInput, MerchantServiceDetail, UploadedFile } from "@/lib/api/types";
 import { compareMoney, formatMoney, formatNumber, isValidImei, normalizeImei, subtractMoney } from "@/lib/format";
-import { fmt, plural } from "@/lib/i18n/define";
+import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
 import type { MerchantMessages } from "@/lib/i18n/messages/merchant";
@@ -29,24 +30,24 @@ import { ltr } from "@/lib/merchant/format";
 import { leaveIfSignedOut } from "@/lib/merchant/signed-out";
 import { mulMoney } from "@/lib/merchant/money-math";
 import {
-  MAX_BULK_IMEIS,
   MAX_FIELD_VALUE,
   MAX_IN_PROGRESS_RETRIES,
   buildInputs,
   checkField,
+  checkMainInput,
   defaultQuantityOf,
   hasFieldErrors,
   inProgressWaitMs,
+  mainInputOf,
   mapOrderFieldErrors,
   orderSignature,
-  parseImeiLines,
   parseQuantity,
   placedHref,
   quantityRule,
-  summarizeImeiLines,
-  visibleFields,
+  type FieldProblem,
   type OrderFieldErrors,
   type OrderFormHrefs,
+  type ServiceField,
 } from "@/lib/merchant/order-input";
 import { fromMerchantRule, invalidQuantityText, quantityRuleText } from "@/lib/quantity";
 import { FileUpload } from "@/components/forms/file-upload";
@@ -56,7 +57,6 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { DescriptionItem, DescriptionList } from "@/components/ui/description-list";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Money } from "@/components/ui/money";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { toast } from "@/components/ui/toast";
 
 export type OrderFormLabels = {
@@ -88,7 +88,12 @@ type Banner =
   | { kind: "processing" }
   | { kind: "generic"; message: string; reference?: string };
 
-const ID = { imei: "order-imei", bulk: "order-bulk", quantity: "order-quantity", file: "order-file", field: (key: string) => `order-field-${key}` };
+const ID = {
+  quantity: "order-quantity",
+  file: "order-file",
+  unorderable: "order-unorderable",
+  field: (key: string) => `order-field-${key}`,
+};
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -97,15 +102,17 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
   const errorText = useErrorText();
   const { form: f, summary: s } = labels;
 
-  const needsImei = service.type === "imei";
-  const fields = visibleFields(service);
+  // Every field the service lists, in its own order (decision 007); the IMEI of an IMEI service is one of them.
+  const fields = service.fields;
+  const mainInput = mainInputOf(service);
+  // The boxes this form draws: a server error on any other path has no place on the page.
+  const drawn = { inputKeys: new Set(fields.map((field) => field.key)), file: service.type === "file" };
+  // An IMEI service without a field for its IMEI cannot be ordered from here (decision 007): say so, never send half an order.
+  const unorderable = service.type === "imei" && mainInput === null;
   const rule = quantityRule(service);
   const wording = fromMerchantRule(service);
   const fileRequired = service.type === "file" && service.fields.length === 0;
 
-  const [mode, setMode] = useState<"single" | "bulk">("single");
-  const [imei, setImei] = useState("");
-  const [bulk, setBulk] = useState("");
   const [qtyText, setQtyText] = useState(() => String(defaultQuantityOf(rule)));
   const [values, setValues] = useState<Record<string, string>>({});
   const [file, setFile] = useState<UploadedFile | null>(null);
@@ -126,7 +133,6 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
   const [serverErrors, setServerErrors] = useState<OrderFieldErrors | null>(null);
   const [banner, setBanner] = useState<Banner | null>(null);
   const bannerRef = useRef<HTMLDivElement>(null);
-  const sentLines = useRef<ReturnType<typeof parseImeiLines>>([]);
 
   // Staff can change the rule while the page is open (the page is re-read after a refused quantity): keep what was
   // typed when the new rule still accepts it, else start again from the new default.
@@ -149,59 +155,42 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
   }, [reloading]);
 
   // ── What the form currently holds
-  const lines = parseImeiLines(bulk);
-  const list = summarizeImeiLines(lines);
-  const imeiNormalized = normalizeImei(imei);
-  const readyCount = lines.filter((l) => l.valid && !l.duplicate).length;
   const quantity = parseQuantity(qtyText, rule);
-  const imeiCount = needsImei ? (mode === "single" ? 1 : Math.max(1, list.count)) : 1;
   const shownQuantity = quantity ?? defaultQuantityOf(rule);
-  const total = mulMoney(service.price, shownQuantity * imeiCount);
+  const total = mulMoney(service.price, shownQuantity);
   const afterOrder = available === null ? null : subtractMoney(available, total);
   const lowBalance = available !== null && compareMoney(total, available) > 0;
 
   // ── Local checks (the API checks everything again; these only save a round trip)
   const local = {
-    imei: needsImei && mode === "single" ? (imeiNormalized === "" ? f.imeiRequired : isValidImei(imeiNormalized) ? undefined : f.imeiBad) : undefined,
-    bulk: needsImei && mode === "bulk" ? (list.count === 0 ? f.imeiRequired : list.tooMany ? fmt(f.tooMany, { max: MAX_BULK_IMEIS }) : !list.ok ? f.bulkFix : undefined) : undefined,
     quantity: quantity === null ? quantityProblem() : undefined,
     file: fileRequired && !file ? f.fileRequired : undefined,
     inputs: Object.fromEntries(
       fields.flatMap((field) => {
-        const problem = checkField(field, values[field.key] ?? "");
-        return problem ? [[field.key, fmt(f.problems[problem], { max: MAX_FIELD_VALUE })]] : [];
+        const isMain = field === mainInput;
+        const problem = isMain ? checkMainInput(field, values[field.key] ?? "") : checkField(field, values[field.key] ?? "");
+        return problem ? [[field.key, problemText(problem, isMain)]] : [];
       }),
     ) as Record<string, string>,
   };
+
+  /** The words for a problem of a field; the main input of an IMEI service has its own for an empty box and a bad check digit. */
+  function problemText(problem: FieldProblem | "invalid_imei", isMain: boolean): string {
+    if (problem === "invalid_imei") return f.imeiBad;
+    if (problem === "required" && isMain) return f.imeiRequired;
+    return fmt(f.problems[problem], { max: MAX_FIELD_VALUE });
+  }
 
   /** What to say about a refused quantity: the pack list or the range, from the rule the page holds now. */
   function quantityProblem(): string {
     return invalidQuantityText(wording, labels.quantity);
   }
 
-  const hasLocalErrors = Boolean(local.imei || local.bulk || local.quantity || local.file || Object.keys(local.inputs).length);
+  const hasLocalErrors = Boolean(local.quantity || local.file || Object.keys(local.inputs).length);
 
-  /**
-   * Line problems of the bulk list: shown after a submit, plus what the server said. Nothing appears on blur: a message
-   * that pushes the page down between the press and the release of a tap on "Place order" cancels the tap.
-   */
-  const lineProblems: { line: number; text: string }[] = [];
-  if (submitted) {
-    for (const l of lines) {
-      if (!l.valid) lineProblems.push({ line: l.line, text: fmt(f.lineInvalid, { line: l.line }) });
-      else if (l.duplicate) lineProblems.push({ line: l.line, text: fmt(f.lineDuplicate, { line: l.line }) });
-    }
-  }
-  for (const [line, text] of Object.entries(serverErrors?.lines ?? {})) {
-    const n = Number(line);
-    if (!lineProblems.some((p) => p.line === n)) lineProblems.push({ line: n, text: fmt(f.lineError, { line: n, message: text }) });
-  }
-  lineProblems.sort((a, b) => a.line - b.line);
-
-  // What each control shows: a server answer wins; local checks appear after the first submit.
+  // What each control shows: a server answer wins; local checks appear after the first submit. Nothing appears on blur: a
+  // message that pushes the page down between the press and the release of a tap on "Place order" cancels the tap.
   const shown = {
-    imei: serverErrors?.imei ?? (submitted ? local.imei : undefined),
-    bulk: serverErrors?.imeis ?? (submitted ? local.bulk : undefined),
     // A server refusal is worded from the rule as it stands now (it may have been re-read since the answer came).
     quantity: serverErrors?.quantity ? quantityProblem() : submitted ? local.quantity : undefined,
     file: serverErrors?.fileId ?? (submitted ? local.file : undefined),
@@ -232,9 +221,8 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
   }
 
   function firstInvalidIds(): string[] {
+    // The order of the page: the quantity, the fields in the service's order, the file.
     const ids: string[] = [];
-    if (local.imei) ids.push(ID.imei);
-    if (local.bulk) ids.push(ID.bulk);
     if (local.quantity) ids.push(ID.quantity);
     for (const field of fields) if (local.inputs[field.key]) ids.push(ID.field(field.key));
     if (local.file) ids.push(ID.file);
@@ -249,7 +237,7 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting || inFlight.current) return; // one send at a time; a repeat after it ends carries the same key
+    if (submitting || inFlight.current || unorderable) return; // one send at a time; a repeat after it ends carries the same key
     setSubmitted(true);
     setBanner(null);
     setServerErrors(null);
@@ -260,29 +248,22 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
     }
 
     const body: MerchantOrderInput = { serviceId: service.id };
-    if (needsImei) {
-      if (mode === "single") body.imei = imeiNormalized;
-      else {
-        sentLines.current = lines;
-        body.imeis = lines.map((l) => l.imei);
-      }
-    }
     // Everything but "one per order" is sent: an exact N or a single pack is not asked, but the API orders `min` without it.
     if (quantity !== null && !(rule.kind === "fixed" && rule.value === 1)) body.quantity = quantity;
-    const inputs = buildInputs(fields, values);
+    // The IMEI of an IMEI service is one of the inputs, under the key of its main-input field, as digits only.
+    const inputs = buildInputs(fields, values, mainInput?.key ?? null);
     if (Object.keys(inputs).length > 0) body.inputs = inputs;
     if (file) body.fileId = file.id;
 
     inFlight.current = true;
     setSubmitting(true);
     try {
-      const orders = await sendOrder(body);
-      if (orders === null) return; // the form was left while it waited
+      const order = await sendOrder(body);
+      if (order === null) return; // the form was left while it waited
       keys.reset(); // a new submission starts with a new key
       // Stay disabled while the next page loads (submitting is not reset on success).
-      if (orders.length === 1) toast.success(fmt(labels.placed.one, { id: orders[0].id }));
-      else toast.success(fmt(labels.placed.many, { count: orders.length }), labels.placed.manyText);
-      router.push(placedHref(orders, hrefs));
+      toast.success(fmt(labels.placed.one, { id: order.id }));
+      router.push(placedHref(order, hrefs));
       router.refresh(); // the wallet pill in the header
     } catch (error) {
       inFlight.current = false;
@@ -296,14 +277,17 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
    * `POST /client/orders` with the key of this body. A replay answers 201 with the first answer, so the caller goes to
    * the order page, which reads the order's current status. `IDEMPOTENCY_IN_PROGRESS` waits `Retry-After` and sends the
    * same request again (same key), at most `MAX_IN_PROGRESS_RETRIES` times; then the error reaches the person, who can
-   * press the button again (same body, same key). Returns null when the form was left during a wait.
+   * press the button again (same body, same key). Returns the order (one request places one), or null when the form was left
+   * during a wait.
    */
-  async function sendOrder(body: MerchantOrderInput): Promise<MerchantOrder[] | null> {
+  async function sendOrder(body: MerchantOrderInput): Promise<MerchantOrder | null> {
     const key = keys.keyFor(orderSignature(body));
     for (let retry = 0; ; retry++) {
       try {
         const { orders } = await api.post<{ orders: MerchantOrder[] }>("/client/orders", body, { idempotencyKey: key });
-        return orders;
+        // One request places one order. An answer without it is a failed send (the generic message, the key kept for a retry).
+        if (!orders[0]) throw new Error("POST /client/orders answered without an order");
+        return orders[0];
       } catch (error) {
         if (!isApiError(error) || error.code !== "IDEMPOTENCY_IN_PROGRESS" || retry >= MAX_IN_PROGRESS_RETRIES) throw error;
         setBanner({ kind: "processing" }); // no focus move: it is a wait, not a failure
@@ -348,18 +332,26 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
       default:
     }
     if (error.status === 422 && error.fieldErrors.length > 0) {
-      const mapped = mapOrderFieldErrors(error.fieldErrors, sentLines.current, fieldText);
+      const mapped = mapOrderFieldErrors(error.fieldErrors, drawn, fieldText);
       setServerErrors(mapped);
-      if (hasFieldErrors(mapped)) {
-        showBanner({ kind: "fields" });
-        if (mapped.quantity) router.refresh(); // the rule may have changed: read the service again
-        const ids: string[] = [];
-        if (mapped.imei) ids.push(ID.imei);
-        if (mapped.imeis || Object.keys(mapped.lines).length) ids.push(ID.bulk);
-        if (mapped.quantity) ids.push(ID.quantity);
-        for (const key of Object.keys(mapped.inputs)) ids.push(ID.field(key));
-        if (mapped.fileId) ids.push(ID.file);
-        requestAnimationFrame(() => focusFirst(ids));
+      const placed = hasFieldErrors(mapped);
+      if (placed || mapped.other.length > 0) {
+        // An error the form draws no box for (`serviceId`, `body`, an input the service no longer lists, `imei` of an older API) is
+        // said as it is, never lost: its message is the banner's, also when other errors sit on boxes.
+        showBanner(
+          mapped.other.length > 0
+            ? { kind: "generic", message: mapped.other[0], reference: errorText.reference(error) }
+            : { kind: "fields" },
+        );
+        if (placed) {
+          if (mapped.quantity) router.refresh(); // the rule may have changed: read the service again
+          // The order of the page: the quantity, the fields in the service's order, the file.
+          const ids: string[] = [];
+          if (mapped.quantity) ids.push(ID.quantity);
+          for (const field of fields) if (mapped.inputs[field.key]) ids.push(ID.field(field.key));
+          if (mapped.fileId) ids.push(ID.file);
+          requestAnimationFrame(() => focusFirst(ids));
+        }
         return;
       }
     }
@@ -368,6 +360,73 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
 
   // ── Render
   const optional = f.optional;
+
+  /** One custom field, drawn by its type. The main input of an IMEI service is a numeric box with the check-digit hint. */
+  function renderField(field: ServiceField) {
+    const isMain = field === mainInput;
+    const common = {
+      id: ID.field(field.key),
+      name: `inputs.${field.key}`,
+      label: field.label,
+      required: isMain || field.required,
+      optionalLabel: optional,
+      value: values[field.key] ?? "",
+      error: shown.input(field.key),
+    };
+    const set = (v: string) => {
+      setValues((prev) => ({ ...prev, [field.key]: v }));
+      dropInputError(field.key);
+    };
+    if (isMain) {
+      const imei = normalizeImei(common.value);
+      return (
+        <Input
+          key={field.key}
+          {...common}
+          inputMode="numeric"
+          autoComplete="off"
+          spellCheck={false}
+          dir="ltr"
+          maxLength={64}
+          hint={
+            imei !== "" && isValidImei(imei) ? (
+              <span className="text-success-ink">{f.imeiOk}</span>
+            ) : /^\d{15}$/.test(imei) ? (
+              <span className="text-danger-ink">{f.imeiBad}</span>
+            ) : (
+              f.imeiHint
+            )
+          }
+          onChange={(e) => set(e.target.value)}
+        />
+      );
+    }
+    if (field.fieldType === "select") {
+      return (
+        <Select
+          key={field.key}
+          {...common}
+          placeholder={f.selectPlaceholder}
+          options={field.options.map((o) => ({ value: o, label: o }))}
+          onChange={(e) => set(e.target.value)}
+        />
+      );
+    }
+    if (field.fieldType === "textarea") {
+      return <Textarea key={field.key} {...common} rows={4} maxLength={MAX_FIELD_VALUE} onChange={(e) => set(e.target.value)} />;
+    }
+    return (
+      <Input
+        key={field.key}
+        {...common}
+        inputMode={field.fieldType === "number" ? "decimal" : undefined}
+        autoComplete="off"
+        maxLength={MAX_FIELD_VALUE}
+        onChange={(e) => set(e.target.value)}
+      />
+    );
+  }
+
   return (
     <form onSubmit={onSubmit} noValidate aria-busy={submitting || undefined} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
       <div className="grid min-w-0 gap-6">
@@ -380,89 +439,18 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
         <Card>
           <CardHeader title={f.title} />
           <CardBody className="grid gap-5">
-            {needsImei ? (
-              <>
-                <div className="grid gap-2">
-                  <span className="text-small font-semibold text-ink">
-                    {f.imeiMode}
-                  </span>
-                  <SegmentedControl
-                    label={f.imeiMode}
-                    value={mode}
-                    onValueChange={(v) => setMode(v === "bulk" ? "bulk" : "single")}
-                    options={[
-                      { value: "single", label: f.single },
-                      { value: "bulk", label: f.bulk },
-                    ]}
-                    className="w-full sm:w-fit"
-                    fullWidth
-                  />
-                </div>
-
-                {mode === "single" ? (
-                  <div>
-                    <Input
-                      id={ID.imei}
-                      name="imei"
-                      label={f.imei}
-                      required
-                      value={imei}
-                      onChange={(e) => {
-                        setImei(e.target.value);
-                        dropServerError({ imei: undefined });
-                      }}
-                      inputMode="numeric"
-                      autoComplete="off"
-                      spellCheck={false}
-                      dir="ltr"
-                      maxLength={64}
-                      error={shown.imei}
-                      hint={
-                        imeiNormalized !== "" && isValidImei(imeiNormalized) ? (
-                          <span className="text-success-ink">{f.imeiOk}</span>
-                        ) : /^\d{15}$/.test(imeiNormalized) ? (
-                          <span className="text-danger-ink">{f.imeiBad}</span>
-                        ) : (
-                          f.imeiHint
-                        )
-                      }
-                    />
-                  </div>
-                ) : (
-                  <div className="grid gap-2">
-                    <Textarea
-                      id={ID.bulk}
-                      name="imeis"
-                      label={f.bulkLabel}
-                      required
-                      rows={7}
-                      value={bulk}
-                      onChange={(e) => {
-                        setBulk(e.target.value);
-                        dropServerError({ imeis: undefined, lines: {} });
-                      }}
-                      autoComplete="off"
-                      spellCheck={false}
-                      dir="ltr"
-                      className="font-mono"
-                      error={shown.bulk}
-                      hint={fmt(f.bulkHint, { max: MAX_BULK_IMEIS })}
-                    />
-                    <p className="text-small font-semibold text-ink" aria-live="polite">
-                      {plural(readyCount, f.bulkReady, formatNumber(readyCount))}
-                      {list.invalid.length + list.duplicates.length > 0 ? ` · ${fmt(f.bulkToFix, { count: formatNumber(new Set([...list.invalid, ...list.duplicates].map((l) => l.line)).size) })}` : ""}
-                    </p>
-                    {lineProblems.length > 0 ? (
-                      <ul className="grid gap-1 rounded-control bg-danger-soft px-3 py-2.5 text-small text-danger-ink">
-                        {lineProblems.slice(0, 8).map((p) => (
-                          <li key={p.line}>{p.text}</li>
-                        ))}
-                        {lineProblems.length > 8 ? <li>… +{formatNumber(lineProblems.length - 8)}</li> : null}
-                      </ul>
-                    ) : null}
-                  </div>
-                )}
-              </>
+            {unorderable ? (
+              <Alert
+                id={ID.unorderable}
+                tone="warning"
+                action={
+                  <ButtonLink href={hrefs.support} size="sm" variant="secondary">
+                    {f.contactSupport}
+                  </ButtonLink>
+                }
+              >
+                {f.noMainInput}
+              </Alert>
             ) : null}
 
             {rule.kind === "options" ? (
@@ -505,45 +493,7 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
               </p>
             ) : null}
 
-            {fields.map((field) => {
-              const common = {
-                id: ID.field(field.key),
-                name: `inputs.${field.key}`,
-                label: field.label,
-                required: field.required,
-                optionalLabel: optional,
-                value: values[field.key] ?? "",
-                error: shown.input(field.key),
-              };
-              const set = (v: string) => {
-                setValues((prev) => ({ ...prev, [field.key]: v }));
-                dropInputError(field.key);
-              };
-              if (field.fieldType === "select") {
-                return (
-                  <Select
-                    key={field.key}
-                    {...common}
-                    placeholder={f.selectPlaceholder}
-                    options={field.options.map((o) => ({ value: o, label: o }))}
-                    onChange={(e) => set(e.target.value)}
-                  />
-                );
-              }
-              if (field.fieldType === "textarea") {
-                return <Textarea key={field.key} {...common} rows={4} maxLength={MAX_FIELD_VALUE} onChange={(e) => set(e.target.value)} />;
-              }
-              return (
-                <Input
-                  key={field.key}
-                  {...common}
-                  inputMode={field.fieldType === "number" ? "decimal" : undefined}
-                  autoComplete="off"
-                  maxLength={MAX_FIELD_VALUE}
-                  onChange={(e) => set(e.target.value)}
-                />
-              );
-            })}
+            {fields.map(renderField)}
 
             {service.type === "file" ? (
               <div id={ID.file} tabIndex={-1} className="grid gap-2 focus:outline-none">
@@ -572,7 +522,7 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
               </div>
             ) : null}
 
-            {!needsImei && fields.length === 0 && service.type !== "file" ? <p className="text-body text-ink-muted">{f.noInputs}</p> : null}
+            {fields.length === 0 && service.type !== "file" && !unorderable ? <p className="text-body text-ink-muted">{f.noInputs}</p> : null}
           </CardBody>
         </Card>
       </div>
@@ -589,11 +539,6 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
               <DescriptionItem label={s.quantity}>
                 <span className="num">{formatNumber(shownQuantity)}</span>
               </DescriptionItem>
-              {needsImei && mode === "bulk" ? (
-                <DescriptionItem label={s.imeis}>
-                  <span className="num">{formatNumber(imeiCount)}</span>
-                </DescriptionItem>
-              ) : null}
               <DescriptionItem label={s.total} emphasis>
                 <Money amount={total} currency={service.currency} />
               </DescriptionItem>
@@ -618,7 +563,15 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
               </Alert>
             ) : null}
 
-            <Button type="submit" size="lg" block loading={submitting} aria-label={submitting ? s.placing : undefined}>
+            <Button
+              type="submit"
+              size="lg"
+              block
+              loading={submitting}
+              disabled={unorderable}
+              aria-describedby={unorderable ? ID.unorderable : undefined}
+              aria-label={submitting ? s.placing : undefined}
+            >
               <span>{s.place}</span>
               <span aria-hidden="true">·</span>
               <Money amount={total} currency={service.currency} />

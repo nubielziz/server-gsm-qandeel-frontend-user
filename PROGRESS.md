@@ -584,6 +584,16 @@ The three mockup parts that were missing, adapted to the API (no categories, sto
 - Checks: typecheck, lint, the unit tests, `gen:api:check`, a production build, and a look in the browser (the row at seven widths,
   the current link after each click, the phone menu). The e2e were not run (`e2e/home-sections.spec.ts` lists the new names).
 
+## Order forms draw only the custom fields (2026-11-26, owner's decision; `docs/decisions/007-fields-only-order-forms.md`, backend decision 070)
+
+The checkout's built-in IMEI box and the merchant form's One IMEI / Several IMEIs switch, IMEI box and bulk list are removed: both forms draw the
+service's own fields in the service's order, then nothing else but the quantity (and the file of a File service). On an IMEI service the field the API
+flags `isMainInput` holds the IMEI (numeric box, the 15-digit and check-digit checks, sent as digits under `inputs[key]`); an IMEI service without
+one shows "can't be ordered" with a support link and cannot be submitted. An error the server reports on a path with no drawn box becomes the form's
+message (`lib/checkout/field-errors.ts`, `mapOrderFieldErrors`). Bulk ordering left the shop. Built by a Sonnet implementer, reviewed by an Opus
+reviewer (one fix round), final review by the lead. Checks: gen:api against the backend, typecheck, lint, the touched unit tests (73 pass); e2e specs
+updated, not run. Needs the backend's decision 070 first. Merged and pushed on the owner's word.
+
 ## Open items and blockers (2026-11-09)
 - **Smart sign-in** (ROADMAP 1.3) needs the lead's route-parity choice (handoff §6.1); the sign-in page uses an
   interim Customer | Merchant switch. Merchant register cannot use Turnstile (code) while ROADMAP 1.7 lists it.

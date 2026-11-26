@@ -7,10 +7,12 @@
 // Playwright route mocks at the browser boundary.
 import { expect, test } from "./fixtures";
 import { type APIRequestContext, type Page } from "@playwright/test";
-import { ACCOUNTS, freshAccount, signIn } from "./helpers";
+import { ACCOUNTS, freshAccount, imeiBox, imeiInputs, signIn } from "./helpers";
 
 const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 const IMEI = "490154203237518";
+/** Service 1: an IMEI service. Its IMEI is the field of the service the API flags `isMainInput` (decision 007). */
+const ICLOUD = "icloud-clean-lost-check";
 
 async function stubTurnstile(page: Page) {
   await page.route("https://challenges.cloudflare.com/**", (route) =>
@@ -25,7 +27,7 @@ async function stubTurnstile(page: Page) {
 async function createSession(request: APIRequestContext, overrides: Record<string, unknown> = {}): Promise<string> {
   const res = await request.post("/store/v1/checkout-sessions", {
     headers: { "X-Turnstile-Token": DEV_TOKEN, "Content-Type": "application/json" },
-    data: { serviceId: 1, email: "e2e-buyer@example.com", country: "DE", currency: "EUR", imei: IMEI, ...overrides },
+    data: { serviceId: 1, email: "e2e-buyer@example.com", country: "DE", currency: "EUR", inputs: await imeiInputs(request, ICLOUD, IMEI), ...overrides },
   });
   expect(res.status(), await res.text()).toBe(201);
   return ((await res.json()) as { token: string }).token;
@@ -41,7 +43,7 @@ async function enterImei(page: Page, imei = IMEI) {
   await page.getByRole("button", { name: "Enter details" }).first().click();
   const drawer = page.getByRole("dialog");
   await expect(drawer).toBeVisible();
-  await drawer.getByLabel("IMEI number").fill(imei);
+  await drawer.getByLabel((await imeiBox(page.request, ICLOUD)).label).fill(imei);
   await drawer.getByRole("button", { name: "Save details and continue" }).click();
 }
 
@@ -73,7 +75,10 @@ test.describe("opening a checkout", () => {
     await page.getByRole("button", { name: "Continue to payment" }).click();
     const request = await create;
     expect(request.headers()["x-turnstile-token"]).toBe(DEV_TOKEN);
-    expect(request.postDataJSON()).toMatchObject({ serviceId: 1, country: "DE", currency: "USD", imei: IMEI, quantity: 1 });
+    // The IMEI is an input like any other, under the key of its field, as digits only: there is no `imei` in the body any more.
+    const sent = request.postDataJSON();
+    expect(sent).toMatchObject({ serviceId: 1, country: "DE", currency: "USD", inputs: await imeiInputs(page.request, ICLOUD, IMEI), quantity: 1 });
+    expect(sent).not.toHaveProperty("imei");
 
     await expect(page).toHaveURL(/\/en\/checkout\/[A-Za-z0-9_-]{16,}$/);
     await expect(page.getByRole("heading", { level: 1, name: "Review and pay" })).toBeVisible();
@@ -97,14 +102,15 @@ test.describe("opening a checkout", () => {
 
   test("the first click without details shows the errors and opens the drawer on the IMEI", async ({ page }) => {
     await stubTurnstile(page);
+    const { label } = await imeiBox(page.request, ICLOUD);
     await page.goto("/en/checkout?service=icloud-clean-lost-check");
     await formReady(page);
     await page.getByRole("button", { name: "Continue to payment" }).click();
     await expect(page.getByRole("dialog").getByText("An IMEI has 15 digits.")).toBeVisible();
-    await page.getByRole("dialog").getByLabel("IMEI number").fill("490154203237519");
+    await page.getByRole("dialog").getByLabel(label).fill("490154203237519");
     await page.getByRole("button", { name: "Save details and continue" }).click();
     await expect(page.getByRole("dialog").getByText("last digit does not match")).toBeVisible();
-    await page.getByRole("dialog").getByLabel("IMEI number").fill(IMEI);
+    await page.getByRole("dialog").getByLabel(label).fill(IMEI);
     await page.getByRole("button", { name: "Save details and continue" }).click();
     await expect(page.getByRole("dialog")).toBeHidden();
     await page.getByRole("button", { name: "Continue to payment" }).click();
@@ -149,10 +155,20 @@ test.describe("opening a checkout", () => {
     await fillBuyer(page);
     const submit = page.getByRole("button", { name: "Continue to payment" });
 
-    reply = { status: 422, body: { code: "VALIDATION_FAILED", errors: [{ field: "imei", code: "INVALID_IMEI", message: "x" }] } };
+    // The server names a problem of the IMEI on the field of the form (`inputs.<key>`): it lands on that box, in the drawer.
+    const invalidImei = "Enter a valid 15-digit IMEI (the last digit is a check digit).";
+    const { key } = await imeiBox(page.request, ICLOUD);
+    reply = { status: 422, body: { code: "VALIDATION_FAILED", errors: [{ field: `inputs.${key}`, code: "invalid_imei", message: "x" }] } };
     await submit.click();
-    await expect(page.getByRole("dialog").getByText("Enter a valid 15-digit IMEI (the last digit is a check digit).")).toBeVisible();
+    await expect(page.getByRole("dialog").getByText(invalidImei)).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).click();
+
+    // An error on a path the form draws no box for (here the old `imei`) is not lost: it is the message of the whole form.
+    reply = { status: 422, body: { code: "VALIDATION_FAILED", errors: [{ field: "imei", code: "INVALID_IMEI", message: "x" }] } };
+    await expect(submit).toBeEnabled();
+    await submit.click();
+    await expect(page.getByRole("alert").filter({ hasText: invalidImei })).toBeVisible();
+    await expect(page.getByRole("dialog")).toBeHidden();
 
     reply = { status: 403, body: { code: "ACCOUNT_SUSPENDED" } };
     await expect(submit).toBeEnabled();

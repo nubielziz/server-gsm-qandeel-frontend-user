@@ -2,7 +2,7 @@
 // session cookies land in the browser context exactly as after a real sign-in. There is one kind of account: a rank tells a
 // retail account from a merchant (its own prices in the shop, wallet invoices, API); the helpers take the rank as an option.
 import { readFileSync } from "node:fs";
-import { expect, type Page } from "@playwright/test";
+import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { FIXTURES_FILE, changeAccountEmail, createAccount, setAccountStatus, type E2eFixtures, type RankKind } from "./admin";
 
 /** Credentials of an account. */
@@ -46,6 +46,43 @@ export async function signIn(page: Page, account: Credentials = ACCOUNTS.retail,
   expect(res.status(), await res.text()).toBe(200);
   expect((await res.json()).next).toBe(options.next ?? "done");
   return res.headers()["x-csrf-token"] ?? "";
+}
+
+/**
+ * The box that holds the IMEI of an IMEI service: its custom field flagged `isMainInput` (decision 007). Its key and its label
+ * come from the shop's own read of the service (`GET /store/v1/services/:slug`, through the site's rewrite), so no spec guesses
+ * either. There is no `imei` in an order or a checkout session any more: the IMEI is an input under that key.
+ */
+export async function imeiBox(request: APIRequestContext, slug: string): Promise<{ key: string; label: string }> {
+  const res = await request.get(`/store/v1/services/${encodeURIComponent(slug)}`);
+  expect(res.status(), `${slug}: ${await res.text()}`).toBe(200);
+  const { fields } = (await res.json()) as { fields: { key: string; label: string; isMainInput: boolean }[] };
+  const box = fields.find((field) => field.isMainInput);
+  if (!box) throw new Error(`E2E: ${slug} is an IMEI service with no main-input field: the demo data must give it one (decision 007).`);
+  return { key: box.key, label: box.label };
+}
+
+/** The `inputs` of a checkout session for an IMEI service of the shop: `{ [key of its IMEI field]: imei }`. */
+export async function imeiInputs(request: APIRequestContext, slug: string, imei: string): Promise<Record<string, string>> {
+  return { [(await imeiBox(request, slug)).key]: imei };
+}
+
+/**
+ * The same for the order form of the signed-in merchant rank (`GET /client/services/:id`): the key and the label of the field
+ * of the service the API flags `isMainInput`. The page must be signed in as a merchant rank.
+ */
+export async function merchantImeiBox(request: APIRequestContext, serviceId: number): Promise<{ key: string; label: string }> {
+  const res = await request.get(`/client/services/${serviceId}`);
+  expect(res.status(), `service ${serviceId}: ${await res.text()}`).toBe(200);
+  const { fields } = (await res.json()) as { fields: { key: string; label: string; isMainInput: boolean }[] };
+  const box = fields.find((field) => field.isMainInput);
+  if (!box) throw new Error(`E2E: service ${serviceId} is an IMEI service with no main-input field: the demo data must give it one (decision 007).`);
+  return { key: box.key, label: box.label };
+}
+
+/** The `inputs` of `POST /client/orders` for an IMEI service: `{ [key of its IMEI field]: imei }`. */
+export async function merchantImeiInputs(request: APIRequestContext, serviceId: number, imei: string): Promise<Record<string, string>> {
+  return { [(await merchantImeiBox(request, serviceId)).key]: imei };
 }
 
 /** Latest Mailpit message to an address (the isolated backend sends all mail to Mailpit). */

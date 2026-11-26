@@ -52,8 +52,8 @@ one read this needs.
      and ordering needs JavaScript here as everywhere in the shop; its order form shows the account's true price.
 3. **Buying like everybody.** "Buy now" of the service page and the quick view, and a card's order link, go to the same checkout
    address for every buyer, `/checkout?service=<slug>`. For a merchant rank that page mounts its existing order form
-   (`MerchantCheckout`: single orders, a list of IMEIs, custom fields, file services, one Idempotency-Key per submission, the
-   price-change guard), paid from the wallet through `POST /client/orders`; the retail form never mounts, so no checkout session is
+   (`MerchantCheckout`: single orders, custom fields, file services, one Idempotency-Key per submission, the
+   price-change guard; decision 007 took the list of IMEIs away), paid from the wallet through `POST /client/orders`; the retail form never mounts, so no checkout session is
    created. A file service, which the shop checkout does not sell, opens the order form for a merchant rank too (the service page
    and the quick view offer it "Buy now"); everybody else gets the notice to order it through support, which is also the
    boundary's fallback, so a guest sees it at once. The card that refused the checkout is gone from that page; the same notice

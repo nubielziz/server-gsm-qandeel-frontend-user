@@ -38,6 +38,7 @@ import {
   VERIFY_EMAIL_LINK,
   fixtures,
   freshAccount,
+  merchantImeiInputs,
   signIn,
   signUpByLink,
   tokenOf,
@@ -258,10 +259,11 @@ test.describe("accounts", () => {
     const keys = await getJson<{ id: number; name: string; createdByStaff?: boolean }[]>(page.request, "/client/api-keys");
     expect(keys).toContainEqual(expect.objectContaining({ id: key.id, name: "e2e support key", createdByStaff: true }));
 
-    // IMEI-ICL-LOST is a manual service: its orders wait for staff.
+    // IMEI-ICL-LOST is a manual service: its orders wait for staff. Its IMEI is an input under the key of its own IMEI field (decision 007).
+    const serviceId = await serviceIdByCode("IMEI-ICL-LOST");
     const placed = await page.request.post("/client/orders", {
       headers: { Origin: siteOrigin, "X-CSRF-Token": csrf, "Idempotency-Key": randomUUID(), "Content-Type": "application/json" },
-      data: { serviceId: await serviceIdByCode("IMEI-ICL-LOST"), imei: "490154203237518" },
+      data: { serviceId, inputs: await merchantImeiInputs(page.request, serviceId, "490154203237518") },
     });
     expect(placed.status(), await placed.text()).toBe(201);
     const orderId = ((await placed.json()) as { orders: { id: number; status: string }[] }).orders[0].id;

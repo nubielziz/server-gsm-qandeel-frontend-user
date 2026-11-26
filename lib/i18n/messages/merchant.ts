@@ -93,22 +93,12 @@ export const merchant = {
 
   form: {
     title: "Order details",
-    imeiMode: "How many IMEIs?",
-    single: "One IMEI",
-    bulk: "Several IMEIs",
-    imei: "IMEI",
     imeiHint: "15 digits. Spaces and dashes are removed.",
     imeiOk: "This IMEI is valid.",
     imeiBad: "This IMEI does not pass the check-digit test. Check the number.",
-    bulkLabel: "IMEI list",
-    bulkHint: "One IMEI per line, up to {max}. The orders are placed all together, or not at all.",
-    bulkReady: { zero: "No IMEIs yet", one: "1 IMEI ready", other: "{count} IMEIs ready" },
-    bulkToFix: "{count} to fix",
-    bulkFix: "Fix these lines before you continue:",
-    lineInvalid: "Line {line}: not a valid IMEI.",
-    lineError: "Line {line}: {message}",
-    lineDuplicate: "Line {line}: this IMEI is already in the list.",
-    tooMany: "A bulk order takes at most {max} IMEIs.",
+    /** An IMEI service with no field for its IMEI (decision 007): it cannot be ordered, and the button stays off. */
+    noMainInput: "This service can't be ordered right now. Please contact support.",
+    contactSupport: "Contact support",
     quantity: "Quantity",
     selectPlaceholder: "Select…",
     file: "Input file",
@@ -139,7 +129,6 @@ export const merchant = {
     service: "Service",
     unitPrice: "Unit price",
     quantity: "Quantity",
-    imeis: "IMEIs",
     total: "Total",
     available: "Available balance",
     after: "Balance after the order",
@@ -167,8 +156,6 @@ export const merchant = {
 
   placed: {
     one: "Order #{id} placed",
-    many: "{count} orders placed",
-    manyText: "They are listed in your orders.",
   },
 
   orders: {
