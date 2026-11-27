@@ -672,3 +672,15 @@ specs updated, not run. Needs the backend's decision 073 first. Merged, not push
 - `e2e/routing.spec.ts`: 6/6 pass (language redirects for email links, private-area redirects, API rewrites) — 2026-11-09.
 - `npm run test`: 20 unit tests pass (format, API errors/query, i18n) — 2026-11-09.
 - `npm run typecheck`: clean on the foundation — 2026-11-09.
+
+## Ten more field types; Cancel and Verify in the orders list (2026-11-27, owner's notes; `docs/decisions/009-ten-more-field-types.md`, `010-order-actions-in-the-list-and-their-reasons.md`, backend decisions 075 and 076)
+
+Merged and pushed on the owner's order of 2026-11-27. **009:** both order forms (the retail checkout and the merchant order form) draw and check
+`imei_bulk`, `imeisv`, `serial`, `iccid`, `eid`, `meid`, `ecid`, `mac_address`, `mi_lock_code` and `box_sn` with the server's rules and sentences
+(one table, `lib/checkout/field-types.ts`, drawn by `components/forms/typed-field.tsx`); `imei_bulk` is a text area with a live count, one order
+at one price. **010:** the merchant's orders list has an Actions column (Cancel, Verify); the order page says until when a button is there
+(`cancelUntil`: website orders of a service with cancel on wait 2 minutes before they are sent; `verifyUntil`) and why it is missing
+(`cancelBlocked`, `verifyBlocked`); an open order's page refreshes itself every 30 seconds and once when the cancel window ends. The four keys
+are read as optional. `lib/api/schema.gen.ts` was regenerated against the backend's main. Built by two Sonnet implementers; the field types were
+reviewed by an Opus reviewer with the backend; final review by the lead. **Checks:** `gen:api:check`, typecheck, lint, the whole Vitest suite
+(1,863 tests). No e2e run. **Release order:** console, backend, shop.
