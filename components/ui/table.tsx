@@ -12,9 +12,11 @@ import { cn } from "@/lib/cn";
  * Where a cell goes in a `compact` row below 768px (from `md` up every cell is a normal table cell):
  * line 1 holds `title`, `badge` and, at the end side, `amount`; `subtitle` takes a line of its own; `meta` and
  * `meta-labeled` flow as small muted text under it. `hide` drops the cell on phones (an actions column the row link
- * replaces, an empty value). `meta-labeled` keeps the column name before the value (a bare "3" says nothing).
+ * replaces, an empty value). `meta-labeled` keeps the column name before the value (a bare "3" says nothing). `actions`
+ * takes a line of its own at the end of the row for buttons, and lifts them above the row's link (`z-10` over the link's
+ * stretched `::after`), so they stay clickable.
  */
-export type PhoneSlot = "title" | "badge" | "amount" | "subtitle" | "meta" | "meta-labeled" | "hide";
+export type PhoneSlot = "title" | "badge" | "amount" | "subtitle" | "meta" | "meta-labeled" | "actions" | "hide";
 
 // Below md the cells of a `compact` table are flex items of their row. Utilities beat the `.table-stacked` rules in
 // globals.css (that is a lower layer), so these only override what a compact row changes. `tbody` only: the header row
@@ -35,6 +37,7 @@ const phoneSlots: Record<PhoneSlot, string> = {
   meta: `${phoneBase} max-md:order-5 max-md:text-small max-md:text-ink-subtle`,
   "meta-labeled":
     "max-md:w-auto max-md:justify-start max-md:gap-1 max-md:p-0 max-md:text-start max-md:order-5 max-md:text-small max-md:text-ink-subtle",
+  actions: `${phoneBase} max-md:relative max-md:z-10 max-md:order-6 max-md:basis-full`,
   hide: "max-md:hidden",
 };
 

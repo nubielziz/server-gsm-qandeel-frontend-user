@@ -202,8 +202,16 @@ export type GetClientDashboardResponse = {
     inputFileId: Id | null;
     /** `POST /client/orders/:id/cancel` would be accepted now. */
     canCancel: boolean;
+    /** Until when the order waits before it is sent, so it can still be cancelled (decision 075): an order placed on the website for a service that allows cancellation is sent 2 minutes after it was placed. Set only while `canCancel` is true and the order is inside that window; `null` otherwise (a cancellable manual or held order has no deadline). */
+    cancelUntil: IsoDateTime | null;
+    /** Why the order cannot be cancelled now, `null` exactly when `canCancel` is true. The first that applies: `closed` (completed or rejected), `not_allowed` (the service does not allow cancellation), `already_sent` (sent to a supplier, or claimed for a send, at least once: the cancel would be `409 ALREADY_SENT`), `in_progress` (anything else: staff are working on it). */
+    cancelBlocked: "closed" | "not_allowed" | "already_sent" | "in_progress" | null;
     /** `POST /client/orders/:id/verify` would be accepted now. */
     canVerify: boolean;
+    /** Until when a verification can be asked for: `completedAt` plus the service's `verify_window_h` hours. Set only while `canVerify` is true, `null` otherwise. */
+    verifyUntil: IsoDateTime | null;
+    /** Why a verification cannot be asked for now, `null` exactly when `canVerify` is true. The first that applies: `already_requested` (asked once already), `not_allowed` (the service does not allow verification), `not_completed` (the order is not completed), `window_passed` (the window has passed, or the service has a window of 0 hours). */
+    verifyBlocked: "already_requested" | "not_allowed" | "not_completed" | "window_passed" | null;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
     completedAt: IsoDateTime | null;
@@ -605,8 +613,16 @@ export type GetClientOrdersResponse = Array<{
   inputFileId: Id | null;
   /** `POST /client/orders/:id/cancel` would be accepted now. */
   canCancel: boolean;
+  /** Until when the order waits before it is sent, so it can still be cancelled (decision 075): an order placed on the website for a service that allows cancellation is sent 2 minutes after it was placed. Set only while `canCancel` is true and the order is inside that window; `null` otherwise (a cancellable manual or held order has no deadline). */
+  cancelUntil: IsoDateTime | null;
+  /** Why the order cannot be cancelled now, `null` exactly when `canCancel` is true. The first that applies: `closed` (completed or rejected), `not_allowed` (the service does not allow cancellation), `already_sent` (sent to a supplier, or claimed for a send, at least once: the cancel would be `409 ALREADY_SENT`), `in_progress` (anything else: staff are working on it). */
+  cancelBlocked: "closed" | "not_allowed" | "already_sent" | "in_progress" | null;
   /** `POST /client/orders/:id/verify` would be accepted now. */
   canVerify: boolean;
+  /** Until when a verification can be asked for: `completedAt` plus the service's `verify_window_h` hours. Set only while `canVerify` is true, `null` otherwise. */
+  verifyUntil: IsoDateTime | null;
+  /** Why a verification cannot be asked for now, `null` exactly when `canVerify` is true. The first that applies: `already_requested` (asked once already), `not_allowed` (the service does not allow verification), `not_completed` (the order is not completed), `window_passed` (the window has passed, or the service has a window of 0 hours). */
+  verifyBlocked: "already_requested" | "not_allowed" | "not_completed" | "window_passed" | null;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
   completedAt: IsoDateTime | null;
@@ -618,11 +634,11 @@ export type PostClientOrdersBody = {
   serviceId: Id;
   /** The main input of an IMEI service, from older pages: the value of its main-input field (it wins over a value sent under that field's key; a service without such a field takes it as sent). The shop now types it into the field (`inputs`). */
   imei?: string;
-  /** A bulk order: one order of the same service per item, each the value of the main-input field like `imei`, placed all together or not at all. Still accepted; the shop no longer sends it. */
+  /** A bulk order: one order of the same service per item, each the value of the main-input field like `imei`, placed all together or not at all. Still accepted; the shop no longer sends it. Unrelated to a field of type `imei_bulk`, whose list is the value of one field of one order (decision 076). */
   imeis?: string[];
   /** Defaults to the service's minimum. */
   quantity?: number;
-  /** The values of the service's custom fields by field key (`GET /client/services/:id`), each judged by its field's type, required tick and pattern; a field of type `imei` is stored as digits. */
+  /** The values of the service's custom fields by field key (`GET /client/services/:id`), each judged by its field's type, required tick and pattern and stored in its type's form (an `imei` as digits, an `imei_bulk` list one IMEI per line, a `mac_address` as `AA:BB:CC:DD:EE:FF`; decisions 073 and 076). At most 2000 characters as sent; the stored form at most 500 (`too_long` on `inputs.<key>`; an `imei_bulk` list of more than 30 IMEIs is `too_many_imeis` first). */
   inputs?: {
     [key: string]: string;
   };
@@ -663,8 +679,16 @@ export type PostClientOrdersResponse = {
     inputFileId: Id | null;
     /** `POST /client/orders/:id/cancel` would be accepted now. */
     canCancel: boolean;
+    /** Until when the order waits before it is sent, so it can still be cancelled (decision 075): an order placed on the website for a service that allows cancellation is sent 2 minutes after it was placed. Set only while `canCancel` is true and the order is inside that window; `null` otherwise (a cancellable manual or held order has no deadline). */
+    cancelUntil: IsoDateTime | null;
+    /** Why the order cannot be cancelled now, `null` exactly when `canCancel` is true. The first that applies: `closed` (completed or rejected), `not_allowed` (the service does not allow cancellation), `already_sent` (sent to a supplier, or claimed for a send, at least once: the cancel would be `409 ALREADY_SENT`), `in_progress` (anything else: staff are working on it). */
+    cancelBlocked: "closed" | "not_allowed" | "already_sent" | "in_progress" | null;
     /** `POST /client/orders/:id/verify` would be accepted now. */
     canVerify: boolean;
+    /** Until when a verification can be asked for: `completedAt` plus the service's `verify_window_h` hours. Set only while `canVerify` is true, `null` otherwise. */
+    verifyUntil: IsoDateTime | null;
+    /** Why a verification cannot be asked for now, `null` exactly when `canVerify` is true. The first that applies: `already_requested` (asked once already), `not_allowed` (the service does not allow verification), `not_completed` (the order is not completed), `window_passed` (the window has passed, or the service has a window of 0 hours). */
+    verifyBlocked: "already_requested" | "not_allowed" | "not_completed" | "window_passed" | null;
     /** ISO 8601 UTC time with milliseconds. */
     createdAt: IsoDateTime;
     completedAt: IsoDateTime | null;
@@ -713,8 +737,16 @@ export type GetClientOrdersByIdResponse = {
   inputFileId: Id | null;
   /** `POST /client/orders/:id/cancel` would be accepted now. */
   canCancel: boolean;
+  /** Until when the order waits before it is sent, so it can still be cancelled (decision 075): an order placed on the website for a service that allows cancellation is sent 2 minutes after it was placed. Set only while `canCancel` is true and the order is inside that window; `null` otherwise (a cancellable manual or held order has no deadline). */
+  cancelUntil: IsoDateTime | null;
+  /** Why the order cannot be cancelled now, `null` exactly when `canCancel` is true. The first that applies: `closed` (completed or rejected), `not_allowed` (the service does not allow cancellation), `already_sent` (sent to a supplier, or claimed for a send, at least once: the cancel would be `409 ALREADY_SENT`), `in_progress` (anything else: staff are working on it). */
+  cancelBlocked: "closed" | "not_allowed" | "already_sent" | "in_progress" | null;
   /** `POST /client/orders/:id/verify` would be accepted now. */
   canVerify: boolean;
+  /** Until when a verification can be asked for: `completedAt` plus the service's `verify_window_h` hours. Set only while `canVerify` is true, `null` otherwise. */
+  verifyUntil: IsoDateTime | null;
+  /** Why a verification cannot be asked for now, `null` exactly when `canVerify` is true. The first that applies: `already_requested` (asked once already), `not_allowed` (the service does not allow verification), `not_completed` (the order is not completed), `window_passed` (the window has passed, or the service has a window of 0 hours). */
+  verifyBlocked: "already_requested" | "not_allowed" | "not_completed" | "window_passed" | null;
   /** ISO 8601 UTC time with milliseconds. */
   createdAt: IsoDateTime;
   completedAt: IsoDateTime | null;
@@ -952,8 +984,8 @@ export type GetClientServicesByIdResponse = {
   fields: Array<{
     key: string;
     label: string;
-    /** `imei` holds one IMEI: read as digits (spaces and dashes removed), 15 digits with a valid Luhn check digit (else `422 INVALID_IMEI`, code `invalid_imei` on `inputs.<key>`). */
-    fieldType: "text" | "number" | "select" | "textarea" | "imei";
+    /** Each value is trimmed, read into its stored form and judged by its type, on any service type (decisions 073 and 076). `imei`: one IMEI, spaces and dashes removed, 15 digits with a valid Luhn check digit (else `422 INVALID_IMEI`, code `invalid_imei` on `inputs.<key>`). `imei_bulk`: 1 to 30 IMEIs split on line breaks, commas and semicolons and stored one per line; still one order at one price (a bad line is `422 INVALID_IMEI`, `invalid_imei` "Line N ..."; more than 30 `too_many_imeis`, a repeat `duplicate_imei`). The other check types answer `422 VALIDATION_FAILED` with `invalid_<type>`: `imeisv` 16 digits; `serial` 5 to 30 letters and digits (stored upper-case); `iccid` 18 to 22 digits starting with 89; `eid` 32 digits; `meid` 14 or 15 hexadecimal characters or 18 digits; `ecid` an optional `0x` and 8 to 16 hexadecimal characters, or 8 to 20 digits; `mac_address` 12 hexadecimal characters, alone or in pairs by `:` or `-` or in fours by `.`, stored as `AA:BB:CC:DD:EE:FF`; `mi_lock_code` 6 to 64 letters, digits and dashes; `box_sn` 4 to 32 letters, digits and dashes (stored upper-case). `text`, `number`, `select` and `textarea` are stored as sent. */
+    fieldType: "text" | "number" | "select" | "textarea" | "imei" | "imei_bulk" | "imeisv" | "serial" | "iccid" | "eid" | "meid" | "ecid" | "mac_address" | "mi_lock_code" | "box_sn";
     required: boolean;
     /** The choices of a `select` field. */
     options: string[];
@@ -1342,7 +1374,7 @@ export type PostStoreV1CheckoutSessionsBody = {
   quantity?: number;
   /** The main input of an IMEI service, from older shop pages: the value of its main-input field (it wins over a value sent under that field's key; a service without such a field takes it as sent). The shop now types it into the field (`inputs`). */
   imei?: string;
-  /** The values of the service's order fields by field key (`GET /store/v1/services/:slug`), each judged by its field's type, required tick and pattern; a field of type `imei` is stored as digits. */
+  /** The values of the service's order fields by field key (`GET /store/v1/services/:slug`), each judged by its field's type, required tick and pattern and stored in its type's form (an `imei` as digits, an `imei_bulk` list one IMEI per line; decisions 073 and 076). At most 2000 characters as sent; the stored form at most 500 (`too_long` on `inputs.<key>`; an `imei_bulk` list of more than 30 IMEIs is `too_many_imeis` first). */
   inputs?: {
     [key: string]: string;
   };
@@ -1373,7 +1405,7 @@ export type PostStoreV1CheckoutSessionsResponse = {
     deliveryTime: string;
   };
   quantity: number;
-  /** The main input of an IMEI service (usually its IMEI) with all but its last four characters hidden; null for another service or none. */
+  /** The main input of an IMEI service (usually its IMEI) with all but its last four characters hidden; a list of IMEIs (a main input of type `imei_bulk`, decision 076) shows its first IMEI so, then ` +N more` for the others (`•••••••••••0861 +2 more`; a one-item list reads like one IMEI). null for another service or none. */
   imei: string | null;
   /** The buyer's address with most of it hidden. */
   email: string;
@@ -1450,7 +1482,7 @@ export type GetStoreV1CheckoutSessionsByTokenResponse = {
     deliveryTime: string;
   };
   quantity: number;
-  /** The main input of an IMEI service (usually its IMEI) with all but its last four characters hidden; null for another service or none. */
+  /** The main input of an IMEI service (usually its IMEI) with all but its last four characters hidden; a list of IMEIs (a main input of type `imei_bulk`, decision 076) shows its first IMEI so, then ` +N more` for the others (`•••••••••••0861 +2 more`; a one-item list reads like one IMEI). null for another service or none. */
   imei: string | null;
   /** The buyer's address with most of it hidden. */
   email: string;
@@ -2889,8 +2921,8 @@ export type GetStoreV1ServicesBySlugResponse = {
   fields: Array<{
     key: string;
     label: string;
-    /** `imei` holds one IMEI: read as digits (spaces and dashes removed), 15 digits with a valid Luhn check digit (else `422 INVALID_IMEI`, code `invalid_imei` on `inputs.<key>`). */
-    fieldType: "text" | "number" | "select" | "textarea" | "imei";
+    /** Each value is trimmed, read into its stored form and judged by its type (decisions 073 and 076). `imei`: one IMEI, spaces and dashes removed, 15 digits with a valid Luhn check digit (else `422 INVALID_IMEI`, code `invalid_imei` on `inputs.<key>`). `imei_bulk`: 1 to 30 IMEIs split on line breaks, commas and semicolons and stored one per line, still one order at one price (a bad line is `422 INVALID_IMEI`; more than 30 `too_many_imeis`, a repeat `duplicate_imei`). `imeisv`, `serial`, `iccid`, `eid`, `meid`, `ecid`, `mac_address`, `mi_lock_code` and `box_sn` answer `422 VALIDATION_FAILED` with `invalid_<type>` (the rules of `GET /admin/services/:id`). */
+    fieldType: "text" | "number" | "select" | "textarea" | "imei" | "imei_bulk" | "imeisv" | "serial" | "iccid" | "eid" | "meid" | "ecid" | "mac_address" | "mi_lock_code" | "box_sn";
     /** The choices of a `select` field. */
     options: string[];
     required: boolean;

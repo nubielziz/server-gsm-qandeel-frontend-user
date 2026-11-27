@@ -4,8 +4,9 @@
 //   Amounts follow the API exactly: `totalPrice` is USD BEFORE VAT, `taxAmount` is the VAT, and `currency` is only the
 //   code the customer paid in. The column is labelled "USD, before VAT" and the paid-in currency is shown in words, so
 //   no number is presented as something it is not.
-// - MerchantOrdersTable: a merchant rank's orders (`GET /client/orders` rows), one markup for every screen.
-// Where a row leads is decided in lib/account/order-href.ts. Server components.
+// - MerchantOrdersTable: a merchant rank's orders (`GET /client/orders` rows), one markup for every screen. Its last column holds
+//   the Cancel and Verify buttons of the rows that have one (shop decision 010).
+// Where a row leads is decided in lib/account/order-href.ts. Server components (the actions cell is the one client component).
 import Link from "next/link";
 import { ArrowUpRight, FileText } from "lucide-react";
 import { orderHref } from "@/lib/account/order-href";
@@ -15,6 +16,7 @@ import { fmt } from "@/lib/i18n/define";
 import { account } from "@/lib/i18n/messages/account";
 import { common, statusLabel } from "@/lib/i18n/messages/common";
 import { merchant } from "@/lib/i18n/messages/merchant";
+import { OrderRowActions } from "@/components/merchant/order-actions";
 import { TypeBadge } from "@/components/merchant/type-badge";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -123,7 +125,9 @@ export function OrdersTable({ orders, compact }: OrdersTableProps) {
  * The orders of a merchant rank (`GET /client/orders` rows). One markup for every screen: a `compact` table is the real
  * table from `md` up and short list rows on phones (line 1: number, status, total; line 2: service; then date, input,
  * quantity and check as small text). The number link covers the whole row on phones. A value a phone row would show as an
- * empty or default fact (a single unit, no check, no input) is dropped there.
+ * empty or default fact (a single unit, no check, no input) is dropped there. The last column, "Actions", has a small
+ * Cancel button where `canCancel` and a small Verify button where `canVerify` (an em dash otherwise, dropped on phones);
+ * on a phone the buttons take a line of their own above the row's link, so they stay clickable.
  */
 export function MerchantOrdersTable({ rows }: { rows: MerchantOrder[] }) {
   const t = merchant;
@@ -142,6 +146,7 @@ export function MerchantOrdersTable({ rows }: { rows: MerchantOrder[] }) {
           <TableHeaderCell numeric>{col.total}</TableHeaderCell>
           <TableHeaderCell>{col.status}</TableHeaderCell>
           <TableHeaderCell>{col.verification}</TableHeaderCell>
+          <TableHeaderCell>{col.actions}</TableHeaderCell>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -197,6 +202,13 @@ export function MerchantOrdersTable({ rows }: { rows: MerchantOrder[] }) {
                 >
                   {verification[o.verificationStatus]}
                 </Badge>
+              ) : (
+                <span className="text-ink-subtle">{t.shared.dash}</span>
+              )}
+            </TableCell>
+            <TableCell phone={o.canCancel || o.canVerify ? "actions" : "hide"} label={col.actions}>
+              {o.canCancel || o.canVerify ? (
+                <OrderRowActions orderId={o.id} canCancel={o.canCancel} canVerify={o.canVerify} labels={t.order} row={t.orders.actions} />
               ) : (
                 <span className="text-ink-subtle">{t.shared.dash}</span>
               )}

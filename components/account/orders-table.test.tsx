@@ -1,7 +1,13 @@
 // The two orders tables (components/account/orders-table.tsx): where each row leads, and what each kind of row shows.
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The action buttons of a merchant row read the router from next/navigation and the error texts from the layout's provider.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {}, replace: () => {} }) }));
+
 import type { CustomerOrder, MerchantOrder } from "@/lib/api/types";
+import { ErrorTextProvider } from "@/lib/i18n/error-text";
+import { errors } from "@/lib/i18n/messages/errors";
 import { MerchantOrdersTable, OrdersTable, orderLabel } from "./orders-table";
 
 const retailOrder = (over: Partial<CustomerOrder> = {}): CustomerOrder => ({
@@ -78,26 +84,92 @@ describe("OrdersTable (retail rows)", () => {
   });
 });
 
+/** The merchant table as the page draws it: the error texts come from the root layout. */
+const drawMerchant = (rows: MerchantOrder[]) =>
+  renderToStaticMarkup(
+    <ErrorTextProvider messages={errors}>
+      <MerchantOrdersTable rows={rows} />
+    </ErrorTextProvider>,
+  );
+
 describe("MerchantOrdersTable (merchant rows)", () => {
   it("opens the order's own page in the account area, from the number link", () => {
-    const html = renderToStaticMarkup(<MerchantOrdersTable rows={[merchantOrder()]} />);
+    const html = drawMerchant([merchantOrder()]);
     expect(html).toContain('href="/en/account/orders/42"');
     expect(html).toContain('aria-label="Open order 42"');
     expect(html).not.toContain("/en/track/");
   });
 
   it("shows the input, the quantity and the total of the row", () => {
-    const html = renderToStaticMarkup(<MerchantOrdersTable rows={[merchantOrder()]} />);
+    const html = drawMerchant([merchantOrder()]);
     expect(html).toContain("490154203237518");
     expect(html).toContain("Carrier check");
     expect(html).toContain("$3.00");
   });
 
   it("shows a file input as such and a verification as its badge", () => {
-    const html = renderToStaticMarkup(
-      <MerchantOrdersTable rows={[merchantOrder({ imei: "", inputFileId: 9, verificationStatus: "accepted" })]} />,
-    );
+    const html = drawMerchant([merchantOrder({ imei: "", inputFileId: 9, verificationStatus: "accepted" })]);
     expect(html).toContain("File");
     expect(html).toContain("Accepted");
+  });
+});
+
+describe("MerchantOrdersTable: the Actions column", () => {
+  const headers = (html: string) => [...html.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => m[1]);
+
+  it("is the last column, headed Actions", () => {
+    const list = headers(drawMerchant([merchantOrder()]));
+    expect(list.at(-1)).toBe("Actions");
+    expect(list).toHaveLength(9);
+  });
+
+  it("gives a row that can be cancelled a small Cancel button, named after the order", () => {
+    const html = drawMerchant([merchantOrder({ canCancel: true, canVerify: false })]);
+    expect(html).toContain('aria-label="Cancel order 42"');
+    expect(html).not.toContain("Verify order");
+  });
+
+  it("gives a row that can be verified a small Verify button", () => {
+    const html = drawMerchant([merchantOrder({ status: "completed", canCancel: false, canVerify: true })]);
+    expect(html).toContain('aria-label="Verify order 42"');
+    expect(html).not.toContain("Cancel order 42");
+  });
+
+  it("gives a row both buttons when both are allowed", () => {
+    const html = drawMerchant([merchantOrder({ canCancel: true, canVerify: true })]);
+    expect(html).toContain('aria-label="Cancel order 42"');
+    expect(html).toContain('aria-label="Verify order 42"');
+  });
+
+  it("a row with no action has no button and an em dash, like the other empty cells, dropped on phones", () => {
+    const html = drawMerchant([merchantOrder({ canCancel: false, canVerify: false })]);
+    expect(html).not.toContain("Cancel order 42");
+    expect(html).not.toContain("Verify order 42");
+    const cell = [...html.matchAll(/<td[^>]*data-label="Actions"[^>]*>(.*?)<\/td>/g)];
+    expect(cell).toHaveLength(1);
+    expect(cell[0][0]).toContain("max-md:hidden");
+    expect(cell[0][1]).toContain("—");
+  });
+
+  it("on phones the buttons take a line of their own above the row's link, which stays the way to open the order", () => {
+    const html = drawMerchant([merchantOrder({ canCancel: true })]);
+    const cell = html.match(/<td[^>]*data-label="Actions"[^>]*>/)?.[0] ?? "";
+    expect(cell).toContain("max-md:z-10");
+    expect(cell).toContain("max-md:basis-full");
+    expect(html).toContain("max-md:after:absolute");
+    expect(html).toContain('href="/en/account/orders/42"');
+  });
+
+  it("each row has its own buttons: only the rows that have an action show one", () => {
+    const html = drawMerchant([merchantOrder({ id: 1, canCancel: true }), merchantOrder({ id: 2, canCancel: false }), merchantOrder({ id: 3, canVerify: true, canCancel: false })]);
+    expect(html).toContain('aria-label="Cancel order 1"');
+    expect(html).not.toContain("Cancel order 2");
+    expect(html).toContain('aria-label="Verify order 3"');
+  });
+
+  it("an older backend (no new keys) is drawn from the two flags alone", () => {
+    const row = merchantOrder({ canCancel: true });
+    expect(row.cancelUntil).toBeUndefined();
+    expect(drawMerchant([row])).toContain('aria-label="Cancel order 42"');
   });
 });

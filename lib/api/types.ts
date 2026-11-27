@@ -165,8 +165,24 @@ export type SmartSignInResult = S.PostClientAuthSignInResponse;
 export type MerchantPasswordChangeResult = S.PostClientAuthPasswordChangeResponse;
 export type MerchantProfileInput = S.PatchClientProfileBody;
 export type MerchantDashboard = S.GetClientDashboardResponse;
-export type MerchantOrder = S.GetClientOrdersResponse[number];
-export type MerchantOrderDetail = S.GetClientOrdersByIdResponse;
+/**
+ * The four keys backend decision 075 added to every merchant order (list rows and detail), so the order's buttons can say
+ * why one is missing and until when one is there. They are OPTIONAL here on purpose: an API that does not send them yet
+ * leaves them out, and the site then reads each as "unknown" and shows what it showed before (lib/merchant/order-actions.ts).
+ * Once `schema.gen.ts` carries them, the Omit below can go.
+ */
+export type OrderActionHints = {
+  /** ISO time: the end of the 2-minute cancel window, set only while the order can be cancelled and waits in it. */
+  cancelUntil?: string | null;
+  /** Why Cancel is missing; null exactly when `canCancel`. */
+  cancelBlocked?: "closed" | "not_allowed" | "already_sent" | "in_progress" | null;
+  /** ISO time: the end of the time to ask for verification, set only while it can be asked. */
+  verifyUntil?: string | null;
+  /** Why Verify is missing; null exactly when `canVerify`. */
+  verifyBlocked?: "already_requested" | "not_allowed" | "not_completed" | "window_passed" | null;
+};
+export type MerchantOrder = Omit<S.GetClientOrdersResponse[number], keyof OrderActionHints> & OrderActionHints;
+export type MerchantOrderDetail = Omit<S.GetClientOrdersByIdResponse, keyof OrderActionHints> & OrderActionHints;
 export type MerchantOrderInput = S.PostClientOrdersBody;
 export type MerchantService = S.GetClientServicesResponse[number];
 export type MerchantServiceDetail = WithOpenFieldTypes<S.GetClientServicesByIdResponse>;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareMoney, formatMoney, imeiProblem, isValidImei, latinDigits, maskImei, normalizeImei, subtractMoney, sumMoney } from "./index";
+import { compareMoney, formatMoney, formatTime, imeiProblem, isValidImei, latinDigits, maskImei, normalizeImei, subtractMoney, sumMoney } from "./index";
 
 describe("money math on 4-decimal strings", () => {
   it("sums exactly where floats would drift", () => {
@@ -16,6 +16,17 @@ describe("money math on 4-decimal strings", () => {
   });
   it("rejects non-money strings", () => {
     expect(() => sumMoney(["12,49"])).toThrow();
+  });
+});
+
+describe("formatTime", () => {
+  it("writes the time of day with seconds and names the zone", () => {
+    // `\s` also matches the narrow no-break space newer ICU puts before PM.
+    expect(formatTime("2026-11-27T17:45:12.000Z")).toMatch(/^5:45:12\sPM UTC$/);
+    expect(formatTime("2026-11-27T00:05:09.500Z")).toMatch(/^12:05:09\sAM UTC$/);
+  });
+  it("gives back what it cannot read", () => {
+    expect(formatTime("soon")).toBe("soon");
   });
 });
 

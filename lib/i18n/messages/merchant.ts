@@ -166,8 +166,16 @@ export const merchant = {
     searchLabel: "Search orders",
     searchPlaceholder: "Order number, IMEI or service",
     sorts: { newest: "Newest first", oldest: "Oldest first", total_desc: "Highest total", total_asc: "Lowest total" },
-    columns: { order: "Order", date: "Date", service: "Service", input: "Input", quantity: "Qty", total: "Total", status: "Status", verification: "Verification" },
+    columns: { order: "Order", date: "Date", service: "Service", input: "Input", quantity: "Qty", total: "Total", status: "Status", verification: "Verification", actions: "Actions" },
     verification: { requested: "Requested", accepted: "Accepted", refunded: "Refunded" },
+    // The buttons of a row of the list (the texts of the confirmation and the toasts are `order.*`, the same as on the order's page).
+    actions: {
+      cancel: "Cancel",
+      verify: "Verify",
+      cancelLabel: "Cancel order {id}",
+      verifyLabel: "Verify order {id}",
+      cancelTitle: "Cancel order #{id}?",
+    },
     caption: "Your orders",
     emptyTitle: "No orders yet",
     emptyText: "Orders you place appear here, with their status and result.",
@@ -231,6 +239,14 @@ export const merchant = {
     verifying: "Sending…",
     verified: "Verification requested",
     noActions: "No actions are available for this order.",
+    // Why a button is there only for a while, or not there (backend decision 075; shop decision 010).
+    cancelUntilNote: "You can cancel until {time}. After that the order is sent for processing.",
+    cancelNotAllowed: "This service does not allow cancelling orders.",
+    cancelAlreadySent: "This order was already sent for processing, so it can no longer be cancelled. Contact support if something is wrong.",
+    cancelInProgress: "Our team is already working on this order.",
+    verifyUntilNote: "You can ask for verification until {date}.",
+    verifyNotCompleted: "You can ask for verification once the order is completed.",
+    verifyWindowPassed: "The time to ask for verification has passed.",
   },
 };
 

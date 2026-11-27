@@ -68,6 +68,11 @@ export function formatDateTime(iso: string): string {
   });
 }
 
+/** Time of day with seconds and the zone named ("5:45:12 PM UTC"): for a deadline that is minutes away. */
+export function formatTime(iso: string): string {
+  return formatDate(iso, { hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short" });
+}
+
 // ── Exact money math on 4-decimal strings (BigInt of ten-thousandths).
 const ZERO = BigInt(0);
 const SCALE = BigInt(10000);

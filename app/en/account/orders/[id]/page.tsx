@@ -1,5 +1,6 @@
 // One order of a merchant rank (handoff §4.6): what was ordered, the result, verification, the events timeline and the
-// actions the API currently allows (cancel / verify). Only a merchant rank has this page: a retail account's orders open on
+// actions the API currently allows (cancel / verify) with the sentence that says until when a button is there or why it is not
+// (shop decision 010). While the order is open the page keeps itself fresh (OrderRefresher). Only a merchant rank has this page: a retail account's orders open on
 // their tracking page, so a retail account that comes here is sent to its list.
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
@@ -8,6 +9,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/layout/container";
 import { OrderActions } from "@/components/merchant/order-actions";
 import { OrderAnswerItems, answersOf } from "@/components/merchant/order-answers";
+import { OrderRefresher } from "@/components/merchant/order-refresher";
 import { PageError } from "@/components/merchant/page-error";
 import { DetailSkeleton } from "@/components/merchant/skeletons";
 import { TypeBadge } from "@/components/merchant/type-badge";
@@ -31,6 +33,7 @@ import { fmt } from "@/lib/i18n/define";
 import { common, statusLabel } from "@/lib/i18n/messages/common";
 import { merchant } from "@/lib/i18n/messages/merchant";
 import { labelOf } from "@/lib/merchant/format";
+import { orderActionNotes } from "@/lib/merchant/order-actions";
 import { settle } from "@/lib/merchant/load";
 import { PageTransition } from "@/components/layout/page-transition";
 
@@ -75,6 +78,7 @@ async function Order({ params }: { params: Promise<{ id: string }> }) {
   const verification = t.order.verificationStatus as Record<string, string>;
   const events = t.order.events as Record<string, string>;
   const answers = answersOf(o);
+  const notes = orderActionNotes(o, t.order);
   const hasResult = Boolean(o.result.code || o.result.comment || o.result.fileId);
   const fileLink = (fileId: number, label: string) => (
     // A plain link: `GET /client/files/:id` answers 302 to a short-lived storage URL (handoff §3.13).
@@ -90,6 +94,7 @@ async function Order({ params }: { params: Promise<{ id: string }> }) {
         label={c.workspace.breadcrumbLabel}
         items={[{ label: t.orders.title, href: sitePath("/account/orders") }, { label: `#${o.id}` }]}
       />
+      <OrderRefresher status={o.status} cancelUntil={o.canCancel ? (o.cancelUntil ?? null) : null} />
       <PageHeader
         variant="card"
         title={fmt(t.order.title, { id: o.id })}
@@ -180,7 +185,7 @@ async function Order({ params }: { params: Promise<{ id: string }> }) {
           <Card>
             <CardHeader title={t.order.actionsTitle} />
             <CardBody>
-              <OrderActions orderId={o.id} canCancel={o.canCancel} canVerify={o.canVerify} labels={t.order} />
+              <OrderActions orderId={o.id} canCancel={o.canCancel} canVerify={o.canVerify} notes={notes} labels={t.order} />
             </CardBody>
           </Card>
 

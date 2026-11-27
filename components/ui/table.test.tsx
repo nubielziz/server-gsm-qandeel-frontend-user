@@ -50,6 +50,14 @@ describe("Table compact (plan P1.1: one markup for every screen)", () => {
     expect(plain).not.toContain("max-md:");
   });
 
+  it("lifts an actions cell above the row's link and gives it a line of its own on phones", () => {
+    const html = renderToStaticMarkup(<TableCell phone="actions">buttons</TableCell>);
+    for (const rule of ["max-md:relative", "max-md:z-10", "max-md:order-6", "max-md:basis-full", "max-md:before:hidden"]) {
+      expect(html).toContain(rule);
+    }
+    expect(html).toContain("md:px-4");
+  });
+
   it("only compact tables carry the row rules", () => {
     expect(list({ stacked: true })).not.toContain("_tbody_tr");
     expect(list({})).not.toContain("table-stacked");

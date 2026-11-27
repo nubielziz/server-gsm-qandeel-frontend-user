@@ -21,7 +21,11 @@ const order = (id: number): MerchantDashboard["latestOrders"][number] => ({
   verificationStatus: null,
   inputFileId: null,
   canCancel: false,
+  cancelUntil: null,
+  cancelBlocked: "closed",
   canVerify: false,
+  verifyUntil: null,
+  verifyBlocked: "not_allowed",
   createdAt: "2026-11-01T10:00:00.000Z",
   completedAt: null,
 });
