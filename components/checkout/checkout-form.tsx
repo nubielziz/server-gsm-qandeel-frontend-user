@@ -5,7 +5,10 @@
 // indicative: the session locks price, tax and exchange rate for 30 minutes on the next page (handoff §5.8).
 // The drawer draws only what the service lists (decision 007): its custom fields, and the quantity. Every field is drawn and
 // checked by its own type and Required tick, whatever the type of the service (decision 008): a field of type `imei` is a
-// numeric box checked with the check digit and sent as digits only. A service with no fields and no quantity control asks nothing.
+// numeric box checked with the check digit and sent as digits only. The ten checked types of decision 009 (a list of IMEIs, an
+// IMEISV, a serial, an ICCID, an EID, a MEID, an ECID, a MAC address, a Mi lock code, a box serial number) are drawn by
+// components/forms/typed-field.tsx and judged by lib/checkout/field-types.ts with the server's rules and sentences.
+// A service with no fields and no quantity control asks nothing.
 // The quantity rule of the service (a range, packs, exactly N) is state, not a constant: it starts from the server-rendered
 // service and is replaced by every re-read of the service (currency, country, region, a server refusal) (plan D17).
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -16,6 +19,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { TypedField } from "@/components/forms/typed-field";
 import { DialogClose, DialogTrigger, Drawer, closeDialog, openDialog } from "@/components/ui/dialog";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Money } from "@/components/ui/money";
@@ -25,7 +29,8 @@ import { isApiError } from "@/lib/api/errors";
 import type { CheckoutSession, CheckoutSessionInput, StoreConfig, StoreServiceDetail } from "@/lib/api/types";
 import { checkoutHref, type CheckoutBuyer } from "@/lib/checkout/access";
 import { drawnPaths, placeFieldErrors } from "@/lib/checkout/field-errors";
-import { fieldProblem, sentValue, summaryValue } from "@/lib/checkout/field-check";
+import { fieldIssue, issueText, sentValue, summaryValue } from "@/lib/checkout/field-check";
+import { imeiCount, isTypedFieldType } from "@/lib/checkout/field-types";
 import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
 import { fmt, plural } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
@@ -245,7 +250,17 @@ export function CheckoutForm({
   const taxRate = country ? taxRates.find((rate) => rate.country === country && (!region || rate.region === region || !rate.region)) : undefined;
   const countryLabel = countries.find((c) => c.code === country)?.name ?? country;
   // The summary line of the main input: masked for an IMEI, as typed (cut short) for anything else; nothing while it is empty.
-  const mainValue = mainInput ? summaryValue(mainInput, inputs[mainInput.key] ?? "") : "";
+  // A list of IMEIs is shown as its count ("3 IMEIs"), never as the numbers.
+  const mainIsList = mainInput?.fieldType === "imei_bulk";
+  const listCount = mainInput && mainIsList ? imeiCount(inputs[mainInput.key] ?? "") : 0;
+  const mainValue = !mainInput
+    ? ""
+    : mainIsList
+      ? listCount > 0
+        ? plural(listCount, labels.drawer.types.count)
+        : ""
+      : summaryValue(mainInput, inputs[mainInput.key] ?? "");
+  const digitsShown = mainInput?.fieldType === "imei" || mainIsList;
 
   const fieldMessage = (code: string) => errorText.field({ field: "", code, message: "" }) ?? "";
 
@@ -253,11 +268,8 @@ export function CheckoutForm({
   function detailErrors(): Record<string, string> {
     const found: Record<string, string> = {};
     for (const field of fields) {
-      const problem = fieldProblem(field, inputs[field.key] ?? "");
-      if (problem) {
-        found[`inputs.${field.key}`] =
-          problem === "required" ? labels.drawer.errorRequired : problem === "length" ? labels.drawer.errorLength : labels.drawer.errorChecksum;
-      }
+      const issue = fieldIssue(field, inputs[field.key] ?? "");
+      if (issue) found[`inputs.${field.key}`] = issueText(issue, labels.drawer, errorText);
     }
     // One per order and exactly N have no control: the rule decides the quantity.
     if (controlled && (typedQuantity === null || !isAllowedQuantity(rule, typedQuantity))) {
@@ -513,7 +525,7 @@ export function CheckoutForm({
                     <div className="flex justify-between gap-4">
                       <dt className="text-ink-subtle">{mainInput.label}</dt>
                       {/* A masked IMEI is digits (left to right); any other value is text a person typed. */}
-                      <dd className={mainInput.fieldType === "imei" ? "num font-semibold text-ink" : "min-w-0 break-words text-end font-semibold text-ink"} dir={mainInput.fieldType === "imei" ? "ltr" : "auto"}>
+                      <dd className={digitsShown ? "num font-semibold text-ink" : "min-w-0 break-words text-end font-semibold text-ink"} dir={digitsShown ? "ltr" : "auto"}>
                         {mainValue}
                       </dd>
                     </div>
@@ -759,6 +771,23 @@ export function CheckoutForm({
                     spellCheck={false}
                     maxLength={24}
                     dir="ltr"
+                  />
+                );
+              }
+              if (isTypedFieldType(field.fieldType)) {
+                // One of the ten checked types (decision 009): its own control, hint and keyboard, in lib/checkout/field-types.ts.
+                return (
+                  <TypedField
+                    key={field.key}
+                    type={field.fieldType}
+                    labels={labels.drawer.types}
+                    name={field.key}
+                    label={field.label}
+                    required={field.required}
+                    optionalLabel={common.optionalLabel}
+                    error={common.error}
+                    value={inputs[field.key] ?? ""}
+                    onChange={(value) => setInput(field.key, value)}
                   />
                 );
               }

@@ -2,6 +2,15 @@
 // Safe to import anywhere (types only).
 import type * as S from "./schema.gen";
 
+/**
+ * A response whose custom fields (`fields`) may name a `fieldType` the generated union does not list yet: the API gains field
+ * types (backend decision 076 added ten) before this site is regenerated, and a form draws a type it does not know as a plain text
+ * field (decision 008). `string & {}` keeps the known values for completion and for checks like `fieldType === "imei"`.
+ */
+type WithOpenFieldTypes<T extends { fields: Array<{ fieldType: string }> }> = Omit<T, "fields"> & {
+  fields: Array<Omit<T["fields"][number], "fieldType"> & { fieldType: T["fields"][number]["fieldType"] | (string & {}) }>;
+};
+
 export type { Id, Money, Decimal, IsoDateTime, ApiRoutes } from "./schema.gen";
 
 // ── Store (customers, /store/v1)
@@ -9,7 +18,7 @@ export type StoreConfig = S.GetStoreV1ConfigResponse;
 export type StoreCurrency = StoreConfig["currencies"][number];
 export type StorePaymentMethod = StoreConfig["paymentMethods"][number];
 export type StoreServiceCard = S.GetStoreV1ServicesResponse[number];
-export type StoreServiceDetail = S.GetStoreV1ServicesBySlugResponse;
+export type StoreServiceDetail = WithOpenFieldTypes<S.GetStoreV1ServicesBySlugResponse>;
 export type StoreServicesQuery = S.GetStoreV1ServicesQuery;
 /** One category of `GET /store/v1/categories` (`serviceCount` is not narrowed by any other filter). */
 export type StoreCategory = S.GetStoreV1CategoriesResponse["categories"][number];
@@ -160,7 +169,7 @@ export type MerchantOrder = S.GetClientOrdersResponse[number];
 export type MerchantOrderDetail = S.GetClientOrdersByIdResponse;
 export type MerchantOrderInput = S.PostClientOrdersBody;
 export type MerchantService = S.GetClientServicesResponse[number];
-export type MerchantServiceDetail = S.GetClientServicesByIdResponse;
+export type MerchantServiceDetail = WithOpenFieldTypes<S.GetClientServicesByIdResponse>;
 export type MerchantWallet = S.GetClientWalletResponse;
 export type StatementLine = S.GetClientWalletStatementResponse[number];
 export type PaymentMethod = S.GetClientPaymentMethodsResponse[number];

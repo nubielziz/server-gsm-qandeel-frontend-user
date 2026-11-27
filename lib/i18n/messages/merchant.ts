@@ -2,6 +2,8 @@
 // Server Components import it; Client Components receive the strings they need as props.
 // Status labels, service types, pagination and generic actions come from `common`; error texts from `errors`.
 
+import { fieldTypes } from "./field-types";
+
 export const merchant = {
   shared: {
     exportCsv: "Export CSV",
@@ -96,6 +98,8 @@ export const merchant = {
     imeiHint: "15 digits. Spaces and dashes are removed.",
     imeiOk: "This IMEI is valid.",
     imeiBad: "This is not a valid IMEI: it needs 15 digits and a correct check digit.",
+    /** The hint of each checked field type (decision 009) and the live count of a list of IMEIs. */
+    types: fieldTypes,
     quantity: "Quantity",
     selectPlaceholder: "Select…",
     file: "Input file",

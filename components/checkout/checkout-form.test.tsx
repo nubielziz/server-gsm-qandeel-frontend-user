@@ -177,3 +177,85 @@ describe("CheckoutForm: every field is drawn by its own type, whatever the type 
     expect(empty).not.toContain("Enter details");
   });
 });
+
+// ── The ten checked types of decision 009: each is drawn by the shared table with its own control, keyboard hints and hint line.
+describe("CheckoutForm: the ten checked field types are drawn by their own control (decision 009)", () => {
+  const typed = (fieldType: string, over: Partial<Field> = {}): Field => ({
+    key: "code_box",
+    label: "Device code",
+    fieldType,
+    options: [],
+    required: true,
+    isMainInput: false,
+    ...over,
+  });
+  const hints = checkout.start.drawer.types.hints;
+
+  it("draws every one of the ten with its label, its hint under the box and a name of the field's own key", () => {
+    for (const type of ["imei_bulk", "imeisv", "serial", "iccid", "eid", "meid", "ecid", "mac_address", "mi_lock_code", "box_sn"] as const) {
+      const html = render(null, [typed(type)]);
+      expect(html, type).toContain("Device code");
+      expect(html, type).toContain(hints[type]);
+      expect(html, type).toMatch(new RegExp(`<(input|textarea)[^>]*name="code_box"`));
+      expect(html, type).not.toContain(checkout.start.drawer.imeiHint);
+    }
+  });
+
+  it("draws the digit types as a one-line numeric box with no spell check, read left to right", () => {
+    const expected = { imeisv: 24, iccid: 32, eid: 48 } as const;
+    for (const [type, maxLength] of Object.entries(expected)) {
+      const box = inputOf(render(null, [typed(type)]), "code_box");
+      expect(box, type).toContain('inputMode="numeric"');
+      expect(box, type).toContain('autoCapitalize="off"');
+      expect(box, type).toContain('autoComplete="off"');
+      expect(box, type).toContain('spellCheck="false"');
+      expect(box, type).toContain('dir="ltr"');
+      expect(box, type).toContain(`maxLength="${maxLength}"`);
+      expect(box, type).not.toContain('type="number"');
+    }
+  });
+
+  it("starts the keyboard in capitals for the codes that are stored in capitals, and not for the Mi lock code", () => {
+    for (const type of ["serial", "meid", "ecid", "mac_address", "box_sn"]) {
+      const box = inputOf(render(null, [typed(type)]), "code_box");
+      expect(box, type).toContain('autoCapitalize="characters"');
+      expect(box, type).toContain('inputMode="text"');
+      expect(box, type).toContain('spellCheck="false"');
+    }
+    expect(inputOf(render(null, [typed("mi_lock_code")]), "code_box")).toContain('autoCapitalize="off"');
+  });
+
+  it("draws a list of IMEIs as a text area of six rows with the hint 'One IMEI per line, up to 30.'", () => {
+    const html = render(null, [typed("imei_bulk")]);
+    const area = /<textarea[^>]*name="code_box"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(area).toContain('rows="6"');
+    expect(area).toContain('dir="ltr"');
+    expect(area).toContain('spellCheck="false"');
+    expect(area).toContain('maxLength="1000"');
+    expect(inputOf(html, "code_box")).toBe("");
+    expect(html).toContain("One IMEI per line, up to 30.");
+    // One order at one price: the list adds no quantity control.
+    expect(html).not.toContain('name="quantity"');
+  });
+
+  it("follows the field's own Required tick", () => {
+    const optional = render(null, [typed("serial", { required: false })]);
+    expect(optional).toContain(checkout.start.drawer.optional);
+    expect(render(null, [typed("serial")])).not.toContain(checkout.start.drawer.optional);
+  });
+
+  it("draws the field flagged isMainInput by its own type: a serial number box is not an IMEI box", () => {
+    const html = render(null, [typed("serial", { isMainInput: true })]);
+    expect(inputOf(html, "code_box")).toContain('autoCapitalize="characters"');
+    expect(html).not.toContain(checkout.start.drawer.imeiHint);
+  });
+
+  it("draws a type this code does not know as a plain text field, as decision 008 says", () => {
+    const html = render(null, [typed("future_type")]);
+    const box = inputOf(html, "code_box");
+    expect(box).not.toContain("inputMode");
+    expect(box).not.toContain("autoCapitalize");
+    expect(html).toContain("Device code");
+    for (const hint of Object.values(hints)) expect(html).not.toContain(hint);
+  });
+});

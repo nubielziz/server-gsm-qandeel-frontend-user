@@ -222,3 +222,23 @@ describe("checkout: the message for a merchant rank whose payment the API refuse
     expect(text).not.toMatch(/payment method|choose|pay another way/i);
   });
 });
+
+describe("checkout: the masked line of the main input", () => {
+  it("lets the line of a list of IMEIs wrap on a phone (backend decision 076: the first IMEI masked and the count of the others)", () => {
+    const html = renderToStaticMarkup(
+      <ErrorTextProvider messages={errors}>
+        <SessionView
+          session={{ ...session([]), imei: "•••••••••••0861 +2 more" }}
+          labels={checkout.session}
+          quantityLabels={common.quantity}
+          typeLabel="IMEI"
+          decimals={2}
+          restartHref={null}
+          countryName="United States"
+          balance={{ signedIn: false, wallet: null }}
+        />
+      </ErrorTextProvider>,
+    );
+    expect(html).toContain('<span class="num wrap-anywhere" dir="ltr">•••••••••••0861 +2 more</span>');
+  });
+});

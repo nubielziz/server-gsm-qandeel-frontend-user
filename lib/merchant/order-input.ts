@@ -1,9 +1,13 @@
 // Pure helpers for the order form (handoff §4.5): checking custom fields (each by its own type and Required tick, a field of
-// type `imei` included, decision 008), building the request body and mapping the API's field errors back onto the form.
+// type `imei` included, decision 008, and the ten checked types of decision 009), building the request body and mapping the API's
+// field errors back onto the form.
 // No React, no I/O: unit-tested.
 import { isValidImei, normalizeImei } from "@/lib/format";
 import type { MerchantOrderInput, MerchantServiceDetail } from "@/lib/api/types";
 import type { FieldError } from "@/lib/api/errors";
+import { isTypedFieldType, typedProblem, typedRead, typedSent, type TypedCode } from "@/lib/checkout/field-types";
+import { fmt } from "@/lib/i18n/define";
+import type { ErrorText } from "@/lib/i18n/error-text-core";
 import { fromMerchantRule, isAllowedQuantity, parseQuantityInput, quantityMode } from "@/lib/quantity";
 import { sitePath } from "@/lib/site-path";
 
@@ -14,7 +18,11 @@ export type ServiceField = MerchantServiceDetail["fields"][number];
 
 // ── Custom fields ──────────────────────────────────────────────────────────────────────────────────────────
 
-export type FieldProblem = "required" | "pattern" | "number" | "tooLong" | "option" | "invalid_imei";
+/** What is wrong with a value: the form's own words, or (a checked type) the code the server would answer with. */
+export type FieldProblem = "required" | "pattern" | "number" | "tooLong" | "option" | "invalid_imei" | TypedCode;
+
+/** A problem and, for a list of IMEIs, the line it is on (counted from 1). */
+export type FieldIssue = { problem: FieldProblem; line?: number };
 
 /** A `new RegExp` that never throws: an invalid pattern from the catalog is ignored (the server still checks). */
 export function safeRegExp(pattern: string): RegExp | null {
@@ -29,34 +37,71 @@ export function safeRegExp(pattern: string): RegExp | null {
 /**
  * Checks one custom field the way the API does, by the field's own type and Required tick: required, number, select option,
  * regex, 500 characters. A field of type `imei` is read as digits (spaces and dashes removed): empty follows its Required
- * tick, else it must be 15 digits with a valid check digit (`invalid_imei`) and fit the field's own pattern.
+ * tick, else it must be 15 digits with a valid check digit (`invalid_imei`) and fit the field's own pattern. A field of one of the ten
+ * checked types (lib/checkout/field-types.ts) is read into the server's stored form, judged by the type's rule with the server's code
+ * (the first problem only, and the line of a list) and then matched by the field's own pattern.
  */
-export function checkField(field: ServiceField, value: string): FieldProblem | null {
+export function checkFieldIssue(field: ServiceField, value: string): FieldIssue | null {
   if (field.fieldType === "imei") {
     const imei = normalizeImei(value);
-    if (imei === "") return field.required ? "required" : null;
-    if (!isValidImei(imei)) return "invalid_imei";
+    if (imei === "") return field.required ? { problem: "required" } : null;
+    if (!isValidImei(imei)) return { problem: "invalid_imei" };
     const imeiPattern = safeRegExp(field.regex);
-    return imeiPattern && !imeiPattern.test(imei) ? "pattern" : null;
+    return imeiPattern && !imeiPattern.test(imei) ? { problem: "pattern" } : null;
+  }
+  if (isTypedFieldType(field.fieldType)) {
+    if (value.trim() === "") return field.required ? { problem: "required" } : null;
+    const found = typedProblem(field.fieldType, value);
+    if (found) return { problem: found.code, line: found.line };
+    const typedPattern = safeRegExp(field.regex);
+    return typedPattern && !typedPattern.test(typedRead(field.fieldType, value)) ? { problem: "pattern" } : null;
   }
   const text = value.trim();
-  if (text === "") return field.required ? "required" : null;
-  if (text.length > MAX_FIELD_VALUE) return "tooLong";
-  if (field.fieldType === "number" && !/^-?\d+(\.\d+)?$/.test(text)) return "number";
-  if (field.fieldType === "select" && field.options.length > 0 && !field.options.includes(text)) return "option";
+  if (text === "") return field.required ? { problem: "required" } : null;
+  if (text.length > MAX_FIELD_VALUE) return { problem: "tooLong" };
+  if (field.fieldType === "number" && !/^-?\d+(\.\d+)?$/.test(text)) return { problem: "number" };
+  if (field.fieldType === "select" && field.options.length > 0 && !field.options.includes(text)) return { problem: "option" };
   const re = safeRegExp(field.regex);
-  if (re && !re.test(text)) return "pattern";
+  if (re && !re.test(text)) return { problem: "pattern" };
   return null;
+}
+
+/** The problem of one field without its line (see `checkFieldIssue`); null when the field is fine. */
+export function checkField(field: ServiceField, value: string): FieldProblem | null {
+  return checkFieldIssue(field, value)?.problem ?? null;
+}
+
+/** The form's own sentences for its problems (`merchant.form`). */
+export type ProblemLabels = {
+  imeiBad: string;
+  problems: { required: string; number: string; pattern: string; tooLong: string; option: string };
+};
+
+/**
+ * The sentence shown under a field for a problem: the form's own words for the problems it names, the API's sentence of the same code
+ * (lib/i18n/messages/errors.ts) for a checked type, with the line for a list of IMEIs. `{max}` of "too long" is `MAX_FIELD_VALUE`.
+ */
+export function problemMessage(issue: FieldIssue, labels: ProblemLabels, errors: Pick<ErrorText, "field" | "line">): string {
+  const { problem, line } = issue;
+  if (line !== undefined) {
+    const lineText = errors.line(problem, line);
+    if (lineText !== undefined) return lineText;
+  }
+  if (problem === "invalid_imei") return labels.imeiBad;
+  if (Object.hasOwn(labels.problems, problem)) return fmt(labels.problems[problem as keyof ProblemLabels["problems"]], { max: MAX_FIELD_VALUE });
+  return errors.field({ field: "", code: problem, message: "" }) ?? "";
 }
 
 /**
  * `inputs` for the request: only fields with a value, trimmed. The value of a field of type `imei` goes out as digits
- * only, the way the API reads an IMEI; a field that holds nothing (an IMEI box with only dashes, say) is left out.
+ * only, the way the API reads an IMEI; a field of a checked type goes out as typed, trimmed, with Latin digits (a list of IMEIs as
+ * one IMEI per line, see `typedSent`); a field that holds nothing (an IMEI box with only dashes, say) is left out.
  */
 export function buildInputs(fields: ServiceField[], values: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const f of fields) {
-    const v = f.fieldType === "imei" ? normalizeImei(values[f.key] ?? "") : (values[f.key] ?? "").trim();
+    const typed = values[f.key] ?? "";
+    const v = f.fieldType === "imei" ? normalizeImei(typed) : isTypedFieldType(f.fieldType) ? typedSent(f.fieldType, typed) : typed.trim();
     if (v !== "") out[f.key] = v;
   }
   return out;

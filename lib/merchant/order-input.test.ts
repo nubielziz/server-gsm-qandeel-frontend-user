@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createIdempotencyKeys } from "@/lib/api/idempotency";
+import { errorText } from "@/lib/i18n/error-text-core";
+import { errors } from "@/lib/i18n/messages/errors";
+import { merchant } from "@/lib/i18n/messages/merchant";
 import {
   buildInputs,
   checkField,
+  checkFieldIssue,
   defaultQuantityOf,
   hasFieldErrors,
   inProgressWaitMs,
@@ -11,6 +15,7 @@ import {
   orderSignature,
   parseQuantity,
   placedHref,
+  problemMessage,
   quantityRule,
   safeRegExp,
   type ServiceField,
@@ -282,5 +287,105 @@ describe("where the order form leads", () => {
 
   it("after an order the form links to that order's page in the account area", () => {
     expect(placedHref({ id: 42 }, orderFormHrefs())).toBe("/en/account/orders/42");
+  });
+});
+
+// ── The ten checked types of decision 009 (the rules themselves are tested in lib/checkout/field-types.test.ts).
+describe("checkField on a field of a checked type", () => {
+  const typed = (fieldType: string, over: Partial<ServiceField> = {}) => field({ key: "code", label: "Code", fieldType, required: true, ...over });
+
+  it("follows the field's Required tick when it is empty", () => {
+    for (const fieldType of ["imei_bulk", "imeisv", "serial", "iccid", "eid", "meid", "ecid", "mac_address", "mi_lock_code", "box_sn"]) {
+      expect(checkField(typed(fieldType), "  "), fieldType).toBe("required");
+      expect(checkField(typed(fieldType, { required: false }), ""), fieldType).toBeNull();
+    }
+  });
+
+  it("refuses a bad value with the server's code and accepts a good one, optional or not", () => {
+    expect(checkField(typed("imeisv"), "35693803564380")).toBe("invalid_imeisv");
+    expect(checkField(typed("imeisv", { required: false }), "35693803564380")).toBe("invalid_imeisv");
+    expect(checkField(typed("imeisv"), "3569 3803-5643 8091")).toBeNull();
+    expect(checkField(typed("serial"), "AB")).toBe("invalid_serial");
+    expect(checkField(typed("serial"), "f2lxk1abcd")).toBeNull();
+    expect(checkField(typed("iccid"), "8901")).toBe("invalid_iccid");
+    expect(checkField(typed("eid"), "123")).toBe("invalid_eid");
+    expect(checkField(typed("meid"), "123")).toBe("invalid_meid");
+    expect(checkField(typed("ecid"), "123")).toBe("invalid_ecid");
+    expect(checkField(typed("mac_address"), "aa:bb:cc")).toBe("invalid_mac_address");
+    expect(checkField(typed("mac_address"), "aabb.ccdd.eeff")).toBeNull();
+    expect(checkField(typed("mi_lock_code"), "abc")).toBe("invalid_mi_lock_code");
+    expect(checkField(typed("box_sn"), "x")).toBe("invalid_box_sn");
+  });
+
+  it("judges a list of IMEIs by its first problem and names the line", () => {
+    const list = typed("imei_bulk");
+    expect(checkFieldIssue(list, "490154203237518\n356938035643809")).toBeNull();
+    expect(checkFieldIssue(list, "490154203237518\n123")).toEqual({ problem: "invalid_imei", line: 2 });
+    expect(checkFieldIssue(list, "490154203237518, 4901-5420-3237-518")).toEqual({ problem: "duplicate_imei", line: 2 });
+    expect(checkFieldIssue(list, "1;".repeat(31))).toEqual({ problem: "too_many_imeis" });
+    expect(checkField(list, "123")).toBe("invalid_imei");
+  });
+
+  it("matches the field's own pattern against the stored form, after the type's rule", () => {
+    const mac = typed("mac_address", { regex: "^00:1A:" });
+    expect(checkField(mac, "001a2b3c4d5e")).toBeNull();
+    expect(checkField(mac, "aabbccddeeff")).toBe("pattern");
+    expect(checkField(mac, "nope")).toBe("invalid_mac_address");
+    expect(checkField(typed("serial", { regex: "([" }), "ABCDE")).toBeNull();
+  });
+
+  it("a type this code does not know is checked like a plain text field", () => {
+    expect(checkField(typed("future_type"), "anything")).toBeNull();
+    expect(checkField(typed("future_type"), " ")).toBe("required");
+  });
+});
+
+describe("buildInputs with a field of a checked type", () => {
+  const fields = [field({ key: "serial", fieldType: "serial" }), field({ key: "list", fieldType: "imei_bulk" }), field({ key: "sv", fieldType: "imeisv" })];
+
+  it("sends what was typed, trimmed; a list in its stored form, one IMEI per line", () => {
+    expect(buildInputs(fields, { serial: " f2lxk 1abcd ", list: " 490154203237518 , 356938035643809;\n", sv: " 3569 3803 5643 8091" })).toEqual({
+      serial: "f2lxk 1abcd",
+      list: "490154203237518\n356938035643809",
+      sv: "3569 3803 5643 8091",
+    });
+  });
+
+  it("leaves out a field that holds nothing", () => {
+    expect(buildInputs(fields, { serial: "  ", list: "\n", sv: "" })).toEqual({});
+  });
+
+  it("reads Arabic-Indic digits as Latin ones", () => {
+    expect(buildInputs(fields, { sv: "٣٥٦٩٣٨٠٣٥٦٤٣٨٠٩١" })).toEqual({ sv: "3569380356438091" });
+  });
+});
+
+describe("problemMessage", () => {
+  const text = errorText(errors);
+  const say = (issue: Parameters<typeof problemMessage>[0]) => problemMessage(issue, merchant.form, text);
+
+  it("keeps the form's own words for its own problems", () => {
+    expect(say({ problem: "required" })).toBe(merchant.form.problems.required);
+    expect(say({ problem: "number" })).toBe(merchant.form.problems.number);
+    expect(say({ problem: "tooLong" })).toBe("Use at most 500 characters.");
+    expect(say({ problem: "invalid_imei" })).toBe(merchant.form.imeiBad);
+  });
+
+  it("says the API's sentence of the same code for a checked type", () => {
+    expect(say({ problem: "invalid_imeisv" })).toBe("This IMEISV is not valid: it must be 16 digits.");
+    expect(say({ problem: "invalid_serial" })).toBe("This serial number is not valid: 5 to 30 letters and digits.");
+    expect(say({ problem: "invalid_iccid" })).toBe("This ICCID is not valid: 18 to 22 digits, starting with 89.");
+    expect(say({ problem: "invalid_eid" })).toBe("This EID is not valid: it must be 32 digits.");
+    expect(say({ problem: "invalid_meid" })).toBe("This MEID is not valid: 14 hexadecimal characters (0-9, A-F), or 18 digits.");
+    expect(say({ problem: "invalid_ecid" })).toBe("This ECID is not valid: 8 to 16 hexadecimal characters, or up to 20 digits.");
+    expect(say({ problem: "invalid_mac_address" })).toBe("This MAC address is not valid: 12 hexadecimal characters, like AA:BB:CC:DD:EE:FF.");
+    expect(say({ problem: "invalid_mi_lock_code" })).toBe("This Mi lock code is not valid: 6 to 64 letters, digits and dashes.");
+    expect(say({ problem: "invalid_box_sn" })).toBe("This box serial number is not valid: 4 to 32 letters, digits and dashes.");
+    expect(say({ problem: "too_many_imeis" })).toBe("Enter at most 30 IMEIs.");
+  });
+
+  it("names the line for a list of IMEIs", () => {
+    expect(say({ problem: "invalid_imei", line: 4 })).toBe("Line 4 is not a valid IMEI: each line must be 15 digits with a correct check digit.");
+    expect(say({ problem: "duplicate_imei", line: 2 })).toBe("Line 2 repeats an IMEI of this list.");
   });
 });

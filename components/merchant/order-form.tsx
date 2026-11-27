@@ -1,10 +1,13 @@
 "use client";
 // The order form of a service (handoff §4.5). One form for the four service types, drawn from what the service lists
 // (decision 007: no built-in box, no bulk list; one request is one order):
-//  - custom fields (text / number / select / textarea / imei) with the catalog's regex, exactly as the API sends them. Every
-//    field is drawn and checked by its own type and Required tick, whatever the type of the service (decision 008). A field of
-//    type `imei` is a numeric box with a live "valid / not valid" hint, checked with the check digit, and sent as digits
-//    only under `inputs[<its key>]`. A service with no fields asks nothing (a file service asks for its file);
+//  - custom fields (text / number / select / textarea / imei, and the ten checked types of decision 009) with the catalog's regex,
+//    exactly as the API sends them. Every field is drawn and checked by its own type and Required tick, whatever the type of the
+//    service (decision 008). A field of type `imei` is a numeric box with a live "valid / not valid" hint, checked with the check
+//    digit, and sent as digits only under `inputs[<its key>]`. A field of a checked type (a list of IMEIs, an IMEISV, a serial, an
+//    ICCID, an EID, a MEID, an ECID, a MAC address, a Mi lock code, a box serial number) is drawn by components/forms/typed-field.tsx
+//    and judged by lib/checkout/field-types.ts with the server's rules and sentences. A service with no fields asks nothing (a file
+//    service asks for its file);
 //  - quantity (lib/quantity.ts decides): a select for two or more packs, a number box for a range, nothing for one
 //    pack, an exact N or one per order; the rule and its refusals are worded by `quantityRuleText` and
 //    `invalidQuantityText`, for the local check and for a server `invalid_quantity` alike;
@@ -23,7 +26,9 @@ import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { MerchantOrder, MerchantOrderInput, MerchantServiceDetail, UploadedFile } from "@/lib/api/types";
 import { compareMoney, formatMoney, formatNumber, isValidImei, normalizeImei, subtractMoney } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
+import { isTypedFieldType } from "@/lib/checkout/field-types";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { errorLine } from "@/lib/i18n/error-text-core";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
 import type { MerchantMessages } from "@/lib/i18n/messages/merchant";
 import { ltr } from "@/lib/merchant/format";
@@ -33,7 +38,7 @@ import {
   MAX_FIELD_VALUE,
   MAX_IN_PROGRESS_RETRIES,
   buildInputs,
-  checkField,
+  checkFieldIssue,
   defaultQuantityOf,
   hasFieldErrors,
   inProgressWaitMs,
@@ -41,14 +46,15 @@ import {
   orderSignature,
   parseQuantity,
   placedHref,
+  problemMessage,
   quantityRule,
-  type FieldProblem,
   type OrderFieldErrors,
   type OrderFormHrefs,
   type ServiceField,
 } from "@/lib/merchant/order-input";
 import { fromMerchantRule, invalidQuantityText, quantityRuleText } from "@/lib/quantity";
 import { FileUpload } from "@/components/forms/file-upload";
+import { TypedField } from "@/components/forms/typed-field";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -161,17 +167,11 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
     file: fileRequired && !file ? f.fileRequired : undefined,
     inputs: Object.fromEntries(
       fields.flatMap((field) => {
-        const problem = checkField(field, values[field.key] ?? "");
-        return problem ? [[field.key, problemText(problem)]] : [];
+        const issue = checkFieldIssue(field, values[field.key] ?? "");
+        return issue ? [[field.key, problemMessage(issue, f, errorText)]] : [];
       }),
     ) as Record<string, string>,
   };
-
-  /** The words for a problem of a field; a field of type `imei` has its own for a number that fails the check digit. */
-  function problemText(problem: FieldProblem): string {
-    if (problem === "invalid_imei") return f.imeiBad;
-    return fmt(f.problems[problem], { max: MAX_FIELD_VALUE });
-  }
 
   /** What to say about a refused quantity: the pack list or the range, from the rule the page holds now. */
   function quantityProblem(): string {
@@ -289,9 +289,12 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
     }
   }
 
-  /** The API names an invalid IMEI `invalid_imei` on the field (the whole error is `INVALID_IMEI`): say it as the form does. */
+  /**
+   * The API names an invalid IMEI `invalid_imei` on the field (the whole error is `INVALID_IMEI`): say it as the form does. A line of a
+   * list of IMEIs has the same code and a message that names the line ("Line 3 ..."): that one is worded with its line.
+   */
   function fieldText(fe: FieldError): string {
-    return fe.code.toLowerCase() === "invalid_imei" ? f.imeiBad : (errorText.field(fe) ?? "");
+    return fe.code.toLowerCase() === "invalid_imei" && errorLine(fe) === null ? f.imeiBad : (errorText.field(fe) ?? "");
   }
 
   function handleError(error: unknown) {
@@ -389,6 +392,24 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
             )
           }
           onChange={(e) => set(e.target.value)}
+        />
+      );
+    }
+    if (isTypedFieldType(field.fieldType)) {
+      // One of the ten checked types (decision 009): its own control, hint and keyboard, in lib/checkout/field-types.ts.
+      return (
+        <TypedField
+          key={field.key}
+          type={field.fieldType}
+          labels={f.types}
+          id={common.id}
+          name={common.name}
+          label={field.label}
+          required={field.required}
+          optionalLabel={optional}
+          value={common.value}
+          error={common.error}
+          onChange={set}
         />
       );
     }

@@ -133,3 +133,79 @@ describe("OrderForm: every field is drawn by its own type (decision 008)", () =>
     }
   });
 });
+
+// ── The ten checked types of decision 009: each is drawn by the shared table with its own control, keyboard hints and hint line.
+describe("OrderForm: the ten checked field types are drawn by their own control (decision 009)", () => {
+  const typed = (fieldType: string, over: Partial<Field> = {}): Field => ({
+    key: "code_box",
+    label: "Device code",
+    fieldType,
+    required: true,
+    isMainInput: false,
+    options: [],
+    regex: "",
+    ...over,
+  });
+  const hints = merchant.form.types.hints;
+
+  it("draws every one of the ten with its label, its hint under the box and the field's own name", () => {
+    for (const type of ["imei_bulk", "imeisv", "serial", "iccid", "eid", "meid", "ecid", "mac_address", "mi_lock_code", "box_sn"] as const) {
+      const html = render({ fields: [typed(type)] });
+      expect(html, type).toContain("Device code");
+      expect(html, type).toContain(hints[type]);
+      expect(html, type).toMatch(new RegExp(`<(input|textarea)[^>]*name="inputs.code_box"`));
+      expect(html, type).not.toContain(merchant.form.imeiHint);
+    }
+  });
+
+  it("draws the digit types as a one-line numeric box with no spell check, read left to right", () => {
+    const expected = { imeisv: 24, iccid: 32, eid: 48 } as const;
+    for (const [type, maxLength] of Object.entries(expected)) {
+      const box = inputOf(render({ fields: [typed(type)] }), "inputs.code_box");
+      expect(box, type).toContain('inputMode="numeric"');
+      expect(box, type).toContain('autoCapitalize="off"');
+      expect(box, type).toContain('autoComplete="off"');
+      expect(box, type).toContain('spellCheck="false"');
+      expect(box, type).toContain('dir="ltr"');
+      expect(box, type).toContain(`maxLength="${maxLength}"`);
+      expect(box, type).toContain("required");
+    }
+  });
+
+  it("starts the keyboard in capitals for the codes that are stored in capitals, and not for the Mi lock code", () => {
+    for (const type of ["serial", "meid", "ecid", "mac_address", "box_sn"]) {
+      expect(inputOf(render({ fields: [typed(type)] }), "inputs.code_box"), type).toContain('autoCapitalize="characters"');
+    }
+    expect(inputOf(render({ fields: [typed("mi_lock_code")] }), "inputs.code_box")).toContain('autoCapitalize="off"');
+  });
+
+  it("draws a list of IMEIs as a text area of six rows with the hint 'One IMEI per line, up to 30.', and no other quantity", () => {
+    const html = render({ fields: [typed("imei_bulk")] });
+    const area = /<textarea[^>]*name="inputs.code_box"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(area).toContain('rows="6"');
+    expect(area).toContain('dir="ltr"');
+    expect(area).toContain('spellCheck="false"');
+    expect(area).toContain('maxLength="1000"');
+    expect(area).toContain("required");
+    expect(inputOf(html, "inputs.code_box")).toBe("");
+    expect(html).toContain("One IMEI per line, up to 30.");
+    // One order at one price: no quantity control, no per-IMEI orders.
+    expect(html).not.toContain('name="quantity"');
+    expect(html).not.toContain('name="imeis"');
+  });
+
+  it("follows the field's own Required tick", () => {
+    const optional = render({ fields: [typed("box_sn", { required: false })] });
+    expect(inputOf(optional, "inputs.code_box")).not.toContain("required");
+    expect(optional).toContain(merchant.form.optional);
+  });
+
+  it("draws a type this code does not know as a plain text field, as decision 008 says", () => {
+    const html = render({ fields: [typed("future_type")] });
+    const box = inputOf(html, "inputs.code_box");
+    expect(box).not.toContain("inputMode");
+    expect(box).not.toContain("autoCapitalize");
+    expect(html).toContain("Device code");
+    for (const hint of Object.values(hints)) expect(html).not.toContain(hint);
+  });
+});

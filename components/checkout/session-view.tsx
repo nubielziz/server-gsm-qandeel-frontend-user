@@ -422,7 +422,8 @@ export function SessionView({
               </DescriptionItem>
               {session.imei ? (
                 <DescriptionItem label={labels.order.imei}>
-                  <span className="num" dir="ltr">
+                  {/* A list of IMEIs reads "•••••••••••0861 +2 more" (backend decision 076); `wrap-anywhere` lets the line wrap on a phone. */}
+                  <span className="num wrap-anywhere" dir="ltr">
                     {session.imei}
                   </span>
                 </DescriptionItem>

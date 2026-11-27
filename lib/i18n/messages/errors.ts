@@ -64,6 +64,18 @@ export const errors = {
     WEAK_PASSWORD:
       "Use 10–128 characters, at least 5 different ones, no common words, sequences, or parts of your name or email.",
     INVALID_IMEI: "Enter a valid 15-digit IMEI (the last digit is a check digit).",
+    // The checked field types of backend decision 076 (shop decision 009): the API's sentences, by code.
+    too_many_imeis: "Enter at most 30 IMEIs.",
+    duplicate_imei: "An IMEI of this list appears more than once.",
+    invalid_imeisv: "This IMEISV is not valid: it must be 16 digits.",
+    invalid_serial: "This serial number is not valid: 5 to 30 letters and digits.",
+    invalid_iccid: "This ICCID is not valid: 18 to 22 digits, starting with 89.",
+    invalid_eid: "This EID is not valid: it must be 32 digits.",
+    invalid_meid: "This MEID is not valid: 14 hexadecimal characters (0-9, A-F), or 18 digits.",
+    invalid_ecid: "This ECID is not valid: 8 to 16 hexadecimal characters, or up to 20 digits.",
+    invalid_mac_address: "This MAC address is not valid: 12 hexadecimal characters, like AA:BB:CC:DD:EE:FF.",
+    invalid_mi_lock_code: "This Mi lock code is not valid: 6 to 64 letters, digits and dashes.",
+    invalid_box_sn: "This box serial number is not valid: 4 to 32 letters, digits and dashes.",
     not_available: "This service is not available right now.",
     not_orderable: "This service cannot be bought online.",
     not_offered: "This payment method is not available for this order.",
@@ -112,6 +124,14 @@ export const errors = {
     INVALID_PASSWORD: "The current password is not correct.",
     INVALID_CODE: "This code is not correct or has expired. Enter the current code from your app.",
     fallback: "Check this field.",
+  },
+  /**
+   * The errors of a list of IMEIs (a field of type `imei_bulk`) name the line: the API's message starts with "Line N", and the
+   * text of the code is then read from here (`{line}`). The same codes without a line (`fields` above) are the plain texts.
+   */
+  lines: {
+    invalid_imei: "Line {line} is not a valid IMEI: each line must be 15 digits with a correct check digit.",
+    duplicate_imei: "Line {line} repeats an IMEI of this list.",
   },
   requestId: "Reference: {id}",
   retryIn: "Try again in {seconds} s.",

@@ -105,9 +105,15 @@ export function compareMoney(a: string, b: string): -1 | 0 | 1 {
  * digits into 0-9: an Arabic keyboard types those, and the API only takes Latin digits (group C, decision 039).
  */
 export function normalizeImei(value: string): string {
-  return value
-    .replace(/[\s-]/g, "")
-    .replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (d) => String((d.charCodeAt(0) & 0xf) % 10));
+  return latinDigits(value.replace(/[\s-]/g, ""));
+}
+
+/**
+ * Turns Arabic-Indic (U+0660 to U+0669) and Persian (U+06F0 to U+06F9) digits into 0-9 and leaves everything else as it is: the API
+ * only takes Latin digits, and the checked field types (an IMEI, an IMEISV, an ICCID, a list of IMEIs, ...) are read after this.
+ */
+export function latinDigits(value: string): string {
+  return value.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (d) => String((d.charCodeAt(0) & 0xf) % 10));
 }
 
 /**

@@ -2,6 +2,8 @@
 // the abandoned-checkout resume page. Server Components import them and pass the pieces a Client Component needs as
 // props. API error texts live in ./errors.ts (by code); the ones below are checkout-specific.
 
+import { fieldTypes } from "./field-types";
+
 export const checkout = {
   meta: {
     start: "Secure checkout",
@@ -68,6 +70,8 @@ export const checkout = {
       description: "Provide the information we need to deliver this service.",
       imeiHint: "15 digits. Dial *#06# on the device to see it.",
       imeiPlaceholder: "Enter the 15-digit IMEI",
+      /** The hint of each checked field type (decision 009) and the live count of a list of IMEIs. */
+      types: fieldTypes,
       quantity: "Quantity",
       quantityHint: "{rule}. The total is shown in the order summary.",
       optional: "(optional)",

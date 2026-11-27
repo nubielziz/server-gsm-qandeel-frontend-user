@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareMoney, formatMoney, imeiProblem, isValidImei, maskImei, normalizeImei, subtractMoney, sumMoney } from "./index";
+import { compareMoney, formatMoney, imeiProblem, isValidImei, latinDigits, maskImei, normalizeImei, subtractMoney, sumMoney } from "./index";
 
 describe("money math on 4-decimal strings", () => {
   it("sums exactly where floats would drift", () => {
@@ -27,6 +27,15 @@ describe("formatMoney", () => {
   });
   it("falls back to plain text for an unknown currency code", () => {
     expect(formatMoney("5.0000", "NOT-A-CODE")).toBe("5.0000 NOT-A-CODE");
+  });
+});
+
+describe("latinDigits", () => {
+  it("turns Arabic-Indic and Persian digits into Latin ones and touches nothing else", () => {
+    expect(latinDigits("٠١٢٣٤٥٦٧٨٩")).toBe("0123456789");
+    expect(latinDigits("۰۱۲۳۴۵۶۷۸۹")).toBe("0123456789");
+    expect(latinDigits("aa:bb-٣٤ 56, 0x1F\n")).toBe("aa:bb-34 56, 0x1F\n");
+    expect(latinDigits("")).toBe("");
   });
 });
 
