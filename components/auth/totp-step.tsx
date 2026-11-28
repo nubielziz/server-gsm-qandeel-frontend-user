@@ -16,7 +16,12 @@ import { useMounted } from "@/lib/use-mounted";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
 
 export type TotpStepProps = {
-  t: Pick<AuthMessages, "fields" | "shared" | "signIn">;
+  /** The strings the step shows: the code box, its texts and "Back to sign in". */
+  t: {
+    fields: Pick<AuthMessages["fields"], "code">;
+    shared: Pick<AuthMessages["shared"], "backToSignIn">;
+    signIn: Pick<AuthMessages["signIn"], "totp">;
+  };
   /** The code was accepted: the account is signed in. */
   onDone: () => void | Promise<void>;
   /** The pending session ended: go back to the form with the "sign-in expired" sentence. */

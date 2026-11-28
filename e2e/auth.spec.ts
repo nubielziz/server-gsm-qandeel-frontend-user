@@ -7,6 +7,8 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { accountIdByEmail, createAccount, temporaryPassword } from "./admin";
 import {
+  chooseCountry,
+  countryField,
   ACCOUNTS,
   BASE_URL,
   DEV_TURNSTILE_TOKEN,
@@ -232,8 +234,7 @@ test.describe("email-link pages", () => {
     await page.locator('input[name="lastName"]').fill("Hamdan");
     await page.locator('input[name="email"]').fill(email);
     await page.locator('input[name="phone"]').fill("+1 202 555 0100");
-    await page.locator('select[name="country"]').selectOption({ index: 1 }); // the first country of the menu (index 0 is the prompt)
-    const country = await page.locator('select[name="country"]').inputValue();
+    const country = await chooseCountry(countryField(page)); // the first country of the list, whichever the demo shop offers
     await page.locator('input[name="password"]').fill(password);
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page.getByText(`a link is on its way to ${email}`)).toBeVisible();
@@ -266,8 +267,7 @@ test.describe("email-link pages", () => {
     await page.locator('input[name="lastName"]').fill("Hamdan");
     await page.locator('input[name="email"]').fill(email);
     await page.locator('input[name="phone"]').fill("+1 202 555 0100");
-    await page.locator('select[name="country"]').selectOption({ index: 1 });
-    const country = await page.locator('select[name="country"]').inputValue();
+    const country = await chooseCountry(countryField(page));
     await page.locator('input[name="password"]').fill(password);
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page.getByText(`a link is on its way to ${email}`)).toBeVisible();
@@ -520,7 +520,7 @@ test.describe("become a merchant page", () => {
 
     // The short form: five details, no password.
     for (const name of ["firstName", "lastName", "email", "phone"]) await expect(main.locator(`input[name="${name}"]`)).toBeVisible();
-    await expect(main.locator('select[name="country"]')).toBeVisible();
+    await expect(countryField(main)).toBeVisible();
     await expect(main.locator('input[type="password"]')).toHaveCount(0);
 
     const chat = main.getByRole("button", { name: "Chat on WhatsApp" });
@@ -538,9 +538,8 @@ test.describe("become a merchant page", () => {
     await main.locator('input[name="email"]').fill("sam@example.com");
     await main.locator('input[name="phone"]').fill("+1 202 555 0100");
     // The menu is the shop's tax-rate countries (every country when it has none): the first one, whichever the demo shop offers.
-    const country = main.locator('select[name="country"]');
-    await country.selectOption({ index: 1 });
-    const countryName = (await country.locator("option:checked").innerText()).trim();
+    await chooseCountry(countryField(main));
+    const countryName = ((await main.locator('select[name="country"] option:checked').textContent()) ?? "").trim();
     const [chatTab] = await Promise.all([page.context().waitForEvent("page"), chat.click()]);
     expect(chatTab.url()).toBe(waLink(messageWithDetails(countryName)));
 

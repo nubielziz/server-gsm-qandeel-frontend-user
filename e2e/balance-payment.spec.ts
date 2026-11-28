@@ -10,7 +10,7 @@ import { randomUUID } from "node:crypto";
 import type { APIRequestContext, Locator, Page, Request } from "@playwright/test";
 import { accountIdByEmail, creditAccount, freezeWallet } from "./admin";
 import { expect, test } from "./fixtures";
-import { DEV_TURNSTILE_TOKEN, freshAccount, imeiBox, imeiInputs, signIn, signUpByLink, stubTurnstile } from "./helpers";
+import { DEV_TURNSTILE_TOKEN, chooseCountry, countryField, freshAccount, imeiBox, imeiInputs, signIn, signUpByLink, stubTurnstile } from "./helpers";
 
 /** Service 1: an IMEI service sold at $3.99 net, one at a time. Its IMEI is its field of type `imei` (decisions 007 and 008). */
 const SLUG = "icloud-clean-lost-check";
@@ -194,7 +194,7 @@ test.describe("pay from the store balance", () => {
     await drawer.getByLabel((await imeiBox(page.request, SLUG)).label).fill(IMEI);
     await drawer.getByRole("button", { name: "Save details and continue" }).click();
     await expect(page.getByText("Details added")).toBeVisible();
-    await page.getByLabel("Country").selectOption("DE");
+    await chooseCountry(countryField(page), "DE");
     const created = page.waitForResponse((r) => r.url().endsWith("/store/v1/checkout-sessions") && r.request().method() === "POST");
     await page.getByRole("button", { name: "Continue to payment" }).click();
     const session = (await (await created).json()) as SessionBody;

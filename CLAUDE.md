@@ -87,6 +87,15 @@ Mailpit http://localhost:8025); the owner's API on :3000 and its data are never 
   `lib/wallet/*`, `components/wallet/*` and `components/account/wallet/*` (the store wallet of a retail rank and the merchant wallet,
   top-ups and invoices), the notification bell and pages (`components/notifications`). Wallet reads are `no-store` inside `<Suspense>`. Wording: say "In stock" or
   "On request" with the delivery line, never "Pre-order", "Out of stock" or a count (handoff §14).
+- **Country and phone fields (2026-11-28):** a country is asked with `CountrySelect` and a phone with `PhoneInput`
+  (`components/ui`; never a plain select or tel box): a searchable list with flags (`public/images/flags`, docs/LOGOS.md), the list
+  drawn only when its panel opens (`CountryList`, `useAnchoredPopover`). `CountrySelect` keeps a hidden native
+  `<select name>` for the value, the options and autofill; the button (`role="combobox"`) is what a person and a test use
+  (e2e: `countryField`, `chooseCountry`). Calling codes are data (`lib/phone/dial-data.ts`, read through `lib/phone/dial.ts`): the
+  site names a number's country and writes a code, it never judges a number, and a phone box that holds only a code is an empty phone.
+- **Sign-in panel (2026-11-28):** the shop header's "Sign in" opens `SignInPopover` (`components/auth`), which loads
+  `SignInSteps` (`sign-in-flow.tsx`, `embedded`) on the first opening; a finished sign-in closes it and refreshes the route.
+  Phones and the checkout header keep a plain link to the sign-in page, which draws the same steps (`SignInFlow`).
 - **e2e:** only against the isolated API (`:3100`); `e2e/admin.ts` (staff helpers) and `e2e/helpers.ts` (`signIn`, `signUpByLink`,
   `freshAccount` with a rank option; accounts are made through the admin API, never by a retired route); exclusive
   specs (for example `wallet-disabled`) run only with `E2E_EXCLUSIVE=1`. Next keeps the previous route hidden in the DOM

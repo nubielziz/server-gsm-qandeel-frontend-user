@@ -23,10 +23,14 @@ describe("the merchant application form", () => {
     </ErrorTextProvider>,
   );
 
-  it("asks for first name, last name, email, phone and country, all required, and for no password", () => {
-    for (const name of ["firstName", "lastName", "email", "phone", "country"]) {
+  it("asks for first name, last name, email, country and phone, all required, and for no password", () => {
+    for (const name of ["firstName", "lastName", "email", "phone"]) {
       expect(html, name).toMatch(new RegExp(`<(?:input|select)[^>]*required=""[^>]*name="${name}"`));
     }
+    // The country is a button that opens the list; the select beside it is hidden and carries the value.
+    expect(html).toMatch(/<button[^>]*role="combobox"[^>]*aria-required="true"/);
+    expect(html).toContain('<select name="country"');
+    expect(html.indexOf('name="country"')).toBeLessThan(html.indexOf('name="phone"'));
     expect(html).not.toContain('type="password"');
     expect(html).not.toContain('name="password"');
     expect(html).toContain('autoComplete="given-name"');

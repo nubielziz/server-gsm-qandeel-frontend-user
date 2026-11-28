@@ -11,7 +11,7 @@
 import { type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { checkout } from "../lib/i18n/messages/checkout";
 import { expect, test } from "./fixtures";
-import { DEV_TURNSTILE_TOKEN, fixtures, imeiBox, imeiInputs, stubTurnstile } from "./helpers";
+import { DEV_TURNSTILE_TOKEN, chooseCountry, countryField, fixtures, imeiBox, imeiInputs, stubTurnstile } from "./helpers";
 
 type Rule = { min: number; max: number; options: number[] };
 
@@ -109,7 +109,7 @@ async function saveDrawer(drawer: Locator) {
 async function fillBuyer(page: Page) {
   const t = checkout.start;
   await page.getByLabel(t.you.email).fill("e2e-qty-buyer@example.com");
-  await page.getByLabel(t.you.country).selectOption("DE");
+  await chooseCountry(countryField(page, t.you.country), "DE");
 }
 
 /** The value (dd) of the visible row whose label (dt) contains `label`. */

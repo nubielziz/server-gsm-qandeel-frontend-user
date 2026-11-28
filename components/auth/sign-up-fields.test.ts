@@ -14,6 +14,7 @@ import {
   finishBody,
   finishStart,
   isPhone,
+  phoneForCountry,
   serverFieldTexts,
   signUpBody,
   submitFinish,
@@ -113,9 +114,48 @@ describe("checkDetails: everything is required, and the server's shapes are chec
     expect(checkDetails({ ...good, phone: "call me" }, countries, t)).toEqual({ phone: t.phone });
   });
 
+  it("asks for the phone when the box holds only the calling code the country field wrote", () => {
+    for (const phone of ["+962 ", "+962", "+", "+1 242 "]) {
+      expect(checkDetails({ ...good, phone }, countries, t), phone).toEqual({ phone: t.required });
+    }
+    // One digit of a number makes it a number of the wrong shape, not a missing one.
+    expect(checkDetails({ ...good, phone: "+962 7" }, countries, t)).toEqual({ phone: t.phone });
+  });
+
   it("refuses a country the menu does not offer", () => {
     expect(checkDetails({ ...good, country: "FR" }, countries, t)).toEqual({ country: t.country });
     expect(checkDetails({ ...good, country: "jo" }, countries, t)).toEqual({ country: t.country });
+  });
+});
+
+describe("phoneForCountry: what choosing a country does to the phone box", () => {
+  it("writes the country's calling code into a box that holds no number yet", () => {
+    expect(phoneForCountry("", "JO")).toBe("+962 ");
+    expect(phoneForCountry("  ", "US")).toBe("+1 ");
+    expect(phoneForCountry("+", "JO")).toBe("+962 ");
+  });
+
+  it("replaces a calling code that no number follows (the person changed their mind about the country)", () => {
+    expect(phoneForCountry("+962 ", "GB")).toBe("+44 ");
+    expect(phoneForCountry("+1 242 ", "JO")).toBe("+962 ");
+  });
+
+  it("never touches a number, whatever its calling code, and says so with null", () => {
+    expect(phoneForCountry("+962 79 123 4567", "US")).toBeNull();
+    expect(phoneForCountry("0791234567", "JO")).toBeNull();
+    expect(phoneForCountry("+962 7", "US")).toBeNull();
+  });
+
+  it("gives null when there is nothing to change", () => {
+    expect(phoneForCountry("+962 ", "JO")).toBeNull();
+    // A country without a calling code writes nothing.
+    expect(phoneForCountry("", "AQ")).toBeNull();
+  });
+
+  it("gives a value the form reads as a missing number, and cleans to the bare code", () => {
+    const value = phoneForCountry("", "JO") ?? "";
+    expect(checkDetails({ ...good, phone: value }, countries, t)).toEqual({ phone: t.required });
+    expect(cleanPhone(value)).toBe("+962");
   });
 });
 

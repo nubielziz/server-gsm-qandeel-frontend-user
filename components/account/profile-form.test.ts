@@ -21,6 +21,12 @@ describe("changedStoreProfile: the body of PATCH /store/v1/me", () => {
     expect(changedStoreProfile({ ...saved, phone: "   " }, saved)).toEqual({ phone: "" });
   });
 
+  it("reads a phone box that holds only a calling code as an empty phone", () => {
+    // The list of the phone box wrote the code and no number followed: with no saved phone nothing is sent, with one it is cleared.
+    expect(changedStoreProfile({ ...saved, phone: "+962 " }, { ...saved, phone: "" })).toEqual({});
+    expect(changedStoreProfile({ ...saved, phone: "+1 242 " }, saved)).toEqual({ phone: "" });
+  });
+
   it("never sends an empty country: a saved country can be changed, not removed", () => {
     expect(changedStoreProfile({ ...saved, country: "" }, saved)).toEqual({});
   });

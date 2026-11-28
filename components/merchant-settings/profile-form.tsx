@@ -9,11 +9,14 @@ import { FAMILY_ROUTES } from "@/lib/account/routes";
 import type { AccountMe, MerchantProfileInput } from "@/lib/api/types";
 import type { MerchantSettingsMessages } from "@/lib/i18n/messages/merchant-settings";
 import { cn } from "@/lib/cn";
+import { isOnlyDialCode } from "@/lib/phone/dial";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardFooter, CardHeader } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
-import { Input, Select, Textarea, controlClasses } from "@/components/ui/input";
+import { CountrySelect } from "@/components/ui/country-select";
+import { Input, Textarea, controlClasses } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { toast } from "@/components/ui/toast";
 import { ProblemAlert, useFocusFirstInvalid, useFormProblem } from "./form-problem";
 
@@ -42,11 +45,14 @@ const FIELDS = ["name", "company", "phone", "country", "address", "taxId"];
 /** Free-text keys are compared and sent trimmed; the country is a code. */
 const TEXT_KEYS = ["name", "company", "phone", "address", "taxId"] as const;
 
-/** The keys that differ from what the server shows (the body of the PATCH): nothing else is ever sent. */
+/**
+ * The keys that differ from what the server shows (the body of the PATCH): nothing else is ever sent. A phone box that holds only
+ * a calling code (the list of the phone box wrote it and no number followed) is an empty phone.
+ */
 export function changedProfileFields(values: ProfileValues, initial: ProfileValues): MerchantProfileInput {
   const changed: MerchantProfileInput = {};
   for (const key of TEXT_KEYS) {
-    const now = values[key].trim();
+    const now = key === "phone" && isOnlyDialCode(values.phone) ? "" : values[key].trim();
     if (now !== initial[key].trim()) changed[key] = now;
   }
   if (values.country !== initial.country) changed.country = values.country;
@@ -133,28 +139,26 @@ export function ProfileForm({ countries, initial, email, emailVerified, t, field
               onChange={(e) => set("company")(e.target.value)}
               error={problem?.fields.company}
             />
-            <Input
+            <PhoneInput
               label={t.phone}
               optionalLabel={optional}
               name="phone"
-              type="tel"
-              autoComplete="tel"
               maxLength={40}
               value={values.phone}
-              onChange={(e) => set("phone")(e.target.value)}
+              onValueChange={set("phone")}
+              countryHint={values.country}
               error={problem?.fields.phone}
             />
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
-            <Select
+            <CountrySelect
               label={t.country}
               required
               name="country"
-              autoComplete="country"
               placeholder={t.countryPlaceholder}
-              options={countries.map((c) => ({ value: c.code, label: c.name }))}
+              countries={countries}
               value={values.country}
-              onChange={(e) => set("country")(e.target.value)}
+              onValueChange={set("country")}
               error={problem?.fields.country}
             />
             <Input

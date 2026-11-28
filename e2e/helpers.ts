@@ -2,8 +2,37 @@
 // session cookies land in the browser context exactly as after a real sign-in. There is one kind of account: a rank tells a
 // retail account from a merchant (its own prices in the shop, wallet invoices, API); the helpers take the rank as an option.
 import { readFileSync } from "node:fs";
-import { expect, request as playwrightRequest, type APIRequestContext, type Browser, type Page } from "@playwright/test";
+import { expect, request as playwrightRequest, type APIRequestContext, type Browser, type Locator, type Page } from "@playwright/test";
 import { FIXTURES_FILE, changeAccountEmail, createAccount, setAccountStatus, type E2eFixtures, type RankKind } from "./admin";
+
+/**
+ * The country field of a form: the button a person uses (a combobox named by the field's label). The `<select name="country">`
+ * next to it is hidden: it carries the field's value and options (read them from it), and nobody clicks it.
+ * @param name the field's label (default "Country")
+ */
+export function countryField(scope: Page | Locator, name = "Country"): Locator {
+  return scope.getByRole("combobox", { name, exact: true });
+}
+
+/**
+ * Chooses a country the way a person does: opens the field's list and takes the row of `code`, or the first row of the list when
+ * no code is given (whichever the demo shop offers first).
+ *
+ * @param field the country field (`countryField`)
+ * @param code an ISO 3166-1 alpha-2 code the list offers
+ * @returns the chosen code, read from the field's hidden select
+ */
+export async function chooseCountry(field: Locator, code?: string): Promise<string> {
+  // The button names its panel only once the page's script runs: a click before that would be lost.
+  await expect(field).toHaveAttribute("popovertarget", /.+/);
+  await field.click();
+  await expect(field).toHaveAttribute("aria-expanded", "true");
+  const listId = await field.getAttribute("aria-controls");
+  const list = field.page().locator(`[id="${listId}"]`);
+  await (code ? list.locator(`[id="${listId}-${code}"]`) : list.getByRole("option").first()).click();
+  await expect(field).toHaveAttribute("aria-expanded", "false");
+  return field.locator("xpath=following-sibling::select").inputValue();
+}
 
 /** Credentials of an account. */
 export interface Credentials {

@@ -698,3 +698,29 @@ the shop's tax-rate countries, else the full list. `lib/api/schema.gen.ts` regen
 twice by an Opus reviewer with the backend, final review by the lead. **Checks:** `gen:api:check`, typecheck, lint, the whole Vitest suite
 (1,994 tests). The e2e specs (`e2e/helpers.ts` `signUpByLink`, `auth.spec.ts`, `account.spec.ts`, `harness.spec.ts`) were rewritten for the
 new flow and NOT run. **Release:** together with the backend (the deployer was held until both had passed their checks).
+
+## Sign-in panel in the header; country and phone fields with search and flags (2026-11-28, owner's request)
+
+**Sign-in panel.** The shop header's "Sign in" button opens a panel under it (`components/auth/sign-in-popover.tsx`, a native popover
+placed by `components/ui/use-anchored-popover.ts`) with the email and password form, "Email me a sign-in link" and "Create an account"
+(the sign-up page). It draws the same steps as the sign-in page: `sign-in-flow.tsx` now has `SignInSteps` (the typed steps, no address
+read) and `SignInFlow` (the page: the steps plus the mailed link's landing and `?next=`). A finished sign-in closes the panel and
+refreshes the route, so the visitor stays on the page. The steps and Turnstile load on the first opening. On phones the header keeps its
+icon link to the sign-in page (a full page suits a small screen and its keyboard better than a panel), and so does the checkout header.
+
+**Country and phone fields.** The owner pointed at the shadcn country dropdown and phone input (`uixmat/shadcn-country-dropdown`). They
+were rebuilt on the site's own primitives instead of installed: that component needs cmdk, Radix, country-data-list, libphonenumber-js and
+react-circle-flags (which loads every flag from another site), and its styles are shadcn's, not this site's tokens. Same experience, no new
+dependency: `CountrySelect` (a button with the flag and the name, a panel with a search box and the list) and `PhoneInput` (the flag of the
+number's country follows what is typed; its list writes a calling code, search by name or by code), both on `CountryList`. Flags are the
+MIT "circle-flags" files in `public/images/flags` (docs/LOGOS.md); calling codes are a copy of libphonenumber's data
+(`lib/phone/dial-data.ts`). Used by sign-up, "finish your account", the merchant application (the country now comes before the phone and
+writes its calling code into an empty phone box), both profile forms and the checkout's country. The phone's value is still the string as
+typed and the server still judges it; a box that holds only a calling code counts as empty.
+
+**Checks:** typecheck, lint, the whole Vitest suite (2,052 tests), a production build, and in a real browser against the isolated API:
+`e2e/sign-in-panel.spec.ts` (new, 6/6), the sign-up, become-a-merchant, sign-in page, profile, checkout-opening and quantity specs on
+desktop and the sign-up ones on mobile. The demo database of the isolated API was behind the backend (`e2e/global-setup.ts` stops on its
+first step), so the suite was run with `E2E_SKIP_SETUP=1`; the tests that failed did so on data the setup would have made (the merchant
+demo password, offered currencies, a stocked service), not on this change. Two expectations of `customer-profile.spec.ts` that assumed a
+new account has no country were corrected (staff now give one).

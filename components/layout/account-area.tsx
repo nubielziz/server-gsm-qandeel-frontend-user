@@ -1,4 +1,6 @@
 // AccountArea: the signed-in state in the header: "Sign in" button, or the bell, the wallet pill and the account menu.
+// The shop header's "Sign in" button opens the sign-in panel under it (SignInPopover: password, email link, or the sign-up page);
+// on phones, and in the compact checkout header, it is a plain link to the sign-in page.
 // It reads the session cookies, so it must be rendered inside <Suspense fallback={<AccountAreaSkeleton />}>.
 // There is one account type: the menu is the same for every rank, with a row more or less (the wallet row of a retail rank
 // shows only while its store balance does). The rows come from
@@ -10,8 +12,11 @@ import { accountMenuItems, walletRowShows, type AccountMenuLink, type AccountMen
 import { capabilitiesOf } from "@/lib/account/capabilities";
 import { readAccountWallet } from "@/lib/account/wallet-read";
 import { getAccount } from "@/lib/api/session";
+import { auth } from "@/lib/i18n/messages/auth";
 import { common } from "@/lib/i18n/messages/common";
 import { sitePath } from "@/lib/site-path";
+import { SignInPopover } from "@/components/auth/sign-in-popover";
+import { signInStepsText } from "@/components/auth/sign-in-steps-text";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -86,9 +91,14 @@ export async function AccountAreaContent({ compact }: { compact?: boolean }) {
           <LogIn aria-hidden="true" className="size-5" />
         </Link>
         <span className="hidden sm:inline-flex">
-          <ButtonLink href={signIn} variant={compact ? "secondary" : "primary"} size="md">
-            {t.header.signIn}
-          </ButtonLink>
+          {compact ? (
+            <ButtonLink href={signIn} variant="secondary" size="md">
+              {t.header.signIn}
+            </ButtonLink>
+          ) : (
+            // The panel under the button. A checkout keeps the plain link: it has its own way to sign in, in its page.
+            <SignInPopover href={signIn} label={t.header.signIn} t={signInStepsText(auth)} />
+          )}
         </span>
       </>
     );

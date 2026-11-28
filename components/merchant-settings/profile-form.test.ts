@@ -21,6 +21,11 @@ describe("changedProfileFields: the body of PATCH /client/profile", () => {
     expect(changedProfileFields({ ...initial, country: "AE" }, initial)).toEqual({ country: "AE" });
   });
 
+  it("reads a phone box that holds only a calling code as an empty phone", () => {
+    expect(changedProfileFields({ ...initial, phone: "+962 " }, initial)).toEqual({});
+    expect(changedProfileFields({ ...initial, phone: "+" }, { ...initial, phone: "+962 79 555 0100" })).toEqual({ phone: "" });
+  });
+
   it("sends the new address and tax id, trimmed", () => {
     expect(changedProfileFields({ ...initial, address: "  12 Rainbow St\nAmman \n", taxId: " TX-4455 " }, initial)).toEqual({
       address: "12 Rainbow St\nAmman",

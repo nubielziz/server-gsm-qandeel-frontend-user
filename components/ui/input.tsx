@@ -7,13 +7,18 @@ import { Field, type FieldControlProps, type FieldMessages } from "./field";
 
 type Wiring = Partial<FieldControlProps>;
 
-/** Shared look of text-like controls: 44px, 10px radius, a 3:1 border, 16px text on phones (no iOS zoom). */
-export const controlClasses =
+/**
+ * The box of a control: 44px, 10px radius, a 3:1 border, 16px text on phones (no iOS zoom). For a control that is not a text
+ * box (the button of a country select): CSS calls every such element read-only, so it must not take the read-only look.
+ */
+export const controlBoxClasses =
   "w-full rounded-control border border-control bg-surface px-3.5 text-base text-ink md:text-body " +
   "placeholder:text-ink-subtle transition-colors duration-(--duration-fast) ease-standard " +
   "hover:border-ink-muted focus-visible:border-ink aria-invalid:border-danger aria-invalid:hover:border-danger " +
-  "disabled:cursor-not-allowed disabled:border-line-strong disabled:bg-surface-muted disabled:text-ink-subtle " +
-  "read-only:bg-surface-muted";
+  "disabled:cursor-not-allowed disabled:border-line-strong disabled:bg-surface-muted disabled:text-ink-subtle";
+
+/** Shared look of text-like controls: the box, and a muted background while read-only. */
+export const controlClasses = controlBoxClasses + " read-only:bg-surface-muted";
 
 export type InputProps = Omit<ComponentProps<"input">, "size"> &
   FieldMessages & {

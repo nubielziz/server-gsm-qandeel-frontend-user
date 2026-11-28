@@ -14,6 +14,12 @@ export type UiText = {
   copy: string;
   copied: string;
   menu: string;
+  /** The search box of a country list: its name and its placeholder. */
+  searchCountries: string;
+  /** What a country list says when the search finds nothing. */
+  noCountryFound: string;
+  /** The name of the button in a phone box that opens the list of calling codes. */
+  callingCode: string;
 };
 
 const defaults: UiText = {
@@ -27,6 +33,9 @@ const defaults: UiText = {
   copy: "Copy",
   copied: "Copied",
   menu: "Menu",
+  searchCountries: "Search countries",
+  noCountryFound: "No country found.",
+  callingCode: "Country calling code",
 };
 
 const UiTextContext = createContext<UiText>(defaults);

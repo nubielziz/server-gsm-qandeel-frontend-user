@@ -21,6 +21,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { TypedField } from "@/components/forms/typed-field";
 import { DialogClose, DialogTrigger, Drawer, closeDialog, openDialog } from "@/components/ui/dialog";
+import { CountrySelect } from "@/components/ui/country-select";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Money } from "@/components/ui/money";
 import { Turnstile } from "@/components/turnstile";
@@ -560,21 +561,20 @@ export function CheckoutForm({
                 autoComplete="email"
                 required
               />
-              <Select
+              <CountrySelect
                 name="country"
                 fieldClassName="content-start"
                 label={labels.you.country}
                 hint={labels.you.countryHint}
                 error={errors.country}
                 value={country}
-                onChange={(event) => {
-                  setCountry(event.target.value);
+                onValueChange={(code) => {
+                  setCountry(code);
                   setRegion("");
                   clearError("country");
                 }}
                 placeholder={labels.you.countryPlaceholder}
-                options={countries.map((c) => ({ value: c.code, label: c.name }))}
-                autoComplete="country"
+                countries={countries}
                 required
               />
               {regionChoices.length > 0 ? (

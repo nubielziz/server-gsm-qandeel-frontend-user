@@ -193,3 +193,17 @@ smaller below 640 px, so a signed-in header still fits a phone, and the name hid
 picture, the script and the full lock-ups (mark, name and tagline in one picture) are kept outside the repository
 (`/home/saifi/gsm-project/.brand/`). To replace the logo, replace these files; a logo of another shape also needs the boxes
 (`MARK_BOX`, `WORDMARK_BOX`) in `components/layout/logo.tsx`, in whole pixels.
+
+## Country flags (250)
+
+The country field and the phone box of the forms (`components/ui/country-select.tsx`, `components/ui/phone-input.tsx`) show a
+round flag before a country's name and inside the phone box. The flags are files, never drawn:
+`public/images/flags/<iso code>.svg` (lower case, `jo.svg`), one for every country of `lib/countries.ts`
+(`lib/phone/dial.test.ts` fails when a country has no file).
+
+| Files | Source | Terms |
+|---|---|---|
+| `flags/*.svg` (250) | "circle-flags" by HatScripts, the `flags/` folder of its `gh-pages` branch (`https://github.com/HatScripts/circle-flags`), copied 2026-11-28 | MIT, © HatScripts |
+
+They are shown by `components/ui/flag.tsx` as they are (vector files: the image optimizer is skipped); a code without a file
+shows a globe icon. To add a country, add its code to `lib/countries.ts` and copy its file from the same set.

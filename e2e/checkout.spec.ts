@@ -7,7 +7,7 @@
 // Playwright route mocks at the browser boundary.
 import { expect, test } from "./fixtures";
 import { type APIRequestContext, type Page } from "@playwright/test";
-import { ACCOUNTS, freshAccount, imeiBox, imeiInputs, signIn } from "./helpers";
+import { ACCOUNTS, chooseCountry, countryField, freshAccount, imeiBox, imeiInputs, signIn } from "./helpers";
 
 const DEV_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 const IMEI = "490154203237518";
@@ -49,7 +49,7 @@ async function enterImei(page: Page, imei = IMEI) {
 
 async function fillBuyer(page: Page, email = "e2e-guest@example.com", country = "DE") {
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Country").selectOption(country);
+  await chooseCountry(countryField(page), country);
 }
 
 test.describe("opening a checkout", () => {
@@ -131,7 +131,7 @@ test.describe("opening a checkout", () => {
     await expect(email).toHaveAttribute("readonly", "");
     await expect(page.getByText("You are signed in.")).toBeVisible();
     await enterImei(page);
-    if (!(await page.getByLabel("Country").inputValue())) await page.getByLabel("Country").selectOption("GB");
+    if (!(await page.locator('select[name="country"]').inputValue())) await chooseCountry(countryField(page), "GB");
     await page.getByRole("button", { name: "Continue to payment" }).click();
     // The CSRF token travels with the request (a signed-in account must send it, handoff trap 4).
     await expect(page).toHaveURL(/\/en\/checkout\/[A-Za-z0-9_-]{16,}$/);

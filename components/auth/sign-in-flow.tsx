@@ -1,5 +1,5 @@
 "use client";
-// SignInFlow: the one sign-in form, for every account (one kind of account: the rank decides what the account can do, never the form).
+// The one sign-in form, for every account (one kind of account: the rank decides what the account can do, never the form).
 // `POST /client/auth/sign-in` (email + password + Turnstile) answers `{ next, rank }`: `next` is the step still to do.
 // Sign-in runs in the BROWSER (Set-Cookie must reach the browser), never in a Server Action. Steps:
 //   password       email + password + Turnstile → `api.signIn()` → `done` | `totp` | `password`
@@ -8,13 +8,19 @@
 //   new-password   `next: password` (a temporary password) → POST /client/auth/password/change {password}
 //                  → `totp` (continue with the code) | `done`
 //   link           `/sign-in?token=` from the email-link mail: a box and a button, never auto-submitted (mail scanners)
-// A 401 is always "wrong email or password" and never reveals whether the email exists. After success
-// router.replace(target) and router.refresh() so the header shows the signed-in state. `?as=` is not read: an old link that
-// carries it opens the same form.
+// A 401 is always "wrong email or password" and never reveals whether the email exists.
+// Two components draw it:
+//   SignInSteps    the steps a person types through (password, magic, totp, new-password). It reads no address and goes nowhere
+//                  by itself: `onFinish` says what a finished sign-in does. With `embedded` it is the header's sign-in panel
+//                  (components/auth/sign-in-popover.tsx): tighter, the email box takes the focus, and under the form it offers
+//                  the email link and "Create an account" (the sign-up page).
+//   SignInFlow     the sign-in page: the steps, plus the landing of a mailed link (`?token=`); a finished sign-in goes to
+//                  `?next=` (router.replace, then router.refresh so the header shows the signed-in state). `?as=` is not read:
+//                  an old link that carries it opens the same form.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
-import { Mail, Store } from "lucide-react";
+import { Mail, Store, UserPlus } from "lucide-react";
 import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { SignInResult } from "@/lib/api/types";
@@ -34,54 +40,58 @@ import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "./form-errors";
 import { LinkConfirm } from "./link-confirm";
 import { MagicLinkForm } from "./magic-link-form";
 import { targetAfterSignIn } from "./safe-next";
-import { moveAfterPasswordChange, moveAfterSignIn, pendingSessionEnded, type SignInStep } from "./sign-in-steps";
+import { moveAfterPasswordChange, moveAfterSignIn, pendingSessionEnded, type SignInMove, type SignInStep } from "./sign-in-steps";
 import { TotpStep } from "./totp-step";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
 import { useTurnstile } from "./use-turnstile";
 
-export type SignInFlowProps = {
-  t: Pick<AuthMessages, "fields" | "shared" | "signIn"> & { signUp: Pick<AuthMessages["signUp"], "errors"> };
-  /** The countries the "finish your account" form offers, `{ code, name }`: the shop's tax-rate countries, else the full list. */
-  countries: readonly { code: string; name: string }[];
+/**
+ * The strings of the steps a person types through: the labels of their boxes, the shared lines and everything of `auth.signIn` but
+ * the mailed link's landing. The header's panel sends exactly these to the browser on every page (`signInStepsText`).
+ */
+export type SignInStepsText = {
+  fields: Pick<
+    AuthMessages["fields"],
+    | "email"
+    | "emailPlaceholder"
+    | "password"
+    | "passwordPlaceholder"
+    | "newPassword"
+    | "confirmPassword"
+    | "passwordRules"
+    | "passwordsDontMatch"
+    | "code"
+  >;
+  shared: AuthMessages["shared"];
+  signIn: Omit<AuthMessages["signIn"], "link" | "finish">;
 };
 
-export function SignInFlow({ t, countries }: SignInFlowProps) {
-  const router = useRouter();
-  const params = useSearchParams();
-  const token = params.get("token");
-  const [step, setStep] = useState<SignInStep>(token ? "link" : "password");
+/** A step of SignInSteps: every step but the landing of a mailed link, which only the sign-in page has. */
+export type TypedStep = Exclude<SignInStep, "link">;
+
+export type SignInStepsProps = {
+  t: SignInStepsText;
+  /** The step to open with (default the password form). The page passes the step a mailed link's answer asks for. */
+  start?: TypedStep;
+  /** The account is signed in: go where a sign-in goes from here. */
+  onFinish: () => void;
+  /** Inside the header's sign-in panel: tighter, the email box takes the focus, and "Create an account" is a button. */
+  embedded?: boolean;
+};
+
+export function SignInSteps({ t, start = "password", onFinish, embedded = false }: SignInStepsProps) {
+  const [step, setStep] = useState<TypedStep>(start);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   // "Your sign-in expired": shown on the form a step sent the visitor back to.
   const [notice, setNotice] = useState<string | null>(null);
 
-  /** Signs in: go to the target, then refresh so the server parts see the session. */
-  function finish() {
-    router.replace(targetAfterSignIn(params.get("next")));
-    router.refresh();
-  }
-
   /** Goes where a step's answer says: the target, the code step or (for a temporary password) the new-password step. */
-  function go(move: "finish" | "totp" | "new-password") {
+  function go(move: SignInMove) {
     setNotice(null);
-    if (move === "finish") return finish();
+    if (move === "finish") return onFinish();
     setPassword("");
     setStep(move);
-  }
-
-  /** The answer of the password form; throws an ApiError for an answer the site has no step for. */
-  function onSignedIn(result: SignInResult) {
-    go(moveAfterSignIn(result));
-  }
-
-  /** "Not you? Sign out" on the link page: the link is spent and its session is gone. Back to the plain form, token dropped. */
-  function afterLinkSignOut() {
-    const next = params.get("next");
-    setNotice(null);
-    setPassword("");
-    setStep("password");
-    router.replace(next ? `${sitePath("/sign-in")}?next=${encodeURIComponent(next)}` : sitePath("/sign-in"));
-    router.refresh();
   }
 
   /** A step's pending session ended (10 minutes): back to the form with a sentence, nothing kept. */
@@ -91,27 +101,11 @@ export function SignInFlow({ t, countries }: SignInFlowProps) {
     setStep("password");
   }
 
-  if (step === "link" && token) {
-    return (
-      <LinkConfirm
-        token={token}
-        strings={{ ...t.signIn.link, requestNewLink: t.shared.requestNewLink }}
-        finish={{
-          countries,
-          t: { fields: t.fields, errors: t.signUp.errors, finish: t.signIn.finish, continue: t.signIn.link.continue },
-        }}
-        onSignedIn={go}
-        onRequestNewLink={() => setStep("magic")}
-        onSignedOut={afterLinkSignOut}
-      />
-    );
-  }
-
   if (step === "totp") {
     return (
       <TotpStep
         t={t}
-        onDone={finish}
+        onDone={onFinish}
         onExpired={startAgain}
         onBack={() => {
           setPassword("");
@@ -138,7 +132,7 @@ export function SignInFlow({ t, countries }: SignInFlowProps) {
 
   if (step === "magic") {
     return (
-      <div className="grid gap-6">
+      <div className={embedded ? "grid gap-4" : "grid gap-6"}>
         <StepHeading title={t.signIn.magic.title} text={t.signIn.magic.text} />
         <MagicLinkForm
           defaultEmail={email}
@@ -154,7 +148,7 @@ export function SignInFlow({ t, countries }: SignInFlowProps) {
         >
           <Button
             variant="secondary"
-            size="lg"
+            size={embedded ? "md" : "lg"}
             block
             onClick={() => {
               setNotice(null);
@@ -169,7 +163,9 @@ export function SignInFlow({ t, countries }: SignInFlowProps) {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className={embedded ? "grid gap-4" : "grid gap-6"}>
+      {/* The page has its own title above the form; the panel has none, so the step names itself. */}
+      {embedded ? <StepHeading title={t.signIn.title} text={t.signIn.subtitle} /> : null}
       <PasswordStep
         t={t}
         notice={notice}
@@ -178,7 +174,8 @@ export function SignInFlow({ t, countries }: SignInFlowProps) {
         setEmail={setEmail}
         password={password}
         setPassword={setPassword}
-        onSignedIn={onSignedIn}
+        onSignedIn={(result) => go(moveAfterSignIn(result))}
+        embedded={embedded}
       />
       <Divider label={t.signIn.or} />
       <div className="grid gap-3">
@@ -194,28 +191,84 @@ export function SignInFlow({ t, countries }: SignInFlowProps) {
         >
           {t.signIn.emailLink}
         </Button>
-        <ButtonLink
-          href={sitePath("/become-a-merchant")}
-          variant="secondary"
-          size="md"
-          block
-          startIcon={<Store aria-hidden="true" />}
-        >
-          {t.signIn.merchantPrices}
-        </ButtonLink>
+        {embedded ? (
+          <ButtonLink href={sitePath("/sign-up")} variant="secondary" size="md" block startIcon={<UserPlus aria-hidden="true" />}>
+            {t.signIn.createAccount}
+          </ButtonLink>
+        ) : (
+          <ButtonLink
+            href={sitePath("/become-a-merchant")}
+            variant="secondary"
+            size="md"
+            block
+            startIcon={<Store aria-hidden="true" />}
+          >
+            {t.signIn.merchantPrices}
+          </ButtonLink>
+        )}
       </div>
-      <p className="text-center text-body text-ink-muted">
-        {t.signIn.noAccount}{" "}
-        <Link href={sitePath("/sign-up")} className={authLinkClass}>
-          {t.signIn.createAccount}
-        </Link>
-      </p>
+      {embedded ? null : (
+        <p className="text-center text-body text-ink-muted">
+          {t.signIn.noAccount}{" "}
+          <Link href={sitePath("/sign-up")} className={authLinkClass}>
+            {t.signIn.createAccount}
+          </Link>
+        </p>
+      )}
     </div>
   );
 }
 
+export type SignInFlowProps = {
+  t: Pick<AuthMessages, "fields" | "shared" | "signIn"> & { signUp: Pick<AuthMessages["signUp"], "errors"> };
+  /** The countries the "finish your account" form offers, `{ code, name }`: the shop's tax-rate countries, else the full list. */
+  countries: readonly { code: string; name: string }[];
+};
+
+export function SignInFlow({ t, countries }: SignInFlowProps) {
+  const router = useRouter();
+  const params = useSearchParams();
+  const token = params.get("token");
+  // The landing of a mailed link while it waits for its button; then the steps, opening with the one its answer asks for.
+  const [stage, setStage] = useState<{ link: true } | { link: false; start: TypedStep }>(
+    token ? { link: true } : { link: false, start: "password" },
+  );
+
+  /** Signs in: go to the target, then refresh so the server parts see the session. */
+  function finish() {
+    router.replace(targetAfterSignIn(params.get("next")));
+    router.refresh();
+  }
+
+  /** "Not you? Sign out" on the link page: the link is spent and its session is gone. Back to the plain form, token dropped. */
+  function afterLinkSignOut() {
+    const next = params.get("next");
+    setStage({ link: false, start: "password" });
+    router.replace(next ? `${sitePath("/sign-in")}?next=${encodeURIComponent(next)}` : sitePath("/sign-in"));
+    router.refresh();
+  }
+
+  if (stage.link && token) {
+    return (
+      <LinkConfirm
+        token={token}
+        strings={{ ...t.signIn.link, requestNewLink: t.shared.requestNewLink }}
+        finish={{
+          countries,
+          t: { fields: t.fields, errors: t.signUp.errors, finish: t.signIn.finish, continue: t.signIn.link.continue },
+        }}
+        onSignedIn={(move) => (move === "finish" ? finish() : setStage({ link: false, start: move }))}
+        onRequestNewLink={() => setStage({ link: false, start: "magic" })}
+        onSignedOut={afterLinkSignOut}
+      />
+    );
+  }
+
+  return <SignInSteps t={t} start={stage.link ? "password" : stage.start} onFinish={finish} />;
+}
+
 type PasswordStepProps = {
-  t: SignInFlowProps["t"];
+  t: SignInStepsText;
   /** A sentence to show at once (the session of a later step expired). */
   notice: string | null;
   forgotHref: string;
@@ -225,9 +278,11 @@ type PasswordStepProps = {
   setPassword: (value: string) => void;
   /** Called with the API's answer; may throw an ApiError for an answer the site has no step for. */
   onSignedIn: (result: SignInResult) => void | Promise<void>;
+  /** Inside the header's panel: tighter, and the email box takes the focus when the form is drawn. */
+  embedded: boolean;
 };
 
-function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPassword, onSignedIn }: PasswordStepProps) {
+function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPassword, onSignedIn, embedded }: PasswordStepProps) {
   const errorText = useErrorText();
   const ts = useTurnstile();
   const form = useRef<HTMLFormElement>(null);
@@ -277,7 +332,7 @@ function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPas
   }
 
   return (
-    <form ref={form} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
+    <form ref={form} method="post" onSubmit={onSubmit} noValidate className={embedded ? "grid gap-4" : "grid gap-5"}>
       <Input
         type="email"
         name="email"
@@ -287,6 +342,8 @@ function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPas
         autoComplete="username"
         inputMode="email"
         required
+        // The panel was opened to sign in: its first box is ready to type in. The page leaves the focus where the person put it.
+        autoFocus={embedded}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         error={feedback.fields.email}
@@ -310,7 +367,7 @@ function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPas
       </div>
       <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} />
       <FormAlert message={feedback.message} reference={feedback.reference} />
-      <Button type="submit" size="lg" block loading={busy} disabled={!mounted}>
+      <Button type="submit" size={embedded ? "md" : "lg"} block loading={busy} disabled={!mounted}>
         {t.signIn.submit}
       </Button>
     </form>
@@ -318,7 +375,7 @@ function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPas
 }
 
 type NewPasswordStepProps = {
-  t: SignInFlowProps["t"];
+  t: SignInStepsText;
   copy: { title: string; text: string; submit: string };
   /** Sends the new password and goes on (the code step, or the target). Throws the ApiError of a refused call. */
   save: (newPassword: string) => Promise<void>;

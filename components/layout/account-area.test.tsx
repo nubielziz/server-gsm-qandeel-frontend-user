@@ -87,6 +87,26 @@ describe("AccountAreaContent", () => {
     expect(html).not.toContain("Account menu");
   });
 
+  it("the shop header's Sign in button opens the sign-in panel; phones keep a plain link to the page", async () => {
+    const html = await draw(null, null);
+    const links = html.match(/<a [^>]*href="\/en\/sign-in"[^>]*>/g) ?? [];
+    expect(links).toHaveLength(2);
+    // The icon link of phones: a plain link. The button from `sm` up: it names its panel.
+    expect(links[0]).toContain("sm:hidden");
+    expect(links[0]).not.toContain("aria-haspopup");
+    expect(links[1]).toContain('aria-haspopup="dialog"');
+    expect(html).toMatch(/<div[^>]*popover="auto"[^>]*role="dialog"[^>]*aria-label="Sign in"/);
+    // The form is not in the page until the panel is opened.
+    expect(html).not.toContain("<form");
+  });
+
+  it("the compact checkout header keeps a plain Sign in link: no panel", async () => {
+    const html = await draw(null, null, { compact: true });
+    expect(html).toContain('href="/en/sign-in"');
+    expect(html).not.toContain("aria-haspopup");
+    expect(html).not.toContain('popover="auto"');
+  });
+
   it("an account that cannot be read (the API is down) shows the Sign in button: the header never breaks the page", async () => {
     const html = await draw("fails", null);
     expect(html).toContain('href="/en/sign-in"');

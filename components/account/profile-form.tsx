@@ -17,11 +17,14 @@ import { useErrorText } from "@/lib/i18n/error-text";
 import { useMounted } from "@/lib/use-mounted";
 import type { AccountMessages } from "@/lib/i18n/messages/account";
 import { ltr } from "@/lib/merchant/format";
+import { isOnlyDialCode } from "@/lib/phone/dial";
 import { FormAlert } from "@/components/auth/form-alert";
 import { useFocusOnFeedback } from "@/components/auth/use-focus-on-feedback";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "@/components/auth/form-errors";
 import { Button } from "@/components/ui/button";
-import { Input, Select } from "@/components/ui/input";
+import { CountrySelect } from "@/components/ui/country-select";
+import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { toast } from "@/components/ui/toast";
 
 /** The API takes a name of 2 to 120 characters. */
@@ -35,13 +38,14 @@ export type StoreProfileValues = { name: string; phone: string; country: string 
 
 /**
  * The body of the PATCH: only what differs from what the account holds. The API trims the name and the phone, so trimmed
- * values are compared; an emptied phone is sent as "" (that clears it); an empty country is never sent (a saved country can be
- * changed, not removed).
+ * values are compared; an emptied phone is sent as "" (that clears it), and a phone box that holds only a calling code (the
+ * list of the phone box wrote it and no number followed) is an emptied one; an empty country is never sent (a saved country can
+ * be changed, not removed).
  */
 export function changedStoreProfile(values: StoreProfileValues, saved: StoreProfileValues): StoreMeInput {
   const changes: StoreMeInput = {};
   const name = values.name.trim();
-  const phone = values.phone.trim();
+  const phone = isOnlyDialCode(values.phone) ? "" : values.phone.trim();
   if (name !== saved.name) changes.name = name;
   if (phone !== saved.phone) changes.phone = phone;
   if (values.country !== "" && values.country !== saved.country) changes.country = values.country;
@@ -131,29 +135,26 @@ export function ProfileForm({ initial, email, countries, t }: ProfileFormProps) 
           onChange={(e) => setName(e.target.value)}
           error={feedback.fields.name}
         />
-        <Input
+        <PhoneInput
           name="phone"
-          type="tel"
           label={t.phone}
-          autoComplete="tel"
-          inputMode="tel"
           maxLength={PHONE_MAX}
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onValueChange={setPhone}
+          countryHint={country}
           hint={t.phoneHint}
           error={feedback.fields.phone}
         />
       </div>
       <div className="grid items-start gap-5 sm:grid-cols-2">
-        <Select
+        <CountrySelect
           name="country"
           label={t.country}
-          autoComplete="country"
-          // Without a saved country the first option asks for one; once saved the country can be changed, not removed.
+          // Without a saved country the field asks for one; once saved the country can be changed, not removed.
           placeholder={saved.country === "" ? t.countryPlaceholder : undefined}
           value={country}
-          onChange={(e) => setCountry(e.target.value)}
-          options={countries.map((c) => ({ value: c.code, label: c.name }))}
+          onValueChange={setCountry}
+          countries={countries}
           hint={t.countryHint}
           error={feedback.fields.country}
         />

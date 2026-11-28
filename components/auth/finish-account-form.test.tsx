@@ -25,7 +25,11 @@ const draw = (over: Partial<FinishAccountFormProps> = {}) =>
     </ErrorTextProvider>,
   );
 /** The opening tag of the control with this `name`. */
-const control = (html: string, name: string) => new RegExp(`<(?:input|select)[^>]*name="${name}"[^>]*>`).exec(html)?.[0] ?? "";
+const control = (html: string, name: string) =>
+  name === "country"
+    ? // The country's control is the button a person uses; the select beside it is hidden and only carries the value.
+      (/<button[^>]*role="combobox"[^>]*>/.exec(html)?.[0] ?? "")
+    : (new RegExp(`<(?:input|select)[^>]*name="${name}"[^>]*>`).exec(html)?.[0] ?? "");
 
 describe("the finish-your-account form", () => {
   const html = draw();
@@ -53,7 +57,7 @@ describe("the finish-your-account form", () => {
     expect(control(html, "firstName")).toContain('autoComplete="given-name"');
     expect(control(html, "lastName")).toContain('autoComplete="family-name"');
     expect(control(html, "phone")).toContain('autoComplete="tel"');
-    expect(control(html, "country")).toContain('autoComplete="country"');
+    expect(html).toContain('<select name="country" autoComplete="country"');
     expect(control(html, "password")).toContain('autoComplete="new-password"');
   });
 

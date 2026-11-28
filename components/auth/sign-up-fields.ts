@@ -7,6 +7,7 @@
 import { isApiError } from "@/lib/api/errors";
 import type { PendingDetails, SignUpFinishInput, SignUpInput } from "@/lib/api/types";
 import { latinDigits } from "@/lib/format";
+import { isOnlyDialCode, withCountry } from "@/lib/phone/dial";
 import type { ErrorText } from "@/lib/i18n/error-text";
 import { feedbackFrom, type FormFeedback } from "./form-errors";
 
@@ -34,7 +35,7 @@ export type DetailsValues = {
 export type SignUpValues = DetailsValues & { password: string };
 
 /** The form's field names, in the order they are drawn (the first one with a problem gets the focus). */
-export const SIGN_UP_FIELDS = ["firstName", "lastName", "email", "phone", "country", "password"] as const;
+export const SIGN_UP_FIELDS = ["firstName", "lastName", "email", "country", "phone", "password"] as const;
 
 /** The sentences of the checks (`auth.signUp.errors`). */
 export type SignUpErrorTexts = {
@@ -78,6 +79,18 @@ export function cleanPhone(raw: string): string {
   return latinDigits(raw.replace(DIRECTION_MARKS, "").trim()).replace(/[\s\-.()]/g, "");
 }
 
+/**
+ * What choosing a country does to the phone box: a box that holds no number yet (nothing, or only a calling code) gets the
+ * country's calling code, ready for the number; a box with a number is left alone, whatever its code (a person may live in one
+ * country and keep a number of another).
+ * @returns the new value of the box, or null to leave it as it is
+ */
+export function phoneForCountry(phone: string, country: string): string | null {
+  if (!isOnlyDialCode(phone)) return null;
+  const next = withCountry("", country);
+  return next === phone ? null : next;
+}
+
 const PHONE_SHAPE = new RegExp(`^\\+?\\d{${PHONE_MIN_DIGITS},${PHONE_MAX_DIGITS}}$`);
 /** An address has something before an @, something after it and no space; the server's check is the full one. */
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+$/;
@@ -88,8 +101,8 @@ export function isPhone(raw: string): boolean {
 }
 
 /**
- * What is wrong with the details, as `{ field: sentence }` (empty when all is well). Everything is required; a name is 1 to
- * 60 characters once trimmed; the phone has the shape of `isPhone`; the country is one of `countries` (the codes the menu offers).
+ * What is wrong with the details, as `{ field: sentence }` (empty when all is well). Everything is required (a phone box that holds
+ * only a calling code counts as empty); a name is 1 to 60 characters once trimmed; the phone has the shape of `isPhone`; the country is one of `countries` (the codes the menu offers).
  * The email is checked only when `values` has one (the finish form has none: the address is already proved).
  * @param countries the codes of the countries the menu offers
  */
@@ -109,7 +122,8 @@ export function checkDetails(
     if (email === "") problems.email = t.required;
     else if (!EMAIL_SHAPE.test(email)) problems.email = t.email;
   }
-  if (values.phone.trim() === "") problems.phone = t.required;
+  // A box that holds only the calling code the country field wrote (or a lone +) holds no number: it is missing, not malformed.
+  if (isOnlyDialCode(values.phone)) problems.phone = t.required;
   else if (!isPhone(values.phone)) problems.phone = t.phone;
   if (values.country === "") problems.country = t.country;
   else if (!countries.includes(values.country)) problems.country = t.country;
@@ -240,7 +254,7 @@ export async function submitSignUp(values: SignUpValues, deps: SignUpDeps): Prom
 }
 
 /** The finish form's field names, in the order they are drawn (the first one with a problem gets the focus). */
-export const FINISH_FIELDS = ["firstName", "lastName", "phone", "country", "password"] as const;
+export const FINISH_FIELDS = ["firstName", "lastName", "country", "phone", "password"] as const;
 
 /** What a person types on the "finish your account" form: the four details (prefilled) and the password (empty). */
 export type FinishValues = PendingDetails & { password: string };

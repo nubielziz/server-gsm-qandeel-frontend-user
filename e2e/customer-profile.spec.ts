@@ -4,7 +4,7 @@
 // demo accounts stay as the other specs expect them). Runs against the isolated demo backend (:3100) only.
 import type { Page, Request } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { freshAccount, go, signIn } from "./helpers";
+import { chooseCountry, countryField, freshAccount, go, signIn } from "./helpers";
 
 type Me = { name: string; phone: string; country: string; currency: string | null; email: string };
 
@@ -17,7 +17,9 @@ async function me(page: Page): Promise<Me> {
 /** The profile card of the settings page (the retail rank's: its name, phone, country and the read-only email). */
 const profile = (page: Page) => page.locator("section#profile");
 const field = (page: Page, name: "name" | "phone" | "email") => profile(page).locator(`input[name="${name}"]`);
+/** The hidden select of the country field: its value and its options. A person uses `countryButton`. */
 const countrySelect = (page: Page) => profile(page).locator('select[name="country"]');
+const countryButton = (page: Page) => countryField(profile(page));
 const save = (page: Page) => profile(page).getByRole("button", { name: "Save profile" });
 
 /** Every `PATCH /store/v1/me` body the page sends. */
@@ -106,13 +108,16 @@ test("a country change lists the shop's countries, saves, and moves the currency
   expect(sellable).toContain("GB");
 
   await go(page, "/en/account/settings");
-  // Only the countries with a tax rate are offered (the account has none saved, so the first option asks for one).
+  // Only the countries with a tax rate are offered, and the field holds the account's own country (staff give a new account one;
+  // an account without one starts on the prompt, whose value is empty).
   const options = await countrySelect(page).locator("option").evaluateAll((all) => all.map((option) => (option as HTMLOptionElement).value));
   expect(options.filter((code) => code !== "").sort()).toEqual(sellable);
-  await expect(countrySelect(page)).toHaveValue("");
+  const before = (await me(page)).country;
+  expect(before, "the test changes the country to GB, so the account must start elsewhere").not.toBe("GB");
+  await expect(countrySelect(page)).toHaveValue(before);
 
   const patches = recordPatches(page);
-  await countrySelect(page).selectOption("GB");
+  await chooseCountry(countryButton(page), "GB");
   await save(page).click();
   await expect(page.getByText("Profile saved")).toBeVisible();
   await expect(page.getByText("Prices are now shown in")).toBeVisible();
@@ -134,6 +139,7 @@ test("a country change lists the shop's countries, saves, and moves the currency
 
 test("a country the shop does not sell to (422 unsupported) is explained on the country field and changes nothing else", async ({ page }) => {
   await freshAccount(page, { signedIn: true });
+  const before = (await me(page)).country;
   await go(page, "/en/account/settings");
   await page.route("**/store/v1/me", (route) =>
     route.request().method() === "PATCH"
@@ -145,13 +151,13 @@ test("a country the shop does not sell to (422 unsupported) is explained on the 
       : route.continue(),
   );
 
-  await countrySelect(page).selectOption("GB");
+  await chooseCountry(countryButton(page), "GB");
   await save(page).click();
   await expect(profile(page).getByText("We do not sell to this country yet.")).toBeVisible();
-  await expect(countrySelect(page)).toHaveAttribute("aria-invalid", "true");
-  await expect(countrySelect(page)).toBeFocused();
+  await expect(countryButton(page)).toHaveAttribute("aria-invalid", "true");
+  await expect(countryButton(page)).toBeFocused();
   expect(await shopCurrencyCookie(page)).toBeUndefined();
-  expect((await me(page)).country).toBe("");
+  expect((await me(page)).country).toBe(before);
 });
 
 test("emptying the phone sends an empty string, and the API clears it", async ({ page }) => {
@@ -182,7 +188,7 @@ test("a name typed in Arabic script is saved as typed, and a one-letter one is r
   await go(page, "/en/account/settings");
   await field(page, "name").fill(arabicName);
   await field(page, "phone").fill("+962790000000");
-  await countrySelect(page).selectOption("DE");
+  await chooseCountry(countryButton(page), "DE");
   await save(page).click();
   await expect(page.getByText("Profile saved")).toBeVisible();
   expect(await me(page)).toMatchObject({ name: arabicName, phone: "+962790000000", country: "DE" });

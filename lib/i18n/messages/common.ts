@@ -156,6 +156,9 @@ export const common = {
     copy: "Copy",
     copied: "Copied",
     menu: "Menu",
+    searchCountries: "Search countries",
+    noCountryFound: "No country found.",
+    callingCode: "Country calling code",
   },
 
   pagination: {

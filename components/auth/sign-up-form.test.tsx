@@ -19,13 +19,17 @@ const noop = () => {};
 
 const draw = (node: React.ReactNode) => renderToStaticMarkup(<ErrorTextProvider messages={errors}>{node}</ErrorTextProvider>);
 /** The opening tag of the control with this `name`. */
-const control = (html: string, name: string) => new RegExp(`<(?:input|select)[^>]*name="${name}"[^>]*>`).exec(html)?.[0] ?? "";
+const control = (html: string, name: string) =>
+  name === "country"
+    ? // The country's control is the button a person uses; the select beside it is hidden and only carries the value.
+      (/<button[^>]*role="combobox"[^>]*>/.exec(html)?.[0] ?? "")
+    : (new RegExp(`<(?:input|select)[^>]*name="${name}"[^>]*>`).exec(html)?.[0] ?? "");
 
 describe("the sign-up form", () => {
   const html = draw(<SignUpForm countries={countries} t={text} />);
 
   it("asks for the six details, in this order, all required", () => {
-    const names = ["firstName", "lastName", "email", "phone", "country", "password"];
+    const names = ["firstName", "lastName", "email", "country", "phone", "password"];
     const positions = names.map((name) => html.indexOf(`name="${name}"`));
     expect(positions.every((p) => p > -1)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
@@ -43,7 +47,7 @@ describe("the sign-up form", () => {
     expect(control(html, "lastName")).toContain('autoComplete="family-name"');
     expect(control(html, "email")).toContain('autoComplete="email"');
     expect(control(html, "phone")).toContain('autoComplete="tel"');
-    expect(control(html, "country")).toContain('autoComplete="country"');
+    expect(html).toContain('<select name="country" autoComplete="country"');
     expect(control(html, "password")).toContain('autoComplete="new-password"');
   });
 
