@@ -117,9 +117,11 @@ describe("ACCOUNT_ROUTES", () => {
     expect(ACCOUNT_ROUTES.verifyEmail).toBe("/client/auth/verify-email");
   });
 
-  it("keeps the email link on the shop prefix", () => {
+  it("keeps the email link and the sign-up on the shop prefix", () => {
     expect(ACCOUNT_ROUTES.linkRequest).toBe("/store/v1/auth/magic-link");
     expect(ACCOUNT_ROUTES.linkSignIn).toBe("/store/v1/auth/verify");
+    expect(ACCOUNT_ROUTES.signUp).toBe("/store/v1/auth/sign-up");
+    expect(ACCOUNT_ROUTES.signUpFinish).toBe("/store/v1/auth/sign-up/finish");
   });
 
   it("keeps both privacy requests on the shop prefix, one route each for every rank", () => {

@@ -35,12 +35,14 @@ import {
   DEV_TURNSTILE_TOKEN,
   SET_PASSWORD_LINK,
   SIGN_IN_LINK,
+  SIGN_UP_PHONE_STORED,
   VERIFY_EMAIL_LINK,
   fixtures,
   freshAccount,
   merchantImeiInputs,
   signIn,
   signUpByLink,
+  signUpInAnotherBrowser,
   tokenOf,
   waitForLink,
 } from "./helpers";
@@ -63,6 +65,9 @@ interface AccountMe {
   email: string;
   status: string;
   rank: { id: number; name: string; kind: RankKind };
+  name: string;
+  phone: string;
+  country: string;
   hasPassword: boolean;
   emailVerifiedAt: string | null;
 }
@@ -190,10 +195,37 @@ test.describe("accounts", () => {
     expect(((await res.json()) as { code: string }).code).toBe("ACCOUNT_SUSPENDED");
   });
 
-  test("signUpByLink makes a retail account with no password and signs the page in", async ({ page }) => {
-    const { email, claimedOrders } = await signUpByLink(page, { claimGuestOrders: true });
+  test("signUpByLink makes a retail account with its password and details (the link opened where the form was sent) and signs the page in", async ({ page }) => {
+    const { email, password, details, claimedOrders } = await signUpByLink(page, { claimGuestOrders: true });
     expect(claimedOrders).toBe(0);
-    expect(await getJson<AccountMe>(page.request, FAMILY.retail.me)).toMatchObject({ email, hasPassword: false, rank: { kind: "retail" } });
+    expect(await getJson<AccountMe>(page.request, FAMILY.retail.me)).toMatchObject({
+      email,
+      name: `${details.firstName} ${details.lastName}`,
+      phone: SIGN_UP_PHONE_STORED,
+      country: details.country,
+      hasPassword: true,
+      rank: { kind: "retail" },
+    });
+    // The password of the form works.
+    await page.context().clearCookies();
+    await signIn(page, { email, password });
+  });
+
+  test("signUpInAnotherBrowser makes a retail account with NOTHING applied, hands the details back and signs the page in", async ({ page }) => {
+    const { email, password, details, answer } = await signUpInAnotherBrowser(page);
+    expect(answer.pendingDetails).toEqual({ ...details, phone: SIGN_UP_PHONE_STORED });
+    expect(JSON.stringify(answer)).not.toContain(password);
+    const me = await getJson<AccountMe>(page.request, FAMILY.retail.me);
+    expect(me).toMatchObject({ email, hasPassword: false, rank: { kind: "retail" } });
+    expect(me.name || "").toBe("");
+    expect(me.phone || "").toBe("");
+    // The password of the form was never stored: it cannot sign in.
+    await page.context().clearCookies();
+    const refused = await page.request.post("/client/auth/sign-in", {
+      headers: { Origin: siteOrigin, "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "Content-Type": "application/json" },
+      data: { email, password },
+    });
+    expect(refused.status()).toBe(401);
   });
 
   test("changeRank moves an account between ranks and ends its sessions", async ({ page }) => {

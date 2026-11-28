@@ -1,6 +1,6 @@
 // Security, for an account of either rank: change the password and two-step verification, each on the routes of the account's
-// family. An account that signs in by email link has no password yet: it is offered one (the forgot-password page sends the
-// mail that sets it), and two-step verification waits for it because the second step is asked after the password. The warning
+// family. An account with no password yet (an older one made by an email link, or one whose sign-up link was opened in another
+// browser and never finished) is offered one (the forgot-password page sends the mail that sets it), and two-step verification waits for it because the second step is asked after the password. The warning
 // for a temporary password sits above every page of the account area (the gate in the frame), and this page is where it points.
 import { Suspense } from "react";
 import type { Metadata } from "next";

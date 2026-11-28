@@ -2,8 +2,10 @@
 // answer asks for, when a pending session has ended, and what to tell about the claim of guest orders. Pure: no API calls.
 import { ApiError, isApiError } from "@/lib/api/errors";
 import type { SignInResult } from "@/lib/api/types";
+import type { PendingDetails } from "@/lib/api/types";
 import { plural, type PluralForms } from "@/lib/i18n/define";
 import type { LinkExchangeAnswer } from "./auth-requests";
+import { readPendingDetails } from "./pending-details";
 
 /** The steps of the sign-in page. `link` is the landing of an emailed link (`?token=`). */
 export type SignInStep = "password" | "magic" | "totp" | "new-password" | "link";
@@ -71,7 +73,23 @@ export type LinkOutcomeState = {
   move: "finish" | "totp";
   /** The masked address of the account the link opened, when the link was not asked for in this browser; else null. */
   openedFor: string | null;
+  /**
+   * The details of a sign-up whose link was opened in another browser than the one that filled the form (the answer carries
+   * `pendingDetails`): the account exists and is signed in, nothing was applied, and the page shows the "finish your account" form
+   * with these details to confirm or change and an empty password box. Null for every other link.
+   */
+  pending: PendingDetails | null;
 };
+
+/**
+ * The details to confirm on the "finish your account" form, or null when there are none to confirm: `passwordSet: true` (this
+ * browser sent the form: everything was applied), a link of any other kind (neither key), or an answer whose `pendingDetails` is
+ * not four strings. `passwordSet: false` alone, with no details, is not enough to ask for anything.
+ */
+export function pendingDetailsOf(answer: Pick<LinkExchangeAnswer, "passwordSet" | "pendingDetails">): PendingDetails | null {
+  if (answer.passwordSet === true) return null;
+  return readPendingDetails(answer.pendingDetails);
+}
 
 /**
  * Whose account to name after the link was exchanged. A link asked for in this browser needs no word (the reader typed that
@@ -84,15 +102,19 @@ export function openedAccount(answer: Pick<LinkExchangeAnswer, "requestedHere" |
 }
 
 /**
- * What to show after the sign-in link was exchanged. Null when there is nothing to tell (no claim line, and the link was asked
- * for here): the page goes straight on.
+ * What to show after the sign-in link was exchanged. Null when there is nothing to tell (no claim line, the link was asked
+ * for here, and no sign-up details wait to be confirmed): the page goes straight on.
  */
 export function outcomeAfterLink(
-  answer: Pick<LinkExchangeAnswer, "next" | "claimedOrders" | "claimSkipped" | "requestedHere" | "maskedEmail">,
+  answer: Pick<
+    LinkExchangeAnswer,
+    "next" | "claimedOrders" | "claimSkipped" | "requestedHere" | "maskedEmail" | "passwordSet" | "pendingDetails"
+  >,
   t: ClaimStrings,
 ): LinkOutcomeState | null {
   const lines = claimLines(answer, t);
   const openedFor = openedAccount(answer);
-  if (lines.length === 0 && openedFor === null) return null;
-  return { lines, move: moveAfterLink(answer), openedFor };
+  const pending = pendingDetailsOf(answer);
+  if (lines.length === 0 && openedFor === null && pending === null) return null;
+  return { lines, move: moveAfterLink(answer), openedFor, pending };
 }

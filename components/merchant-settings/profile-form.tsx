@@ -91,7 +91,7 @@ export function ProfileForm({ countries, initial, email, emailVerified, t, field
 
   return (
     <Card as="section" id="profile">
-      <form ref={formRef} onSubmit={onSubmit} noValidate aria-busy={busy || undefined} className="flex min-w-0 flex-col">
+      <form ref={formRef} method="post" onSubmit={onSubmit} noValidate aria-busy={busy || undefined} className="flex min-w-0 flex-col">
         <CardHeader title={t.title} description={t.description} divided />
         <CardBody className="grid gap-5">
           <ProblemAlert problem={problem} />

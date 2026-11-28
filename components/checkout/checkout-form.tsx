@@ -472,7 +472,7 @@ export function CheckoutForm({
 
   return (
     <>
-      <form onSubmit={onSubmit} noValidate className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
+      <form method="post" onSubmit={onSubmit} noValidate className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
         <div className="grid min-w-0 gap-6">
           <Card>
             <CardHeader title={labels.info.title} description={labels.info.description} />

@@ -10,6 +10,7 @@ import { isApiError } from "@/lib/api/errors";
 import type { TicketCreated } from "@/lib/api/types";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
 import { sitePath } from "@/lib/site-path";
 import { FormAlert } from "@/components/auth/form-alert";
@@ -50,6 +51,7 @@ export function NewTicketForm({ t, defaults }: NewTicketFormProps) {
   const ui = useUiText();
   const ts = useTurnstile();
   const form = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   const [values, setValues] = useState({
     email: defaults.email,
     name: defaults.name,
@@ -145,7 +147,7 @@ export function NewTicketForm({ t, defaults }: NewTicketFormProps) {
 
   const emailHint = defaults.signedIn ? t.form.emailSignedIn : orderToken ? t.form.emailHintOrder : t.form.emailHint;
   return (
-    <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
+    <form ref={form} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
       <div className="grid items-start gap-5 sm:grid-cols-2">
         <Input
           type="email"
@@ -219,7 +221,7 @@ export function NewTicketForm({ t, defaults }: NewTicketFormProps) {
       <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} />
       <FormAlert message={feedback.message} reference={feedback.reference} />
       <div>
-        <Button type="submit" size="lg" loading={busy}>
+        <Button type="submit" size="lg" loading={busy} disabled={!mounted}>
           {t.form.submit}
         </Button>
       </div>

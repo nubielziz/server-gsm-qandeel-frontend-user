@@ -9,6 +9,7 @@ import { api } from "@/lib/api/browser";
 import type { AccountMe } from "@/lib/api/types";
 import { CURRENCY_COOKIE } from "@/lib/currency-cookie";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import type { AccountMessages } from "@/lib/i18n/messages/account";
 import { FormAlert } from "@/components/auth/form-alert";
 import { useFocusOnFeedback } from "@/components/auth/use-focus-on-feedback";
@@ -52,6 +53,7 @@ export function PreferencesForm({ initial, currencies, t }: PreferencesFormProps
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<FormFeedback>(NO_FEEDBACK);
   const formRef = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   useFocusOnFeedback(feedback, formRef);
 
   async function onSubmit(event: FormEvent) {
@@ -78,7 +80,7 @@ export function PreferencesForm({ initial, currencies, t }: PreferencesFormProps
   }
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} noValidate className="grid gap-5">
+    <form ref={formRef} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
       <div className="grid items-start gap-5 sm:grid-cols-2">
         <Select
           name="currency"
@@ -95,7 +97,7 @@ export function PreferencesForm({ initial, currencies, t }: PreferencesFormProps
       </div>
       <FormAlert message={feedback.message} reference={feedback.reference} />
       <div>
-        <Button type="submit" loading={busy}>
+        <Button type="submit" loading={busy} disabled={!mounted}>
           {t.save}
         </Button>
       </div>

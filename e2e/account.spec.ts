@@ -5,7 +5,17 @@
 // demo accounts stay as every other test expects them.
 import { expect, test } from "./fixtures";
 import { type Page } from "@playwright/test";
-import { ACCOUNTS, BASE_URL, DEV_TURNSTILE_TOKEN, FRESH_ACCOUNT_PASSWORD, freshAccount, go, signIn, signUpByLink } from "./helpers";
+import {
+  ACCOUNTS,
+  BASE_URL,
+  DEV_TURNSTILE_TOKEN,
+  FRESH_ACCOUNT_PASSWORD,
+  freshAccount,
+  go,
+  signIn,
+  signUpByLink,
+  signUpInAnotherBrowser,
+} from "./helpers";
 
 /** What the "me" routes answer that these tests read: the rank's name and the sign-in state. */
 type Me = { currency: string | null; marketingOptIn: boolean; hasPassword: boolean; rank: { name: string; kind: "retail" | "merchant" } };
@@ -176,10 +186,10 @@ test.describe("overview and orders (demo merchant rank, read only)", () => {
 });
 
 test.describe("settings pages of a retail account (throwaway account)", () => {
-  test("a new account sees an empty orders state and the account page without a name", async ({ page }) => {
+  test("a new account sees an empty orders state and the account page, greeted by the name of its sign-up form", async ({ page }) => {
     await signUpByLink(page);
     await go(page, "/en/account");
-    await expect(page.getByRole("heading", { level: 1, name: "Welcome back" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Welcome back, Sam Hamdan" })).toBeVisible();
     await expect(page.getByText("No orders yet")).toBeVisible();
     await go(page, "/en/account/orders");
     await expect(page.getByRole("heading", { name: "No orders yet" })).toBeVisible();
@@ -214,8 +224,8 @@ test.describe("settings pages of a retail account (throwaway account)", () => {
     await expect(page.getByRole("switch", { name: /Marketing emails/ })).toBeChecked();
   });
 
-  test("an account without a password is pointed to the password link instead of a form", async ({ page }) => {
-    await signUpByLink(page);
+  test("an account without a password (a sign-up link opened in another browser) is pointed to the password link instead of a form", async ({ page }) => {
+    await signUpInAnotherBrowser(page);
     await go(page, "/en/account/settings/security");
     await expect(page.getByText("You sign in with email links")).toBeVisible();
     await expect(page.getByRole("link", { name: /^(Set|Create) a password$/ })).toHaveAttribute("href", "/en/forgot-password");

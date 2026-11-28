@@ -14,6 +14,7 @@ import type { AccountMe, StoreMeInput } from "@/lib/api/types";
 import { CURRENCY_COOKIE } from "@/lib/currency-cookie";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import type { AccountMessages } from "@/lib/i18n/messages/account";
 import { ltr } from "@/lib/merchant/format";
 import { FormAlert } from "@/components/auth/form-alert";
@@ -73,6 +74,7 @@ export function ProfileForm({ initial, email, countries, t }: ProfileFormProps) 
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<FormFeedback>(NO_FEEDBACK);
   const formRef = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   useFocusOnFeedback(feedback, formRef);
 
   /** The texts that replace the generic ones: a name outside 2 to 120 characters, a country the shop does not sell to. */
@@ -118,7 +120,7 @@ export function ProfileForm({ initial, email, countries, t }: ProfileFormProps) 
   }
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} noValidate className="grid gap-5">
+    <form ref={formRef} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
       <div className="grid items-start gap-5 sm:grid-cols-2">
         <Input
           name="name"
@@ -159,7 +161,7 @@ export function ProfileForm({ initial, email, countries, t }: ProfileFormProps) 
       </div>
       <FormAlert message={feedback.message} reference={feedback.reference} />
       <div>
-        <Button type="submit" loading={busy}>
+        <Button type="submit" loading={busy} disabled={!mounted}>
           {t.save}
         </Button>
       </div>

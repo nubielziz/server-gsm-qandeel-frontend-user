@@ -2,7 +2,7 @@
 // session cookies land in the browser context exactly as after a real sign-in. There is one kind of account: a rank tells a
 // retail account from a merchant (its own prices in the shop, wallet invoices, API); the helpers take the rank as an option.
 import { readFileSync } from "node:fs";
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, request as playwrightRequest, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 import { FIXTURES_FILE, changeAccountEmail, createAccount, setAccountStatus, type E2eFixtures, type RankKind } from "./admin";
 
 /** Credentials of an account. */
@@ -150,7 +150,10 @@ export function uniqueEmail(prefix: string) {
 export const SET_PASSWORD_LINK = /^\/set-password\?token=/;
 /** The mailed link that verifies an address: `/verify-email` at the root of the shop, for every rank. */
 export const VERIFY_EMAIL_LINK = /^\/verify-email\?token=/;
-/** The mailed link that signs a retail account in (or makes it: the email link). */
+/**
+ * The mailed link of a sign-in or of a sign-up: it signs an account in, and the link of a sign-up makes the account first. A plain
+ * request for an address with no account gets no such link (a note with the sign-up address instead).
+ */
 export const SIGN_IN_LINK = /\/sign-in\?token=/;
 
 /**
@@ -180,30 +183,120 @@ export function tokenOf(link: string): string {
   return new URL(link, "http://x").searchParams.get("token") ?? "";
 }
 
+/** The details the sign-up form collects besides the email and the password (a country the demo shop has a tax window for). */
+export interface SignUpDetails {
+  firstName: string;
+  lastName: string;
+  country: string;
+  phone: string;
+}
+
+/** The details `signUpByLink` sends unless a spec gives its own. The phone is written the way a person types it. */
+export const SIGN_UP_DETAILS: SignUpDetails = { firstName: "Sam", lastName: "Hamdan", country: "US", phone: "+1 202 555 0100" };
+
+/** What the server keeps of `SIGN_UP_DETAILS.phone`: spaces, dashes, dots and brackets removed. */
+export const SIGN_UP_PHONE_STORED = "+12025550100";
+
+/** A random private client address, so a context made by hand is not counted with the test's own (the API's limits are per address). */
+function randomPrivateIp(): string {
+  return `10.${200 + Math.floor(Math.random() * 50)}.${Math.floor(Math.random() * 256)}.${1 + Math.floor(Math.random() * 253)}`;
+}
+
 /**
- * A brand-new retail account made the way a visitor makes one: the email link (`POST /store/v1/auth/magic-link`, then the link's
- * token to `POST /store/v1/auth/verify`). The page is signed in afterwards, the account has no password and its address is proven.
- * Use `freshAccount` for an account with a password or a merchant rank.
+ * A second browser: a context of its own (its own cookies, so it never holds the asking-browser cookie or the session of the first
+ * one) with its own client address. Close its context when the test is done: `await page.context().close()`.
+ */
+export async function openAnotherBrowser(browser: Browser): Promise<Page> {
+  const context = await browser.newContext({ baseURL: BASE_URL, extraHTTPHeaders: { "X-Forwarded-For": randomPrivateIp() } });
+  return context.newPage();
+}
+
+/** What a sign-up helper made. */
+export interface SignedUp {
+  email: string;
+  /** The password of the form: set on the account when the link was opened in the browser that sent the form. */
+  password: string;
+  details: SignUpDetails;
+  /** How many guest orders the exchange added (the box is ticked with `claimGuestOrders`). */
+  claimedOrders: number;
+  claimSkipped?: "busy";
+}
+
+/** The sign-up call the form makes: `POST /store/v1/auth/sign-up` with the dev Turnstile token. The answer is 204 whatever the address is. */
+async function postSignUp(request: APIRequestContext, email: string, password: string, details: SignUpDetails): Promise<void> {
+  const asked = await request.post("/store/v1/auth/sign-up", {
+    headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN },
+    data: { email, password, ...details },
+  });
+  expect(asked.status(), await asked.text()).toBe(204);
+}
+
+/**
+ * A brand-new retail account made the way a visitor makes one: the sign-up form's call (`POST /store/v1/auth/sign-up`, with the
+ * password and the four details), the mailed link, and the link's token to `POST /store/v1/auth/verify` through the SAME browser
+ * context (its cookie jar holds the asking-browser cookie the sign-up call set), so the details and the password are applied and
+ * the exchange answers `passwordSet: true`. The page is signed in afterwards, with a password, a name and a proven address. Use
+ * `signUpInAnotherBrowser` for an account with no password and no details, `freshAccount` for a merchant rank or an account that
+ * staff made.
  *
- * @param options `email`: the address to sign up (default: a new one); `claimGuestOrders`: tick the box that adds the orders a guest
- *   placed with this address (the account's address is proven by the link)
- * @returns the address, how many guest orders the exchange added, and `claimSkipped` when it could not just now
+ * @param options `email`: the address to sign up (default: a new one); `password`: the form's password (default
+ *   `FRESH_ACCOUNT_PASSWORD`); `details`: replaces some of `SIGN_UP_DETAILS`; `claimGuestOrders`: tick the box that adds the orders
+ *   a guest placed with this address (the account's address is proven by the link)
+ * @returns the address, the password and the details, how many guest orders the exchange added, and `claimSkipped` when it could not just now
  */
 export async function signUpByLink(
   page: Page,
-  options: { email?: string; claimGuestOrders?: boolean } = {},
-): Promise<{ email: string; claimedOrders: number; claimSkipped?: "busy" }> {
+  options: { email?: string; password?: string; details?: Partial<SignUpDetails>; claimGuestOrders?: boolean } = {},
+): Promise<SignedUp> {
   const email = options.email ?? uniqueEmail("acct");
-  const asked = await page.request.post("/store/v1/auth/magic-link", { headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN }, data: { email } });
-  expect(asked.status(), await asked.text()).toBe(204);
+  const password = options.password ?? FRESH_ACCOUNT_PASSWORD;
+  const details = { ...SIGN_UP_DETAILS, ...options.details };
+  await postSignUp(page.request, email, password, details);
   const link = await waitForLink(page, email, SIGN_IN_LINK);
   const verified = await page.request.post("/store/v1/auth/verify", {
     data: { token: tokenOf(link), ...(options.claimGuestOrders ? { claimGuestOrders: true } : {}) },
   });
   expect(verified.status(), await verified.text()).toBe(200);
-  const answer = (await verified.json()) as { next?: string; claimedOrders?: number; claimSkipped?: "busy" };
+  const answer = (await verified.json()) as { next?: string; claimedOrders?: number; claimSkipped?: "busy"; passwordSet?: boolean };
   expect(answer.next).toBe("done");
-  return { email, claimedOrders: answer.claimedOrders ?? 0, ...(answer.claimSkipped ? { claimSkipped: answer.claimSkipped } : {}) };
+  expect(answer.passwordSet, "the link was opened in the browser that sent the form").toBe(true);
+  return { email, password, details, claimedOrders: answer.claimedOrders ?? 0, ...(answer.claimSkipped ? { claimSkipped: answer.claimSkipped } : {}) };
+}
+
+/**
+ * A brand-new retail account whose sign-up link was opened in ANOTHER browser than the one that sent the form (a phone's mail
+ * app): the sign-up call goes through a request context of its own (its own cookie jar, so the asking-browser cookie never reaches
+ * the page), and the link's token goes to `POST /store/v1/auth/verify` through the page. The account is made and the page is signed in
+ * with NOTHING applied: no password, no name, no phone, no country. The answer carries `passwordSet: false` and `pendingDetails` (the
+ * details as typed, never the password); the account is finished by `POST /store/v1/auth/sign-up/finish` (or the "finish your account" form).
+ *
+ * @param options as `signUpByLink`
+ * @returns the address, the password the form carried (never applied), the details, and the answer of the exchange
+ */
+export async function signUpInAnotherBrowser(
+  page: Page,
+  options: { email?: string; password?: string; details?: Partial<SignUpDetails> } = {},
+): Promise<{ email: string; password: string; details: SignUpDetails; answer: { next?: string; passwordSet?: boolean; pendingDetails?: SignUpDetails; requestedHere?: boolean } }> {
+  const email = options.email ?? uniqueEmail("acct");
+  const password = options.password ?? FRESH_ACCOUNT_PASSWORD;
+  const details = { ...SIGN_UP_DETAILS, ...options.details };
+  const other = await playwrightRequest.newContext({
+    baseURL: BASE_URL,
+    extraHTTPHeaders: { "X-Forwarded-For": randomPrivateIp() },
+  });
+  try {
+    await postSignUp(other, email, password, details);
+  } finally {
+    await other.dispose();
+  }
+  const link = await waitForLink(page, email, SIGN_IN_LINK);
+  const verified = await page.request.post("/store/v1/auth/verify", { data: { token: tokenOf(link) } });
+  expect(verified.status(), await verified.text()).toBe(200);
+  const answer = (await verified.json()) as { next?: string; passwordSet?: boolean; pendingDetails?: SignUpDetails; requestedHere?: boolean };
+  expect(answer.next).toBe("done");
+  expect(answer.passwordSet, "another browser opened the link: nothing of the form is applied").toBe(false);
+  expect(answer.requestedHere).toBe(false);
+  return { email, password, details, answer };
 }
 
 /** The password `freshAccount` gives a new account (the one e2e/auth.spec.ts sets from the invitation). */

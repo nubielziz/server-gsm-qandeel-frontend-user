@@ -22,8 +22,21 @@ export const ACCOUNT_ROUTES = {
   resetPassword: "/client/auth/password/reset",
   /** Marks the email as verified; never signs anyone in. */
   verifyEmail: "/client/auth/verify-email",
-  /** Asks for a sign-in link by email. Only a retail rank gets a mail; every address gets the same answer. */
+  /**
+   * Asks for a sign-in link by email. It signs in an account that exists and creates none: an address without an account is
+   * mailed a note with the sign-up address instead. Every address gets the same answer.
+   */
   linkRequest: "/store/v1/auth/magic-link",
+  /**
+   * Creates an account from the sign-up form: email, password, first name, last name, country and phone (backend decision 079).
+   * The answer is the same for every valid body; the mailed link finishes it through `linkSignIn`.
+   */
+  signUp: "/store/v1/auth/sign-up",
+  /**
+   * Finishes an account that a sign-up link made in another browser than the one that filled the form: the signed-in person
+   * confirms the four details and chooses the password (`POST`, session + CSRF; 409 when the account already has a password).
+   */
+  signUpFinish: "/store/v1/auth/sign-up/finish",
   /** Exchanges the emailed link for a session. */
   linkSignIn: "/store/v1/auth/verify",
   /** Asks for a copy of the account's data (every rank). */

@@ -19,6 +19,7 @@ import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { SignInResult } from "@/lib/api/types";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import type { AuthMessages } from "@/lib/i18n/messages/auth";
 import { sitePath } from "@/lib/site-path";
 import { Turnstile } from "@/components/turnstile";
@@ -39,10 +40,12 @@ import { useFocusOnFeedback } from "./use-focus-on-feedback";
 import { useTurnstile } from "./use-turnstile";
 
 export type SignInFlowProps = {
-  t: Pick<AuthMessages, "fields" | "shared" | "signIn">;
+  t: Pick<AuthMessages, "fields" | "shared" | "signIn"> & { signUp: Pick<AuthMessages["signUp"], "errors"> };
+  /** The countries the "finish your account" form offers, `{ code, name }`: the shop's tax-rate countries, else the full list. */
+  countries: readonly { code: string; name: string }[];
 };
 
-export function SignInFlow({ t }: SignInFlowProps) {
+export function SignInFlow({ t, countries }: SignInFlowProps) {
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get("token");
@@ -93,6 +96,10 @@ export function SignInFlow({ t }: SignInFlowProps) {
       <LinkConfirm
         token={token}
         strings={{ ...t.signIn.link, requestNewLink: t.shared.requestNewLink }}
+        finish={{
+          countries,
+          t: { fields: t.fields, errors: t.signUp.errors, finish: t.signIn.finish, continue: t.signIn.link.continue },
+        }}
         onSignedIn={go}
         onRequestNewLink={() => setStep("magic")}
         onSignedOut={afterLinkSignOut}
@@ -224,6 +231,7 @@ function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPas
   const errorText = useErrorText();
   const ts = useTurnstile();
   const form = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<FormFeedback>(() =>
     notice ? { fields: {}, message: notice, reference: null } : NO_FEEDBACK,
@@ -269,7 +277,7 @@ function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPas
   }
 
   return (
-    <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
+    <form ref={form} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
       <Input
         type="email"
         name="email"
@@ -302,7 +310,7 @@ function PasswordStep({ t, notice, forgotHref, email, setEmail, password, setPas
       </div>
       <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} />
       <FormAlert message={feedback.message} reference={feedback.reference} />
-      <Button type="submit" size="lg" block loading={busy}>
+      <Button type="submit" size="lg" block loading={busy} disabled={!mounted}>
         {t.signIn.submit}
       </Button>
     </form>
@@ -321,6 +329,7 @@ type NewPasswordStepProps = {
 function NewPasswordStep({ t, copy, save, onExpired }: NewPasswordStepProps) {
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
@@ -352,7 +361,7 @@ function NewPasswordStep({ t, copy, save, onExpired }: NewPasswordStepProps) {
   }
 
   return (
-    <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
+    <form ref={form} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
       <StepHeading title={copy.title} text={copy.text} />
       <PasswordInput
         name="newPassword"
@@ -374,7 +383,7 @@ function NewPasswordStep({ t, copy, save, onExpired }: NewPasswordStepProps) {
         error={feedback.fields.confirm}
       />
       <FormAlert message={feedback.message} reference={feedback.reference} />
-      <Button type="submit" size="lg" block loading={busy}>
+      <Button type="submit" size="lg" block loading={busy} disabled={!mounted}>
         {copy.submit}
       </Button>
     </form>

@@ -17,6 +17,7 @@ import { authLinkClass } from "./auth-heading";
 import { requestPasswordLink } from "./auth-requests";
 import { FormAlert } from "./form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "./form-errors";
+import { useMounted } from "@/lib/use-mounted";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
 import { useTurnstile } from "./use-turnstile";
 
@@ -28,6 +29,7 @@ export function ForgotPasswordForm({ t }: ForgotPasswordFormProps) {
   const errorText = useErrorText();
   const ts = useTurnstile();
   const form = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<FormFeedback>(NO_FEEDBACK);
@@ -87,7 +89,7 @@ export function ForgotPasswordForm({ t }: ForgotPasswordFormProps) {
 
   return (
     <div className="grid gap-6">
-      <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
+      <form ref={form} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
         <Input
           type="email"
           name="email"
@@ -104,7 +106,7 @@ export function ForgotPasswordForm({ t }: ForgotPasswordFormProps) {
         />
         <Turnstile key="ts" onToken={ts.setToken} resetKey={ts.resetKey} />
         <FormAlert message={feedback.message} reference={feedback.reference} />
-        <Button type="submit" size="lg" block loading={busy}>
+        <Button type="submit" size="lg" block loading={busy} disabled={!mounted}>
           {t.forgot.submit}
         </Button>
       </form>

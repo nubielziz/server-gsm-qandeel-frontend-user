@@ -1,10 +1,13 @@
-// Create an account: an email and an emailed link that creates the account on first use (an account of the retail rank).
-// There is no choice to make: merchant accounts are opened by our team, and one quiet line says so. Fully static page: the
-// form reads no query. Never indexed.
+// Create an account: one form that collects the full details (first name, last name, email, phone, country and a password) and
+// emails a link that finishes the sign-up (an account of the retail rank; backend decision 079, shop decision 011). There is no
+// choice to make: merchant accounts are opened by our team, and one quiet line says so. The page is static: the form reads no query,
+// and the menu of countries (the shop's cached config) sits behind <Suspense> with a same-size skeleton. Never indexed.
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { AuthHeading, authLinkClass } from "@/components/auth/auth-heading";
-import { MagicLinkForm } from "@/components/auth/magic-link-form";
+import { SignUpSkeleton } from "@/components/auth/sign-up-skeleton";
+import { SignUpSlot } from "@/components/auth/sign-up-slot";
 import { sitePath } from "@/lib/site-path";
 import { auth } from "@/lib/i18n/messages/auth";
 
@@ -19,18 +22,9 @@ export default function SignUpPage() {
     <>
       <AuthHeading title={t.signUp.title} subtitle={t.signUp.subtitle} />
       <div className="grid gap-6">
-        <MagicLinkForm
-          strings={{
-            email: t.fields.email,
-            emailPlaceholder: t.fields.emailPlaceholder,
-            hint: t.signUp.form.hint,
-            submit: t.signUp.form.submit,
-            sentText: t.signUp.form.sentText,
-            sentTitle: t.shared.checkEmailTitle,
-            useDifferentEmail: t.shared.useDifferentEmail,
-            securityCheckWait: t.shared.securityCheckWait,
-          }}
-        />
+        <Suspense fallback={<SignUpSkeleton />}>
+          <SignUpSlot />
+        </Suspense>
         <p className="text-center text-body text-ink-muted">
           {t.signUp.haveAccount}{" "}
           <Link href={sitePath("/sign-in")} className={authLinkClass}>

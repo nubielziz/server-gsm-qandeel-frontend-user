@@ -12,6 +12,7 @@ import { submitTotpCode } from "./auth-requests";
 import { FormAlert } from "./form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "./form-errors";
 import { pendingSessionEnded } from "./sign-in-steps";
+import { useMounted } from "@/lib/use-mounted";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
 
 export type TotpStepProps = {
@@ -27,6 +28,7 @@ export type TotpStepProps = {
 export function TotpStep({ t, onDone, onExpired, onBack }: TotpStepProps) {
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<FormFeedback>(NO_FEEDBACK);
@@ -59,7 +61,7 @@ export function TotpStep({ t, onDone, onExpired, onBack }: TotpStepProps) {
   }
 
   return (
-    <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
+    <form ref={form} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
       <StepHeading title={t.signIn.totp.title} text={t.signIn.totp.text} />
       <Input
         name="code"
@@ -76,7 +78,7 @@ export function TotpStep({ t, onDone, onExpired, onBack }: TotpStepProps) {
         error={feedback.fields.code}
       />
       <FormAlert message={feedback.message} reference={feedback.reference} />
-      <Button type="submit" size="lg" block loading={busy}>
+      <Button type="submit" size="lg" block loading={busy} disabled={!mounted}>
         {t.signIn.totp.submit}
       </Button>
       <Button variant="secondary" size="lg" block onClick={onBack}>

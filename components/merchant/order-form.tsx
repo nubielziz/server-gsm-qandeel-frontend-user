@@ -28,6 +28,7 @@ import { compareMoney, formatMoney, formatNumber, isValidImei, normalizeImei, su
 import { fmt } from "@/lib/i18n/define";
 import { isTypedFieldType } from "@/lib/checkout/field-types";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import { errorLine } from "@/lib/i18n/error-text-core";
 import type { CommonMessages } from "@/lib/i18n/messages/common";
 import type { MerchantMessages } from "@/lib/i18n/messages/merchant";
@@ -103,6 +104,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 export function OrderForm({ service, available, hrefs, labels, intro }: OrderFormProps) {
   const router = useRouter();
   const errorText = useErrorText();
+  const mounted = useMounted();
   const { form: f, summary: s } = labels;
 
   // Every field the service lists, in its own order (decision 007), each drawn and checked by its own type (decision 008).
@@ -440,7 +442,7 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-busy={submitting || undefined} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+    <form method="post" onSubmit={onSubmit} noValidate aria-busy={submitting || undefined} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
       <div className="grid min-w-0 gap-6">
         {intro}
 
@@ -566,6 +568,7 @@ export function OrderForm({ service, available, hrefs, labels, intro }: OrderFor
               size="lg"
               block
               loading={submitting}
+              disabled={!mounted}
               aria-label={submitting ? s.placing : undefined}
             >
               <span>{s.place}</span>

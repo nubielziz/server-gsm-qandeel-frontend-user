@@ -38,6 +38,8 @@ export const checkout = {
     signInTitle: "Sign in to buy",
     signInText: "Checkout is open to signed-in accounts only. Sign in or create an account to continue.",
     signInAction: "Sign in",
+    /** The second action of the signed-out card: it points to the sign-up page (an emailed link signs in, it does not create an account). */
+    signUpAction: "Create an account",
     info: {
       title: "Service information",
       description: "Some services need extra details before payment.",

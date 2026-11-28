@@ -684,3 +684,17 @@ at one price. **010:** the merchant's orders list has an Actions column (Cancel,
 are read as optional. `lib/api/schema.gen.ts` was regenerated against the backend's main. Built by two Sonnet implementers; the field types were
 reviewed by an Opus reviewer with the backend; final review by the lead. **Checks:** `gen:api:check`, typecheck, lint, the whole Vitest suite
 (1,863 tests). No e2e run. **Release order:** console, backend, shop.
+
+## Sign-up with the full details (2026-11-28, owner's request; `docs/decisions/011-sign-up-with-details.md`, backend decision 079)
+
+Merged and pushed on the owner's order. The owner's ruling: sign-up asks for email, password, first name, last name, country and phone, all
+required. The sign-up page is one form (`components/auth/sign-up-form.tsx`, `POST /store/v1/auth/sign-up`); the mailed link opened in the
+browser that filled the form creates the account with everything set; opened anywhere else (a phone's mail app) the confirm page shows "Finish
+creating your account" with the details to check and a password box (`finish-account-form.tsx`, `POST /store/v1/auth/sign-up/finish`). An
+emailed sign-in link no longer creates an account: the sign-in pages and the checkout's signed-out card point to sign-up. Become a merchant
+collects the same details without a password and writes them into the WhatsApp message. Every form that holds a password or personal data is
+`method="post"` and stays disabled until the script has loaded (`lib/use-mounted.ts`), so a value never reaches the URL. The country menus are
+the shop's tax-rate countries, else the full list. `lib/api/schema.gen.ts` regenerated (109 operations). Built by a Sonnet implementer, reviewed
+twice by an Opus reviewer with the backend, final review by the lead. **Checks:** `gen:api:check`, typecheck, lint, the whole Vitest suite
+(1,994 tests). The e2e specs (`e2e/helpers.ts` `signUpByLink`, `auth.spec.ts`, `account.spec.ts`, `harness.spec.ts`) were rewritten for the
+new flow and NOT run. **Release:** together with the backend (the deployer was held until both had passed their checks).

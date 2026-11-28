@@ -14,6 +14,7 @@ import type { InvoiceCreated, PaymentMethod } from "@/lib/api/types";
 import { compareMoney, formatMoney, formatPercent, subtractMoney } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
 import { ltr } from "@/lib/merchant/format";
 import { leaveIfSignedOut } from "@/lib/merchant/signed-out";
@@ -46,6 +47,7 @@ export function TopUpForm({
 }) {
   const router = useRouter();
   const errorText = useErrorText();
+  const mounted = useMounted();
   const [keys] = useState(() => createIdempotencyKeys());
   const inFlight = useRef(false);
   const t = labels;
@@ -158,7 +160,7 @@ export function TopUpForm({
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-busy={submitting || undefined} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+    <form method="post" onSubmit={onSubmit} noValidate aria-busy={submitting || undefined} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
       <div className="grid min-w-0 gap-6">
         <div ref={errorRef} tabIndex={-1} className="empty:hidden focus:outline-none">
           {error ? (
@@ -232,7 +234,7 @@ export function TopUpForm({
                 {net && !localAmountError ? <Money amount={net} currency="USD" /> : "—"}
               </DescriptionItem>
             </DescriptionList>
-            <Button type="submit" size="lg" block loading={submitting} aria-label={submitting ? (status === "redirecting" ? t.redirecting : t.creating) : undefined}>
+            <Button type="submit" size="lg" block loading={submitting} disabled={!mounted} aria-label={submitting ? (status === "redirecting" ? t.redirecting : t.creating) : undefined}>
               {t.submit}
             </Button>
             <p className="text-small text-ink-subtle" aria-live="polite">

@@ -16,7 +16,10 @@ import { SignInFlow } from "./sign-in-flow";
 function draw() {
   return renderToStaticMarkup(
     <ErrorTextProvider messages={errors}>
-      <SignInFlow t={{ fields: auth.fields, shared: auth.shared, signIn: auth.signIn }} />
+      <SignInFlow
+        t={{ fields: auth.fields, shared: auth.shared, signIn: auth.signIn, signUp: { errors: auth.signUp.errors } }}
+        countries={[{ code: "JO", name: "Jordan" }]}
+      />
     </ErrorTextProvider>,
   );
 }
@@ -46,7 +49,8 @@ describe("the sign-in form: one form for every account", () => {
     const html = draw();
     expect(html).toContain("Email me a sign-in link");
     expect(hrefOf(html, "Forgot password?")).toBe("/en/forgot-password");
-    expect(hrefOf(html, "Create account")).toBe("/en/sign-up");
+    expect(hrefOf(html, "Create an account")).toBe("/en/sign-up");
+    expect(html).toContain("New here?");
     expect(hrefOf(html, "Need merchant prices?")).toBe("/en/become-a-merchant");
   });
 
@@ -54,12 +58,26 @@ describe("the sign-in form: one form for every account", () => {
     nav.query = "as=merchant&next=/en/account/orders";
     const html = draw();
     expect(hrefOf(html, "Forgot password?")).toBe("/en/forgot-password");
-    expect(hrefOf(html, "Create account")).toBe("/en/sign-up");
+    expect(hrefOf(html, "Create an account")).toBe("/en/sign-up");
     expect(html).not.toMatch(/[?&]as=/);
   });
 
   it("never links to the old merchant application page", () => {
     expect(draw()).not.toContain("/merchant/register");
+  });
+});
+
+describe("the sign-in wording: a link signs in an account that exists", () => {
+  it("never says that an emailed link creates an account", () => {
+    const words = JSON.stringify(auth.signIn);
+    expect(words).not.toMatch(/we create your account|creates? your account|create your account/i);
+    expect(words).toContain("It works for an account you already have.");
+  });
+
+  it("points a new visitor to the sign-up page", () => {
+    const html = draw();
+    expect(html).toContain("New here?");
+    expect(hrefOf(html, "Create an account")).toBe("/en/sign-up");
   });
 });
 

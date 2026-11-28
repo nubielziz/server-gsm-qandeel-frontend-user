@@ -117,3 +117,15 @@ describe("merchant top-up form: the page around the request", () => {
     expect(html).not.toContain("/merchant/");
   });
 });
+
+
+describe("before its script has loaded", () => {
+  it('is a post form whose submit button is disabled in the server HTML: nothing can go to the address', () => {
+    const html = render([method(1, {})]);
+    expect(html).toMatch(/<form [^>]*method="post"/);
+    expect(html).not.toMatch(/<form [^>]*action=/);
+    const buttons = (html.match(/<button\b[^>]*>/g) ?? []).filter((tag) => /\btype="submit"/.test(tag));
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const tag of buttons) expect(tag).toContain('disabled=""');
+  });
+});

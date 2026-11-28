@@ -15,6 +15,7 @@ import { api } from "@/lib/api/browser";
 import { createIdempotencyKeys } from "@/lib/api/idempotency";
 import type { UploadedFile } from "@/lib/api/types";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
 import { leaveIfSignedOut } from "@/lib/merchant/signed-out";
 import { topUpErrorText, type TopUpAction } from "@/lib/wallet/top-up-errors";
@@ -45,6 +46,7 @@ type Failure = { message: string; reference?: string };
 export function TopUpActions({ id, canReceipt, canCancel, labels: t, errors }: TopUpActionsProps) {
   const router = useRouter();
   const errorText = useErrorText();
+  const mounted = useMounted();
   const [receiptKeys] = useState(() => createIdempotencyKeys());
   const [cancelKeys] = useState(() => createIdempotencyKeys());
   const sending = useRef(false);
@@ -169,7 +171,7 @@ export function TopUpActions({ id, canReceipt, canCancel, labels: t, errors }: T
         <Card>
           <CardHeader title={t.receiptTitle} description={t.receiptText} />
           <CardBody>
-            <form onSubmit={onSend} noValidate aria-busy={busy === "send" || undefined} className="grid grid-cols-1 gap-5">
+            <form method="post" onSubmit={onSend} noValidate aria-busy={busy === "send" || undefined} className="grid grid-cols-1 gap-5">
               {formError ? (
                 <Alert ref={errorBox} tabIndex={-1} tone="danger" className="focus:outline-none">
                   {formError.message}
@@ -224,7 +226,7 @@ export function TopUpActions({ id, canReceipt, canCancel, labels: t, errors }: T
                   {t.sentText}
                 </Alert>
               ) : (
-                <Button type="submit" size="lg" block loading={busy === "send"} aria-label={busy === "send" ? t.sending : undefined}>
+                <Button type="submit" size="lg" block loading={busy === "send"} disabled={!mounted} aria-label={busy === "send" ? t.sending : undefined}>
                   {t.send}
                 </Button>
               )}

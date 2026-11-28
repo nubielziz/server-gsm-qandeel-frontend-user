@@ -13,6 +13,7 @@ import type { TicketMessage } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
 import {
   activeChips,
@@ -62,6 +63,7 @@ export function TicketReplyForm({ adapter, t, hint, initialBody = "", onSent, on
   const errorText = useErrorText();
   const hintId = useId();
   const form = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   const box = useRef<HTMLTextAreaElement>(null);
   const nextKey = useRef(1);
   const [body, setBody] = useState(initialBody);
@@ -173,7 +175,7 @@ export function TicketReplyForm({ adapter, t, hint, initialBody = "", onSent, on
   }
 
   return (
-    <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-3">
+    <form ref={form} method="post" onSubmit={onSubmit} noValidate className="grid gap-3">
       {hint ? <p className="text-small text-ink-subtle">{hint}</p> : null}
       <Textarea
         ref={box}
@@ -261,7 +263,7 @@ export function TicketReplyForm({ adapter, t, hint, initialBody = "", onSent, on
             {t.attachHint}
           </span>
         </div>
-        <Button type="submit" loading={busy} startIcon={<Send aria-hidden="true" />}>
+        <Button type="submit" loading={busy} disabled={!mounted} startIcon={<Send aria-hidden="true" />}>
           {t.submit}
         </Button>
       </div>

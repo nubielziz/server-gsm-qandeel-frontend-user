@@ -16,6 +16,7 @@ import type { TopUpDetail, TopUpMethod } from "@/lib/api/types";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
 import { isHttpUrl, ltr } from "@/lib/merchant/format";
 import { leaveIfSignedOut } from "@/lib/merchant/signed-out";
@@ -58,6 +59,7 @@ export type TopUpFormProps = {
 };
 
 export function TopUpForm({ methods, limits, frozen, detailBase, labels: t, errors }: TopUpFormProps) {
+  const mounted = useMounted();
   const router = useRouter();
   const errorText = useErrorText();
   const [keys] = useState(() => createIdempotencyKeys());
@@ -179,6 +181,7 @@ export function TopUpForm({ methods, limits, frozen, detailBase, labels: t, erro
 
   return (
     <form
+      method="post"
       onSubmit={onSubmit}
       noValidate
       aria-busy={submitting || undefined}
@@ -297,6 +300,7 @@ export function TopUpForm({ methods, limits, frozen, detailBase, labels: t, erro
               size="lg"
               block
               loading={submitting}
+              disabled={!mounted}
               aria-label={submitting ? (redirecting ? t.redirecting : t.creating) : undefined}
             >
               {t.submit}

@@ -51,6 +51,39 @@ export type DataRequest = S.PostStoreV1MeDataExportResponse;
 export type TicketInput = S.PostStoreV1TicketsBody;
 export type TicketCreated = S.PostStoreV1TicketsResponse;
 export type StoreMeInput = S.PatchStoreV1MeBody;
+/**
+ * The body of `POST /store/v1/auth/sign-up` (backend decision 079; shop decision 011): every key is required. HAND-TYPED until
+ * `schema.gen.ts` carries the route, so the code compiles before and after `npm run gen:api`; the generated body then replaces this.
+ * `firstName` and `lastName` are 1 to 60 characters, `country` is a two-letter code of a country the shop sells to, `phone` is an
+ * optional leading + and 7 to 15 digits. The route answers 204 for every valid body, whether or not the address has an account.
+ */
+export type SignUpInput = {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  country: string;
+  phone: string;
+};
+/**
+ * The details of a sign-up form as the server kept them, handed back by `POST /store/v1/auth/verify` as `pendingDetails` when the
+ * sign-up link was opened in another browser than the one that filled the form (backend decision 079): the account exists and is
+ * signed in, but NOTHING of the form was applied, so the person who proved the mailbox confirms or corrects them on the "finish your
+ * account" form. It never carries the password. HAND-TYPED until `schema.gen.ts` carries the key.
+ */
+export type PendingDetails = {
+  firstName: string;
+  lastName: string;
+  country: string;
+  phone: string;
+};
+/**
+ * The body of `POST /store/v1/auth/sign-up/finish` (signed-in session, CSRF like the other session routes): the four details and
+ * the password, with exactly the rules of sign-up. It is allowed only for an account that has no password yet; the answer is the
+ * account's own view (`AccountMe`). A refused call is a 422 naming the field, or a 409 for an account that already has a password.
+ * HAND-TYPED until `schema.gen.ts` carries the route.
+ */
+export type SignUpFinishInput = PendingDetails & { password: string };
 export type StoreUploadedFile = S.PostStoreV1FilesResponse;
 
 // ── Support live chat (feature 28). HAND-TYPED from the backend plan `docs/briefs/28-support-live-chat.md` §3.2: the

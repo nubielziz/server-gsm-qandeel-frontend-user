@@ -152,5 +152,9 @@ describe("the page that opens a checkout", () => {
     expect(find(shown, (element) => element.type === PriceListCard)).toBeNull();
     const action = find(shown, (element) => typeof element.props.href === "string");
     expect(action?.props.href).toBe("/en/sign-in?next=%2Fen%2Fcheckout%3Fservice%3Dicloud-clean");
+    // The offer to create an account points to the sign-up page (an emailed link signs in; it never creates an account).
+    const create = find(shown, (element) => element.props.href === "/en/sign-up");
+    expect(create).not.toBeNull();
+    expect(create?.props.children).toBe("Create an account");
   });
 });

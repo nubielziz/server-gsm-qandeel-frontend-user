@@ -1,6 +1,6 @@
 "use client";
-// MagicLinkForm: asks for an email and sends a sign-in link (`POST /store/v1/auth/magic-link`, Turnstile). An unknown
-// email creates an account of the retail rank (self sign-up), so the same form serves "sign in" and "sign up". The answer is
+// MagicLinkForm: asks for an email and sends a sign-in link (`POST /store/v1/auth/magic-link`, Turnstile). The link signs in an
+// account that exists; it creates none (sign-up has its own form, with the full details: sign-up-form.tsx). The answer is
 // always the same neutral "check your email": the page never says whether the address has an account.
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Mail } from "lucide-react";
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { requestSignInLink } from "./auth-requests";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "./form-errors";
 import { FormAlert } from "./form-alert";
+import { useMounted } from "@/lib/use-mounted";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
 import { useTurnstile } from "./use-turnstile";
 
@@ -39,6 +40,7 @@ export function MagicLinkForm({ strings: s, defaultEmail = "", children }: Magic
   const errorText = useErrorText();
   const ts = useTurnstile();
   const form = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   const [email, setEmail] = useState(defaultEmail);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<FormFeedback>(NO_FEEDBACK);
@@ -86,7 +88,7 @@ export function MagicLinkForm({ strings: s, defaultEmail = "", children }: Magic
   }
 
   return (
-    <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
+    <form ref={form} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
       <Input
         type="email"
         name="email"
@@ -103,7 +105,7 @@ export function MagicLinkForm({ strings: s, defaultEmail = "", children }: Magic
       />
       <Turnstile onToken={ts.setToken} resetKey={ts.resetKey} />
       <FormAlert message={feedback.message} reference={feedback.reference} />
-      <Button type="submit" size="lg" block loading={busy}>
+      <Button type="submit" size="lg" block loading={busy} disabled={!mounted}>
         {s.submit}
       </Button>
       {children}

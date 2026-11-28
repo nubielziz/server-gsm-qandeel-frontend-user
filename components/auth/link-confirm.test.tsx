@@ -4,15 +4,22 @@ import { ErrorTextProvider } from "@/lib/i18n/error-text";
 import { auth } from "@/lib/i18n/messages/auth";
 import { errors } from "@/lib/i18n/messages/errors";
 import { claimLines } from "./sign-in-steps";
-import { LinkConfirm, LinkOutcome } from "./link-confirm";
+import { LinkConfirm, LinkNotices, LinkOutcome } from "./link-confirm";
 
 const strings = { ...auth.signIn.link, requestNewLink: auth.shared.requestNewLink };
 const noop = () => {};
+const finish = {
+  countries: [
+    { code: "JO", name: "Jordan" },
+    { code: "US", name: "United States" },
+  ],
+  t: { fields: auth.fields, errors: auth.signUp.errors, finish: auth.signIn.finish, continue: auth.signIn.link.continue },
+};
 
 describe("the sign-in link page: the claim box", () => {
   const html = renderToStaticMarkup(
     <ErrorTextProvider messages={errors}>
-      <LinkConfirm token="abc" strings={strings} onSignedIn={noop} onRequestNewLink={noop} onSignedOut={noop} />
+      <LinkConfirm token="abc" strings={strings} finish={finish} onSignedIn={noop} onRequestNewLink={noop} onSignedOut={noop} />
     </ErrorTextProvider>,
   );
 
@@ -52,6 +59,28 @@ describe("LinkOutcome: what the claim did, before the page goes on", () => {
     expect(html).toContain("Your guest orders could not be added just now. Ask for a new sign-in link later to try again.");
     expect(html).toContain('role="alert"');
     expect(html).not.toContain("were added");
+  });
+});
+
+describe("LinkNotices: the lines above the finish form", () => {
+  it("names the account the link opened, with the way out, and the claim lines, and has no button that goes on", () => {
+    const html = renderToStaticMarkup(
+      <LinkNotices
+        lines={claimLines({ claimedOrders: 2 }, strings)}
+        opened={{ text: "You are signed in as da•••@example.com.", signOut: strings.notYou, pending: false, onSignOut: noop }}
+      />,
+    );
+    expect(html).toContain("You are signed in as da•••@example.com.");
+    expect(html).toContain("Not you? Sign out");
+    expect(html).toContain("2 guest orders were added to your account.");
+    expect(html).not.toContain(">Continue<");
+  });
+
+  it("is an empty box when there is nothing to say", () => {
+    const html = renderToStaticMarkup(<LinkNotices lines={[]} />);
+    expect(html).not.toContain("<button");
+    expect(html).not.toContain("<div role");
+    expect(html).not.toContain('role="');
   });
 });
 

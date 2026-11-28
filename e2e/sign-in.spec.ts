@@ -97,7 +97,7 @@ test.describe("one form", () => {
     const magic = page.getByRole("button", { name: "Email me a sign-in link" });
     await expect(magic).toBeVisible();
     await expect(page.getByRole("link", { name: "Forgot password?" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Create account" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create an account" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Need merchant prices?" })).toBeVisible();
 
     await magic.click();

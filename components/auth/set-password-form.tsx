@@ -15,6 +15,7 @@ import { setPasswordFromLink } from "./auth-requests";
 import { FormAlert } from "./form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "./form-errors";
 import { LinkProblem } from "./link-problem";
+import { useMounted } from "@/lib/use-mounted";
 import { useFocusOnFeedback } from "./use-focus-on-feedback";
 
 export type SetPasswordFormProps = {
@@ -25,6 +26,7 @@ export function SetPasswordForm({ t }: SetPasswordFormProps) {
   const token = useSearchParams().get("token");
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,7 +78,7 @@ export function SetPasswordForm({ t }: SetPasswordFormProps) {
   }
 
   return (
-    <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
+    <form ref={form} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
       <PasswordInput
         name="password"
         label={t.fields.newPassword}
@@ -97,7 +99,7 @@ export function SetPasswordForm({ t }: SetPasswordFormProps) {
         error={feedback.fields.confirm}
       />
       <FormAlert message={feedback.message} reference={feedback.reference} />
-      <Button type="submit" size="lg" block loading={busy}>
+      <Button type="submit" size="lg" block loading={busy} disabled={!mounted}>
         {t.setPassword.submit}
       </Button>
     </form>

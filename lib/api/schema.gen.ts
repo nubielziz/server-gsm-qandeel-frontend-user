@@ -1293,6 +1293,70 @@ export type PostStoreV1AuthPasswordSetBody = {
 /** 204 */
 export type PostStoreV1AuthPasswordSetResponse = void;
 
+// ── POST /store/v1/auth/sign-up — Sign up with the full details
+export type PostStoreV1AuthSignUpBody = {
+  email: string;
+  /** The password, as typed: at least 10 characters, not trivial, without the email or the names. */
+  password: string;
+  /** The first name: trimmed, then 1 to 60 characters, no line break or other control character; any script. */
+  firstName: string;
+  /** The last name: trimmed, then 1 to 60 characters, no line break or other control character; any script. */
+  lastName: string;
+  /** ISO 3166 alpha-2 (any case): a country of the shop’s tax windows (`taxRates` of `GET /store/v1/config`), or any country when there is none. */
+  country: string;
+  /** The phone number with its country code. Spaces, dashes, dots and brackets are removed; what is left must be an optional leading `+` and 7 to 15 digits, and is stored in that form (`+962791234567`). */
+  phone: string;
+};
+/** 204 */
+export type PostStoreV1AuthSignUpResponse = void;
+
+// ── POST /store/v1/auth/sign-up/finish — Finish the sign-up of my account
+export type PostStoreV1AuthSignUpFinishBody = {
+  /** The password, as typed: at least 10 characters, not trivial, without the email or the names. */
+  password: string;
+  /** The first name: trimmed, then 1 to 60 characters, no line break or other control character; any script. */
+  firstName: string;
+  /** The last name: trimmed, then 1 to 60 characters, no line break or other control character; any script. */
+  lastName: string;
+  /** ISO 3166 alpha-2 (any case): a country of the shop’s tax windows (`taxRates` of `GET /store/v1/config`), or any country when there is none. */
+  country: string;
+  /** The phone number with its country code. Spaces, dashes, dots and brackets are removed; what is left must be an optional leading `+` and 7 to 15 digits, and is stored in that form (`+962791234567`). */
+  phone: string;
+};
+/** 200 */
+export type PostStoreV1AuthSignUpFinishResponse = {
+  /** Numeric record id. */
+  id: Id;
+  name: string;
+  email: string;
+  status: "active" | "suspended" | "blocked" | "anonymized";
+  rank: {
+    /** Numeric record id. */
+    id: Id;
+    name: string;
+    kind: "retail" | "merchant";
+    /** Exact decimal number as a string. */
+    discountPercent: Decimal;
+  };
+  /** True once the account has a password; false for an account that signs in by link. */
+  hasPassword: boolean;
+  mustChangePassword: boolean;
+  twofaEnabled: boolean;
+  /** The ISO code of the currency prices are shown in; null when none is chosen. */
+  currency: string | null;
+  marketingOptIn: boolean;
+  company: string;
+  /** The Dhru username of a merchant rank; empty for a retail account. */
+  username: string;
+  phone: string;
+  country: string;
+  address: string;
+  taxId: string;
+  emailVerifiedAt: IsoDateTime | null;
+  /** ISO 8601 UTC time with milliseconds. */
+  createdAt: IsoDateTime;
+};
+
 // ── POST /store/v1/auth/verify — Exchange a sign-in link for a session
 export type PostStoreV1AuthVerifyBody = {
   token: string;
@@ -1341,6 +1405,17 @@ export type PostStoreV1AuthVerifyResponse = {
   claimedOrders: number;
   /** `busy` when the claim gave up because another request holds a row it needs: the sign-in still succeeded, ask for a new link later. */
   claimSkipped?: "busy";
+  /** Only for a link mailed by `POST /store/v1/auth/sign-up` that made the account (decision 079): true when the form was applied (the name, country, phone and password), which happens when the link is opened in the browser that sent the form; false when it was opened in another browser: the account exists and is signed in, but nothing of the form was applied (no name, country, phone or password), and `pendingDetails` shows what was typed so the person can confirm or correct it with `POST /store/v1/auth/sign-up/finish`. Absent for every other link, and for a sign-up link of an address that already had an account (then it was a plain sign-in and nothing was applied). */
+  passwordSet?: boolean;
+  /** Only with `passwordSet: false`: the details of the sign-up form as typed (never the password), shown only to the person who proved the mailbox. Nothing of them was applied; send them back, corrected if need be, with a password to `POST /store/v1/auth/sign-up/finish`. */
+  pendingDetails?: {
+    firstName: string;
+    lastName: string;
+    /** ISO 3166 alpha-2, upper case. */
+    country: string;
+    /** The cleaned form: an optional leading `+` and 7 to 15 digits. */
+    phone: string;
+  };
 };
 
 // ── GET /store/v1/categories — List the storefront categories
@@ -3190,6 +3265,8 @@ export interface ApiRoutes {
   "POST /store/v1/auth/magic-link": { query: never; params: never; body: PostStoreV1AuthMagicLinkBody; response: PostStoreV1AuthMagicLinkResponse; status: 204 };
   "POST /store/v1/auth/password/forgot": { query: never; params: never; body: PostStoreV1AuthPasswordForgotBody; response: PostStoreV1AuthPasswordForgotResponse; status: 204 };
   "POST /store/v1/auth/password/set": { query: never; params: never; body: PostStoreV1AuthPasswordSetBody; response: PostStoreV1AuthPasswordSetResponse; status: 204 };
+  "POST /store/v1/auth/sign-up": { query: never; params: never; body: PostStoreV1AuthSignUpBody; response: PostStoreV1AuthSignUpResponse; status: 204 };
+  "POST /store/v1/auth/sign-up/finish": { query: never; params: never; body: PostStoreV1AuthSignUpFinishBody; response: PostStoreV1AuthSignUpFinishResponse; status: 200 };
   "POST /store/v1/auth/verify": { query: never; params: never; body: PostStoreV1AuthVerifyBody; response: PostStoreV1AuthVerifyResponse; status: 200 };
   "GET /store/v1/categories": { query: never; params: never; body: never; response: GetStoreV1CategoriesResponse; status: 200 };
   "POST /store/v1/checkout-sessions": { query: never; params: never; body: PostStoreV1CheckoutSessionsBody; response: PostStoreV1CheckoutSessionsResponse; status: 201 };

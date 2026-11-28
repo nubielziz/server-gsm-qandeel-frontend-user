@@ -8,7 +8,7 @@ import { merchant } from "@/lib/i18n/messages/merchant";
 export type WelcomeSource = RankSource & { name?: string | null; email?: string | null };
 
 /**
- * The overview's heading. A name greets by name. Without one, a retail account (one made by the email link has no name yet)
+ * The overview's heading. A name greets by name. Without one, a retail account (an older account made by an email link, or one whose sign-up link was opened in another browser and never finished, has no name yet)
  * is greeted plainly, and a merchant rank by its email, so the heading never ends in a bare comma.
  *
  * @param me the signed-in account

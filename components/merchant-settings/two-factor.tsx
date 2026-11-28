@@ -132,7 +132,7 @@ export function TwoFactor({ family, enabled, t, fieldTexts }: Props) {
         <ProblemAlert problem={problem} />
 
         {phase.kind === "setup" ? (
-          <form ref={formRef} onSubmit={submitCode("enable")} noValidate className="grid gap-5">
+          <form ref={formRef} method="post" onSubmit={submitCode("enable")} noValidate className="grid gap-5">
             <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
               {/* A data URI of the API's SVG: shown as an image, so no markup from the answer can run. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -180,7 +180,7 @@ export function TwoFactor({ family, enabled, t, fieldTexts }: Props) {
             </div>
           </form>
         ) : phase.kind === "disable" ? (
-          <form ref={formRef} onSubmit={submitCode("disable")} noValidate className="grid gap-5">
+          <form ref={formRef} method="post" onSubmit={submitCode("disable")} noValidate className="grid gap-5">
             <div>
               <h3 className="text-subheading text-ink">{t.disableTitle}</h3>
               <p className="mt-1 text-body text-ink-muted">{t.disableText}</p>

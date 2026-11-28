@@ -3,18 +3,22 @@
 // accounts are never changed (passwords, settings): lifecycle tests create their own accounts.
 // There is one kind of account: the sign-in page is ONE form for every rank and nothing on these pages asks who the visitor is.
 // The sign-in specifics (request shape, tokens, temporary passwords, two-step) live in e2e/sign-in.spec.ts.
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { accountIdByEmail, createAccount, temporaryPassword } from "./admin";
 import {
   ACCOUNTS,
+  BASE_URL,
   DEV_TURNSTILE_TOKEN,
   SET_PASSWORD_LINK,
   SIGN_IN_LINK,
   VERIFY_EMAIL_LINK,
   freshAccount,
   go,
+  latestMailTo,
+  openAnotherBrowser,
   signIn,
-  signUpByLink,
+  signUpInAnotherBrowser,
   stubTurnstile,
   tokenOf,
   uniqueEmail,
@@ -28,6 +32,12 @@ const CLAIM_BOX = "Add the orders I placed as a guest with this email";
 const isVerify = (request: { method(): string; url(): string }) =>
   request.method() === "POST" && new URL(request.url()).pathname === VERIFY_PATH;
 
+/** Asks for the sign-in link of an address that HAS an account (the call the "Email me the link" button makes). */
+async function askForLink(page: Page, email: string): Promise<void> {
+  const asked = await page.request.post("/store/v1/auth/magic-link", { headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN }, data: { email } });
+  expect(asked.status(), await asked.text()).toBe(204);
+}
+
 test.describe("sign-in page", () => {
   test.beforeEach(async ({ page }) => stubTurnstile(page));
 
@@ -37,7 +47,7 @@ test.describe("sign-in page", () => {
     await expect(page.getByRole("radio")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Forgot password?" })).toHaveAttribute("href", "/en/forgot-password");
-    await expect(page.getByRole("link", { name: "Create account" })).toHaveAttribute("href", "/en/sign-up");
+    await expect(page.getByRole("link", { name: "Create an account" })).toHaveAttribute("href", "/en/sign-up");
     await expect(page.getByRole("link", { name: "Need merchant prices?" })).toHaveAttribute("href", "/en/become-a-merchant");
   });
 
@@ -45,7 +55,7 @@ test.describe("sign-in page", () => {
     await go(page, "/en/sign-in?as=merchant");
     await expect(page.getByRole("radio")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Forgot password?" })).toHaveAttribute("href", "/en/forgot-password");
-    await expect(page.getByRole("link", { name: "Create account" })).toHaveAttribute("href", "/en/sign-up");
+    await expect(page.getByRole("link", { name: "Create an account" })).toHaveAttribute("href", "/en/sign-up");
   });
 
   test("a wrong password shows one generic message and keeps the page", async ({ page }) => {
@@ -127,7 +137,8 @@ test.describe("email-link pages", () => {
   test.beforeEach(async ({ page }) => stubTurnstile(page));
 
   test("sign-in link: request, mail, button, signed in; the link works once", async ({ page }) => {
-    const email = uniqueEmail("magic");
+    // A link signs in an account that exists (staff made this one): it never makes an account.
+    const { email } = await freshAccount(page);
     await go(page, "/en/sign-in");
     await page.getByRole("button", { name: "Email me a sign-in link" }).click();
     await page.locator('input[name="email"]').fill(email);
@@ -158,15 +169,8 @@ test.describe("email-link pages", () => {
 
   test("the sign-in link page has the claim box ticked, and the box is what the exchange sends", async ({ page }) => {
     for (const ticked of [true, false]) {
-      const email = uniqueEmail(ticked ? "claim" : "noclaim");
-      expect(
-        (
-          await page.request.post("/store/v1/auth/magic-link", {
-            headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN },
-            data: { email },
-          })
-        ).status(),
-      ).toBe(204);
+      const { email } = await freshAccount(page); // an address with an account: it is what gets a sign-in link
+      await askForLink(page, email);
       const link = await waitForLink(page, email, SIGN_IN_LINK);
       await page.context().clearCookies();
       await go(page, link);
@@ -192,15 +196,8 @@ test.describe("email-link pages", () => {
       },
     ];
     for (const { patch, line } of answers) {
-      const email = uniqueEmail("told");
-      expect(
-        (
-          await page.request.post("/store/v1/auth/magic-link", {
-            headers: { "X-Turnstile-Token": DEV_TURNSTILE_TOKEN },
-            data: { email },
-          })
-        ).status(),
-      ).toBe(204);
+      const { email } = await freshAccount(page);
+      await askForLink(page, email);
       const link = await waitForLink(page, email, SIGN_IN_LINK);
       await page.context().clearCookies();
       await page.route(`**${VERIFY_PATH}`, async (route) => {
@@ -217,21 +214,130 @@ test.describe("email-link pages", () => {
     }
   });
 
-  test("sign-up: an unknown email gets a link and lands on the account as a retail account", async ({ page }) => {
+  test("sign-up: the full details get a link, and the link opened here signs the new retail account in with its password", async ({
+    page,
+  }) => {
     const email = uniqueEmail("signup");
+    const password = "Orchard-Lantern-8841";
     await go(page, "/en/sign-up");
     await expect(page.getByRole("heading", { level: 1, name: "Create your account" })).toBeVisible();
     await expect(page.getByRole("radio")).toHaveCount(0); // nothing to choose
+
+    // Nothing is sent while a detail is missing: the sentences sit under the fields and the focus goes to the first one.
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(page.locator('input[name="firstName"]')).toBeFocused();
+    await expect(page.getByText("This field is required.").first()).toBeVisible();
+
+    await page.locator('input[name="firstName"]').fill("Sam");
+    await page.locator('input[name="lastName"]').fill("Hamdan");
     await page.locator('input[name="email"]').fill(email);
-    await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+    await page.locator('input[name="phone"]').fill("+1 202 555 0100");
+    await page.locator('select[name="country"]').selectOption({ index: 1 }); // the first country of the menu (index 0 is the prompt)
+    const country = await page.locator('select[name="country"]').inputValue();
+    await page.locator('input[name="password"]').fill(password);
+    await page.getByRole("button", { name: "Create account" }).click();
     await expect(page.getByText(`a link is on its way to ${email}`)).toBeVisible();
+    await expect(
+      page.getByText("Open the link on this device to finish at once. On another device you will be asked to confirm your details."),
+    ).toBeVisible();
     const link = await waitForLink(page, email, SIGN_IN_LINK);
 
+    // This browser sent the form (it holds the asking cookie): the link makes the account and applies everything at once.
     await go(page, link);
     await page.getByRole("button", { name: "Sign in to IMEI-HUB" }).click();
     await expect(page).toHaveURL(/\/en\/account$/);
-    const me = (await (await page.request.get("/store/v1/me")).json()) as { email: string; rank: { kind: string } };
-    expect(me).toMatchObject({ email, rank: { kind: "retail" } });
+    const me = (await (await page.request.get("/store/v1/me")).json()) as { email: string; name: string; phone: string; country: string; hasPassword: boolean; rank: { kind: string } };
+    expect(me).toMatchObject({ email, name: "Sam Hamdan", phone: "+12025550100", country, hasPassword: true, rank: { kind: "retail" } });
+    await expect(page.getByRole("heading", { level: 1, name: "Welcome back, Sam Hamdan" })).toBeVisible();
+
+    // The password of the form was set because the link was opened in the browser that filled the form.
+    await page.context().clearCookies();
+    await signIn(page, { email, password });
+  });
+
+  test("sign-up: a link opened in another browser signs in with nothing applied and asks to finish the account (details to confirm, a password to choose)", async ({
+    page,
+    browser,
+  }) => {
+    const email = uniqueEmail("other");
+    const password = "Orchard-Lantern-8841";
+    await go(page, "/en/sign-up");
+    await page.locator('input[name="firstName"]').fill("Sam");
+    await page.locator('input[name="lastName"]').fill("Hamdan");
+    await page.locator('input[name="email"]').fill(email);
+    await page.locator('input[name="phone"]').fill("+1 202 555 0100");
+    await page.locator('select[name="country"]').selectOption({ index: 1 });
+    const country = await page.locator('select[name="country"]').inputValue();
+    await page.locator('input[name="password"]').fill(password);
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByText(`a link is on its way to ${email}`)).toBeVisible();
+    const link = await waitForLink(page, email, SIGN_IN_LINK);
+
+    // The link is opened in ANOTHER browser (a context of its own: it never held the asking cookie), as a phone's mail app does.
+    const phone = await openAnotherBrowser(browser);
+    try {
+      await go(phone, link);
+      await phone.getByRole("button", { name: "Sign in to IMEI-HUB" }).click();
+
+      // The page stops at the finish form: the details as typed, a password box that is empty.
+      await expect(phone.getByRole("heading", { level: 2, name: "Finish creating your account" })).toBeVisible();
+      await expect(phone.getByText("Check these details. If they are not yours, change them.")).toBeVisible();
+      await expect(phone).toHaveURL(/\/en\/sign-in\?token=/);
+      await expect(phone.locator('input[name="firstName"]')).toHaveValue("Sam");
+      await expect(phone.locator('input[name="lastName"]')).toHaveValue("Hamdan");
+      await expect(phone.locator('input[name="phone"]')).toHaveValue("+12025550100");
+      await expect(phone.locator('select[name="country"]')).toHaveValue(country);
+      await expect(phone.locator('input[name="password"]')).toHaveValue("");
+      await expect(phone.locator('input[name="email"]')).toHaveCount(0);
+      // The account is signed in and holds nothing of the form: no name, no phone, no password.
+      const before = (await (await phone.request.get("/store/v1/me")).json()) as { email: string; name: string; phone: string; hasPassword: boolean };
+      expect(before.email).toBe(email);
+      expect(before.hasPassword).toBe(false);
+      expect(before.name || "").toBe("");
+      expect(before.phone || "").toBe("");
+
+      // A weak password is refused under its field and the form stays; the details are editable.
+      await phone.locator('input[name="lastName"]').fill("Ali");
+      await phone.locator('input[name="password"]').fill("password123");
+      await phone.getByRole("button", { name: "Finish creating account" }).click();
+      await expect(phone.locator('input[name="password"]')).toHaveAttribute("aria-invalid", "true");
+      await expect(phone.getByRole("heading", { level: 2, name: "Finish creating your account" })).toBeVisible();
+
+      const chosen = "Willow-Anchor-7304";
+      await phone.locator('input[name="password"]').fill(chosen);
+      const sent = phone.waitForRequest((request) => request.method() === "POST" && new URL(request.url()).pathname === "/store/v1/auth/sign-up/finish");
+      await phone.getByRole("button", { name: "Finish creating account" }).click();
+      expect((await sent).postDataJSON()).toEqual({ firstName: "Sam", lastName: "Ali", country, phone: "+12025550100", password: chosen });
+      await expect(phone).toHaveURL(/\/en\/account$/);
+      const after = (await (await phone.request.get("/store/v1/me")).json()) as { name: string; phone: string; country: string; hasPassword: boolean };
+      expect(after).toMatchObject({ name: "Sam Ali", phone: "+12025550100", country, hasPassword: true });
+
+      // The password the stranger-proof form took is the one chosen on the finish form; the one typed on the sign-up form never worked.
+      await phone.context().clearCookies();
+      await signIn(phone, { email, password: chosen });
+      await phone.context().clearCookies();
+      const refused = await phone.request.post("/client/auth/sign-in", {
+        headers: { Origin: new URL(BASE_URL).origin, "X-Turnstile-Token": DEV_TURNSTILE_TOKEN, "Content-Type": "application/json" },
+        data: { email, password },
+      });
+      expect(refused.status()).toBe(401);
+    } finally {
+      await phone.context().close();
+    }
+  });
+
+  test("an address with no account asks for a sign-in link and gets a note with the sign-up address, never a link", async ({ page }) => {
+    const email = uniqueEmail("nobody");
+    await go(page, "/en/sign-in");
+    await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+    await page.locator('input[name="email"]').fill(email);
+    await page.getByRole("button", { name: "Email me the link" }).click();
+    // The page says the same for every address.
+    await expect(page.getByText(`a link is on its way to ${email}`)).toBeVisible();
+    const note = await waitForLink(page, email, /^\/en\/sign-up$/);
+    expect(note).toBe("/en/sign-up");
+    const mail = await latestMailTo(page, email);
+    expect(mail?.text ?? "").not.toMatch(/\/sign-in\?token=/);
   });
 
   test("sign-up: one quiet line says merchant accounts are opened by the team, and links to the page that explains it", async ({
@@ -244,8 +350,8 @@ test.describe("email-link pages", () => {
   });
 
   test("password lifecycle of a link-only account: forgot, set password (weak refused), sign in with it", async ({ page }) => {
-    // An account holder with no password yet: made by the email link, then signed out.
-    const { email } = await signUpByLink(page);
+    // An account holder with no password yet: its sign-up link was opened in another browser (nothing applied), then signed out.
+    const { email } = await signUpInAnotherBrowser(page);
     await page.context().clearCookies();
 
     await go(page, "/en/forgot-password");
@@ -373,8 +479,8 @@ test.describe("email-link pages", () => {
   });
 });
 
-// "Become a merchant" is not a form (2026-11-16): the page sends the visitor to the team's WhatsApp number. The number is
-// a build-time value (NEXT_PUBLIC_MERCHANT_WHATSAPP, see .env.example): the tests read it from the env files of the site
+// "Become a merchant" sends the visitor to the team's WhatsApp number (2026-11-16); since shop decision 011 a short form (no password)
+// writes the visitor's details into the message first, and nothing goes to our API. The number is a build-time value (NEXT_PUBLIC_MERCHANT_WHATSAPP, see .env.example): the tests read it from the env files of the site
 // under test and are skipped when it is not set (the page then shows "Contact support" instead of a WhatsApp link).
 const WHATSAPP_RAW = siteEnv("NEXT_PUBLIC_MERCHANT_WHATSAPP");
 const WHATSAPP_NUMBER = normaliseWhatsAppNumber(WHATSAPP_RAW);
@@ -382,11 +488,21 @@ const WHATSAPP_NUMBER = normaliseWhatsAppNumber(WHATSAPP_RAW);
 const WHATSAPP_DISPLAY = WHATSAPP_NUMBER ? displayWhatsAppNumber(WHATSAPP_RAW, WHATSAPP_NUMBER) : "";
 const WHATSAPP_MESSAGE_EN = "Hello, I would like to open a merchant account.";
 const waLink = (text: string) => `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+/** The message the chat opens with after the form below was filled: the plain sentence, then one line per detail. */
+const messageWithDetails = (country: string) =>
+  [
+    WHATSAPP_MESSAGE_EN,
+    "First name: Sam",
+    "Last name: Hamdan",
+    "Email address: sam@example.com",
+    "Phone number: +1 202 555 0100",
+    `Country: ${country}`,
+  ].join("\n");
 
 test.describe("become a merchant page", () => {
   test.skip(!WHATSAPP_NUMBER, "NEXT_PUBLIC_MERCHANT_WHATSAPP is not set in the env files of the site under test");
 
-  test("English: the heading, three steps, no form, and a WhatsApp link with the prefilled message and the number as text", async ({
+  test("English: the heading, three steps, a short form with no password, and a WhatsApp button that writes the details into the message", async ({
     page,
   }) => {
     await go(page, "/en/become-a-merchant");
@@ -397,20 +513,36 @@ test.describe("become a merchant page", () => {
     const steps = main.getByRole("list", { name: "How to apply" }).getByRole("listitem");
     await expect(steps).toHaveCount(3);
     await expect(steps).toHaveText([
-      /Message us on WhatsApp\.$/,
-      /Tell us your name, company, country and email\.$/,
+      /Fill in your details below\.$/,
+      /Press the WhatsApp button: your details are already written in the message\. Send it\.$/,
       /Our team reviews the request and sends you a link to set your password\.$/,
     ]);
 
-    // Nothing to fill in or submit.
-    await expect(main.locator("form, input, select, textarea")).toHaveCount(0);
+    // The short form: five details, no password.
+    for (const name of ["firstName", "lastName", "email", "phone"]) await expect(main.locator(`input[name="${name}"]`)).toBeVisible();
+    await expect(main.locator('select[name="country"]')).toBeVisible();
+    await expect(main.locator('input[type="password"]')).toHaveCount(0);
 
-    const chat = main.getByRole("link", { name: "Chat on WhatsApp" });
-    await expect(chat).toBeVisible();
-    await expect(chat).toHaveAttribute("href", waLink(WHATSAPP_MESSAGE_EN));
-    await expect(chat).toHaveAttribute("target", "_blank");
-    await expect(chat).toHaveAttribute("rel", /noopener/);
+    const chat = main.getByRole("button", { name: "Chat on WhatsApp" });
     await expect(chat).toHaveAccessibleName(/opens WhatsApp in a new tab/);
+
+    // A form with a missing detail opens nothing: the sentences sit under the fields.
+    await chat.click();
+    await expect(main.locator('input[name="firstName"]')).toBeFocused();
+    await expect(main.getByText("This field is required.").first()).toBeVisible();
+
+    // Filled in, the button opens the chat in a new tab with the details after the plain sentence. The tab is answered here, not by WhatsApp.
+    await page.context().route("https://wa.me/**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "chat" }));
+    await main.locator('input[name="firstName"]').fill("Sam");
+    await main.locator('input[name="lastName"]').fill("Hamdan");
+    await main.locator('input[name="email"]').fill("sam@example.com");
+    await main.locator('input[name="phone"]').fill("+1 202 555 0100");
+    // The menu is the shop's tax-rate countries (every country when it has none): the first one, whichever the demo shop offers.
+    const country = main.locator('select[name="country"]');
+    await country.selectOption({ index: 1 });
+    const countryName = (await country.locator("option:checked").innerText()).trim();
+    const [chatTab] = await Promise.all([page.context().waitForEvent("page"), chat.click()]);
+    expect(chatTab.url()).toBe(waLink(messageWithDetails(countryName)));
 
     await expect(main.getByText("Or message this number on WhatsApp:")).toBeVisible();
     await expect(main.locator('span[dir="ltr"]', { hasText: WHATSAPP_DISPLAY })).toBeVisible();
@@ -420,7 +552,7 @@ test.describe("become a merchant page", () => {
     ).toHaveAttribute("href", "/en/sign-in");
   });
 
-  test("an old shared link that still carries a ?ref= value opens the same page: the plain message, no note, no request to the register route", async ({
+  test("an old shared link that still carries a ?ref= value opens the same page: the form, no note, no request to the register route", async ({
     page,
   }) => {
     const registerRequests: string[] = [];
@@ -430,7 +562,7 @@ test.describe("become a merchant page", () => {
     });
     await go(page, "/en/become-a-merchant?ref=gsm0001");
     await expect(page.getByRole("heading", { level: 1, name: "Become a merchant" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Chat on WhatsApp" })).toHaveAttribute("href", waLink(WHATSAPP_MESSAGE_EN));
+    await expect(page.getByRole("button", { name: "Chat on WhatsApp" })).toBeVisible();
     await expect(page.locator("main")).not.toContainText("GSM0001");
     await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
     expect(registerRequests).toEqual([]);

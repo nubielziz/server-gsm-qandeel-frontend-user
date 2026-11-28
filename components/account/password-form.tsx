@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { api } from "@/lib/api/browser";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import type { AccountMessages } from "@/lib/i18n/messages/account";
 import { FormAlert } from "@/components/auth/form-alert";
 import { feedbackFrom, NO_FEEDBACK, type FormFeedback } from "@/components/auth/form-errors";
@@ -35,6 +36,7 @@ export function PasswordForm({ endpoint, t }: PasswordFormProps) {
   const router = useRouter();
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -75,7 +77,7 @@ export function PasswordForm({ endpoint, t }: PasswordFormProps) {
   }
 
   return (
-    <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
+    <form ref={form} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
       <PasswordInput
         name="currentPassword"
         label={t.current}
@@ -115,7 +117,7 @@ export function PasswordForm({ endpoint, t }: PasswordFormProps) {
         </Alert>
       ) : null}
       <div>
-        <Button type="submit" loading={busy || refreshing}>
+        <Button type="submit" loading={busy || refreshing} disabled={!mounted}>
           {t.submit}
         </Button>
       </div>

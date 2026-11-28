@@ -6,6 +6,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {}, replace() {} }) }));
+// The order button is off until the component has mounted in the browser (lib/use-mounted.ts). Most tests read the form as it is
+// once mounted; the last one says what the server's HTML holds.
+const browser = vi.hoisted(() => ({ mounted: true }));
+vi.mock("@/lib/use-mounted", () => ({ useMounted: () => browser.mounted }));
 
 import { ErrorTextProvider } from "@/lib/i18n/error-text";
 import { common } from "@/lib/i18n/messages/common";
@@ -207,5 +211,19 @@ describe("OrderForm: the ten checked field types are drawn by their own control 
     expect(box).not.toContain("autoCapitalize");
     expect(html).toContain("Device code");
     for (const hint of Object.values(hints)) expect(html).not.toContain(hint);
+  });
+});
+
+describe("before its script has loaded", () => {
+  it("is a post form whose order button is disabled in the server's HTML: the IMEIs and account details never reach the address", () => {
+    browser.mounted = false;
+    try {
+      const html = render();
+      expect(html).toMatch(/<form [^>]*method="post"/);
+      expect(html).not.toMatch(/<form [^>]*action=/);
+      expect(/<button type="submit"[^>]*>/.exec(html)?.[0]).toContain('disabled=""');
+    } finally {
+      browser.mounted = true;
+    }
   });
 });

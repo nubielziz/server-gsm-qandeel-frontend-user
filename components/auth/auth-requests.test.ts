@@ -4,8 +4,10 @@ import { isApiError } from "@/lib/api/errors";
 import {
   changeTemporaryPassword,
   exchangeSignInLink,
+  finishSignUp,
   requestPasswordLink,
   requestSignInLink,
+  requestSignUp,
   setPasswordFromLink,
   submitTotpCode,
   verifyEmailAddress,
@@ -96,6 +98,34 @@ describe("the sign-in link: the claim box rides on the exchange", () => {
     expect(await exchangeSignInLink("x", true)).toEqual({ next: "done", claimedOrders: 0, requestedHere: false, maskedEmail: "" });
   });
 
+  it("passes on whether the password of a sign-up was set, only when the answer says it", async () => {
+    stubFetch(json({ ...answer, passwordSet: false }));
+    expect(await exchangeSignInLink("x", true)).toMatchObject({ passwordSet: false });
+    stubFetch(json({ ...answer, passwordSet: true }));
+    expect(await exchangeSignInLink("x", true)).toMatchObject({ passwordSet: true });
+    // A link of any other kind has no such key: it stays out of the result (the page says nothing about a password).
+    stubFetch(json(answer));
+    expect(await exchangeSignInLink("x", true)).not.toHaveProperty("passwordSet");
+    stubFetch(json({ ...answer, passwordSet: "no" }));
+    expect(await exchangeSignInLink("x", true)).not.toHaveProperty("passwordSet");
+  });
+
+  it("hands on the details of a sign-up link opened in another browser, never anything else of them", async () => {
+    const pendingDetails = { firstName: "Sam", lastName: "Hamdan", country: "JO", phone: "+962791234567" };
+    stubFetch(json({ ...answer, passwordSet: false, pendingDetails: { ...pendingDetails, password: "leaked", extra: 1 } }));
+    const result = await exchangeSignInLink("x", true);
+    expect(result).toMatchObject({ passwordSet: false, pendingDetails });
+    expect(JSON.stringify(result)).not.toContain("leaked");
+    // Malformed details are dropped, not guessed.
+    stubFetch(json({ ...answer, passwordSet: false, pendingDetails: { firstName: "Sam" } }));
+    expect(await exchangeSignInLink("x", true)).not.toHaveProperty("pendingDetails");
+    stubFetch(json({ ...answer, passwordSet: false, pendingDetails: "Sam" }));
+    expect(await exchangeSignInLink("x", true)).not.toHaveProperty("pendingDetails");
+    // A link of any other kind has no such key.
+    stubFetch(json(answer));
+    expect(await exchangeSignInLink("x", true)).not.toHaveProperty("pendingDetails");
+  });
+
   it("refuses an answer with no known step", async () => {
     stubFetch(json({ next: "password", claimedOrders: 0 }));
     await expect(exchangeSignInLink("x", true)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
@@ -111,7 +141,7 @@ describe("the sign-in link: the claim box rides on the exchange", () => {
 });
 
 describe("asking for a link", () => {
-  it("the sign-up and sign-in email link: one route, the Turnstile token, only the email", async () => {
+  it("the sign-in email link: one route, the Turnstile token, only the email", async () => {
     const calls = stubFetch(empty());
     await requestSignInLink("a@example.test", "ts-token");
     expect(calls[0].url).toBe("/store/v1/auth/magic-link");
@@ -127,6 +157,50 @@ describe("asking for a link", () => {
     expect(calls[0].method).toBe("POST");
     expect(calls[0].headers.get("x-turnstile-token")).toBe("ts-token");
     expect(calls[0].body).toEqual({ email: "a@example.test" });
+  });
+});
+
+describe("the sign-up", () => {
+  const body = {
+    email: "a@example.test",
+    password: "Orchard-Lantern-8841",
+    firstName: "Sam",
+    lastName: "Hamdan",
+    country: "JO",
+    phone: "+962791234567",
+  };
+
+  it("posts every detail to the sign-up route, with the Turnstile token and the CSRF handling of the other sign-in routes", async () => {
+    const calls = stubFetch(empty());
+    await requestSignUp(body, "ts-token");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("/store/v1/auth/sign-up");
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].headers.get("x-turnstile-token")).toBe("ts-token");
+    expect(calls[0].headers.get("content-type")).toBe("application/json");
+    expect(calls[0].body).toEqual(body);
+  });
+
+  it("answers nothing for a 204 and keeps the field errors of a 422 on the error", async () => {
+    stubFetch(empty());
+    await expect(requestSignUp(body, "t")).resolves.toBeUndefined();
+    stubFetch(
+      new Response(
+        JSON.stringify({
+          type: "about:blank",
+          title: "Validation failed",
+          status: 422,
+          code: "VALIDATION_FAILED",
+          errors: [{ field: "password", code: "WEAK_PASSWORD", message: "Too weak." }],
+        }),
+        { status: 422, headers: { "content-type": "application/problem+json" } },
+      ),
+    );
+    const error = await requestSignUp(body, "t").catch((e: unknown) => e);
+    expect(isApiError(error) && error.status).toBe(422);
+    expect(isApiError(error) && error.fieldError("password")?.code).toBe("WEAK_PASSWORD");
+    stubFetch(problem(429, "RATE_LIMITED"));
+    expect(await requestSignUp(body, "t").catch((e: unknown) => isApiError(e) && e.status)).toBe(429);
   });
 });
 
@@ -187,5 +261,45 @@ describe("the steps after the password", () => {
     await expect(changeTemporaryPassword("p")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
     stubFetch(empty());
     await expect(changeTemporaryPassword("p")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+});
+
+describe("finishing a sign-up that a link made in another browser", () => {
+  const body = { firstName: "Sam", lastName: "Hamdan", country: "JO", phone: "+962791234567", password: "Orchard-Lantern-8841" };
+
+  it("posts the four details and the password to the finish route with the session's CSRF token, and no Turnstile token", async () => {
+    // The session's token comes from the answer of the exchange that opened it.
+    stubFetch(json({ next: "done", claimedOrders: 0 }, { csrf: "t-9" }));
+    await exchangeSignInLink("x", true);
+    const calls = stubFetch(json({ id: 1, email: "sam@example.com" }));
+    const me = await finishSignUp(body);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("/store/v1/auth/sign-up/finish");
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].body).toEqual(body);
+    expect(calls[0].headers.get("x-csrf-token")).toBe("t-9");
+    expect(calls[0].headers.get("x-turnstile-token")).toBeNull();
+    expect(me).toMatchObject({ email: "sam@example.com" });
+  });
+
+  it("throws the ApiError of a refused call: 422 with its fields, 409 for an account that has a password", async () => {
+    stubFetch(
+      new Response(
+        JSON.stringify({
+          type: "about:blank",
+          title: "x",
+          status: 422,
+          code: "VALIDATION_FAILED",
+          errors: [{ field: "password", code: "WEAK_PASSWORD", message: "Too weak." }],
+        }),
+        { status: 422, headers: { "content-type": "application/problem+json" } },
+      ),
+    );
+    const refused = await finishSignUp(body).catch((e: unknown) => e);
+    expect(isApiError(refused) && refused.status).toBe(422);
+    expect(isApiError(refused) && refused.fieldError("password")?.code).toBe("WEAK_PASSWORD");
+    stubFetch(problem(409, "CONFLICT"));
+    const conflict = await finishSignUp(body).catch((e: unknown) => e);
+    expect(isApiError(conflict) && conflict.status).toBe(409);
   });
 });

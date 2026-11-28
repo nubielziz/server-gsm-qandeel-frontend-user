@@ -34,6 +34,20 @@ export function countryOptions(): CountryOption[] {
   return list;
 }
 
+/**
+ * The countries the shop sells to, as `{ code, name }` sorted by name: the countries of its tax rates (`GET /store/v1/config`
+ * `taxRates`), the same list the account profile offers. While the shop has tax rates in force the server refuses sign-up, the
+ * finish form and the profile for any other country. A shop with no tax rate yet gets every country: the server then accepts any
+ * code of the ISO list (`COUNTRY_CODES`, backend decision 079), so the menu is never empty and never offers a refused country.
+ * Used by the sign-up form, the "finish your account" form and the merchant application (`readShopCountries`).
+ */
+export function shopCountryOptions(taxRates: readonly { country: string }[]): CountryOption[] {
+  const codes = new Set(taxRates.map((rate) => rate.country.toUpperCase()));
+  if (codes.size === 0) return countryOptions();
+  const collator = new Intl.Collator(INTL_LOCALE);
+  return [...codes].map((code) => ({ code, name: countryName(code) })).sort((a, b) => collator.compare(a.name, b.name));
+}
+
 /** One country's name in English ("JO" → "Jordan"); the code itself when unknown or empty. */
 export function countryName(code: string): string {
   if (!code) return "";

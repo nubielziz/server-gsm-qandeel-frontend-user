@@ -8,6 +8,7 @@ import {
   moveAfterSignIn,
   openedAccount,
   outcomeAfterLink,
+  pendingDetailsOf,
   pendingSessionEnded,
 } from "./sign-in-steps";
 
@@ -121,6 +122,7 @@ describe("outcomeAfterLink: when the page stops before going on", () => {
       lines: [],
       move: "finish",
       openedFor: "da•••@example.com",
+      pending: null,
     });
   });
 
@@ -129,6 +131,7 @@ describe("outcomeAfterLink: when the page stops before going on", () => {
       lines: [{ tone: "success", text: "2 guest orders were added to your account." }],
       move: "totp",
       openedFor: "da•••@example.com",
+      pending: null,
     });
   });
 
@@ -137,6 +140,46 @@ describe("outcomeAfterLink: when the page stops before going on", () => {
       lines: [{ tone: "success", text: "1 guest order was added to your account." }],
       move: "finish",
       openedFor: null,
+      pending: null,
+    });
+  });
+
+  const pending = { firstName: "Sam", lastName: "Hamdan", country: "JO", phone: "+962791234567" };
+
+  it("stops to ask for the details of a sign-up link opened in another browser, even with nothing else to tell", () => {
+    expect(outcomeAfterLink({ ...here, passwordSet: false, pendingDetails: pending }, t)).toEqual({
+      lines: [],
+      move: "finish",
+      openedFor: null,
+      pending,
+    });
+  });
+
+  it("says nothing new when the password was set (this browser sent the form), and when the answer has neither key", () => {
+    expect(outcomeAfterLink({ ...here, passwordSet: true }, t)).toBeNull();
+    expect(outcomeAfterLink(here, t)).toBeNull();
+    expect(pendingDetailsOf({ passwordSet: true })).toBeNull();
+    // Even a (wrong) answer that says both: a set password means everything was applied, so there is nothing to confirm.
+    expect(pendingDetailsOf({ passwordSet: true, pendingDetails: pending })).toBeNull();
+    expect(pendingDetailsOf({})).toBeNull();
+  });
+
+  it("asks for nothing when passwordSet is false but there are no details (or they are malformed): the page never invents values", () => {
+    expect(outcomeAfterLink({ ...here, passwordSet: false }, t)).toBeNull();
+    expect(pendingDetailsOf({ passwordSet: false })).toBeNull();
+    expect(pendingDetailsOf({ passwordSet: false, pendingDetails: { firstName: "Sam" } as never })).toBeNull();
+    expect(pendingDetailsOf({ passwordSet: false, pendingDetails: { ...pending, phone: 7 } as never })).toBeNull();
+    expect(pendingDetailsOf({ pendingDetails: pending })).toEqual(pending);
+  });
+
+  it("keeps the account line, the claim lines and the code step next to the details", () => {
+    expect(
+      outcomeAfterLink({ ...here, next: "totp", requestedHere: false, claimedOrders: 2, passwordSet: false, pendingDetails: pending }, t),
+    ).toEqual({
+      lines: [{ tone: "success", text: "2 guest orders were added to your account." }],
+      move: "totp",
+      openedFor: "da•••@example.com",
+      pending,
     });
   });
 });

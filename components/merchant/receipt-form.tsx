@@ -9,6 +9,7 @@ import { api } from "@/lib/api/browser";
 import { isApiError } from "@/lib/api/errors";
 import type { UploadedFile } from "@/lib/api/types";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import { leaveIfSignedOut } from "@/lib/merchant/signed-out";
 import type { TopUpsMessages } from "@/lib/i18n/messages/top-ups";
 import { FileUpload } from "@/components/forms/file-upload";
@@ -30,6 +31,7 @@ export type ReceiptFormProps = {
 export function ReceiptForm({ invoiceId, methods, labels: t, optionalLabel }: ReceiptFormProps) {
   const router = useRouter();
   const errorText = useErrorText();
+  const mounted = useMounted();
   const [file, setFile] = useState<UploadedFile | null>(null);
   const [reference, setReference] = useState("");
   const [gatewayId, setGatewayId] = useState("");
@@ -84,7 +86,7 @@ export function ReceiptForm({ invoiceId, methods, labels: t, optionalLabel }: Re
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-busy={submitting || undefined} className="grid grid-cols-1 gap-5">
+    <form method="post" onSubmit={onSubmit} noValidate aria-busy={submitting || undefined} className="grid grid-cols-1 gap-5">
       {alert ? (
         <Alert tone={alert.tone} title={alert.title}>
           {alert.text}
@@ -139,7 +141,7 @@ export function ReceiptForm({ invoiceId, methods, labels: t, optionalLabel }: Re
         hint={t.referenceHint}
         error={referenceError}
       />
-      <Button type="submit" size="lg" block loading={submitting} aria-label={submitting ? t.sending : undefined}>
+      <Button type="submit" size="lg" block loading={submitting} disabled={!mounted} aria-label={submitting ? t.sending : undefined}>
         {t.submit}
       </Button>
     </form>

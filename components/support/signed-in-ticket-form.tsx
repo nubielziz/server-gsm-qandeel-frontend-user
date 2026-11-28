@@ -14,6 +14,7 @@ import { isApiError } from "@/lib/api/errors";
 import type { ClientTicket, MyTicketCreated, SignedInTicketInput, Ticket } from "@/lib/api/types";
 import { fmt } from "@/lib/i18n/define";
 import { useErrorText } from "@/lib/i18n/error-text";
+import { useMounted } from "@/lib/use-mounted";
 import type { SupportMessages } from "@/lib/i18n/messages/support";
 import { sitePath } from "@/lib/site-path";
 import { createdTicketHref } from "@/lib/support/new-ticket-link";
@@ -41,6 +42,7 @@ export function SignedInTicketForm({ family, t, orders, defaultOrderId = null }:
   const router = useRouter();
   const errorText = useErrorText();
   const form = useRef<HTMLFormElement>(null);
+  const mounted = useMounted();
   const [values, setValues] = useState(() => ({
     subject: "",
     category: "other" as Ticket["category"],
@@ -91,7 +93,7 @@ export function SignedInTicketForm({ family, t, orders, defaultOrderId = null }:
   }
 
   return (
-    <form ref={form} onSubmit={onSubmit} noValidate className="grid gap-5">
+    <form ref={form} method="post" onSubmit={onSubmit} noValidate className="grid gap-5">
       <div className="grid items-start gap-5 sm:grid-cols-[minmax(0,1fr)_14rem]">
         <Input
           name="subject"
@@ -137,7 +139,7 @@ export function SignedInTicketForm({ family, t, orders, defaultOrderId = null }:
       ) : null}
       <FormAlert message={feedback.message} reference={feedback.reference} />
       <div>
-        <Button type="submit" size="lg" loading={busy}>
+        <Button type="submit" size="lg" loading={busy} disabled={!mounted}>
           {t.newForm.submit}
         </Button>
       </div>

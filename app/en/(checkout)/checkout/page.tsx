@@ -159,7 +159,14 @@ async function CheckoutContent({ searchParams }: { searchParams: Promise<SearchP
         form={form}
         fileNotice={fileNotice}
         guestCheckout={config.policies.guestCheckout}
-        signIn={{ title: t.start.signInTitle, text: t.start.signInText, action: t.start.signInAction, href: signInHref }}
+        signIn={{
+          title: t.start.signInTitle,
+          text: t.start.signInText,
+          action: t.start.signInAction,
+          href: signInHref,
+          signUpAction: t.start.signUpAction,
+          signUpHref: p("/sign-up"),
+        }}
         merchant={{ serviceId: service.id, next: nextPath, serviceHref: p(`/services/${encodeURIComponent(service.slug)}`) }}
       />
     </Suspense>
@@ -189,7 +196,8 @@ async function AccountCheckout({
   /** The notice of a file service; null for every other service. */
   fileNotice: ReactNode;
   guestCheckout: boolean;
-  signIn: { title: string; text: string; action: string; href: string };
+  /** The signed-out card: "Sign in" (back to this checkout) and "Create an account" (the sign-up page; a link signs in, it never creates one). */
+  signIn: { title: string; text: string; action: string; href: string; signUpAction: string; signUpHref: string };
   merchant: MerchantCheckoutProps;
 }) {
   const me = await getAccount();
@@ -200,7 +208,18 @@ async function AccountCheckout({
   if (access === "sign-in") {
     return (
       <Card>
-        <EmptyState title={signIn.title} description={signIn.text} action={<ButtonLink href={signIn.href}>{signIn.action}</ButtonLink>} />
+        <EmptyState
+          title={signIn.title}
+          description={signIn.text}
+          action={
+            <div className="flex flex-wrap justify-center gap-3">
+              <ButtonLink href={signIn.href}>{signIn.action}</ButtonLink>
+              <ButtonLink href={signIn.signUpHref} variant="secondary">
+                {signIn.signUpAction}
+              </ButtonLink>
+            </div>
+          }
+        />
       </Card>
     );
   }

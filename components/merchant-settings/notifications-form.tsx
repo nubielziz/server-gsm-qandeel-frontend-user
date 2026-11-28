@@ -132,7 +132,7 @@ export function NotificationsForm({ initial, t, fieldTexts }: Props) {
 
   return (
     <Card as="section">
-      <form ref={formRef} onSubmit={onSubmit} noValidate aria-busy={saving || undefined} className="flex min-w-0 flex-col">
+      <form ref={formRef} method="post" onSubmit={onSubmit} noValidate aria-busy={saving || undefined} className="flex min-w-0 flex-col">
         <CardHeader title={t.title} description={t.description} divided />
         <CardBody className="grid gap-6">
           <ProblemAlert problem={problem} />
