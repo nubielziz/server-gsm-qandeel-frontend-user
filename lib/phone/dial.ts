@@ -133,6 +133,17 @@ export function withCountry(value: string, country: string): string {
   return `+${code}${area ? ` ${area}` : ""} ${national}`;
 }
 
+/**
+ * What the box holds after a change: the new text, unless a whole number (one that starts with + or 00) was pasted or typed after a lone
+ * calling code that the country field or the list had written. Then the number replaces that code, so `+962 ` and a pasted
+ * `+962 79 123 4567` do not end up as two codes in a row.
+ */
+export function typedPhone(before: string, next: string): string {
+  if (before.trim() === "" || !isOnlyDialCode(before) || !next.startsWith(before)) return next;
+  const rest = next.slice(before.length).trimStart();
+  return internationalDigits(rest) !== null ? rest : next;
+}
+
 /** A row of the phone box's list: the country, its name and its calling code as shown (`+962`). */
 export type DialCountryOption = CountryOption & { detail: string };
 

@@ -5,12 +5,13 @@
 // a country writes its calling code before the number (`withCountry`: an old code is replaced, a local number loses its leading 0
 // where that is how the country dials) and puts the caret back in the box. Where several countries share a code (+1, +7, +44) and
 // the number cannot tell yet, the country chosen in this list decides, else `countryHint` (the form's own country field).
-// Nothing is checked here and no digit is rewritten: the form and the server judge the number, and digits typed on an Arabic
+// A whole number pasted after a lone calling code (the one the country field wrote) replaces that code. Otherwise
+// nothing is checked here and no digit is rewritten: the form and the server judge the number, and digits typed on an Arabic
 // keyboard stay as typed (they are read, never replaced: group C). The button only works once the script has loaded.
 import { useId, useRef, useState, type ComponentProps } from "react";
 import { ChevronDown, Globe } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { dialCountryOptions, dialLabel, phoneCountry, withCountry } from "@/lib/phone/dial";
+import { dialCountryOptions, dialLabel, phoneCountry, typedPhone, withCountry } from "@/lib/phone/dial";
 import { useMounted } from "@/lib/use-mounted";
 import { CountryList } from "./country-list";
 import { Field, type FieldControlProps, type FieldMessages } from "./field";
@@ -111,7 +112,8 @@ export function PhoneInput({
         aria-invalid={wiring["aria-invalid"] ?? (error ? true : undefined)}
         disabled={disabled}
         value={value}
-        onChange={(event) => onValueChange(event.target.value)}
+        // A whole number pasted after a lone calling code replaces the code instead of following it (`typedPhone`).
+        onChange={(event) => onValueChange(typedPhone(value, event.target.value))}
         className={cn(controlClasses, "h-11 ps-20", className)}
       />
       <div

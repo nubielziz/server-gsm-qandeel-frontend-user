@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { COUNTRY_CODES } from "@/lib/countries";
 import { CALLING_CODES, SHARED_CODES } from "./dial-data";
-import { dialCountryOptions, dialLabel, internationalDigits, isOnlyDialCode, phoneCountry, searchCountries, withCountry } from "./dial";
+import { dialCountryOptions, dialLabel, internationalDigits, isOnlyDialCode, phoneCountry, searchCountries, typedPhone, withCountry } from "./dial";
 
 describe("the calling-code data", () => {
   it("has a code for every country of the list, apart from the seven that have no numbering", () => {
@@ -137,6 +137,21 @@ describe("withCountry", () => {
     const value = withCountry("0791234567", "JO");
     expect(phoneCountry(value)).toBe("JO");
     expect(value.replace(/\s/g, "")).toMatch(/^\+\d{7,15}$/);
+  });
+});
+
+describe("typedPhone", () => {
+  it("lets a whole number replace a lone calling code the form wrote (a paste after choosing a country)", () => {
+    expect(typedPhone("+962 ", "+962 +962 79 123 4567")).toBe("+962 79 123 4567");
+    expect(typedPhone("+962 ", "+962 0044 20 7946 0000")).toBe("0044 20 7946 0000");
+    expect(typedPhone("+1 242 ", "+1 242 +1 242 555 0100")).toBe("+1 242 555 0100");
+  });
+
+  it("keeps ordinary typing as it is", () => {
+    expect(typedPhone("+962 ", "+962 7")).toBe("+962 7");
+    expect(typedPhone("", "+962")).toBe("+962");
+    expect(typedPhone("+962 79", "+962 79 +1")).toBe("+962 79 +1");
+    expect(typedPhone("+962 ", "+96")).toBe("+96");
   });
 });
 

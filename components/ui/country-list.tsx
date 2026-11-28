@@ -38,8 +38,9 @@ export function CountryList({ id, labelledBy, rows, selected, initialQuery = "",
   const ui = useUiText();
   const [query, setQuery] = useState(initialQuery);
   const shown = useMemo(() => searchCountries(rows, query), [rows, query]);
-  // The marked row, by its place in the shown rows. It starts on the chosen country.
-  const [marked, setMarked] = useState(() => Math.max(0, shown.findIndex((row) => row.code === selected)));
+  // The marked row, by its place in the shown rows. It starts on the chosen country; a list opened by a typed letter starts on its best
+  // answer, the first row, so Enter chooses what the letter found.
+  const [marked, setMarked] = useState(() => (initialQuery === "" ? Math.max(0, shown.findIndex((row) => row.code === selected)) : 0));
   const search = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
   const at = Math.min(marked, shown.length - 1);
